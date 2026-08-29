@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PackyWiki — Wikipedia Pack Opener</title>
+    <meta
+      name="description"
+      content="Open booster packs of real Wikipedia articles as collectible trading cards."
+    />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <!-- Full-screen white-out used for high-rarity reveals. -->
+    <div id="flash" class="flash" aria-hidden="true"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark">🃏</span>
+        <div>
+          <h1>PackyWiki</h1>
+          <p class="brand-sub">Wikipedia, by the booster pack.</p>
+        </div>
+      </div>
+      <div class="topbar-actions">
+        <span class="debug-chip" title="No cooldown in this build — open packs back to back.">
+          debug build · no cooldown
+        </span>
+        <button id="odds-button" class="ghost-button" type="button">Odds</button>
+        <button
+          id="mute-button"
+          class="ghost-button"
+          type="button"
+          aria-pressed="false"
+          title="Toggle sound"
+        >
+          🔊 Sound
+        </button>
+      </div>
+    </header>
+
+    <main>
+      <!-- SCREEN 1: choose a pack ------------------------------------------->
+      <section id="screen-select" class="screen is-active">
+        <h2 class="screen-title">Choose a pack</h2>
+        <div id="pack-grid" class="pack-grid"><!-- built from PACKS --></div>
+      </section>
+
+      <!-- SCREEN 2: the idle pack, then the rip ------------------------------>
+      <section id="screen-open" class="screen">
+        <button id="back-button" class="ghost-button back-button" type="button">← Back</button>
+        <div class="open-stage">
+          <div id="pack-visual" class="pack-visual">
+            <div class="pack-body">
+              <div class="pack-foil"></div>
+              <div class="pack-seam" aria-hidden="true"></div>
+              <div class="pack-label">
+                <span class="pack-visual-icon"></span>
+                <span class="pack-visual-name"></span>
+                <span class="pack-visual-count"></span>
+              </div>
+            </div>
+            <div class="pack-shadow" aria-hidden="true"></div>
+          </div>
+          <p id="open-status" class="open-status" role="status" aria-live="polite"></p>
+          <button id="open-button" class="primary-button" type="button">Open Pack</button>
+        </div>
+      </section>
+
+      <!-- SCREEN 3: the pulls ------------------------------------------------>
+      <section id="screen-reveal" class="screen">
+        <div class="reveal-head">
+          <h2 id="reveal-title" class="screen-title"></h2>
+          <p class="reveal-hint">Click any card to flip it over.</p>
+        </div>
+        <div id="card-row" class="card-row"><!-- built per pack --></div>
+        <div id="reveal-actions" class="reveal-actions">
+          <button id="again-button" class="primary-button" type="button">Open Another</button>
+          <button id="change-pack-button" class="ghost-button" type="button">Change Pack</button>
+        </div>
+      </section>
+    </main>
+
+    <!-- Odds table, generated from the rarity table -------------------------->
+    <div id="odds-modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="odds-heading">
+        <div class="modal-head">
+          <h2 id="odds-heading">Pull rates</h2>
+          <button id="odds-close" class="ghost-button" type="button">Close</button>
+        </div>
+        <table id="odds-table" class="odds-table">
+          <thead>
+            <tr><th>Rarity</th><th>Odds</th><th>Card treatment</th></tr>
+          </thead>
+          <tbody><!-- built from RARITIES --></tbody>
+        </table>
+        <p class="modal-note">
+          Rarity is rolled per card, independently of which article you draw.
+        </p>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
