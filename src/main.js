@@ -181,6 +181,12 @@ function renderCustomPacks() {
 }
 
 function renderCustomKinds() {
+  // The form's accent follows the selected kind rather than whichever pack
+  // happened to be opened last.
+  const active = customKindById(state.customKind);
+  el.customForm.style.setProperty('--accent', active.accent);
+  el.customForm.style.setProperty('--accent2', active.accent2);
+
   el.customKinds.replaceChildren(
     ...CUSTOM_KINDS.map((kind) => {
       const button = document.createElement('button');
