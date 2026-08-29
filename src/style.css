@@ -815,7 +815,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   grid-template-columns: repeat(3, 1fr);
   justify-content: center;
   gap: 16px 12px;
-  max-width: 460px;   /* three per row, whatever the pack size */
+  max-width: 600px;   /* three per row, at a size the card can actually fill */
   margin: 0 auto;
   padding: 8px clamp(14px, 3vw, 24px) 0;
 }
@@ -827,6 +827,12 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   width: 100%;
   animation: summary-in 0.5s var(--ease-back) backwards;
 }
+/* Three to a row leaves a narrow card, so the summary is a glance: artwork,
+   title, price, tier. The full text is one tap away in the detail view. */
+.card.summary-card .card-extract,
+.card.summary-card .card-views { display: none; }
+.card.summary-card .card-art { height: 48%; }
+.card.summary-card .card-body { padding-bottom: 0; }
 @keyframes summary-in {
   from { opacity: 0; transform: translateY(18px) scale(0.9); }
   to { opacity: 1; transform: none; }
