@@ -189,6 +189,67 @@ class Synth {
     this.#noise({ at: 0, dur: 0.16, gain: 0.16, from: 2600, to: 700, q: 1.2 });
   }
 
+  /** Small UI click — tabs, filters, opening a card. */
+  playTap() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 880, type: 'sine', at: 0, dur: 0.07, gain: 0.06 });
+    this.#noise({ at: 0, dur: 0.05, gain: 0.05, type: 'highpass', from: 3000, to: 5200 });
+  }
+
+  /** A panel sliding in or out. */
+  playWhoosh(up = true) {
+    if (!this.ensure() || this.muted) return;
+    this.#noise({
+      at: 0, dur: 0.28, gain: 0.09, type: 'bandpass',
+      from: up ? 400 : 2600, to: up ? 2600 : 400, q: 0.9
+    });
+  }
+
+  /** Coins landing — selling a card. */
+  playCoins() {
+    if (!this.ensure() || this.muted) return;
+    this.resume();
+    const notes = [1046, 1318, 1568];
+    notes.forEach((freq, i) => {
+      this.#tone({ freq, type: 'triangle', at: i * 0.045, dur: 0.28, gain: 0.11, send: 0.18 });
+      this.#tone({ freq: freq * 2, type: 'sine', at: i * 0.045, dur: 0.16, gain: 0.05, send: 0.2 });
+    });
+    for (let i = 0; i < 5; i++) {
+      this.#noise({
+        at: 0.02 + Math.random() * 0.2, dur: 0.05, gain: 0.05,
+        type: 'bandpass', from: 4000 + Math.random() * 3500, to: 6500, q: 4
+      });
+    }
+  }
+
+  /** A purchase going through — heavier and more final than a sale. */
+  playPurchase() {
+    if (!this.ensure() || this.muted) return;
+    this.resume();
+    this.#tone({ freq: 392, type: 'triangle', at: 0, dur: 0.32, gain: 0.14, send: 0.2 });
+    this.#tone({ freq: 587, type: 'triangle', at: 0.08, dur: 0.34, gain: 0.13, send: 0.22 });
+    this.#tone({ freq: 784, type: 'sine', at: 0.16, dur: 0.5, gain: 0.12, send: 0.3 });
+    this.#noise({ at: 0, dur: 0.18, gain: 0.07, type: 'bandpass', from: 1800, to: 600, q: 1.5 });
+  }
+
+  /** Refused — not enough Buckarooz. */
+  playDenied() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 220, type: 'square', at: 0, dur: 0.13, gain: 0.09 });
+    this.#tone({ freq: 165, type: 'square', at: 0.11, dur: 0.2, gain: 0.09 });
+  }
+
+  /** Starter kit / restock bonus. */
+  playFanfare() {
+    if (!this.ensure() || this.muted) return;
+    this.resume();
+    [523, 659, 784, 1046].forEach((freq, i) => {
+      this.#tone({ freq, type: 'triangle', at: i * 0.1, dur: 0.7, gain: 0.13, send: 0.35 });
+    });
+    this.#tone({ freq: 261, type: 'sine', at: 0, dur: 1.1, gain: 0.12, send: 0.2 });
+    this.#noise({ at: 0.28, dur: 0.8, gain: 0.045, type: 'highpass', from: 5000, to: 11000, send: 0.4 });
+  }
+
   /**
    * Reveal chime. `rank` is the rarity's index in the rarity table (0-9);
    * higher ranks get more partials, a longer tail, sub-bass, a shimmer sweep
@@ -198,9 +259,10 @@ class Synth {
     if (!this.ensure() || this.muted) return;
     this.resume();
 
-    const tier = Math.max(0, Math.min(9, rank));
+    // Eight tiers, spread across the same dynamic range the ten used to cover.
+    const tier = Math.max(0, Math.min(7, rank)) * (9 / 7);
     const root = midiToFreq(-9 + tier); // climbs a semitone per tier
-    const partials = 2 + Math.floor(tier / 2); // 2 -> 6 notes
+    const partials = 2 + Math.min(5, Math.floor(tier / 2)); // 2 -> 7 notes
     const spacing = 0.075 - tier * 0.004;
     const tail = 0.45 + tier * 0.22;
     const send = 0.06 + tier * 0.07;

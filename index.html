@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>PackyWiki — Wikipedia Pack Opener</title>
+    <title>PackyWiki</title>
     <meta name="description" content="Open booster packs of real Wikipedia articles as collectible trading cards." />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='14' y='8' width='36' height='48' rx='6' fill='%230f1220' stroke='%23f8fafc' stroke-width='3'/><path fill='%23fbbf24' d='M32 18 35.4 27.3 45.3 27.7 37.5 33.8 40.2 43.3 32 37.8 23.8 43.3 26.5 33.8 18.7 27.7 28.6 27.3Z'/></svg>" />
     <link rel="stylesheet" href="/src/style.css" />
@@ -16,82 +16,91 @@
         <span class="brand-mark" id="brand-mark"></span>
         <div class="brand-text">
           <h1>PackyWiki</h1>
-          <p class="brand-sub">Wikipedia, by the booster pack.</p>
+          <p class="brand-sub" id="brand-sub"></p>
         </div>
       </div>
 
-      <nav class="tabs" aria-label="Sections">
-        <button class="tab is-active" data-tab="packs" type="button">Packs</button>
+      <nav class="tabs" id="tabs" aria-label="Sections">
+        <button class="tab is-active" data-tab="boosters" type="button"><span class="tab-label"></span></button>
+        <button class="tab" data-tab="custom" type="button"><span class="tab-label"></span></button>
+        <button class="tab" data-tab="shop" type="button"><span class="tab-label"></span></button>
         <button class="tab" data-tab="collection" type="button">
-          Collection <span class="tab-count" id="tab-count">0</span>
+          <span class="tab-label"></span><span class="tab-count" id="tab-count">0</span>
         </button>
       </nav>
 
       <div class="topbar-actions">
-        <button id="odds-button" class="ghost-button" type="button">Odds</button>
-        <button id="mute-button" class="ghost-button" type="button" aria-pressed="false" title="Toggle sound">
-          <span id="mute-label">Sound on</span>
-        </button>
+        <span class="wallet" id="wallet" title="Buckarooz"></span>
+        <button id="odds-button" class="ghost-button" type="button"></button>
+        <button id="mute-button" class="ghost-button" type="button" aria-pressed="false"></button>
       </div>
     </header>
 
     <main>
-      <!-- SCREEN: booster shelf (horizontal, swipeable) --------------------->
-      <section id="screen-packs" class="screen is-active">
+      <!-- SCREEN: owned boosters ------------------------------------------->
+      <section id="screen-boosters" class="screen is-active">
         <div class="rail-wrap">
-          <button class="rail-arrow is-prev" id="rail-prev" type="button" aria-label="Previous pack">‹</button>
-          <div class="pack-rail" id="pack-rail" role="listbox" aria-label="Booster packs" tabindex="0"></div>
-          <button class="rail-arrow is-next" id="rail-next" type="button" aria-label="Next pack">›</button>
+          <button class="rail-arrow is-prev" id="rail-prev" type="button" aria-label="Previous">‹</button>
+          <div class="pack-rail" id="pack-rail" role="listbox" tabindex="0"></div>
+          <button class="rail-arrow is-next" id="rail-next" type="button" aria-label="Next">›</button>
         </div>
-
-        <div class="rail-caption">
+        <div class="rail-caption" id="rail-caption">
           <h2 class="rail-name" id="rail-name"></h2>
           <p class="rail-tagline" id="rail-tagline"></p>
-          <button id="rail-open" class="primary-button" type="button">Open pack</button>
-          <p class="rail-hint">Swipe the shelf to browse.</p>
+          <p class="rail-owned" id="rail-owned"></p>
+          <button id="rail-open" class="primary-button" type="button"></button>
+          <p class="rail-hint" id="rail-hint"></p>
         </div>
-
-        <section class="custom-section">
-          <h2 class="section-title">Custom boosters</h2>
-          <p class="section-note">
-            Name a game, book or show and PackyWiki finds that subject's own wiki,
-            then builds a booster entirely out of it.
-          </p>
-          <form id="custom-form" class="custom-form" autocomplete="off">
-            <div class="custom-kinds" id="custom-kinds" role="radiogroup" aria-label="Custom pack type"></div>
-            <div class="custom-row">
-              <input id="custom-input" class="custom-input" type="text" placeholder="e.g. Terraria"
-                     aria-label="Subject name" maxlength="60" />
-              <button id="custom-submit" class="primary-button small" type="submit">Create</button>
-            </div>
-            <p id="custom-status" class="custom-status" role="status" aria-live="polite"></p>
-          </form>
-        </section>
+        <p class="empty-note" id="boosters-empty" hidden></p>
       </section>
 
-      <!-- SCREEN: open + reveal (one screen, three phases) ------------------>
-      <!-- Kept as a single screen so the cards can fly out of the pack and
-           settle into the stack without a screen swap or a loading gap. -->
-      <section id="screen-open" class="screen phase-idle">
-        <button id="back-button" class="ghost-button back-button" type="button">← All packs</button>
+      <!-- SCREEN: custom boosters ------------------------------------------>
+      <section id="screen-custom" class="screen">
+        <div class="rail-wrap">
+          <div class="pack-rail" id="custom-rail" role="listbox" tabindex="0"></div>
+        </div>
+        <div class="rail-caption" id="custom-caption">
+          <h2 class="rail-name" id="custom-name"></h2>
+          <p class="rail-tagline" id="custom-tagline"></p>
+          <p class="rail-owned" id="custom-owned"></p>
+          <button id="custom-open" class="primary-button" type="button"></button>
+        </div>
+        <p class="empty-note" id="custom-empty" hidden></p>
 
+        <form id="custom-form" class="custom-form" autocomplete="off">
+          <p class="section-note" id="custom-intro"></p>
+          <div class="custom-row">
+            <input id="custom-input" class="custom-input" type="text" maxlength="60" aria-label="Subject" />
+            <button id="custom-submit" class="primary-button small" type="submit"></button>
+          </div>
+          <p id="custom-status" class="custom-status" role="status" aria-live="polite"></p>
+        </form>
+      </section>
+
+      <!-- SCREEN: shop ----------------------------------------------------->
+      <section id="screen-shop" class="screen">
+        <div class="shop-head">
+          <p class="section-note" id="shop-intro"></p>
+          <span class="restock" id="restock"></span>
+        </div>
+        <div id="shop-rows" class="shop-rows"></div>
+      </section>
+
+      <!-- SCREEN: open + reveal (one screen, four phases) ------------------->
+      <section id="screen-open" class="screen phase-idle">
+        <button id="back-button" class="ghost-button back-button" type="button"></button>
         <div class="open-head">
           <h2 class="open-title" id="open-title"></h2>
           <p class="open-progress" id="open-progress"></p>
         </div>
-
         <div class="open-stage" id="open-stage">
           <div class="booster-slot" id="booster-slot"></div>
           <div class="card-stack" id="card-stack"></div>
         </div>
-
-        <!-- Every card in the pack, shown together once the last one is turned. -->
-        <div id="pack-summary" class="pack-summary" aria-label="Everything in this pack"></div>
-
+        <div id="pack-summary" class="pack-summary"></div>
         <p id="open-hint" class="open-hint"></p>
-
         <div id="reveal-actions" class="reveal-actions">
-          <button id="back-to-shelf" class="primary-button" type="button">Back</button>
+          <button id="back-to-shelf" class="primary-button" type="button"></button>
         </div>
       </section>
 
@@ -99,17 +108,25 @@
       <section id="screen-collection" class="screen">
         <div class="collection-stats" id="collection-stats"></div>
 
-        <div class="filters" id="filters">
-          <input id="filter-search" class="filter-input" type="search" placeholder="Search titles…" aria-label="Search titles" />
-          <select id="filter-pack" class="filter-select" aria-label="Filter by pack"></select>
-          <select id="filter-rarity" class="filter-select" aria-label="Filter by rarity"></select>
-          <select id="filter-band" class="filter-select" aria-label="Filter by popularity"></select>
-          <select id="filter-price" class="filter-select" aria-label="Filter by minimum price"></select>
-          <select id="filter-sort" class="filter-select" aria-label="Sort"></select>
-          <button id="filter-fav" class="chip-toggle" type="button" aria-pressed="false">
-            <span class="chip-star"></span> Favourites
+        <div class="filter-bar">
+          <button id="filter-toggle" class="ghost-button filter-toggle" type="button" aria-expanded="false">
+            <span class="filter-icon" id="filter-icon"></span>
+            <span id="filter-toggle-label"></span>
           </button>
-          <button id="filter-reset" class="ghost-button" type="button">Reset</button>
+          <span class="filter-summary" id="filter-summary"></span>
+        </div>
+
+        <div class="filters" id="filters" hidden>
+          <input id="filter-search" class="filter-input" type="search" />
+          <select id="filter-pack" class="filter-select"></select>
+          <select id="filter-rarity" class="filter-select"></select>
+          <select id="filter-band" class="filter-select"></select>
+          <select id="filter-price" class="filter-select"></select>
+          <select id="filter-sort" class="filter-select"></select>
+          <button id="filter-fav" class="chip-toggle" type="button" aria-pressed="false">
+            <span class="chip-star"></span><span id="filter-fav-label"></span>
+          </button>
+          <button id="filter-reset" class="ghost-button" type="button"></button>
         </div>
 
         <p id="collection-empty" class="empty-note" hidden></p>
@@ -117,24 +134,55 @@
       </section>
     </main>
 
-    <!-- Odds ------------------------------------------------------------->
+    <!-- Card detail ------------------------------------------------------->
+    <div id="card-modal" class="modal card-modal" hidden>
+      <div class="card-modal-inner" role="dialog" aria-modal="true" aria-label="Card">
+        <button id="card-modal-close" class="modal-x" type="button" aria-label="Close"></button>
+        <div class="card-detail" id="card-detail"></div>
+        <div class="card-detail-side">
+          <h2 class="detail-title" id="detail-title"></h2>
+          <p class="detail-sub" id="detail-sub"></p>
+          <div class="detail-facts" id="detail-facts"></div>
+          <div class="detail-scroll" id="detail-extract"></div>
+          <div class="detail-actions">
+            <a id="detail-read" class="ghost-button" target="_blank" rel="noopener noreferrer"></a>
+            <button id="detail-sell" class="sell-button" type="button" hidden></button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Odds -------------------------------------------------------------->
     <div id="odds-modal" class="modal" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="odds-heading">
         <div class="modal-head">
-          <h2 id="odds-heading">Pull rates</h2>
-          <button id="odds-close" class="ghost-button" type="button">Close</button>
+          <h2 id="odds-heading"></h2>
+          <button id="odds-close" class="ghost-button" type="button"></button>
         </div>
-        <p class="modal-note top">
-          Rarity is rolled per card. Every article has the same chance at every
-          tier — how many people read it changes what the card is worth, not how
-          rare it is.
-        </p>
+        <p class="modal-note top" id="odds-note"></p>
         <table class="odds-table">
-          <thead><tr><th>Rarity</th><th>Chance</th></tr></thead>
+          <thead><tr><th id="odds-h1"></th><th id="odds-h2"></th></tr></thead>
           <tbody id="odds-body"></tbody>
         </table>
       </div>
     </div>
+
+    <!-- First run --------------------------------------------------------->
+    <div id="welcome-modal" class="modal" hidden>
+      <div class="modal-card welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
+        <h2 id="welcome-title"></h2>
+        <p class="modal-note top" id="welcome-body"></p>
+        <div class="lang-choices" id="lang-choices"></div>
+        <div class="starter-panel" id="starter-panel" hidden>
+          <h3 id="starter-title"></h3>
+          <p class="modal-note top" id="starter-body"></p>
+          <div class="starter-loot" id="starter-loot"></div>
+          <button id="starter-go" class="primary-button" type="button"></button>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast" class="toast" hidden></div>
 
     <script type="module" src="/src/main.js"></script>
   </body>

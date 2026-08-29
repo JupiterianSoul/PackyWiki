@@ -280,16 +280,16 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 
 .booster-face {
   position: absolute;
-  /* Starts below the tear strip (15%) so the logo isn't bisected by the rip. */
-  inset: 19% 0 20px;
+  /* Starts just under the tear strip (15%): with the logo gone the photo can
+     sit higher and take more of the pack. */
+  inset: 17% 0 18px;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 8px 16px 0;
+  gap: 10px;
+  padding: 6px 15px 0;
 }
-.booster-logo { color: rgba(255, 255, 255, 0.86); flex: none; }
 
 /* Real photograph, not a symbol. */
 .booster-photo {
@@ -528,6 +528,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 .card-stack {
   position: relative;
   z-index: 2;
+  transform-style: preserve-3d;
   width: var(--card-w);
   height: calc(var(--card-w) * 1.4);
   touch-action: none;
@@ -619,23 +620,42 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   -webkit-backface-visibility: hidden;
 }
 
+/* The back is dressed in the booster's own colours and icon, so a card looks
+   like it came from the pack it came from. It carries no rarity. */
 .card-back {
   transform: rotateY(180deg);
   display: grid;
   place-items: center;
-  color: #93a3c9;
+  color: rgba(255, 255, 255, 0.9);
   background:
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 10px, transparent 10px 20px),
-    linear-gradient(150deg, #2b3350, #141826 70%);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 0 60px rgba(0, 0, 0, 0.6);
+    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.06) 0 10px, transparent 10px 20px),
+    radial-gradient(120% 90% at 50% 0%,
+      color-mix(in srgb, var(--back-accent, #2b3350) 70%, #000) 0%,
+      var(--back-accent2, #141826) 62%,
+      #0a0d16 100%);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18), inset 0 0 60px rgba(0, 0, 0, 0.55);
 }
 .collection-card .card-back { display: none; }
-.back-logo { animation: back-breathe 2.6s ease-in-out infinite; }
-@keyframes back-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.06); opacity: 1; }
+.back-icon {
+  display: grid;
+  place-items: center;
+  width: 84px; height: 84px;
+  border-radius: 22px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  animation: back-breathe 2.8s ease-in-out infinite;
 }
-.back-art { position: absolute; inset: 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14); }
+@keyframes back-breathe {
+  0%, 100% { transform: scale(1); opacity: 0.86; }
+  50% { transform: scale(1.05); opacity: 1; }
+}
+.back-art {
+  position: absolute;
+  inset: 11px;
+  border-radius: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+}
 /* Shown only if a card is swiped before its data has landed. */
 .card-back::after {
   content: "";
@@ -786,25 +806,25 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   pointer-events: none;
   opacity: 0;
 }
-.card.is-revealed .fx { opacity: 1; }
+/* `.is-lit` is set on a revealed card and on a rarity booster. */
+.is-lit .fx { opacity: 1; }
 
 /* Once the last card is turned, the whole pack is laid out together. */
 .pack-summary {
   display: none;
-  flex-wrap: wrap;
+  grid-template-columns: repeat(3, 1fr);
   justify-content: center;
-  gap: 18px 14px;
-  max-width: 960px;   /* five 172px cards plus gaps fit on one row */
+  gap: 16px 12px;
+  max-width: 460px;   /* three per row, whatever the pack size */
   margin: 0 auto;
-  padding: 8px clamp(14px, 3vw, 30px) 0;
+  padding: 8px clamp(14px, 3vw, 24px) 0;
 }
-#screen-open.phase-summary .pack-summary { display: flex; }
+#screen-open.phase-summary .pack-summary { display: grid; }
 #screen-open.phase-summary .open-stage { display: none; }
 /* .card.summary-card, not .summary-card: .collection-card sets width:100%
    later in this file and would otherwise win on source order. */
 .card.summary-card {
-  width: 172px;
-  flex: none;
+  width: 100%;
   animation: summary-in 0.5s var(--ease-back) backwards;
 }
 @keyframes summary-in {
@@ -844,7 +864,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
     rgba(255, 255, 255, 0.3) 48%, transparent 60%);
   mix-blend-mode: screen;
 }
-.card.is-revealed[data-rarity="uncommon"] .fx-a { animation: sheen-sweep 3.6s ease-in-out infinite; }
+.is-lit[data-rarity="uncommon"] .fx-a { animation: sheen-sweep 3.6s ease-in-out infinite; }
 @keyframes sheen-sweep {
   0% { transform: translateX(-115%); }
   55%, 100% { transform: translateX(115%); }
@@ -856,7 +876,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
     inset 0 0 0 2px color-mix(in srgb, var(--rarity) 75%, transparent),
     inset 0 0 30px color-mix(in srgb, var(--rarity) 40%, transparent);
 }
-.card.is-revealed[data-rarity="rare"] .fx-a { animation: edge-breathe 2.6s ease-in-out infinite; }
+.is-lit[data-rarity="rare"] .fx-a { animation: edge-breathe 2.6s ease-in-out infinite; }
 @keyframes edge-breathe {
   0%, 100% { opacity: 0.4; }
   50% { opacity: 1; }
@@ -866,7 +886,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
     color-mix(in srgb, var(--rarity) 55%, transparent) 50%, transparent 58%);
   mix-blend-mode: screen;
 }
-.card.is-revealed[data-rarity="rare"] .fx-b { animation: scan-down 3.8s linear infinite; }
+.is-lit[data-rarity="rare"] .fx-b { animation: scan-down 3.8s linear infinite; }
 @keyframes scan-down {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(100%); }
@@ -880,7 +900,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   mix-blend-mode: color-dodge;
   filter: blur(9px);
 }
-.card.is-revealed[data-rarity="epic"] .fx-a { animation: blob-drift 6s ease-in-out infinite alternate; }
+.is-lit[data-rarity="epic"] .fx-a { animation: blob-drift 6s ease-in-out infinite alternate; }
 @keyframes blob-drift {
   0% { transform: translate(-6%, 4%) scale(1.05); opacity: 0.55; }
   100% { transform: translate(6%, -4%) scale(1.2); opacity: 1; }
@@ -888,7 +908,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 [data-rarity="epic"] .fx-b {
   box-shadow: inset 0 0 34px color-mix(in srgb, var(--rarity) 45%, transparent);
 }
-.card.is-revealed[data-rarity="epic"] .fx-b { animation: edge-breathe 2.1s ease-in-out infinite; }
+.is-lit[data-rarity="epic"] .fx-b { animation: edge-breathe 2.1s ease-in-out infinite; }
 
 /* --- 5. Legendary — rotating light rays ---------------------------------- */
 [data-rarity="legendary"] .fx-a {
@@ -898,7 +918,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   mix-blend-mode: color-dodge;
   filter: blur(2px);
 }
-.card.is-revealed[data-rarity="legendary"] .fx-a {
+.is-lit[data-rarity="legendary"] .fx-a {
   animation: rays-spin 15s linear infinite, rays-breathe 3.2s ease-in-out infinite;
 }
 @keyframes rays-spin { to { transform: rotate(360deg) scale(2.2); } }
@@ -910,7 +930,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   background: radial-gradient(58% 44% at 50% 38%, rgba(255, 240, 190, 0.4), transparent 72%);
   mix-blend-mode: screen;
 }
-.card.is-revealed[data-rarity="legendary"] .fx-b { animation: edge-breathe 2.4s ease-in-out infinite; }
+.is-lit[data-rarity="legendary"] .fx-b { animation: edge-breathe 2.4s ease-in-out infinite; }
 
 /* --- 6. Mythic — the card is on fire ------------------------------------ */
 /* Flames climb the inside of the card. fx-b rides above the text so the fire
@@ -925,7 +945,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   filter: blur(6px);
   transform-origin: 50% 100%;
 }
-.card.is-revealed[data-rarity="mythic"] .fx-a { animation: flame-lick 0.46s ease-in-out infinite alternate; }
+.is-lit[data-rarity="mythic"] .fx-a { animation: flame-lick 0.46s ease-in-out infinite alternate; }
 @keyframes flame-lick {
   0% { transform: translateY(0) scaleY(1) scaleX(1); opacity: 0.78; }
   100% { transform: translateY(-10px) scaleY(1.2) scaleX(0.94); opacity: 1; }
@@ -938,7 +958,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   background-size: 41px 120px, 67px 150px;
   mix-blend-mode: screen;
 }
-.card.is-revealed[data-rarity="mythic"] .fx-b {
+.is-lit[data-rarity="mythic"] .fx-b {
   animation: ember-rise 3.2s linear infinite, twinkle 0.9s ease-in-out infinite;
 }
 @keyframes ember-rise {
@@ -960,7 +980,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   mix-blend-mode: color-dodge;
   filter: blur(3px) saturate(1.7);
 }
-.card.is-revealed[data-rarity="exotic"] .fx-a { animation: holo-shift 3.4s linear infinite; }
+.is-lit[data-rarity="exotic"] .fx-a { animation: holo-shift 3.4s linear infinite; }
 @keyframes holo-shift {
   0% { background-position: 0% 0%; filter: blur(3px) saturate(1.7) hue-rotate(0deg); }
   100% { background-position: 200% 200%; filter: blur(3px) saturate(1.7) hue-rotate(360deg); }
@@ -969,7 +989,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.8) 46%, transparent 60%);
   mix-blend-mode: screen;
 }
-.card.is-revealed[data-rarity="exotic"] .fx-b { animation: sheen-sweep 2.2s ease-in-out infinite; }
+.is-lit[data-rarity="exotic"] .fx-b { animation: sheen-sweep 2.2s ease-in-out infinite; }
 
 /* --- 8. Artifact — full iridescent burst -------------------------------- */
 [data-rarity="artifact"] .card-front {
@@ -986,7 +1006,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   filter: blur(4px) saturate(1.6);
   opacity: 0.7;
 }
-.card.is-revealed[data-rarity="artifact"] .fx-a {
+.is-lit[data-rarity="artifact"] .fx-a {
   animation: artifact-burst 8s linear infinite, rays-breathe 2s ease-in-out infinite;
 }
 @keyframes artifact-burst {
@@ -1001,7 +1021,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   background-size: 44px 58px, 73px 51px;
   mix-blend-mode: screen;
 }
-.card.is-revealed[data-rarity="artifact"] .fx-b {
+.is-lit[data-rarity="artifact"] .fx-b {
   animation: sparkle-drift 3.6s linear infinite, twinkle 0.7s ease-in-out infinite;
 }
 @keyframes sparkle-drift {
@@ -1191,4 +1211,300 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
     animation-iteration-count: 1 !important;
     transition-duration: 0.05s !important;
   }
+}
+
+/* ==========================================================================
+   9. Wallet, shop, ownership, card detail, first run
+   ========================================================================== */
+
+.wallet {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #86efac;
+  border: 1px solid rgba(134, 239, 172, 0.35);
+  background: rgba(34, 197, 94, 0.1);
+  font-variant-numeric: tabular-nums;
+}
+.tab-label { pointer-events: none; }
+
+/* --- owned boosters ------------------------------------------------------ */
+.rail-owned { font-size: 0.82rem; color: var(--accent); font-weight: 700; }
+.own-badge {
+  position: absolute;
+  top: 4px; right: 10px;
+  z-index: 6;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  color: #0b0d14;
+  background: #e2e8f0;
+  box-shadow: 0 4px 12px -4px #000;
+}
+.rail-item { position: relative; }
+
+/* --- shop ---------------------------------------------------------------- */
+#screen-shop { padding: 0 clamp(14px, 3vw, 36px); }
+.shop-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.restock {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  padding: 6px 13px;
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+.shop-rows { display: grid; gap: 30px; }
+.shop-row-title {
+  font-size: 1rem;
+  letter-spacing: -0.01em;
+  margin-bottom: 12px;
+}
+.shop-shelf {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  padding: 4px 2px 14px;
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.shop-item {
+  flex: none;
+  scroll-snap-align: start;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+/* A booster wears its tier as an effect, but the pack art still has to read
+   through it — cards get the full-strength version. */
+.booster .fx { opacity: 0.5; }
+.booster[data-rarity="mythic"] .fx-a,
+.booster[data-rarity="artifact"] .fx-a { opacity: 0.42; }
+
+.booster.is-small { --pack-w: 132px; --pack-h: 238px; width: 132px; height: 238px; }
+.booster.is-tiny { --pack-w: 92px; --pack-h: 166px; width: 92px; height: 166px; }
+.booster.is-small .booster-name { font-size: 0.72rem; }
+.booster.is-small .booster-count { font-size: 0.52rem; letter-spacing: 0.1em; padding: 2px 8px; }
+.booster.is-small .booster-crimp, .booster.is-tiny .booster-crimp { height: 11px; }
+.booster.is-tiny .booster-banner, .booster.is-tiny .booster-count { display: none; }
+
+.buy-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  width: 132px;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 12%, rgba(0, 0, 0, 0.4));
+  color: var(--text);
+  transition: transform 0.16s var(--ease-back), background 0.16s ease, border-color 0.16s ease;
+}
+.buy-button:hover { transform: translateY(-2px); border-color: var(--accent); }
+.buy-button.is-bought { background: rgba(34, 197, 94, 0.3); border-color: #86efac; }
+.buy-label { font-size: 0.7rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+.buy-price {
+  display: inline-flex; align-items: baseline;
+  font-size: 0.92rem; font-weight: 800; color: #86efac;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- filters toggle ------------------------------------------------------ */
+.filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.filter-toggle { display: inline-flex; align-items: center; gap: 8px; }
+.filter-summary {
+  min-width: 22px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 800;
+  color: #0b0d14;
+  background: var(--accent);
+}
+.filters[hidden] { display: none; }
+
+/* --- card detail --------------------------------------------------------- */
+.card-modal { padding: 0; }
+.card-modal-inner {
+  position: relative;
+  display: flex;
+  gap: clamp(16px, 3vw, 34px);
+  align-items: center;
+  width: min(860px, 100%);
+  max-height: 92vh;
+  padding: clamp(18px, 3vw, 32px);
+  border-radius: 22px;
+  border: 1px solid var(--panel-line);
+  background: linear-gradient(170deg, #161a26, #0b0e15);
+  box-shadow: 0 50px 90px -40px #000;
+}
+.modal-x {
+  position: absolute;
+  top: 12px; right: 12px;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  width: 34px; height: 34px;
+  border: 1px solid var(--panel-line);
+  border-radius: 50%;
+  color: var(--text-dim);
+  background: rgba(0, 0, 0, 0.4);
+}
+.modal-x:hover { color: var(--text); }
+
+.card-detail { flex: none; perspective: 1100px; }
+.card.detail-card {
+  width: min(260px, 40vw);
+  cursor: grab;
+  touch-action: none;
+  transition: transform 0.35s var(--ease-out);
+}
+.card.detail-card.is-tilting { transition: none; cursor: grabbing; }
+
+.card-detail-side {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+  max-height: 74vh;
+}
+.detail-title { font-size: clamp(1.1rem, 3vw, 1.5rem); letter-spacing: -0.02em; }
+.detail-sub {
+  font-size: 0.72rem; font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--rarity, var(--text-dim));
+}
+.detail-facts { display: flex; flex-wrap: wrap; gap: 8px; }
+.fact {
+  white-space: nowrap;
+  font-size: 0.74rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.3);
+  display: inline-flex;
+  align-items: baseline;
+}
+/* The description scrolls rather than being clamped — this is the full read. */
+.detail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 8px;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: #c2cbdc;
+  overscroll-behavior: contain;
+}
+.detail-scroll::-webkit-scrollbar { width: 8px; }
+.detail-scroll::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 8px; }
+.detail-actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+.sell-button {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  color: #86efac;
+  border: 1px solid rgba(134, 239, 172, 0.45);
+  background: rgba(34, 197, 94, 0.12);
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+.sell-button:hover { background: rgba(34, 197, 94, 0.2); }
+/* Armed: the button becomes its own confirmation instead of a second dialog. */
+.sell-button.is-armed {
+  color: #0b0d14;
+  background: #fca5a5;
+  border-color: #fca5a5;
+  animation: sell-pulse 1.1s ease-in-out infinite;
+}
+@keyframes sell-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(252, 165, 165, 0.5); }
+  50% { box-shadow: 0 0 0 8px rgba(252, 165, 165, 0); }
+}
+
+/* --- first run ----------------------------------------------------------- */
+.welcome-card { width: min(560px, 100%); text-align: center; }
+.lang-choices { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 18px 0 4px; }
+.lang-choice {
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.3);
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+.lang-choice:hover, .lang-choice.is-active {
+  color: var(--text);
+  border-color: #818cf8;
+  background: rgba(129, 140, 248, 0.16);
+}
+.starter-panel { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--panel-line); }
+.starter-panel h3 { font-size: 1.1rem; margin-bottom: 8px; }
+.starter-loot { display: flex; justify-content: center; gap: 12px; margin: 18px 0 20px; }
+.loot-item { animation: loot-in 0.5s var(--ease-back) backwards; }
+.loot-item:nth-child(2) { animation-delay: 0.1s; }
+.loot-item:nth-child(3) { animation-delay: 0.2s; }
+@keyframes loot-in {
+  from { opacity: 0; transform: translateY(20px) rotate(-6deg) scale(0.85); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- toast --------------------------------------------------------------- */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  z-index: 900;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 11px 20px;
+  border-radius: 999px;
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text);
+  border: 1px solid var(--panel-line);
+  background: rgba(12, 15, 24, 0.95);
+  box-shadow: 0 20px 44px -20px #000;
+  transform: translate(-50%, 20px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s var(--ease-out);
+}
+.toast.is-showing { opacity: 1; transform: translate(-50%, 0); }
+.toast.is-error { color: #fca5a5; border-color: rgba(252, 165, 165, 0.4); }
+.toast.is-ok { color: #86efac; border-color: rgba(134, 239, 172, 0.4); }
+
+@media (max-width: 720px) {
+  .card-modal-inner { flex-direction: column; gap: 14px; overflow-y: auto; padding: 44px 16px 20px; }
+  .card.detail-card { width: min(200px, 52vw); }
+  .card-detail-side { max-height: none; width: 100%; }
+  .detail-scroll { max-height: 30vh; flex: none; }
+  .shop-item, .buy-button { width: 120px; }
+  .booster.is-small { --pack-w: 120px; --pack-h: 216px; width: 120px; height: 216px; }
+  .pack-summary { max-width: 100%; gap: 12px 8px; }
+  .wallet { padding: 6px 11px; font-size: 0.8rem; }
+  .tabs { order: 3; width: 100%; }
+  .tab { padding: 7px 12px; font-size: 0.8rem; }
 }

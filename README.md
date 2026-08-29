@@ -1,11 +1,13 @@
 # PackyWiki
 
 A WikiMaster-style booster pack opener where the cards are **real Wikipedia
-articles**. Browse the shelf, slide the rip line to tear a pack open, watch the cards fly
-out of it, then swipe through them — each rolled against an eight-tier rarity
-table with its own visual treatment and its own synthesised chime, priced in
-Buckarooz by how many people actually read the article, and saved to a
-collection you can filter and favourite.
+articles**. Buy boosters from a shop that restocks every two hours, slide the rip line to
+tear one open, watch the cards fly out of it, then swipe through them — each
+rolled against an eight-tier rarity table with its own visual treatment and its
+own synthesised chime, priced in Buckarooz by how many people actually read the
+article, and saved to a collection you can filter, favourite and sell from.
+
+Available in English and French, including the articles themselves.
 
 No backend, no API key, no build-time data. Everything is fetched live from
 Wikipedia's public API and every sound is generated at runtime with the Web
@@ -22,9 +24,9 @@ npm run dev
 
 Then open the URL Vite prints (default <http://localhost:5173>).
 
-Swipe the shelf to pick a pack → slide the rip line sideways to tear it open →
-swipe right-to-left through the cards (left-to-right goes back). Pulls land in
-the **Collection** tab. There is no cooldown.
+On first launch you pick a language and get a starter kit. Buy boosters in the
+**Shop**, open them from **Boosters**, and your pulls land in the
+**Collection**, where you can sell duplicates back for Buckarooz.
 
 Other scripts:
 
@@ -94,7 +96,11 @@ src/
   audio.js            Web Audio synthesis (rip, card flip, per-rarity chimes)
   wiki.js             Wikipedia + custom-wiki fetching, filtering, de-duplication
   pricing.js          popularity model and card prices
-  collection.js       localStorage binder, favourites, filters and sorting
+  economy.js          booster prices, sell rate, the house edge, the stipend
+  shop.js             the two-hourly shop, generated from the window index
+  booster.js          booster specs: identity, naming, colours, art
+  collection.js       localStorage: cards, wallet, inventory, profile
+  i18n.js             English/French strings and the language lock
   data/
     packs.js          PACK TABLE    — themes and custom-pack kinds
     rarities.js       RARITY TABLE  — one row per tier, with weights
@@ -121,83 +127,131 @@ anywhere in the UI code.
 
 ---
 
-## Packs
+## The economy
 
-**18 theme packs** on a horizontal shelf: Cars, Formula One, Planes, Video
-Games, Books, Movies & Shows, Space, Physics, Nature, Animals, Plants, History,
-Philosophy, Celebrities, Quotes, Art, Cactus, Sport. Swipe or drag the shelf
-sideways; the pack in the middle is the one you open.
+This is the part that had to be right, so it is worth stating plainly.
 
-Each pack carries a **real photograph** rather than a symbol — its `hero` field
-names a Wikipedia article, and all 18 lead images are fetched in a single
-batched `pageimages` request. The drawn icon in `src/data/icons.js` is only the
-fallback for when that image is missing or you're offline.
+**You cannot get rich by churning boosters.** Selling a booster's entire
+contents returns a fixed fraction of what the booster cost — the same fraction
+at every tier — so sell-and-reinvest always leaks value instead of compounding:
 
-### How a theme pack draws
+```
+sell value of a card  = 30% of its price
+price of a booster    = its expected sell value ÷ 0.72
+```
 
-Each pack owns a list of `queries` used verbatim as the search API's
-`srsearch`, so a row can mix two strategies:
+A simulation of the obvious exploit (start with the starter kit, always buy the
+most expensive booster you can afford, open it, sell everything, repeat) goes
+broke in **100% of runs**, averaging 3.9 boosters before the money is gone. The
+measured return is ~0.80 at every tier — Common through Artifact — so no rung
+of the ladder is a better deal than any other.
+
+A lucky Artifact can still pay for several packs. That is variance around a
+losing mean, not a strategy, and it is where the excitement lives: about 5% of
+those runs hit an Artifact booster at some point on the way down.
+
+Progression therefore comes from **time**, not grinding. Each shop restock pays
+a stipend, capped at four missed restocks so a long absence doesn't hand over a
+fortune.
+
+| | |
+| --- | --- |
+| Sell rate | 30% of card price |
+| Booster return if you sell it all | 72% of its price |
+| Restock / stipend | every 2 hours, Ᏸ500, max 4 banked |
+| Starter kit | Ᏸ1,500 and 3 boosters |
+| Subject surcharge | +25% for a booster tied to one theme |
+
+### The shop
+
+Stock is generated from the current two-hour window index, so it is stable
+across reloads and restocks on its own — no server involved. Shelves are
+grouped by tier, by subject, mixed, or just cheap, and each booster's size is
+rolled between 3 and 7 cards. Price scales with both size and tier
+automatically, because it is derived from the booster's own expected contents.
+
+Scarcity is the other brake. Pricing alone would let a lucky player buy
+Artifact boosters back to back, so high tiers are also **rare on the shelves**:
+
+| Tier | Windows it appears in |
+| --- | --- |
+| Uncommon | 95% |
+| Rare | 90% |
+| Epic | 68% |
+| Legendary | 40% |
+| Mythic | 9% |
+| Exotic | 3% |
+| Artifact | 2% |
+
+Custom boosters can turn up on any shelf too.
+
+---
+
+## Boosters
+
+**18 subjects**: Cars, Formula One, Planes, Video Games, Books, Movies & Shows,
+Space, Physics, Nature, Animals, Plants, History, Philosophy, Celebrities,
+Quotes, Art, Cactus, Sport.
+
+The **Boosters** tab shows only the ones you own, with a count. Each carries a
+real photograph — its `hero` field names a Wikipedia article, and all 18 lead
+images are fetched in a single batched `pageimages` request. The drawn icon in
+`src/data/icons.js` is only the fallback for when that image is missing.
+
+A **rarity booster** keeps its subject's colours and photo and wears the tier
+as an effect on top; one with no subject falls back to the tier's own colour.
+
+### How a booster draws
+
+Each subject owns a list of `queries`, per language, used verbatim as the
+search API's `srsearch`, so a row can mix two strategies:
 
 ```js
 'incategory:"Sports cars"'   // only DIRECT members of that category
 'sports car model'           // ordinary full-text search
 ```
 
-That mix matters: `incategory:` doesn't descend into subcategories, so a broad
-category alone gives a shallow pool. The free-text queries fill it back out.
-One query is picked at random per card, deep queries are sampled at a random
-`sroffset` (the total is cached per session), and dead queries are skipped
-after one miss.
+`incategory:` doesn't descend into subcategories, so a broad category alone
+gives a shallow pool; the free-text queries fill it back out. They also travel
+between languages far better than category names do, which is why the French
+lists lean on them.
 
 Draws are filtered before they become cards: non-standard page types, extracts
-under 80 characters, disambiguation pages and `List of` / `Index of` / `Outline
-of` pages are all rejected, with up to 8 retries per card slot. The last two
-attempts fall back to a fully random article so a renamed category can never
-leave a pack unopenable.
+under 80 characters, disambiguation pages and `List of` / `Liste de` style
+pages are all rejected, with up to 8 retries per card slot and a random-article
+fallback so a renamed category can never leave a booster unopenable.
 
-### Adding a pack
+### Adding a subject
 
-Append a row to `THEME_PACKS` in `src/data/packs.js`:
-
-```js
-{
-  id: 'deep-time', hero: 'Tyrannosaurus', icon: 'animals', name: 'Deep Time',
-  tagline: 'Dinosaurs, fossils, extinction events.',
-  accent: '#a3e635', accent2: '#3f6212',
-  queries: ['incategory:"Dinosaurs"', 'incategory:"Fossils"', 'extinction event']
-}
-```
+Append a row to `THEME_PACKS` in `src/data/packs.js` with both languages
+filled in. The shop will start stocking it on the next restock.
 
 ---
 
 ## Custom boosters
 
-Name a game, book or show and PackyWiki builds a booster entirely out of that
-subject's **own wiki**.
-
-Searching Wikipedia for "Terraria" yields a handful of pages; the Terraria wiki
-has thousands. So the app resolves the dedicated wiki first:
+Name a game, book, film or show and PackyWiki builds a booster entirely out of
+that subject's **own wiki**. Searching Wikipedia for "Terraria" yields a
+handful of pages; the Terraria wiki has thousands.
 
 1. Normalise the input — `Terraria`, `terraria` and `TERRARIA` all collapse to
    the same candidates, as do `The Legend of Zelda` → `legendofzelda`.
-2. Probe each guessed Fandom subdomain's `api.php` for `meta=siteinfo`. A wiki
-   only counts if MediaWiki answers **and** it has more than 40 articles, which
-   rules out abandoned stubs.
+2. Probe each guessed Fandom subdomain's `api.php`. In a non-English session
+   the **language path** (`terraria.fandom.com/fr/api.php`) is tried first, so
+   a French booster holds French cards. A wiki only counts if MediaWiki answers
+   **and** it has more than 40 articles, which rules out abandoned stubs.
 3. If no slug matches, fall back to Fandom's cross-wiki search.
 4. If nothing resolves: **"Booster cannot be created, try something else."**
 
-Resolution takes a few round trips, so the UI shows **"Booster Pack is being
-created…"** until it settles. The pack is then saved to localStorage, named
-after the resolved wiki (`TERRARIA` becomes `Terraria`), and given the wiki's
-logo as its pack art.
+Building one gives you a copy for free — you designed it. After that they turn
+up in the shop like anything else.
 
-Cards are drawn from that wiki with the same MediaWiki action API — Fandom runs
-MediaWiki too — using `list=random`, `prop=extracts` for the lead text, and an
-`action=parse` fallback for wikis without the TextExtracts extension.
+Fandom's `pageimages` misses a lot, so when it comes back empty the app asks
+what images the page actually *uses* and resolves the first real one, skipping
+icons, logos and other chrome.
 
-> Custom packs depend on the target wiki allowing anonymous CORS
-> (`origin=*`), which standard MediaWiki does. A wiki that blocks it won't
-> resolve.
+> Custom boosters depend on the target wiki allowing anonymous CORS
+> (`origin=*`), which standard MediaWiki does.
 
 ---
 
@@ -208,87 +262,63 @@ MediaWiki too — using `list=random`, `prop=extracts` for the lead text, and an
 Eight tiers. **Odds do not depend on the article** — a page with 100 views a
 month has exactly the same chance at every tier as one with 100k.
 
-| Tier | Chance | Visual treatment |
-| --- | --- | --- |
-| Common | 42% | matte stock, no motion |
-| Uncommon | 27% | single sheen sweep |
-| Rare | 17% | breathing border + slow scan bar |
-| Epic | 9% | drifting colour blobs |
-| Legendary | 3.6% | rotating light rays |
-| Mythic | 0.9% | flames climbing the card |
-| Exotic | 0.35% | holographic prismatic banding |
-| Artifact | 0.15% | full iridescent burst |
+| Tier | Chance | Price bonus | Visual treatment |
+| --- | --- | --- | --- |
+| Common | 42% | +0% | matte stock, no motion |
+| Uncommon | 27% | +25% | single sheen sweep |
+| Rare | 17% | +60% | breathing border + slow scan bar |
+| Epic | 9% | +140% | drifting colour blobs |
+| Legendary | 3.6% | +320% | rotating light rays |
+| Mythic | 0.9% | +700% | flames climbing the card |
+| Exotic | 0.35% | +1500% | holographic prismatic banding |
+| Artifact | 0.15% | +3200% | full iridescent burst |
 
 Two rules hold for every treatment, and both are enforced by tests:
 
 - **Nothing leaves the card.** Every effect lives inside `.card-front`, which
-  `.card-face` clips with `overflow: hidden`, and no card carries an outward
-  glow — an outer box-shadow is the one thing a clip can't contain.
-- **Nothing is visible before the flip.** Effects are gated on `.is-revealed`
-  *and* sit on the back-face-hidden front, so a face-down card can't hint at
-  what it is. Rarity is only attached to a card after it has already flown out
-  of the pack.
+  `.card-face` clips, and no card carries an outward glow.
+- **Nothing is visible before the flip.** Effects are gated on `.is-lit` *and*
+  sit on the back-face-hidden front. Rarity is only attached to a card after it
+  has already flown out of the pack.
 
 ### Money
 
 Prices are in **Buckarooz** (Ᏸ — a B wearing the two bars a dollar sign wears,
-drawn as SVG in `src/data/icons.js`).
-
-Popularity sets the **base price**; rarity is a **percentage on top**:
+drawn as SVG). Popularity sets the **base price**; rarity is a **percentage on
+top**:
 
 ```
 price = base(popularity) × (1 + rarity.bonusPct / 100)
 ```
 
-`base` runs from Ᏸ20 for an unread article to Ᏸ500 for a front-page-famous one,
-and the bonus runs from +0% (Common) to +3200% (Artifact). A Common and an
-Artifact of the same article share a base — the Artifact is simply worth 33×
-more of it. Custom-wiki pages have no pageview API, so article length stands in
-for popularity.
-
-### Adding a rarity tier
-
-1. Insert a row in `RARITIES` (`src/data/rarities.js`), ordered worst → best,
-   with a `weight` and a `bonusPct`.
-2. Add a matching `[data-rarity="<id>"]` block in the **RARITY TREATMENTS**
-   section of `src/style.css`.
-
-Each card carries `data-rarity` plus `--rarity` / `--rarity-glow` custom
-properties and two effect layers (`.fx-a`, `.fx-b`). While tuning:
-
-```js
-__packywiki.debugRarity('artifact')
-__packywiki.clearCollection()
-__packywiki.resetRipDirection()
-```
+`base` runs from Ᏸ20 for an unread article to Ᏸ500 for a front-page-famous one.
+A Common and an Artifact of the same article share a base — the Artifact is
+simply worth 33× more of it.
 
 ---
 
-## Opening a pack
+## Opening a booster
 
-**The rip.** There is no button and no pull-tab — the perforation line *is* the
-control. Grab it near either end and slide sideways; the foil parts in step
-with the drag, behind a glowing tear front, revealing the pack's mouth and the
-card tops inside. Let go before 60% and it springs shut, complaining as it
-goes. Whichever direction you pull the first time is remembered, and from then
-on the pack only tears that way. Finish the tear and the torn scrap tumbles
-away under gravity.
+**The rip.** No button, no pull-tab — the perforation line *is* the control.
+Grab it near either end and slide; the foil parts in step with the drag behind
+a glowing tear front, revealing the pack's mouth and the card tops inside. Let
+go before 60% and it springs shut, complaining as it goes. Whichever direction
+you pull the first time is remembered, and from then on the pack only tears
+that way. Finish the tear and the torn scrap tumbles away under gravity.
 
-**No loading screen.** Cards start being fetched as soon as a pack reaches the
-middle of the shelf, and the opening animation runs on card *backs*, which need
-no data at all — so the animation begins the instant the pack tears. Cards fly
-up out of the pack's mouth one by one while the pack sinks away beneath them,
-then settle into a stack. The data lands underneath all of that.
+**No loading screen.** Cards start being fetched as soon as a booster reaches
+the middle of the shelf, and the opening animation runs on card *backs*, which
+need no data — so it begins the instant the pack tears. Cards fly up out of the
+pack's mouth one by one from *behind* it, while the pack sinks away, then
+settle into a stack. Card backs take the booster's own colours and icon.
 
 **The reveal.** The current card turns itself over. Swipe **right-to-left** for
-the next card and **left-to-right** to go back, freely, as many times as you
-like. Tapping does nothing; holding and moving drags the card a little (damped,
-so it follows your finger without being flung). Pull order is **random** — a
-Legendary can come first and a Common last.
+the next card and **left-to-right** to go back, freely. Tapping does not
+advance; holding and moving makes the card *lean* — it turns on its own axes
+rather than sliding around. Pull order is **random**.
 
 **The summary.** Once every card has been turned, the single-card view is
-replaced by the whole pack laid out together at a smaller size, with a Back
-button.
+replaced by the whole booster laid out three to a row, with a Back button.
 
 ---
 
@@ -296,12 +326,36 @@ button.
 
 Every pull is saved to localStorage and shows up in the **Collection** tab.
 
-- Duplicates are kept as a copy count (`×3`), not separate entries, and the
-  stored rarity is always the *best* pull of that article.
-- **Favourite** any card with the star in its top-right corner.
-- Filter by pack, rarity tier, popularity band, minimum price, favourites, and
-  free-text title search; sort by newest, price, rarity, popularity or name.
-- The header totals unique cards, copies, collection value and favourites.
+- Duplicates are kept as a copy count (`×3`); the stored rarity is the *best*
+  pull of that article.
+- **Click any card**, anywhere in the app, to open it full size: the whole
+  article extract, scrollable, and the card itself leans as you drag it.
+- From the binder that detail view also offers **Sell**. The button arms on the
+  first tap and confirms on the second, so it is its own confirmation rather
+  than a second dialog, and it disarms itself after a few seconds.
+- **Favourite** with the star in a card's top-right corner.
+- Filters live behind a **Filters** button rather than eating the top of the
+  screen, with a badge showing how many are active. Filter by booster, tier,
+  popularity band, minimum price, favourites and title; sort by newest, price
+  ascending or descending, rarity, popularity or name.
+
+---
+
+## Language
+
+English and French, chosen on first launch and then **locked**.
+
+That is a deliberate limitation. Cards are stored with the text the wiki gave
+us, so re-translating a collection would mean re-fetching every card through
+langlinks — slow, lossy, and liable to fail halfway, leaving a binder in two
+languages. Locking keeps every card consistent with every other.
+
+The language decides which Wikipedia is queried, which search terms a booster
+uses, and which Fandom language path a custom booster resolves against, so
+cards are always in the selected language rather than whatever the wiki
+happened to return.
+
+To start over during development: `__packywiki.resetAll()`.
 
 ## Sound
 
@@ -320,15 +374,13 @@ Every pull is saved to localStorage and shows up in the **Collection** tab.
 
 ## Intentionally missing (this is a debug build)
 
-- **No cooldown.** Packs open back to back, unlimited, on purpose — it's the
-  fastest way to eyeball the rare tiers. A real build would gate this.
 - **Local persistence only.** The collection lives in this browser's
   localStorage. No account, no server, no sync between devices; clearing site
   data wipes it.
 - **No cross-pack dedupe.** Titles are de-duplicated *within* one pack. Open
   two Animals packs and you can pull Tardigrade twice — it becomes a `×2`.
-- **English Wikipedia only**, hard-coded in `wiki.js`. Custom packs are
-  resolved against Fandom.
+- **Two languages**, English and French, chosen once and then locked.
+- **No trading, no accounts, no sync.** Everything is one browser.
 - **Rarity is not tied to the article.** It's an independent roll, so a stub
   can come out Artifact and a featured article can come out Common. Only the
   price knows how popular a page is.
@@ -337,14 +389,12 @@ Every pull is saved to localStorage and shows up in the **Collection** tab.
 
 - **Trading** — export a card (or a whole binder) as a share code, import
   someone else's.
+- **Daily goals** — a reason to open a specific subject, and a second income
+  stream that isn't the stipend.
 - **Set completion** — track which articles a pack *can* yield and show a
   completion percentage per pack.
-- **Sell / buy** — the prices are there; a market that lets you sell
-  duplicates for Buckarooz and spend them on packs is the obvious next loop.
 - **Quiz mode** — the article extract is already on the card, so blank out the
   title and make the player name it; scale the points by rarity.
-- **Real cooldown + currency** — a pack timer, and rarer packs that cost
-  something to open.
 - **Duplicate handling** — a "shiny" upgrade path, or dust/crafting from
   repeats.
 - **More packs** — the table makes this a one-row change; the interesting work

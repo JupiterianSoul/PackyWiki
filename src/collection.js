@@ -1,19 +1,26 @@
 /**
- * Collection persistence.
+ * Everything the player owns, in localStorage.
  *
- * Everything the player owns lives in localStorage under two keys: the cards
- * themselves and any custom packs they've created (so a resolved wiki survives
- * a reload without probing it again).
+ *   collection  the cards, keyed by article, with a copy count
+ *   wallet      Buckarooz
+ *   inventory   unopened boosters, as spec -> count
+ *   profile     first-run state and the last stipend paid
  *
- * Duplicates are kept as a copy count rather than as separate entries, and the
- * stored rarity/price is always the BEST pull of that article — pulling
- * Tardigrade a second time as a Legendary upgrades the entry.
+ * Duplicates are kept as a copy count rather than separate entries, and the
+ * stored rarity is always the BEST pull of that article — pulling Tardigrade
+ * again as a Legendary upgrades the entry.
  */
 import { rarityRank } from './data/rarities.js';
 import { bandFor } from './pricing.js';
+import { specId } from './booster.js';
+import { STARTER_COINS, STIPEND, STIPEND_MAX_BANKED, windowIndexAt } from './economy.js';
+import { t } from './i18n.js';
 
-const CARDS_KEY = 'packywiki.collection.v2';
-const PACKS_KEY = 'packywiki.customPacks.v1';
+const CARDS_KEY = 'packywiki.collection.v3';
+const WALLET_KEY = 'packywiki.wallet.v1';
+const INVENTORY_KEY = 'packywiki.inventory.v1';
+const PROFILE_KEY = 'packywiki.profile.v1';
+const CUSTOM_KEY = 'packywiki.customPacks.v2';
 
 /** Every read and write is guarded: localStorage throws in some privacy modes. */
 function readJson(key, fallback) {
@@ -42,17 +49,12 @@ export function loadCollection() {
   return data;
 }
 
-export function saveCollection(collection) {
-  return writeJson(CARDS_KEY, collection);
-}
+export const saveCollection = (collection) => writeJson(CARDS_KEY, collection);
 
-/**
- * Record a set of pulls. Returns the entries as stored, with `isNew` set for
- * articles the player had never seen before.
- */
-export function recordPulls(collection, pulls, pack) {
+export function recordPulls(collection, pulls, spec) {
   const now = Date.now();
   const results = [];
+  const packId = specId(spec);
 
   for (const pull of pulls) {
     const { article, rarity, price } = pull;
@@ -66,16 +68,17 @@ export function recordPulls(collection, pulls, pack) {
         extract: article.extract,
         thumbnail: article.thumbnail,
         url: article.url,
+        lang: article.lang,
         sourceId: article.sourceId,
         sourceName: article.sourceName,
         views: article.views,
         popularity: article.popularity,
         rarityId: rarity.id,
         price,
-        packId: pack.id,
-        packName: pack.name,
-        packIcon: pack.icon,
-        packAccent: pack.accent,
+        packId,
+        packName: pull.packName,
+        packIcon: pull.packIcon,
+        packAccent: pull.packAccent,
         count: 1,
         favorite: false,
         firstPulledAt: now,
@@ -87,14 +90,13 @@ export function recordPulls(collection, pulls, pack) {
 
     existing.count += 1;
     existing.lastPulledAt = now;
-    // Keep the best version of a duplicate.
     if (rarityRank(rarity.id) > rarityRank(existing.rarityId)) {
       existing.rarityId = rarity.id;
       existing.price = price;
-      existing.packId = pack.id;
-      existing.packName = pack.name;
-      existing.packIcon = pack.icon;
-      existing.packAccent = pack.accent;
+      existing.packId = packId;
+      existing.packName = pull.packName;
+      existing.packIcon = pull.packIcon;
+      existing.packAccent = pull.packAccent;
     }
     results.push({ entry: existing, isNew: false });
   }
@@ -111,41 +113,45 @@ export function toggleFavorite(collection, key) {
   return entry.favorite;
 }
 
+/** Sell one copy. The last copy removes the card from the binder. */
+export function sellCopy(collection, key) {
+  const entry = collection.entries[key];
+  if (!entry) return null;
+  entry.count -= 1;
+  if (entry.count <= 0) delete collection.entries[key];
+  saveCollection(collection);
+  return entry;
+}
+
 export const allEntries = (collection) => Object.values(collection.entries);
 
 /* --- filtering ----------------------------------------------------------- */
 
 export const SORTS = [
-  { id: 'recent',     name: 'Newest first',     compare: (a, b) => b.lastPulledAt - a.lastPulledAt },
-  { id: 'price-desc', name: 'Price: high to low', compare: (a, b) => b.price - a.price },
-  { id: 'price-asc',  name: 'Price: low to high', compare: (a, b) => a.price - b.price },
-  { id: 'rarity',     name: 'Rarity',           compare: (a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId) || b.price - a.price },
-  { id: 'popular',    name: 'Most popular',     compare: (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0) },
-  { id: 'name',       name: 'A to Z',           compare: (a, b) => a.title.localeCompare(b.title) }
+  { id: 'recent', labelKey: 'sortRecent', compare: (a, b) => b.lastPulledAt - a.lastPulledAt },
+  { id: 'price-desc', labelKey: 'sortPriceDesc', compare: (a, b) => b.price - a.price },
+  { id: 'price-asc', labelKey: 'sortPriceAsc', compare: (a, b) => a.price - b.price },
+  { id: 'rarity', labelKey: 'sortRarity', compare: (a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId) || b.price - a.price },
+  { id: 'popular', labelKey: 'sortPopular', compare: (a, b) => (b.popularity ?? 0) - (a.popularity ?? 0) },
+  { id: 'name', labelKey: 'sortName', compare: (a, b) => a.title.localeCompare(b.title) }
 ];
 
 export const sortById = (id) => SORTS.find((s) => s.id === id) ?? SORTS[0];
+export const sortLabel = (sort) => t(sort.labelKey);
 
-/**
- * Apply the collection filters.
- *
- * filters = { pack, rarity, band, favoritesOnly, minPrice, search, sort }
- * Empty string means "any" for the dropdown filters.
- */
 export function filterEntries(entries, filters) {
   const term = (filters.search ?? '').trim().toLowerCase();
-
-  const filtered = entries.filter((entry) => {
-    if (filters.favoritesOnly && !entry.favorite) return false;
-    if (filters.pack && entry.packId !== filters.pack) return false;
-    if (filters.rarity && entry.rarityId !== filters.rarity) return false;
-    if (filters.band && bandFor(entry.popularity ?? 0).id !== filters.band) return false;
-    if (filters.minPrice && entry.price < Number(filters.minPrice)) return false;
-    if (term && !entry.title.toLowerCase().includes(term)) return false;
-    return true;
-  });
-
-  return filtered.sort(sortById(filters.sort).compare);
+  return entries
+    .filter((entry) => {
+      if (filters.favoritesOnly && !entry.favorite) return false;
+      if (filters.pack && entry.packId !== filters.pack) return false;
+      if (filters.rarity && entry.rarityId !== filters.rarity) return false;
+      if (filters.band && bandFor(entry.popularity ?? 0).id !== filters.band) return false;
+      if (filters.minPrice && entry.price < Number(filters.minPrice)) return false;
+      if (term && !entry.title.toLowerCase().includes(term)) return false;
+      return true;
+    })
+    .sort(sortById(filters.sort).compare);
 }
 
 export const collectionStats = (entries) => ({
@@ -155,22 +161,101 @@ export const collectionStats = (entries) => ({
   favorites: entries.filter((e) => e.favorite).length
 });
 
-/* --- custom packs -------------------------------------------------------- */
+/* --- wallet -------------------------------------------------------------- */
+
+export function loadWallet() {
+  const value = readJson(WALLET_KEY, null);
+  return Number.isFinite(value) ? value : 0;
+}
+
+export const saveWallet = (amount) => writeJson(WALLET_KEY, Math.max(0, Math.round(amount)));
+
+/* --- inventory ----------------------------------------------------------- */
+
+/** { [specId]: { spec, count } } */
+export function loadInventory() {
+  const data = readJson(INVENTORY_KEY, null);
+  return data && typeof data === 'object' ? data : {};
+}
+
+export const saveInventory = (inventory) => writeJson(INVENTORY_KEY, inventory);
+
+export function addBooster(inventory, spec, count = 1) {
+  const id = specId(spec);
+  const slot = inventory[id] ?? { spec, count: 0 };
+  slot.spec = spec;
+  slot.count += count;
+  inventory[id] = slot;
+  saveInventory(inventory);
+  return inventory;
+}
+
+export function takeBooster(inventory, id) {
+  const slot = inventory[id];
+  if (!slot || slot.count <= 0) return false;
+  slot.count -= 1;
+  if (slot.count <= 0) delete inventory[id];
+  saveInventory(inventory);
+  return true;
+}
+
+export const ownedBoosters = (inventory) =>
+  Object.values(inventory).filter((slot) => slot.count > 0);
+
+/* --- profile ------------------------------------------------------------- */
+
+export function loadProfile() {
+  const data = readJson(PROFILE_KEY, null);
+  return data && typeof data === 'object' ? data : { started: false, stipendWindow: null };
+}
+
+export const saveProfile = (profile) => writeJson(PROFILE_KEY, profile);
+
+/**
+ * Pay the restock stipend for any windows that have elapsed since the last
+ * one, capped so a long absence doesn't hand over a fortune. Returns the
+ * amount paid, or 0.
+ */
+export function claimStipend(profile, wallet) {
+  const now = windowIndexAt();
+  if (profile.stipendWindow == null) {
+    profile.stipendWindow = now;
+    saveProfile(profile);
+    return 0;
+  }
+  const missed = Math.min(STIPEND_MAX_BANKED, now - profile.stipendWindow);
+  if (missed <= 0) return 0;
+  profile.stipendWindow = now;
+  saveProfile(profile);
+  const paid = missed * STIPEND;
+  saveWallet(wallet + paid);
+  return paid;
+}
+
+export function grantStarter(profile) {
+  profile.started = true;
+  profile.stipendWindow = windowIndexAt();
+  saveProfile(profile);
+  saveWallet(STARTER_COINS);
+  return STARTER_COINS;
+}
+
+/* --- custom boosters ----------------------------------------------------- */
 
 export function loadCustomPacks() {
-  const packs = readJson(PACKS_KEY, []);
+  const packs = readJson(CUSTOM_KEY, []);
   return Array.isArray(packs) ? packs : [];
 }
 
 export function saveCustomPack(pack) {
   const packs = loadCustomPacks().filter((p) => p.id !== pack.id);
   packs.unshift(pack);
-  writeJson(PACKS_KEY, packs);
+  writeJson(CUSTOM_KEY, packs);
   return packs;
 }
 
 export function deleteCustomPack(id) {
   const packs = loadCustomPacks().filter((p) => p.id !== id);
-  writeJson(PACKS_KEY, packs);
+  writeJson(CUSTOM_KEY, packs);
   return packs;
 }

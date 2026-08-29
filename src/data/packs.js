@@ -1,233 +1,282 @@
 /**
  * PACK TABLE
  * ----------------------------------------------------------------------------
- * Two kinds of booster live here:
+ * One row per subject. Everything the player sees is bilingual, and so are the
+ * search queries: a booster has to pull French articles when the app is in
+ * French, not English ones with French chrome around them.
  *
- *   THEME_PACKS   hand-written, one per subject. Add a row to add a pack.
- *   CUSTOM_KINDS  templates for user-created packs, which resolve a dedicated
- *                 wiki at runtime (see resolveCustomWiki in src/wiki.js).
- *
- * `queries` is a list of Wikipedia search strings. They are used verbatim as
- * `srsearch`, so a row can mix category membership with plain full-text terms:
+ * queries — used verbatim as the search API's `srsearch`, so a row can mix:
  *
  *     'incategory:"Sports cars"'   only DIRECT members of that category
- *     'sports car'                 ordinary full-text search
+ *     'sports car model'           ordinary full-text search
  *
- * One query is picked at random per card. That mix matters because
  * `incategory:` doesn't descend into subcategories, so a broad category alone
- * gives a shallow pool — the free-text queries fill it back out.
+ * gives a shallow pool; the free-text queries fill it back out. They also
+ * travel between languages far better than category names do, which is why the
+ * French lists lean on them.
  *
- * `hero` is the Wikipedia article whose lead photograph becomes the booster's
- * pack art — the packs carry real pictures, not symbols. `icon` is only the
- * fallback drawn when that image is missing or offline.
+ * hero  — the article whose lead photograph becomes the booster's pack art.
+ * icon  — key in src/data/icons.js, used only when that photo is unavailable.
  */
+
 export const THEME_PACKS = [
   {
-    id: 'cars', hero: 'Ferrari F40', name: 'Cars', icon: 'cars',
-    tagline: 'Marques, models and the machines behind them.',
+    id: 'cars', icon: 'cars',
+    name: { en: 'Cars', fr: 'Voitures' },
+    tagline: { en: 'Marques, models and the machines behind them.',
+               fr: 'Marques, modèles et les machines derrière.' },
+    hero: { en: 'Ferrari F40', fr: 'Ferrari F40' },
     accent: '#f87171', accent2: '#7f1d1d',
-    queries: [
-      'incategory:"Sports cars"', 'incategory:"Car manufacturers"',
-      'incategory:"Electric cars"', 'incategory:"Cars"',
-      'incategory:"Automotive technologies"', 'sports car model', 'automobile marque'
-    ]
+    queries: {
+      en: ['incategory:"Sports cars"', 'incategory:"Car manufacturers"', 'incategory:"Electric cars"',
+           'incategory:"Cars"', 'sports car model', 'automobile marque'],
+      fr: ['incategory:"Automobile"', 'incategory:"Constructeur automobile"',
+           'voiture de sport', 'modèle automobile', 'constructeur automobile', 'automobile']
+    }
   },
   {
-    id: 'f1', hero: 'Formula One', name: 'Formula One', icon: 'f1',
-    tagline: 'Drivers, constructors, circuits and Grands Prix.',
+    id: 'f1', icon: 'f1',
+    name: { en: 'Formula One', fr: 'Formule 1' },
+    tagline: { en: 'Drivers, constructors, circuits and Grands Prix.',
+               fr: 'Pilotes, écuries, circuits et Grands Prix.' },
+    hero: { en: 'Formula One', fr: 'Formule 1' },
     accent: '#ef4444', accent2: '#450a0a',
-    queries: [
-      'incategory:"Formula One drivers"', 'incategory:"Formula One constructors"',
-      'incategory:"Formula One Grands Prix"', 'incategory:"Formula One circuits"',
-      'incategory:"Formula One cars"', 'incategory:"Formula One"',
-      'Formula One season', 'Formula One driver'
-    ]
+    queries: {
+      en: ['incategory:"Formula One drivers"', 'incategory:"Formula One constructors"',
+           'incategory:"Formula One Grands Prix"', 'incategory:"Formula One circuits"',
+           'Formula One season', 'Formula One driver'],
+      fr: ['incategory:"Formule 1"', 'incategory:"Pilote de Formule 1"',
+           'Grand Prix automobile', 'saison de Formule 1', 'écurie de Formule 1', 'circuit automobile']
+    }
   },
   {
-    id: 'planes', hero: 'Boeing 747', name: 'Planes', icon: 'planes',
-    tagline: 'Airliners, fighters and the people who built them.',
+    id: 'planes', icon: 'planes',
+    name: { en: 'Planes', fr: 'Avions' },
+    tagline: { en: 'Airliners, fighters and the people who built them.',
+               fr: 'Avions de ligne, chasseurs et leurs constructeurs.' },
+    hero: { en: 'Boeing 747', fr: 'Boeing 747' },
     accent: '#60a5fa', accent2: '#1e3a8a',
-    queries: [
-      'incategory:"Airliners"', 'incategory:"Military aircraft"',
-      'incategory:"Aircraft manufacturers"', 'incategory:"Jet aircraft"',
-      'incategory:"Aircraft"', 'aircraft type', 'airliner'
-    ]
+    queries: {
+      en: ['incategory:"Airliners"', 'incategory:"Military aircraft"',
+           'incategory:"Aircraft manufacturers"', 'incategory:"Jet aircraft"',
+           'aircraft type', 'airliner'],
+      fr: ['incategory:"Avion"', 'incategory:"Avion de ligne"', 'avion de chasse',
+           'constructeur aéronautique', 'aéronef', 'avion militaire']
+    }
   },
   {
-    id: 'video-games', hero: 'Video game', name: 'Video Games', icon: 'video-games',
-    tagline: 'Titles, studios, consoles and genres.',
+    id: 'video-games', icon: 'video-games',
+    name: { en: 'Video Games', fr: 'Jeux vidéo' },
+    tagline: { en: 'Titles, studios, consoles and genres.',
+               fr: 'Titres, studios, consoles et genres.' },
+    hero: { en: 'Video game', fr: 'Jeu vidéo' },
     accent: '#a78bfa', accent2: '#4c1d95',
-    queries: [
-      'incategory:"Video games"', 'incategory:"Video game developers"',
-      'incategory:"Video game consoles"', 'incategory:"Video game genres"',
-      'video game', 'video game developer'
-    ]
+    queries: {
+      en: ['incategory:"Video games"', 'incategory:"Video game developers"',
+           'incategory:"Video game consoles"', 'video game', 'video game developer'],
+      fr: ['incategory:"Jeu vidéo"', 'incategory:"Console de jeux vidéo"',
+           'jeu vidéo', 'studio de développement', 'console de jeu']
+    }
   },
   {
-    id: 'books', hero: 'Book', name: 'Books', icon: 'books',
-    tagline: 'Novels, authors and literary movements.',
+    id: 'books', icon: 'books',
+    name: { en: 'Books', fr: 'Livres' },
+    tagline: { en: 'Novels, authors and literary movements.',
+               fr: 'Romans, auteurs et mouvements littéraires.' },
+    hero: { en: 'Book', fr: 'Livre' },
     accent: '#fbbf24', accent2: '#78350f',
-    queries: [
-      'incategory:"Novels"', 'incategory:"Books"', 'incategory:"Writers"',
-      'incategory:"Literary genres"', 'incategory:"Literature"',
-      'novel by', 'literary movement'
-    ]
+    queries: {
+      en: ['incategory:"Novels"', 'incategory:"Books"', 'incategory:"Writers"',
+           'incategory:"Literature"', 'novel by', 'literary movement'],
+      fr: ['incategory:"Roman"', 'incategory:"Écrivain"', 'incategory:"Littérature"',
+           'roman de', 'mouvement littéraire', 'œuvre littéraire']
+    }
   },
   {
-    id: 'movies', hero: 'Film', name: 'Movies & Shows', icon: 'movies',
-    tagline: 'Films, series, directors and genres.',
+    id: 'movies', icon: 'movies',
+    name: { en: 'Movies & Shows', fr: 'Films et séries' },
+    tagline: { en: 'Films, series, directors and genres.',
+               fr: 'Films, séries, réalisateurs et genres.' },
+    hero: { en: 'Film', fr: 'Cinéma' },
     accent: '#f472b6', accent2: '#831843',
-    queries: [
-      'incategory:"Films"', 'incategory:"Television series"',
-      'incategory:"Film directors"', 'incategory:"Film genres"',
-      'film directed by', 'television series'
-    ]
+    queries: {
+      en: ['incategory:"Films"', 'incategory:"Television series"',
+           'incategory:"Film directors"', 'film directed by', 'television series'],
+      fr: ['incategory:"Film"', 'incategory:"Série télévisée"', 'incategory:"Réalisateur"',
+           'film réalisé par', 'série télévisée', 'long métrage']
+    }
   },
   {
-    id: 'space', hero: 'Saturn', name: 'Space', icon: 'space',
-    tagline: 'Planets, probes, galaxies and missions.',
+    id: 'space', icon: 'space',
+    name: { en: 'Space', fr: 'Espace' },
+    tagline: { en: 'Planets, probes, galaxies and missions.',
+               fr: 'Planètes, sondes, galaxies et missions.' },
+    hero: { en: 'Saturn', fr: 'Saturne (planète)' },
     accent: '#818cf8', accent2: '#312e81',
-    queries: [
-      'incategory:"Planets"', 'incategory:"Spacecraft"', 'incategory:"Constellations"',
-      'incategory:"Galaxies"', 'incategory:"Astronomical objects"',
-      'incategory:"Space missions"', 'space probe', 'star system'
-    ]
+    queries: {
+      en: ['incategory:"Planets"', 'incategory:"Spacecraft"', 'incategory:"Constellations"',
+           'incategory:"Galaxies"', 'space probe', 'star system'],
+      fr: ['incategory:"Planète"', 'incategory:"Constellation"', 'incategory:"Galaxie"',
+           'sonde spatiale', 'mission spatiale', 'système stellaire']
+    }
   },
   {
-    id: 'physics', hero: 'Physics', name: 'Physics', icon: 'physics',
-    tagline: 'Forces, particles and the laws underneath.',
+    id: 'physics', icon: 'physics',
+    name: { en: 'Physics', fr: 'Physique' },
+    tagline: { en: 'Forces, particles and the laws underneath.',
+               fr: 'Forces, particules et les lois en dessous.' },
+    hero: { en: 'Physics', fr: 'Physique' },
     accent: '#22d3ee', accent2: '#164e63',
-    queries: [
-      'incategory:"Physics"', 'incategory:"Concepts in physics"',
-      'incategory:"Physical quantities"', 'incategory:"Particle physics"',
-      'incategory:"Quantum mechanics"', 'physical law', 'subatomic particle'
-    ]
+    queries: {
+      en: ['incategory:"Physics"', 'incategory:"Concepts in physics"',
+           'incategory:"Particle physics"', 'physical law', 'subatomic particle'],
+      fr: ['incategory:"Physique"', 'incategory:"Mécanique quantique"',
+           'loi physique', 'particule élémentaire', 'grandeur physique']
+    }
   },
   {
-    id: 'nature', hero: 'Mountain', name: 'Nature', icon: 'nature',
-    tagline: 'Mountains, rivers, deserts and weather.',
+    id: 'nature', icon: 'nature',
+    name: { en: 'Nature', fr: 'Nature' },
+    tagline: { en: 'Mountains, rivers, deserts and weather.',
+               fr: 'Montagnes, fleuves, déserts et climat.' },
+    hero: { en: 'Mountain', fr: 'Montagne' },
     accent: '#34d399', accent2: '#065f46',
-    queries: [
-      'incategory:"Mountains"', 'incategory:"Rivers"', 'incategory:"Volcanoes"',
-      'incategory:"Deserts"', 'incategory:"Waterfalls"', 'incategory:"Landforms"',
-      'mountain range', 'national park'
-    ]
+    queries: {
+      en: ['incategory:"Mountains"', 'incategory:"Rivers"', 'incategory:"Volcanoes"',
+           'incategory:"Deserts"', 'mountain range', 'national park'],
+      fr: ['incategory:"Montagne"', 'incategory:"Volcan"', 'incategory:"Fleuve"',
+           'chaîne de montagnes', 'parc national', 'désert']
+    }
   },
   {
-    id: 'animals', hero: 'Lion', name: 'Animals', icon: 'animals',
-    tagline: 'Mammals, birds, reptiles, fish and insects.',
+    id: 'animals', icon: 'animals',
+    name: { en: 'Animals', fr: 'Animaux' },
+    tagline: { en: 'Mammals, birds, reptiles, fish and insects.',
+               fr: 'Mammifères, oiseaux, reptiles, poissons et insectes.' },
+    hero: { en: 'Lion', fr: 'Lion' },
     accent: '#fb923c', accent2: '#7c2d12',
-    queries: [
-      'incategory:"Mammals"', 'incategory:"Birds"', 'incategory:"Reptiles"',
-      'incategory:"Fish"', 'incategory:"Insects"', 'incategory:"Animals"',
-      'species of mammal', 'species of bird'
-    ]
+    queries: {
+      en: ['incategory:"Mammals"', 'incategory:"Birds"', 'incategory:"Reptiles"',
+           'incategory:"Insects"', 'species of mammal', 'species of bird'],
+      fr: ['incategory:"Mammifère"', 'incategory:"Oiseau"', 'incategory:"Reptile"',
+           'espèce de mammifère', 'espèce d’oiseau', 'insecte']
+    }
   },
   {
-    id: 'plants', hero: 'Flower', name: 'Plants', icon: 'plants',
-    tagline: 'Trees, flowers and everything photosynthetic.',
+    id: 'plants', icon: 'plants',
+    name: { en: 'Plants', fr: 'Plantes' },
+    tagline: { en: 'Trees, flowers and everything photosynthetic.',
+               fr: 'Arbres, fleurs et tout ce qui photosynthétise.' },
+    hero: { en: 'Flower', fr: 'Fleur' },
     accent: '#4ade80', accent2: '#14532d',
-    queries: [
-      'incategory:"Trees"', 'incategory:"Flowers"', 'incategory:"Plants"',
-      'incategory:"Edible plants"', 'incategory:"Flora"',
-      'species of plant', 'flowering plant'
-    ]
+    queries: {
+      en: ['incategory:"Trees"', 'incategory:"Flowers"', 'incategory:"Plants"',
+           'species of plant', 'flowering plant'],
+      fr: ['incategory:"Arbre"', 'incategory:"Plante"', 'incategory:"Fleur"',
+           'espèce de plante', 'plante à fleurs']
+    }
   },
   {
-    id: 'history', hero: 'Colosseum', name: 'History', icon: 'history',
-    tagline: 'Empires, wars, ruins and revolutions.',
+    id: 'history', icon: 'history',
+    name: { en: 'History', fr: 'Histoire' },
+    tagline: { en: 'Empires, wars, ruins and revolutions.',
+               fr: 'Empires, guerres, ruines et révolutions.' },
+    hero: { en: 'Colosseum', fr: 'Colisée' },
     accent: '#d6a25c', accent2: '#78350f',
-    queries: [
-      'incategory:"Ancient history"', 'incategory:"Wars"', 'incategory:"Empires"',
-      'incategory:"Archaeology"', 'incategory:"Ancient Rome"',
-      'incategory:"Ancient Egypt"', 'incategory:"Battles"', 'ancient civilization'
-    ]
+    queries: {
+      en: ['incategory:"Ancient history"', 'incategory:"Wars"', 'incategory:"Empires"',
+           'incategory:"Ancient Rome"', 'incategory:"Battles"', 'ancient civilization'],
+      fr: ['incategory:"Rome antique"', 'incategory:"Égypte antique"', 'incategory:"Guerre"',
+           'bataille de', 'civilisation antique', 'empire']
+    }
   },
   {
-    id: 'philosophy', hero: 'The Thinker', name: 'Philosophy', icon: 'philosophy',
-    tagline: 'Thinkers, schools and awkward questions.',
+    id: 'philosophy', icon: 'philosophy',
+    name: { en: 'Philosophy', fr: 'Philosophie' },
+    tagline: { en: 'Thinkers, schools and awkward questions.',
+               fr: 'Penseurs, écoles et questions gênantes.' },
+    hero: { en: 'The Thinker', fr: 'Le Penseur' },
     accent: '#c084fc', accent2: '#581c87',
-    queries: [
-      'incategory:"Philosophers"', 'incategory:"Philosophy"',
-      'incategory:"Philosophical concepts"', 'incategory:"Ethics"',
-      'incategory:"Metaphysics"', 'incategory:"Logic"',
-      'philosophical theory', 'school of philosophy'
-    ]
+    queries: {
+      en: ['incategory:"Philosophers"', 'incategory:"Philosophy"', 'incategory:"Ethics"',
+           'philosophical theory', 'school of philosophy'],
+      fr: ['incategory:"Philosophe"', 'incategory:"Philosophie"',
+           'courant philosophique', 'théorie philosophique', 'concept philosophique']
+    }
   },
   {
-    id: 'celebrities', hero: 'Hollywood Sign', name: 'Celebrities', icon: 'celebrities',
-    tagline: 'Actors, musicians and household names.',
+    id: 'celebrities', icon: 'celebrities',
+    name: { en: 'Celebrities', fr: 'Célébrités' },
+    tagline: { en: 'Actors, musicians and household names.',
+               fr: 'Acteurs, musiciens et noms connus de tous.' },
+    hero: { en: 'Hollywood Sign', fr: 'Hollywood Sign' },
     accent: '#facc15', accent2: '#713f12',
-    queries: [
-      'incategory:"Actors"', 'incategory:"Musicians"', 'incategory:"Singers"',
-      'incategory:"Television presenters"', 'incategory:"Film actors"',
-      'actress known for', 'singer songwriter'
-    ]
+    queries: {
+      en: ['incategory:"Actors"', 'incategory:"Musicians"', 'incategory:"Singers"',
+           'actress known for', 'singer songwriter'],
+      fr: ['incategory:"Acteur"', 'incategory:"Chanteur"', 'incategory:"Actrice"',
+           'auteur-compositeur-interprète', 'acteur français', 'chanteuse']
+    }
   },
   {
-    id: 'quotes', hero: 'Quotation', name: 'Quotes', icon: 'quotes',
-    tagline: 'Catchphrases, mottos, proverbs and slogans.',
+    id: 'quotes', icon: 'quotes',
+    name: { en: 'Quotes', fr: 'Citations' },
+    tagline: { en: 'Catchphrases, mottos, proverbs and slogans.',
+               fr: 'Répliques, devises, proverbes et slogans.' },
+    hero: { en: 'Quotation', fr: 'Citation' },
     accent: '#e879f9', accent2: '#701a75',
-    queries: [
-      'incategory:"Quotations"', 'incategory:"Catchphrases"', 'incategory:"Slogans"',
-      'incategory:"Mottos"', 'incategory:"Proverbs"', 'incategory:"Adages"',
-      'famous quotation', 'catchphrase'
-    ]
+    queries: {
+      en: ['incategory:"Quotations"', 'incategory:"Catchphrases"', 'incategory:"Slogans"',
+           'incategory:"Proverbs"', 'famous quotation', 'catchphrase'],
+      fr: ['incategory:"Proverbe"', 'incategory:"Devise"', 'incategory:"Expression"',
+           'expression française', 'citation célèbre', 'slogan']
+    }
   },
   {
-    id: 'art', hero: 'Mona Lisa', name: 'Art', icon: 'art',
-    tagline: 'Paintings, sculpture, movements and makers.',
+    id: 'art', icon: 'art',
+    name: { en: 'Art', fr: 'Art' },
+    tagline: { en: 'Paintings, sculpture, movements and makers.',
+               fr: 'Peintures, sculptures, mouvements et artistes.' },
+    hero: { en: 'Mona Lisa', fr: 'La Joconde' },
     accent: '#fb7185', accent2: '#881337',
-    queries: [
-      'incategory:"Paintings"', 'incategory:"Painters"', 'incategory:"Art movements"',
-      'incategory:"Sculpture"', 'incategory:"Painting"', 'incategory:"Modern art"',
-      'painting by', 'art movement'
-    ]
+    queries: {
+      en: ['incategory:"Paintings"', 'incategory:"Painters"', 'incategory:"Art movements"',
+           'incategory:"Sculpture"', 'painting by', 'art movement'],
+      fr: ['incategory:"Peinture"', 'incategory:"Peintre"', 'incategory:"Sculpture"',
+           'tableau de', 'mouvement artistique', 'œuvre d’art']
+    }
   },
   {
-    id: 'cactus', hero: 'Cactus', name: 'Cactus', icon: 'cactus',
-    tagline: 'Cacti and the wider succulent family.',
+    id: 'cactus', icon: 'cactus',
+    name: { en: 'Cactus', fr: 'Cactus' },
+    tagline: { en: 'Cacti and the wider succulent family.',
+               fr: 'Cactus et la grande famille des succulentes.' },
+    hero: { en: 'Cactus', fr: 'Cactaceae' },
     accent: '#84cc16', accent2: '#3f6212',
-    queries: [
-      'incategory:"Cactaceae"', 'incategory:"Cacti"', 'incategory:"Succulent plants"',
-      'cactus species', 'succulent plant', 'Opuntia', 'Echinocactus'
-    ]
+    queries: {
+      en: ['incategory:"Cactaceae"', 'incategory:"Cacti"', 'incategory:"Succulent plants"',
+           'cactus species', 'succulent plant', 'Opuntia'],
+      fr: ['incategory:"Cactaceae"', 'incategory:"Plante succulente"',
+           'cactus', 'plante grasse', 'Opuntia', 'Echinocactus']
+    }
   },
   {
-    id: 'sport', hero: 'Sport', name: 'Sport', icon: 'sport',
-    tagline: 'Games, leagues, athletes and records.',
+    id: 'sport', icon: 'sport',
+    name: { en: 'Sport', fr: 'Sport' },
+    tagline: { en: 'Games, leagues, athletes and records.',
+               fr: 'Disciplines, ligues, athlètes et records.' },
+    hero: { en: 'Sport', fr: 'Sport' },
     accent: '#2dd4bf', accent2: '#134e4a',
-    queries: [
-      'incategory:"Sports"', 'incategory:"Olympic sports"', 'incategory:"Team sports"',
-      'incategory:"Association football"', 'incategory:"Basketball"',
-      'incategory:"Sportspeople"', 'professional athlete', 'sports league'
-    ]
+    queries: {
+      en: ['incategory:"Sports"', 'incategory:"Olympic sports"', 'incategory:"Team sports"',
+           'incategory:"Association football"', 'professional athlete', 'sports league'],
+      fr: ['incategory:"Sport"', 'incategory:"Football"', 'incategory:"Sport olympique"',
+           'sportif français', 'championnat sportif', 'discipline sportive']
+    }
   }
-].map((pack) => ({ ...pack, group: 'theme', source: 'wikipedia', cards: 5 }));
+].map((pack) => ({ ...pack, group: 'theme', source: 'wikipedia' }));
 
-/**
- * Templates for user-created packs. The user types a subject (a game, a book,
- * a show); the app finds that subject's own wiki and draws every card from it.
- */
-export const CUSTOM_KINDS = [
-  {
-    id: 'custom-video-game', label: 'Video game', icon: 'video-games',
-    placeholder: 'e.g. Terraria', accent: '#a78bfa', accent2: '#4c1d95'
-  },
-  {
-    id: 'custom-book', label: 'Book or series', icon: 'books',
-    placeholder: 'e.g. Discworld', accent: '#fbbf24', accent2: '#78350f'
-  },
-  {
-    id: 'custom-screen', label: 'Movie or show', icon: 'movies',
-    placeholder: 'e.g. Arcane', accent: '#f472b6', accent2: '#831843'
-  }
-];
+export const themeById = (id) => THEME_PACKS.find((p) => p.id === id) ?? null;
 
-export const customKindById = (id) => CUSTOM_KINDS.find((k) => k.id === id) ?? CUSTOM_KINDS[0];
-
-export const packById = (id, customPacks = []) =>
-  [...THEME_PACKS, ...customPacks].find((p) => p.id === id) ?? THEME_PACKS[0];
-
-/** Hero titles for one batched pageimages lookup — see fetchPackArt in wiki.js. */
-export const heroTitles = () => THEME_PACKS.map((p) => p.hero);
+/** Hero article titles for the batched pack-art lookup, in one language. */
+export const heroTitles = (lang) => THEME_PACKS.map((p) => p.hero[lang] ?? p.hero.en);
