@@ -1,10 +1,11 @@
 # PackyWiki
 
 A WikiMaster-style booster pack opener where the cards are **real Wikipedia
-articles**. Pick a pack, tear the zip strip open with a swipe, then swipe through five
-articles one at a time — each rolled against a ten-tier rarity table with its
-own visual treatment and its own synthesised chime, priced by how many people
-actually read the page, and saved to a collection you can filter and favourite.
+articles**. Browse the shelf, slide the rip line to tear a pack open, watch the cards fly
+out of it, then swipe through them — each rolled against an eight-tier rarity
+table with its own visual treatment and its own synthesised chime, priced in
+Buckarooz by how many people actually read the article, and saved to a
+collection you can filter and favourite.
 
 No backend, no API key, no build-time data. Everything is fetched live from
 Wikipedia's public API and every sound is generated at runtime with the Web
@@ -21,9 +22,9 @@ npm run dev
 
 Then open the URL Vite prints (default <http://localhost:5173>).
 
-Pick a pack → drag the zip tab left or right to tear it open → swipe each card
-to reveal it. Pulls land in the **Collection** tab. There is no cooldown, so
-**Open Another** goes straight into a fresh rip.
+Swipe the shelf to pick a pack → slide the rip line sideways to tear it open →
+swipe right-to-left through the cards (left-to-right goes back). Pulls land in
+the **Collection** tab. There is no cooldown.
 
 Other scripts:
 
@@ -88,16 +89,16 @@ binary image assets.
 ```
 index.html            markup for all three screens + the odds modal
 src/
-  main.js             app controller: screens, zipper drag, swipe reveal, binder
+  main.js             app controller: shelf, rip, opening animation, binder
   style.css           all styling, including one block per rarity treatment
   audio.js            Web Audio synthesis (rip, card flip, per-rarity chimes)
   wiki.js             Wikipedia + custom-wiki fetching, filtering, de-duplication
   pricing.js          popularity model and card prices
   collection.js       localStorage binder, favourites, filters and sorting
   data/
-    packs.js          PACK TABLE    — themes, generated rarity packs, custom kinds
+    packs.js          PACK TABLE    — themes and custom-pack kinds
     rarities.js       RARITY TABLE  — one row per tier, with weights
-    icons.js          ICON SET      — hand-drawn SVG, no emoji
+    icons.js          ICON SET      — fallback art, logo, Buckarooz glyph
 vite.config.js
 android/              WebView wrapper that packages the web build as an APK
   app/src/main/
@@ -122,18 +123,15 @@ anywhere in the UI code.
 
 ## Packs
 
-Three kinds of booster:
+**18 theme packs** on a horizontal shelf: Cars, Formula One, Planes, Video
+Games, Books, Movies & Shows, Space, Physics, Nature, Animals, Plants, History,
+Philosophy, Celebrities, Quotes, Art, Cactus, Sport. Swipe or drag the shelf
+sideways; the pack in the middle is the one you open.
 
-**18 theme packs** — Cars, Formula One, Planes, Video Games, Books,
-Movies & Shows, Space, Physics, Nature, Animals, Plants, History, Philosophy,
-Celebrities, Quotes, Art, Cactus, Sport.
-
-**10 rarity boosters**, one per tier, generated from the rarity table so a new
-tier automatically gets a pack. Each has a `tierShift` that tilts the whole
-table upward and a `floorTier` that excludes the bottom ranks outright — the
-Legendary booster can't hand you a Common.
-
-**3 custom booster kinds** — video game, book, movie/show. See below.
+Each pack carries a **real photograph** rather than a symbol — its `hero` field
+names a Wikipedia article, and all 18 lead images are fetched in a single
+batched `pageimages` request. The drawn icon in `src/data/icons.js` is only the
+fallback for when that image is missing or you're offline.
 
 ### How a theme pack draws
 
@@ -163,16 +161,12 @@ Append a row to `THEME_PACKS` in `src/data/packs.js`:
 
 ```js
 {
-  id: 'deep-time', name: 'Deep Time', icon: 'animals',
+  id: 'deep-time', hero: 'Tyrannosaurus', icon: 'animals', name: 'Deep Time',
   tagline: 'Dinosaurs, fossils, extinction events.',
   accent: '#a3e635', accent2: '#3f6212',
   queries: ['incategory:"Dinosaurs"', 'incategory:"Fossils"', 'extinction event']
 }
 ```
-
-`icon` is a key in `src/data/icons.js`, not an emoji — icons are hand-drawn
-24×24 line SVGs so they render identically everywhere and inherit the pack's
-accent colour.
 
 ---
 
@@ -193,14 +187,13 @@ has thousands. So the app resolves the dedicated wiki first:
 4. If nothing resolves: **"Booster cannot be created, try something else."**
 
 Resolution takes a few round trips, so the UI shows **"Booster Pack is being
-created…"** until it settles. Once created, the pack is saved to localStorage
-and named after the resolved wiki (so `TERRARIA` becomes `Terraria`, not
-`TERRARIA`).
+created…"** until it settles. The pack is then saved to localStorage, named
+after the resolved wiki (`TERRARIA` becomes `Terraria`), and given the wiki's
+logo as its pack art.
 
-Cards are then drawn from that wiki with the same MediaWiki action API —
-Fandom runs MediaWiki too — using `list=random`, `prop=extracts` for the lead
-text, and an `action=parse` fallback for wikis without the TextExtracts
-extension.
+Cards are drawn from that wiki with the same MediaWiki action API — Fandom runs
+MediaWiki too — using `list=random`, `prop=extracts` for the lead text, and an
+`action=parse` fallback for wikis without the TextExtracts extension.
 
 > Custom packs depend on the target wiki allowing anonymous CORS
 > (`origin=*`), which standard MediaWiki does. A wiki that blocks it won't
@@ -208,84 +201,94 @@ extension.
 
 ---
 
-## Rarity, popularity and price
-
-Popularity is the hinge the whole economy turns on, and it deliberately pulls
-in two directions:
-
-- a popular article makes a card **worth more**
-- a popular article makes a high rarity **harder to roll**
-
-So a Legendary Ayrton Senna is both far rarer and far more valuable than a
-Legendary on some 200-view stub.
-
-Popularity comes from the Wikimedia pageviews API (average of the last two
-complete months, on a log scale). Custom-wiki pages have no pageview API, so
-article length stands in — on a topic wiki, the big articles are the ones
-people care about.
+## Rarity and money
 
 ### Rarity
 
-| Tier | Odds (obscure) | Odds (famous) | Visual treatment |
-| --- | --- | --- | --- |
-| Common | 40% | 63% | matte stock |
-| Uncommon | 25% | 24% | sheen sweep |
-| Rare | 15% | 8.5% | pulsing edge glow |
-| Double Rare | 9% | 3.1% | twin sheen + sparkles |
-| Epic | 5.5% | 1.1% | pulsing aura |
-| Ultra Rare | 3% | 0.35% | rainbow foil shimmer |
-| Legendary | 1.6% | 0.12% | rotating light rays |
-| Mythic | 0.7% | 0.03% | flame flicker |
-| Secret Rare | 0.15% | 0.005% | holographic prismatic banding |
-| Artifact | 0.05% | 0.001% | full iridescent burst |
+Eight tiers. **Odds do not depend on the article** — a page with 100 views a
+month has exactly the same chance at every tier as one with 100k.
 
-Each tier's weight is multiplied by `0.6 ^ (popularity × rank)`, which is why
-an Artifact is ~50× harder on a famous page than an obscure one. The same
-table drives the in-app **Odds** modal, so the two can't drift.
+| Tier | Chance | Visual treatment |
+| --- | --- | --- |
+| Common | 42% | matte stock, no motion |
+| Uncommon | 27% | single sheen sweep |
+| Rare | 17% | breathing border + slow scan bar |
+| Epic | 9% | drifting colour blobs |
+| Legendary | 3.6% | rotating light rays |
+| Mythic | 0.9% | flames climbing the card |
+| Exotic | 0.35% | holographic prismatic banding |
+| Artifact | 0.15% | full iridescent burst |
 
-### Price
+Two rules hold for every treatment, and both are enforced by tests:
 
-`price = (12 + 180 × popularity^1.6) × rarity.value`, where `value` runs from
-1× (Common) to 160× (Artifact). A Common on a dead article is ~$43; an Artifact
-on a front-page-famous one is ~$31,000.
+- **Nothing leaves the card.** Every effect lives inside `.card-front`, which
+  `.card-face` clips with `overflow: hidden`, and no card carries an outward
+  glow — an outer box-shadow is the one thing a clip can't contain.
+- **Nothing is visible before the flip.** Effects are gated on `.is-revealed`
+  *and* sit on the back-face-hidden front, so a face-down card can't hint at
+  what it is. Rarity is only attached to a card after it has already flown out
+  of the pack.
+
+### Money
+
+Prices are in **Buckarooz** (Ᏸ — a B wearing the two bars a dollar sign wears,
+drawn as SVG in `src/data/icons.js`).
+
+Popularity sets the **base price**; rarity is a **percentage on top**:
+
+```
+price = base(popularity) × (1 + rarity.bonusPct / 100)
+```
+
+`base` runs from Ᏸ20 for an unread article to Ᏸ500 for a front-page-famous one,
+and the bonus runs from +0% (Common) to +3200% (Artifact). A Common and an
+Artifact of the same article share a base — the Artifact is simply worth 33×
+more of it. Custom-wiki pages have no pageview API, so article length stands in
+for popularity.
 
 ### Adding a rarity tier
 
 1. Insert a row in `RARITIES` (`src/data/rarities.js`), ordered worst → best,
-   with a `weight` and a price `value`.
+   with a `weight` and a `bonusPct`.
 2. Add a matching `[data-rarity="<id>"]` block in the **RARITY TREATMENTS**
    section of `src/style.css`.
 
-A booster pack for the new tier is generated automatically. Each card carries
-`data-rarity` plus `--rarity` / `--rarity-glow` custom properties, and has two
-dedicated effect layers (`.fx-a`, `.fx-b`) plus a `.card-aura` behind it.
-Effect layers sit above the artwork but *below* the text, so even the loudest
-foil never makes the article unreadable.
-
-While tuning, force every card on screen to one tier from the console:
+Each card carries `data-rarity` plus `--rarity` / `--rarity-glow` custom
+properties and two effect layers (`.fx-a`, `.fx-b`). While tuning:
 
 ```js
 __packywiki.debugRarity('artifact')
 __packywiki.clearCollection()
+__packywiki.resetRipDirection()
 ```
 
 ---
 
 ## Opening a pack
 
-**The zipper.** Packs aren't opened by a button. There's a pull-tab on the
-perforation line: drag it **left or right** and the foil tears in step with the
-drag — the strip is clipped away behind a moving tear front, revealing the dark
-interior and the card tops inside. Let go before 60% and it springs shut. The
-tearing sound is granular, firing a short noise burst every few percent, so it
-tracks the gesture rather than playing a fixed sample. Arrow keys and Enter
-work too.
+**The rip.** There is no button and no pull-tab — the perforation line *is* the
+control. Grab it near either end and slide sideways; the foil parts in step
+with the drag, behind a glowing tear front, revealing the pack's mouth and the
+card tops inside. Let go before 60% and it springs shut, complaining as it
+goes. Whichever direction you pull the first time is remembered, and from then
+on the pack only tears that way. Finish the tear and the torn scrap tumbles
+away under gravity.
 
-**The reveal.** Cards don't cascade in on their own. They arrive as a face-down
-stack and you **swipe each one** — one swipe reveals the current card, retires
-the previous one into the tray below it, and brings the next forward. Tap,
-arrow keys and Enter do the same thing. Pulls are sorted worst-first, so the
-best card is always last.
+**No loading screen.** Cards start being fetched as soon as a pack reaches the
+middle of the shelf, and the opening animation runs on card *backs*, which need
+no data at all — so the animation begins the instant the pack tears. Cards fly
+up out of the pack's mouth one by one while the pack sinks away beneath them,
+then settle into a stack. The data lands underneath all of that.
+
+**The reveal.** The current card turns itself over. Swipe **right-to-left** for
+the next card and **left-to-right** to go back, freely, as many times as you
+like. Tapping does nothing; holding and moving drags the card a little (damped,
+so it follows your finger without being flung). Pull order is **random** — a
+Legendary can come first and a Common last.
+
+**The summary.** Once every card has been turned, the single-card view is
+replaced by the whole pack laid out together at a smaller size, with a Back
+button.
 
 ---
 
@@ -294,8 +297,7 @@ best card is always last.
 Every pull is saved to localStorage and shows up in the **Collection** tab.
 
 - Duplicates are kept as a copy count (`×3`), not separate entries, and the
-  stored rarity is always the *best* pull of that article — pulling Tardigrade
-  again as a Legendary upgrades the entry.
+  stored rarity is always the *best* pull of that article.
 - **Favourite** any card with the star in its top-right corner.
 - Filter by pack, rarity tier, popularity band, minimum price, favourites, and
   free-text title search; sort by newest, price, rarity, popularity or name.
@@ -328,7 +330,8 @@ Every pull is saved to localStorage and shows up in the **Collection** tab.
 - **English Wikipedia only**, hard-coded in `wiki.js`. Custom packs are
   resolved against Fandom.
 - **Rarity is not tied to the article.** It's an independent roll, so a stub
-  can come out Artifact and a featured article can come out Common.
+  can come out Artifact and a featured article can come out Common. Only the
+  price knows how popular a page is.
 
 ## Natural next steps
 
@@ -337,7 +340,7 @@ Every pull is saved to localStorage and shows up in the **Collection** tab.
 - **Set completion** — track which articles a pack *can* yield and show a
   completion percentage per pack.
 - **Sell / buy** — the prices are there; a market that lets you sell
-  duplicates for credits and spend them on packs is the obvious next loop.
+  duplicates for Buckarooz and spend them on packs is the obvious next loop.
 - **Quiz mode** — the article extract is already on the card, so blank out the
   title and make the player name it; scale the points by rarity.
 - **Real cooldown + currency** — a pack timer, and rarer packs that cost

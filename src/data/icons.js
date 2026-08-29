@@ -133,6 +133,19 @@ export const LOGO_MARK = `
       d="M32 18 35.4 27.3 45.3 27.7 37.5 33.8 40.2 43.3 32 37.8 23.8 43.3 26.5 33.8 18.7 27.7 28.6 27.3Z"/>
   </g>`;
 
+/**
+ * The Buckarooz mark: a B with two bars running through it, top and bottom,
+ * the way a dollar sign wears its strokes. Drawn rather than borrowed — no
+ * Unicode currency character is this shape without being another currency.
+ */
+export function buckSvg({ size = 13, className = '' } = {}) {
+  return `<svg class="buck ${className}" viewBox="0 0 16 19" height="${size}"
+    width="${(size * 16) / 19}" aria-hidden="true" focusable="false">
+    <path fill="currentColor" fill-rule="evenodd" d="M3.6 3.2H9c2 0 3.3 1.2 3.3 3 0 1.2-.6 2.1-1.6 2.6 1.3.4 2.2 1.5 2.2 3.1 0 2.1-1.5 3.4-3.9 3.4H3.6zM6.2 5.4V8h2.4c.9 0 1.4-.5 1.4-1.3s-.5-1.3-1.4-1.3zm0 4.8v2.9h2.7c1 0 1.6-.6 1.6-1.5s-.6-1.4-1.6-1.4z"/>
+    <path stroke="currentColor" stroke-width="1.5" stroke-linecap="round" d="M7 1v16.6M10.1 1v16.6"/>
+  </svg>`;
+}
+
 export const hasIcon = (id) => Object.prototype.hasOwnProperty.call(ICONS, id);
 
 /**

@@ -181,10 +181,16 @@ async function drawWikipediaCard(pack, seen) {
       // a renamed category can never leave a pack unopenable.
       const useQuery = liveQueries.length > 0 && attempt < MAX_ATTEMPTS_PER_CARD - 2;
 
+      // The search hit already names the article, so its pageviews can be
+      // fetched alongside the summary rather than after it — one fewer round
+      // trip per card, which is most of the wait before a pack opens.
+      let viewsPromise = null;
+
       if (useQuery) {
         const hit = await searchOne(pick(liveQueries));
         if (!hit || seen.has(hit.title)) continue;
         wordCount = hit.wordcount ?? null;
+        viewsPromise = fetchMonthlyViews(hit.title);
         summary = await summaryFor(hit.title);
       } else {
         summary = await fetchJson(`${REST}/page/random/summary`);
@@ -196,13 +202,75 @@ async function drawWikipediaCard(pack, seen) {
       if (seen.has(title)) continue;
       seen.add(title);
 
-      const views = await fetchMonthlyViews(title);
+      // On the query path views are already in flight for the search hit's
+      // title (which redirects rarely change); only the random path needs a
+      // fresh lookup here.
+      const views = viewsPromise ? await viewsPromise : await fetchMonthlyViews(title);
       return summaryToCard(summary, wordCount, views);
     } catch (err) {
       if (attempt === MAX_ATTEMPTS_PER_CARD - 1) throw err;
     }
   }
   throw new Error(`Could not find a usable article for "${pack.name}"`);
+}
+
+/**
+ * Lead photographs for the booster packs, fetched in ONE request for all of
+ * them. Returns a Map of requested title -> image URL; titles with no image
+ * are simply absent and the caller falls back to the pack's drawn icon.
+ */
+export async function fetchPackArt(titles) {
+  const art = new Map();
+  if (!titles.length) return art;
+
+  const params = new URLSearchParams({
+    action: 'query', titles: titles.join('|'), redirects: '1',
+    prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '640',
+    format: 'json', origin: '*'
+  });
+
+  const data = await fetchJson(`${ACTION}?${params}`);
+  const query = data?.query ?? {};
+
+  // MediaWiki rewrites titles twice on the way in (capitalisation, then
+  // redirects), so follow both chains to get back to what we asked for.
+  const rename = new Map();
+  for (const list of [query.normalized ?? [], query.redirects ?? []]) {
+    for (const { from, to } of list) rename.set(from, to);
+  }
+  const resolve = (title) => {
+    let current = title;
+    for (let hop = 0; hop < 4 && rename.has(current); hop++) current = rename.get(current);
+    return current;
+  };
+
+  const byTitle = new Map();
+  for (const page of Object.values(query.pages ?? {})) {
+    if (page.thumbnail?.source) byTitle.set(page.title, page.thumbnail.source);
+  }
+
+  for (const title of titles) {
+    const image = byTitle.get(resolve(title));
+    if (image) art.set(title, image);
+  }
+  return art;
+}
+
+/** A representative image for a custom pack: the wiki's logo, else a page. */
+export async function fetchCustomPackArt(wiki) {
+  if (wiki.logo) return wiki.logo;
+  try {
+    const params = new URLSearchParams({
+      action: 'query', generator: 'random', grnnamespace: '0', grnlimit: '10',
+      prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '640',
+      format: 'json', origin: '*'
+    });
+    const data = await fetchJson(`${wiki.apiUrl}?${params}`);
+    const page = Object.values(data?.query?.pages ?? {}).find((p) => p.thumbnail?.source);
+    return page?.thumbnail?.source ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /* --- custom wikis -------------------------------------------------------- */
@@ -235,9 +303,11 @@ async function probeWiki(apiUrl) {
   const stats = data?.query?.statistics;
   if (!general?.sitename) return null;
   if ((stats?.articles ?? 0) < 40) return null; // empty/abandoned wiki
+  const logo = general.logo?.startsWith('//') ? `https:${general.logo}` : general.logo;
   return {
     apiUrl,
     sitename: general.sitename,
+    logo: logo ?? null,
     server: general.server?.startsWith('//') ? `https:${general.server}` : general.server,
     articlePath: general.articlepath ?? '/wiki/$1',
     articles: stats.articles

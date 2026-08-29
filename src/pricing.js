@@ -1,25 +1,26 @@
 /**
- * Card pricing and popularity.
+ * Card pricing, in Buckarooz (Ᏸ).
  *
- * Popularity is the hinge the whole economy turns on, and it pulls in two
- * directions on purpose:
+ * Popularity sets the BASE price — how many people actually read the article
+ * each month. Rarity is then a percentage bonus on top of that base, so the
+ * tier scales the card rather than replacing its value:
  *
- *   - a popular article makes a card WORTH MORE (see priceFor)
- *   - a popular article makes a high rarity HARDER to roll (see rarities.js)
+ *     price = base(popularity) × (1 + rarity.bonusPct / 100)
  *
- * So a Legendary Isaac Newton is both far rarer and far more valuable than a
- * Legendary pull on some 200-view stub.
+ * A Common and an Artifact of the same article share a base; the Artifact is
+ * simply worth 3200% more of it.
+ *
+ * Popularity affects price ONLY. It has no influence on the rarity roll — see
+ * src/data/rarities.js.
  */
 
 /** log10(views) at which an article counts as maximally popular (~2M/month). */
 const VIEWS_LOG_CEILING = 6.3;
-
 /** log10(words) treated as maximally "big" when pageviews aren't available. */
 const WORDS_LOG_CEILING = Math.log10(9000);
 
 const clamp01 = (n) => Math.min(1, Math.max(0, n));
 
-/** Monthly pageviews -> 0..1 popularity, on a log scale. */
 export function popularityFromViews(views) {
   if (!Number.isFinite(views) || views <= 0) return 0;
   return clamp01(Math.log10(views + 1) / VIEWS_LOG_CEILING);
@@ -35,21 +36,20 @@ export function popularityFromWordCount(words) {
   return clamp01(Math.log10(words + 1) / WORDS_LOG_CEILING);
 }
 
-/**
- * Base price before rarity, in credits. Ranges from 12 (nobody reads this) to
- * ~192 (front-page famous), curved so the middle of the range isn't flat.
- */
+/** Base value of the article itself, before any rarity bonus. */
 export function basePrice(popularity) {
-  return 12 + 180 * Math.pow(clamp01(popularity), 1.6);
+  return 20 + 480 * Math.pow(clamp01(popularity), 1.5);
 }
 
-/** Final card price: popularity sets the base, rarity multiplies it. */
 export function priceFor(popularity, rarity) {
-  return Math.round(basePrice(popularity) * rarity.value);
+  return Math.round(basePrice(popularity) * (1 + rarity.bonusPct / 100));
 }
 
-export function formatPrice(price) {
-  return `$${Math.round(price).toLocaleString('en-US')}`;
+export const CURRENCY_NAME = 'Buckarooz';
+
+/** Plain-text amount. The Ᏸ glyph itself is drawn as SVG — see icons.js. */
+export function formatAmount(price) {
+  return Math.round(price).toLocaleString('en-US');
 }
 
 /** Compact view count for the card face and collection filters. */
@@ -60,15 +60,12 @@ export function formatViews(views) {
   return String(Math.round(views));
 }
 
-/**
- * Popularity bands, used as a collection filter ("the most popular cards") and
- * as the label under the view count.
- */
+/** Popularity bands, used as a collection filter and as a card-face label. */
 export const POPULARITY_BANDS = [
-  { id: 'obscure',   name: 'Obscure',   min: 0,    max: 0.35 },
-  { id: 'known',     name: 'Known',     min: 0.35, max: 0.55 },
-  { id: 'popular',   name: 'Popular',   min: 0.55, max: 0.75 },
-  { id: 'famous',    name: 'Famous',    min: 0.75, max: 1.01 }
+  { id: 'obscure', name: 'Obscure', min: 0,    max: 0.35 },
+  { id: 'known',   name: 'Known',   min: 0.35, max: 0.55 },
+  { id: 'popular', name: 'Popular', min: 0.55, max: 0.75 },
+  { id: 'famous',  name: 'Famous',  min: 0.75, max: 1.01 }
 ];
 
 export const bandFor = (popularity) =>

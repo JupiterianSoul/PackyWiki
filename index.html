@@ -36,99 +36,62 @@
     </header>
 
     <main>
-      <!-- SCREEN: pack picker ---------------------------------------------->
+      <!-- SCREEN: booster shelf (horizontal, swipeable) --------------------->
       <section id="screen-packs" class="screen is-active">
-        <div class="pack-sections">
-          <section class="pack-section">
-            <h2 class="section-title">Themes</h2>
-            <ul id="theme-list" class="pack-list"></ul>
-          </section>
-
-          <section class="pack-section">
-            <h2 class="section-title">Rarity boosters</h2>
-            <p class="section-note">Weighted toward their own tier and above. No Commons above the Double Rare pack.</p>
-            <ul id="rarity-list" class="pack-list"></ul>
-          </section>
-
-          <section class="pack-section">
-            <h2 class="section-title">Custom boosters</h2>
-            <p class="section-note">
-              Name a game, book or show and PackyWiki finds that subject's own wiki,
-              then builds a booster entirely out of it.
-            </p>
-            <form id="custom-form" class="custom-form" autocomplete="off">
-              <div class="custom-kinds" id="custom-kinds" role="radiogroup" aria-label="Custom pack type"></div>
-              <div class="custom-row">
-                <input id="custom-input" class="custom-input" type="text" placeholder="e.g. Terraria"
-                       aria-label="Subject name" maxlength="60" />
-                <button id="custom-submit" class="primary-button small" type="submit">Create</button>
-              </div>
-              <p id="custom-status" class="custom-status" role="status" aria-live="polite"></p>
-            </form>
-            <ul id="custom-list" class="pack-list"></ul>
-          </section>
+        <div class="rail-wrap">
+          <button class="rail-arrow is-prev" id="rail-prev" type="button" aria-label="Previous pack">‹</button>
+          <div class="pack-rail" id="pack-rail" role="listbox" aria-label="Booster packs" tabindex="0"></div>
+          <button class="rail-arrow is-next" id="rail-next" type="button" aria-label="Next pack">›</button>
         </div>
+
+        <div class="rail-caption">
+          <h2 class="rail-name" id="rail-name"></h2>
+          <p class="rail-tagline" id="rail-tagline"></p>
+          <button id="rail-open" class="primary-button" type="button">Open pack</button>
+          <p class="rail-hint">Swipe the shelf to browse.</p>
+        </div>
+
+        <section class="custom-section">
+          <h2 class="section-title">Custom boosters</h2>
+          <p class="section-note">
+            Name a game, book or show and PackyWiki finds that subject's own wiki,
+            then builds a booster entirely out of it.
+          </p>
+          <form id="custom-form" class="custom-form" autocomplete="off">
+            <div class="custom-kinds" id="custom-kinds" role="radiogroup" aria-label="Custom pack type"></div>
+            <div class="custom-row">
+              <input id="custom-input" class="custom-input" type="text" placeholder="e.g. Terraria"
+                     aria-label="Subject name" maxlength="60" />
+              <button id="custom-submit" class="primary-button small" type="submit">Create</button>
+            </div>
+            <p id="custom-status" class="custom-status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
       </section>
 
-      <!-- SCREEN: open the pack -------------------------------------------->
-      <section id="screen-open" class="screen">
+      <!-- SCREEN: open + reveal (one screen, three phases) ------------------>
+      <!-- Kept as a single screen so the cards can fly out of the pack and
+           settle into the stack without a screen swap or a loading gap. -->
+      <section id="screen-open" class="screen phase-idle">
         <button id="back-button" class="ghost-button back-button" type="button">← All packs</button>
 
-        <div class="open-stage">
-          <div id="pack-visual" class="pack-visual">
-            <div class="pack-body">
-              <!-- Revealed as the foil above it is clipped away. -->
-              <div class="pack-inside" aria-hidden="true"></div>
-              <!-- The strip that tears away, clipped by --rip as you drag. -->
-              <div class="pack-foil" id="pack-foil">
-                <div class="pack-foil-grip"></div>
-              </div>
-              <div class="pack-tear-front" id="pack-tear-front" aria-hidden="true"></div>
-
-              <div class="pack-art">
-                <span class="pack-logo" id="pack-logo"></span>
-                <span class="pack-art-icon" id="pack-art-icon"></span>
-                <span class="pack-art-name" id="pack-art-name"></span>
-                <span class="pack-art-count" id="pack-art-count"></span>
-              </div>
-            </div>
-
-            <!-- Drag target. Sits over the perforation line. -->
-            <div class="zip" id="zip">
-              <div class="zip-track"></div>
-              <div class="zip-tab" id="zip-tab" role="slider" tabindex="0"
-                   aria-label="Drag left or right to tear the pack open"
-                   aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-                <span class="zip-tab-grip"></span>
-              </div>
-            </div>
-
-            <div class="pack-shadow" aria-hidden="true"></div>
-          </div>
-
-          <p id="open-hint" class="open-hint">Drag the tab left or right to rip it open.</p>
-          <p id="open-status" class="open-status" role="status" aria-live="polite"></p>
-        </div>
-      </section>
-
-      <!-- SCREEN: the pulls ------------------------------------------------>
-      <section id="screen-reveal" class="screen">
-        <div class="reveal-head">
-          <h2 id="reveal-title" class="section-title"></h2>
-          <p id="reveal-progress" class="reveal-progress"></p>
+        <div class="open-head">
+          <h2 class="open-title" id="open-title"></h2>
+          <p class="open-progress" id="open-progress"></p>
         </div>
 
-        <div class="stack-area">
-          <div id="card-stack" class="card-stack"></div>
+        <div class="open-stage" id="open-stage">
+          <div class="booster-slot" id="booster-slot"></div>
+          <div class="card-stack" id="card-stack"></div>
         </div>
 
-        <p id="reveal-hint" class="reveal-hint">Swipe the card away to reveal the next one.</p>
+        <!-- Every card in the pack, shown together once the last one is turned. -->
+        <div id="pack-summary" class="pack-summary" aria-label="Everything in this pack"></div>
 
-        <div id="revealed-tray" class="revealed-tray" aria-label="Cards revealed so far"></div>
+        <p id="open-hint" class="open-hint"></p>
 
         <div id="reveal-actions" class="reveal-actions">
-          <button id="again-button" class="primary-button" type="button">Open Another</button>
-          <button id="change-pack-button" class="ghost-button" type="button">All packs</button>
+          <button id="back-to-shelf" class="primary-button" type="button">Back</button>
         </div>
       </section>
 
@@ -149,14 +112,12 @@
           <button id="filter-reset" class="ghost-button" type="button">Reset</button>
         </div>
 
-        <p id="collection-empty" class="empty-note" hidden>
-          Nothing here yet — open a pack and your pulls will land in this binder.
-        </p>
+        <p id="collection-empty" class="empty-note" hidden></p>
         <div id="collection-grid" class="collection-grid"></div>
       </section>
     </main>
 
-    <!-- Odds table -------------------------------------------------------->
+    <!-- Odds ------------------------------------------------------------->
     <div id="odds-modal" class="modal" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="odds-heading">
         <div class="modal-head">
@@ -164,15 +125,12 @@
           <button id="odds-close" class="ghost-button" type="button">Close</button>
         </div>
         <p class="modal-note top">
-          Rarity is rolled per card and depends on how popular the article is:
-          the more monthly views a page has, the harder its high tiers are to hit.
-          Price moves the opposite way, so a famous Legendary is both rarer and
-          worth far more.
+          Rarity is rolled per card. Every article has the same chance at every
+          tier — how many people read it changes what the card is worth, not how
+          rare it is.
         </p>
         <table class="odds-table">
-          <thead>
-            <tr><th>Rarity</th><th>Obscure</th><th>Famous</th><th>Treatment</th></tr>
-          </thead>
+          <thead><tr><th>Rarity</th><th>Chance</th></tr></thead>
           <tbody id="odds-body"></tbody>
         </table>
       </div>

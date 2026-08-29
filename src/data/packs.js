@@ -1,11 +1,9 @@
 /**
  * PACK TABLE
  * ----------------------------------------------------------------------------
- * Three kinds of booster live here:
+ * Two kinds of booster live here:
  *
  *   THEME_PACKS   hand-written, one per subject. Add a row to add a pack.
- *   RARITY_PACKS  generated from the rarity table — one per tier, each biased
- *                 toward its own tier and above.
  *   CUSTOM_KINDS  templates for user-created packs, which resolve a dedicated
  *                 wiki at runtime (see resolveCustomWiki in src/wiki.js).
  *
@@ -19,13 +17,13 @@
  * `incategory:` doesn't descend into subcategories, so a broad category alone
  * gives a shallow pool — the free-text queries fill it back out.
  *
- * `icon` is a key in src/data/icons.js, not an emoji.
+ * `hero` is the Wikipedia article whose lead photograph becomes the booster's
+ * pack art — the packs carry real pictures, not symbols. `icon` is only the
+ * fallback drawn when that image is missing or offline.
  */
-import { RARITIES, rarityRank } from './rarities.js';
-
 export const THEME_PACKS = [
   {
-    id: 'cars', name: 'Cars', icon: 'cars',
+    id: 'cars', hero: 'Ferrari F40', name: 'Cars', icon: 'cars',
     tagline: 'Marques, models and the machines behind them.',
     accent: '#f87171', accent2: '#7f1d1d',
     queries: [
@@ -35,7 +33,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'f1', name: 'Formula One', icon: 'f1',
+    id: 'f1', hero: 'Formula One', name: 'Formula One', icon: 'f1',
     tagline: 'Drivers, constructors, circuits and Grands Prix.',
     accent: '#ef4444', accent2: '#450a0a',
     queries: [
@@ -46,7 +44,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'planes', name: 'Planes', icon: 'planes',
+    id: 'planes', hero: 'Boeing 747', name: 'Planes', icon: 'planes',
     tagline: 'Airliners, fighters and the people who built them.',
     accent: '#60a5fa', accent2: '#1e3a8a',
     queries: [
@@ -56,7 +54,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'video-games', name: 'Video Games', icon: 'video-games',
+    id: 'video-games', hero: 'Video game', name: 'Video Games', icon: 'video-games',
     tagline: 'Titles, studios, consoles and genres.',
     accent: '#a78bfa', accent2: '#4c1d95',
     queries: [
@@ -66,7 +64,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'books', name: 'Books', icon: 'books',
+    id: 'books', hero: 'Book', name: 'Books', icon: 'books',
     tagline: 'Novels, authors and literary movements.',
     accent: '#fbbf24', accent2: '#78350f',
     queries: [
@@ -76,7 +74,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'movies', name: 'Movies & Shows', icon: 'movies',
+    id: 'movies', hero: 'Film', name: 'Movies & Shows', icon: 'movies',
     tagline: 'Films, series, directors and genres.',
     accent: '#f472b6', accent2: '#831843',
     queries: [
@@ -86,7 +84,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'space', name: 'Space', icon: 'space',
+    id: 'space', hero: 'Saturn', name: 'Space', icon: 'space',
     tagline: 'Planets, probes, galaxies and missions.',
     accent: '#818cf8', accent2: '#312e81',
     queries: [
@@ -96,7 +94,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'physics', name: 'Physics', icon: 'physics',
+    id: 'physics', hero: 'Physics', name: 'Physics', icon: 'physics',
     tagline: 'Forces, particles and the laws underneath.',
     accent: '#22d3ee', accent2: '#164e63',
     queries: [
@@ -106,7 +104,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'nature', name: 'Nature', icon: 'nature',
+    id: 'nature', hero: 'Mountain', name: 'Nature', icon: 'nature',
     tagline: 'Mountains, rivers, deserts and weather.',
     accent: '#34d399', accent2: '#065f46',
     queries: [
@@ -116,7 +114,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'animals', name: 'Animals', icon: 'animals',
+    id: 'animals', hero: 'Lion', name: 'Animals', icon: 'animals',
     tagline: 'Mammals, birds, reptiles, fish and insects.',
     accent: '#fb923c', accent2: '#7c2d12',
     queries: [
@@ -126,7 +124,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'plants', name: 'Plants', icon: 'plants',
+    id: 'plants', hero: 'Flower', name: 'Plants', icon: 'plants',
     tagline: 'Trees, flowers and everything photosynthetic.',
     accent: '#4ade80', accent2: '#14532d',
     queries: [
@@ -136,7 +134,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'history', name: 'History', icon: 'history',
+    id: 'history', hero: 'Colosseum', name: 'History', icon: 'history',
     tagline: 'Empires, wars, ruins and revolutions.',
     accent: '#d6a25c', accent2: '#78350f',
     queries: [
@@ -146,7 +144,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'philosophy', name: 'Philosophy', icon: 'philosophy',
+    id: 'philosophy', hero: 'The Thinker', name: 'Philosophy', icon: 'philosophy',
     tagline: 'Thinkers, schools and awkward questions.',
     accent: '#c084fc', accent2: '#581c87',
     queries: [
@@ -157,7 +155,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'celebrities', name: 'Celebrities', icon: 'celebrities',
+    id: 'celebrities', hero: 'Hollywood Sign', name: 'Celebrities', icon: 'celebrities',
     tagline: 'Actors, musicians and household names.',
     accent: '#facc15', accent2: '#713f12',
     queries: [
@@ -167,7 +165,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'quotes', name: 'Quotes', icon: 'quotes',
+    id: 'quotes', hero: 'Quotation', name: 'Quotes', icon: 'quotes',
     tagline: 'Catchphrases, mottos, proverbs and slogans.',
     accent: '#e879f9', accent2: '#701a75',
     queries: [
@@ -177,7 +175,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'art', name: 'Art', icon: 'art',
+    id: 'art', hero: 'Mona Lisa', name: 'Art', icon: 'art',
     tagline: 'Paintings, sculpture, movements and makers.',
     accent: '#fb7185', accent2: '#881337',
     queries: [
@@ -187,7 +185,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'cactus', name: 'Cactus', icon: 'cactus',
+    id: 'cactus', hero: 'Cactus', name: 'Cactus', icon: 'cactus',
     tagline: 'Cacti and the wider succulent family.',
     accent: '#84cc16', accent2: '#3f6212',
     queries: [
@@ -196,7 +194,7 @@ export const THEME_PACKS = [
     ]
   },
   {
-    id: 'sport', name: 'Sport', icon: 'sport',
+    id: 'sport', hero: 'Sport', name: 'Sport', icon: 'sport',
     tagline: 'Games, leagues, athletes and records.',
     accent: '#2dd4bf', accent2: '#134e4a',
     queries: [
@@ -206,32 +204,6 @@ export const THEME_PACKS = [
     ]
   }
 ].map((pack) => ({ ...pack, group: 'theme', source: 'wikipedia', cards: 5 }));
-
-/**
- * One booster per rarity tier, generated so a new tier automatically gets a
- * pack. Each is biased toward its own tier and above:
- *
- *   tierShift  multiplies every tier's weight by shift^rank, tilting the whole
- *              table upward.
- *   floorTier  excludes everything below it outright, so a Legendary pack
- *              never hands you a Common.
- */
-export const RARITY_PACKS = RARITIES.map((rarity, rank) => ({
-  id: `rarity-${rarity.id}`,
-  name: `${rarity.name} Booster`,
-  icon: 'gem',
-  tagline: `Weighted toward ${rarity.name} and above.`,
-  accent: rarity.color,
-  accent2: '#1e2233',
-  group: 'rarity',
-  source: 'wikipedia',
-  cards: 5,
-  rarityId: rarity.id,
-  // Anything goes in a Common pack; higher tiers get a floor three ranks down.
-  roll: { tierShift: 1 + rank * 0.15, floorTier: Math.max(0, rank - 3) },
-  // Rarity packs draw from the whole encyclopedia.
-  queries: []
-}));
 
 /**
  * Templates for user-created packs. The user types a subject (a game, a book,
@@ -254,14 +226,8 @@ export const CUSTOM_KINDS = [
 
 export const customKindById = (id) => CUSTOM_KINDS.find((k) => k.id === id) ?? CUSTOM_KINDS[0];
 
-/** Roll options for a pack — rarity packs override, everything else is default. */
-export const packRollOptions = (pack) => pack.roll ?? {};
-
-/** Rank of the tier a rarity pack targets, or null. */
-export const packTargetRank = (pack) =>
-  pack.rarityId ? rarityRank(pack.rarityId) : null;
-
-export const STATIC_PACKS = [...THEME_PACKS, ...RARITY_PACKS];
-
 export const packById = (id, customPacks = []) =>
-  [...STATIC_PACKS, ...customPacks].find((p) => p.id === id) ?? THEME_PACKS[0];
+  [...THEME_PACKS, ...customPacks].find((p) => p.id === id) ?? THEME_PACKS[0];
+
+/** Hero titles for one batched pageimages lookup — see fetchPackArt in wiki.js. */
+export const heroTitles = () => THEME_PACKS.map((p) => p.hero);
