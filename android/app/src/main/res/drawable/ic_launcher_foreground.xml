@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A card with a star on it. Vector-only, so the repo carries no binary art;
+     minSdk 26 means the adaptive icon is the only launcher icon needed. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Back card, tilted, in the accent indigo. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="56"
+        android:rotation="-14">
+        <path
+            android:fillColor="#6366F1"
+            android:pathData="M40,28 L68,28 A6,6 0 0 1 74,34 L74,78 A6,6 0 0 1 68,84 L40,84 A6,6 0 0 1 34,78 L34,34 A6,6 0 0 1 40,28 Z" />
+    </group>
+
+    <!-- Front card. -->
+    <group
+        android:pivotX="54"
+        android:pivotY="56"
+        android:rotation="6">
+        <path
+            android:fillColor="#F8FAFC"
+            android:pathData="M40,28 L68,28 A6,6 0 0 1 74,34 L74,78 A6,6 0 0 1 68,84 L40,84 A6,6 0 0 1 34,78 L34,34 A6,6 0 0 1 40,28 Z" />
+        <path
+            android:fillColor="#FBBF24"
+            android:pathData="M54,43 L57.41,52.31 L67.31,52.67 L59.52,58.79 L62.23,68.33 L54,62.8 L45.77,68.33 L48.48,58.79 L40.69,52.67 L50.59,52.31 Z" />
+    </group>
+</vector>

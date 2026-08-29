@@ -39,6 +39,48 @@ Chrome, Firefox, Safari or Edge.
 
 ---
 
+## Android APK
+
+The app also ships as a sideloadable Android APK — a thin WebView wrapper
+around the same web build, so there is no second codebase to maintain.
+
+**Getting it:** every push builds one in CI and publishes it to the rolling
+[`apk-latest`](../../releases/tag/apk-latest) release. Download
+`packywiki-debug.apk` on your phone, tap it, and allow your browser to install
+unknown apps when prompted.
+
+It's debug-signed, so if an existing install refuses to update, uninstall it
+first. The app needs a network connection — only the shell is bundled; cards
+are still fetched live from Wikipedia.
+
+**Building it yourself** (needs the Android SDK, which CI provides):
+
+```bash
+npm run build                       # produces dist/
+cd android && ./gradlew assembleDebug
+# -> android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+Gradle's `copyWebAssets` task copies `dist/` into the APK's assets, so
+`npm run build` has to run first.
+
+### One implementation note worth knowing
+
+`MainActivity` serves the bundled build through `WebViewAssetLoader` on
+`https://appassets.androidplatform.net/` rather than loading it over `file://`.
+That isn't decoration: WebView blocks cross-origin `fetch()` from `file://`
+pages, which would break every call to the Wikipedia API. Serving from a real
+origin makes the app behave exactly as it does in a desktop browser.
+
+Links to Wikipedia (`Read →`) are intercepted and handed to the system browser
+instead of navigating away from the app.
+
+Config: `minSdk 26` (Android 8.0), `targetSdk 35`. minSdk 26 also means the
+vector adaptive icon is the only launcher icon needed, so the repo carries no
+binary image assets.
+
+---
+
 ## Project layout
 
 ```
@@ -52,6 +94,12 @@ src/
     packs.js          PACK TABLE    — one row per booster pack
     rarities.js       RARITY TABLE  — one row per tier, with weights
 vite.config.js
+android/              WebView wrapper that packages the web build as an APK
+  app/src/main/
+    java/.../MainActivity.java   hosts the WebView, serves assets over https
+    AndroidManifest.xml
+    res/                          theme + vector launcher icon
+.github/workflows/android.yml     builds and publishes the APK
 ```
 
 The two tables in `src/data/` are the extension points. Everything else reads
