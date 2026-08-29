@@ -2,102 +2,179 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>PackyWiki — Wikipedia Pack Opener</title>
-    <meta
-      name="description"
-      content="Open booster packs of real Wikipedia articles as collectible trading cards."
-    />
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🃏</text></svg>" />
+    <meta name="description" content="Open booster packs of real Wikipedia articles as collectible trading cards." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='14' y='8' width='36' height='48' rx='6' fill='%230f1220' stroke='%23f8fafc' stroke-width='3'/><path fill='%23fbbf24' d='M32 18 35.4 27.3 45.3 27.7 37.5 33.8 40.2 43.3 32 37.8 23.8 43.3 26.5 33.8 18.7 27.7 28.6 27.3Z'/></svg>" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <!-- Full-screen white-out used for high-rarity reveals. -->
     <div id="flash" class="flash" aria-hidden="true"></div>
 
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark">🃏</span>
-        <div>
+        <span class="brand-mark" id="brand-mark"></span>
+        <div class="brand-text">
           <h1>PackyWiki</h1>
           <p class="brand-sub">Wikipedia, by the booster pack.</p>
         </div>
       </div>
+
+      <nav class="tabs" aria-label="Sections">
+        <button class="tab is-active" data-tab="packs" type="button">Packs</button>
+        <button class="tab" data-tab="collection" type="button">
+          Collection <span class="tab-count" id="tab-count">0</span>
+        </button>
+      </nav>
+
       <div class="topbar-actions">
-        <span class="debug-chip" title="No cooldown in this build — open packs back to back.">
-          debug build · no cooldown
-        </span>
         <button id="odds-button" class="ghost-button" type="button">Odds</button>
-        <button
-          id="mute-button"
-          class="ghost-button"
-          type="button"
-          aria-pressed="false"
-          title="Toggle sound"
-        >
-          🔊 Sound
+        <button id="mute-button" class="ghost-button" type="button" aria-pressed="false" title="Toggle sound">
+          <span id="mute-label">Sound on</span>
         </button>
       </div>
     </header>
 
     <main>
-      <!-- SCREEN 1: choose a pack ------------------------------------------->
-      <section id="screen-select" class="screen is-active">
-        <h2 class="screen-title">Choose a pack</h2>
-        <div id="pack-grid" class="pack-grid"><!-- built from PACKS --></div>
+      <!-- SCREEN: pack picker ---------------------------------------------->
+      <section id="screen-packs" class="screen is-active">
+        <div class="pack-sections">
+          <section class="pack-section">
+            <h2 class="section-title">Themes</h2>
+            <ul id="theme-list" class="pack-list"></ul>
+          </section>
+
+          <section class="pack-section">
+            <h2 class="section-title">Rarity boosters</h2>
+            <p class="section-note">Weighted toward their own tier and above. No Commons above the Double Rare pack.</p>
+            <ul id="rarity-list" class="pack-list"></ul>
+          </section>
+
+          <section class="pack-section">
+            <h2 class="section-title">Custom boosters</h2>
+            <p class="section-note">
+              Name a game, book or show and PackyWiki finds that subject's own wiki,
+              then builds a booster entirely out of it.
+            </p>
+            <form id="custom-form" class="custom-form" autocomplete="off">
+              <div class="custom-kinds" id="custom-kinds" role="radiogroup" aria-label="Custom pack type"></div>
+              <div class="custom-row">
+                <input id="custom-input" class="custom-input" type="text" placeholder="e.g. Terraria"
+                       aria-label="Subject name" maxlength="60" />
+                <button id="custom-submit" class="primary-button small" type="submit">Create</button>
+              </div>
+              <p id="custom-status" class="custom-status" role="status" aria-live="polite"></p>
+            </form>
+            <ul id="custom-list" class="pack-list"></ul>
+          </section>
+        </div>
       </section>
 
-      <!-- SCREEN 2: the idle pack, then the rip ------------------------------>
+      <!-- SCREEN: open the pack -------------------------------------------->
       <section id="screen-open" class="screen">
-        <button id="back-button" class="ghost-button back-button" type="button">← Back</button>
+        <button id="back-button" class="ghost-button back-button" type="button">← All packs</button>
+
         <div class="open-stage">
           <div id="pack-visual" class="pack-visual">
             <div class="pack-body">
-              <div class="pack-foil"></div>
-              <div class="pack-seam" aria-hidden="true"></div>
-              <div class="pack-label">
-                <span class="pack-visual-icon"></span>
-                <span class="pack-visual-name"></span>
-                <span class="pack-visual-count"></span>
+              <!-- Revealed as the foil above it is clipped away. -->
+              <div class="pack-inside" aria-hidden="true"></div>
+              <!-- The strip that tears away, clipped by --rip as you drag. -->
+              <div class="pack-foil" id="pack-foil">
+                <div class="pack-foil-grip"></div>
+              </div>
+              <div class="pack-tear-front" id="pack-tear-front" aria-hidden="true"></div>
+
+              <div class="pack-art">
+                <span class="pack-logo" id="pack-logo"></span>
+                <span class="pack-art-icon" id="pack-art-icon"></span>
+                <span class="pack-art-name" id="pack-art-name"></span>
+                <span class="pack-art-count" id="pack-art-count"></span>
               </div>
             </div>
+
+            <!-- Drag target. Sits over the perforation line. -->
+            <div class="zip" id="zip">
+              <div class="zip-track"></div>
+              <div class="zip-tab" id="zip-tab" role="slider" tabindex="0"
+                   aria-label="Drag left or right to tear the pack open"
+                   aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                <span class="zip-tab-grip"></span>
+              </div>
+            </div>
+
             <div class="pack-shadow" aria-hidden="true"></div>
           </div>
+
+          <p id="open-hint" class="open-hint">Drag the tab left or right to rip it open.</p>
           <p id="open-status" class="open-status" role="status" aria-live="polite"></p>
-          <button id="open-button" class="primary-button" type="button">Open Pack</button>
         </div>
       </section>
 
-      <!-- SCREEN 3: the pulls ------------------------------------------------>
+      <!-- SCREEN: the pulls ------------------------------------------------>
       <section id="screen-reveal" class="screen">
         <div class="reveal-head">
-          <h2 id="reveal-title" class="screen-title"></h2>
-          <p class="reveal-hint">Click any card to flip it over.</p>
+          <h2 id="reveal-title" class="section-title"></h2>
+          <p id="reveal-progress" class="reveal-progress"></p>
         </div>
-        <div id="card-row" class="card-row"><!-- built per pack --></div>
+
+        <div class="stack-area">
+          <div id="card-stack" class="card-stack"></div>
+        </div>
+
+        <p id="reveal-hint" class="reveal-hint">Swipe the card away to reveal the next one.</p>
+
+        <div id="revealed-tray" class="revealed-tray" aria-label="Cards revealed so far"></div>
+
         <div id="reveal-actions" class="reveal-actions">
           <button id="again-button" class="primary-button" type="button">Open Another</button>
-          <button id="change-pack-button" class="ghost-button" type="button">Change Pack</button>
+          <button id="change-pack-button" class="ghost-button" type="button">All packs</button>
         </div>
+      </section>
+
+      <!-- SCREEN: collection ----------------------------------------------->
+      <section id="screen-collection" class="screen">
+        <div class="collection-stats" id="collection-stats"></div>
+
+        <div class="filters" id="filters">
+          <input id="filter-search" class="filter-input" type="search" placeholder="Search titles…" aria-label="Search titles" />
+          <select id="filter-pack" class="filter-select" aria-label="Filter by pack"></select>
+          <select id="filter-rarity" class="filter-select" aria-label="Filter by rarity"></select>
+          <select id="filter-band" class="filter-select" aria-label="Filter by popularity"></select>
+          <select id="filter-price" class="filter-select" aria-label="Filter by minimum price"></select>
+          <select id="filter-sort" class="filter-select" aria-label="Sort"></select>
+          <button id="filter-fav" class="chip-toggle" type="button" aria-pressed="false">
+            <span class="chip-star"></span> Favourites
+          </button>
+          <button id="filter-reset" class="ghost-button" type="button">Reset</button>
+        </div>
+
+        <p id="collection-empty" class="empty-note" hidden>
+          Nothing here yet — open a pack and your pulls will land in this binder.
+        </p>
+        <div id="collection-grid" class="collection-grid"></div>
       </section>
     </main>
 
-    <!-- Odds table, generated from the rarity table -------------------------->
+    <!-- Odds table -------------------------------------------------------->
     <div id="odds-modal" class="modal" hidden>
       <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="odds-heading">
         <div class="modal-head">
           <h2 id="odds-heading">Pull rates</h2>
           <button id="odds-close" class="ghost-button" type="button">Close</button>
         </div>
-        <table id="odds-table" class="odds-table">
-          <thead>
-            <tr><th>Rarity</th><th>Odds</th><th>Card treatment</th></tr>
-          </thead>
-          <tbody><!-- built from RARITIES --></tbody>
-        </table>
-        <p class="modal-note">
-          Rarity is rolled per card, independently of which article you draw.
+        <p class="modal-note top">
+          Rarity is rolled per card and depends on how popular the article is:
+          the more monthly views a page has, the harder its high tiers are to hit.
+          Price moves the opposite way, so a famous Legendary is both rarer and
+          worth far more.
         </p>
+        <table class="odds-table">
+          <thead>
+            <tr><th>Rarity</th><th>Obscure</th><th>Famous</th><th>Treatment</th></tr>
+          </thead>
+          <tbody id="odds-body"></tbody>
+        </table>
       </div>
     </div>
 

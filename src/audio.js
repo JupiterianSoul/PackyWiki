@@ -141,6 +141,25 @@ class Synth {
     src.stop(t + dur + 0.1);
   }
 
+  /**
+   * One notch of tearing, fired repeatedly while the zipper is dragged. The
+   * tear is driven by the drag itself, so the sound has to be granular rather
+   * than one fixed-length sample — pitch and grit rise with progress.
+   */
+  playRipTick(progress) {
+    if (!this.ensure() || this.muted) return;
+    const p = Math.min(1, Math.max(0, progress));
+    this.#noise({
+      at: 0,
+      dur: 0.07 + Math.random() * 0.03,
+      gain: 0.09 + 0.09 * p,
+      type: 'bandpass',
+      from: 2400 + 4200 * p,
+      to: 800 + 1400 * p,
+      q: 1.6
+    });
+  }
+
   /** Foil tearing: a bright, gritty noise sweep over a low cardboard thump. */
   playRip() {
     if (!this.ensure() || this.muted) return;

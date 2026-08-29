@@ -1,14 +1,14 @@
 /* ==========================================================================
    PackyWiki
    --------------------------------------------------------------------------
-   Layout order:
      1. Tokens & reset
-     2. Top bar / shell
-     3. Screen 1 — pack picker
-     4. Screen 2 — idle pack + rip animation
-     5. Screen 3 — card row, flip mechanics, card front/back
+     2. Shell: top bar, tabs, screens
+     3. Pack list (themes / rarity / custom)
+     4. Opening: pack art + the zipper you drag to tear
+     5. Cards: shared face, swipe stack, reveal tray
      6. RARITY TREATMENTS  <- one block per tier, keyed off [data-rarity]
-     7. Flash, modal, responsive
+     7. Collection binder + filters
+     8. Flash, modal, responsive
    ========================================================================== */
 
 /* 1. Tokens & reset ------------------------------------------------------- */
@@ -22,14 +22,13 @@
   --accent: #94a3b8;
   --accent2: #475569;
 
-  --card-w: 226px;
+  --card-w: 250px;
   --card-radius: 16px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-back: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 * { box-sizing: border-box; }
-
 html, body { height: 100%; }
 
 /* The body gradient is `fixed`, so it only covers the viewport. Without this
@@ -51,21 +50,25 @@ body {
 
 h1, h2, h3 { margin: 0; line-height: 1.2; }
 p { margin: 0; }
-
+ul { margin: 0; padding: 0; list-style: none; }
 button { font: inherit; color: inherit; cursor: pointer; }
+
+.icon { display: block; flex: none; }
+.logo-mark { display: block; color: currentColor; }
 
 .primary-button {
   border: 0;
   border-radius: 999px;
-  padding: 15px 42px;
-  font-size: 1.05rem;
+  padding: 14px 38px;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: #0b0d14;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
-  box-shadow: 0 10px 34px -10px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.45);
-  transition: transform 0.18s var(--ease-back), box-shadow 0.18s ease, filter 0.18s ease;
+  box-shadow: 0 10px 34px -12px var(--accent), inset 0 1px 0 rgba(255, 255, 255, 0.45);
+  transition: transform 0.18s var(--ease-back), filter 0.18s ease;
 }
+.primary-button.small { padding: 11px 22px; font-size: 0.9rem; }
 .primary-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); }
 .primary-button:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
 .primary-button:disabled { opacity: 0.45; cursor: not-allowed; }
@@ -73,12 +76,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ghost-button {
   border: 1px solid var(--panel-line);
   border-radius: 999px;
-  padding: 9px 18px;
-  font-size: 0.88rem;
+  padding: 8px 16px;
+  font-size: 0.85rem;
   font-weight: 600;
   background: var(--panel);
   color: var(--text-dim);
-  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+  transition: color 0.18s ease, border-color 0.18s ease;
 }
 .ghost-button:hover { color: var(--text); border-color: rgba(255, 255, 255, 0.26); }
 
@@ -88,129 +91,202 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  padding: 20px clamp(16px, 4vw, 42px);
+  padding: 14px clamp(14px, 3vw, 36px);
   border-bottom: 1px solid var(--panel-line);
   backdrop-filter: blur(8px);
 }
-.brand { display: flex; align-items: center; gap: 14px; }
-.brand-mark {
-  font-size: 1.9rem;
-  filter: drop-shadow(0 4px 14px rgba(129, 140, 248, 0.6));
-}
-.brand h1 { font-size: 1.35rem; letter-spacing: -0.02em; }
-.brand-sub { font-size: 0.82rem; color: var(--text-dim); }
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+.brand-mark { color: #c7d2fe; filter: drop-shadow(0 4px 14px rgba(129, 140, 248, 0.5)); }
+.brand h1 { font-size: 1.2rem; letter-spacing: -0.02em; }
+.brand-sub { font-size: 0.78rem; color: var(--text-dim); }
 
-.topbar-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.debug-chip {
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.tab {
+  border: 0;
+  border-radius: 999px;
+  padding: 8px 18px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  background: transparent;
+  transition: color 0.18s ease, background 0.18s ease;
+}
+.tab.is-active { color: #0b0d14; background: linear-gradient(135deg, #e2e8f0, #94a3b8); }
+.tab-count {
+  display: inline-block;
+  min-width: 20px;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 999px;
   font-size: 0.72rem;
   font-weight: 700;
-  letter-spacing: 0.09em;
-  text-transform: uppercase;
-  color: #fbbf24;
-  border: 1px dashed rgba(251, 191, 36, 0.45);
-  border-radius: 999px;
-  padding: 6px 13px;
-  background: rgba(251, 191, 36, 0.07);
+  background: rgba(0, 0, 0, 0.25);
 }
+.tab.is-active .tab-count { background: rgba(0, 0, 0, 0.18); }
 
-main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
+.topbar-actions { display: flex; align-items: center; gap: 8px; }
 
-.screen { display: none; animation: screen-in 0.45s var(--ease-out); }
+main { padding: clamp(20px, 4vw, 44px) clamp(14px, 3vw, 36px) 90px; }
+
+.screen { display: none; animation: screen-in 0.4s var(--ease-out); }
 .screen.is-active { display: block; }
 @keyframes screen-in {
-  from { opacity: 0; transform: translateY(14px); }
+  from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: none; }
 }
 
-.screen-title {
-  font-size: clamp(1.4rem, 3vw, 2rem);
-  letter-spacing: -0.02em;
-  margin-bottom: 22px;
-  text-align: center;
-}
+.section-title { font-size: 1.15rem; letter-spacing: -0.01em; margin-bottom: 6px; }
+.section-note { font-size: 0.84rem; color: var(--text-dim); line-height: 1.5; margin-bottom: 14px; }
 
-/* 3. Pack picker ---------------------------------------------------------- */
-.pack-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 20px;
-  max-width: 1180px;
-  margin: 0 auto;
-}
+/* 3. Pack list ------------------------------------------------------------ */
+.pack-sections { max-width: 760px; margin: 0 auto; display: grid; gap: 40px; }
+.pack-section > .section-title { margin-bottom: 12px; }
 
-.pack-tile {
-  position: relative;
-  overflow: hidden;
-  text-align: left;
-  border: 1px solid var(--panel-line);
-  border-radius: 20px;
-  padding: 24px 22px 20px;
-  background:
-    linear-gradient(160deg, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%),
-    var(--panel);
-  transition: transform 0.24s var(--ease-back), border-color 0.24s ease, box-shadow 0.24s ease;
-}
-.pack-tile::after {
-  /* accent wash that lights up on hover */
-  content: "";
-  position: absolute;
-  inset: -40% -10% auto;
-  height: 150%;
-  background: radial-gradient(60% 60% at 50% 0%, color-mix(in srgb, var(--accent) 45%, transparent), transparent 70%);
-  opacity: 0;
-  transition: opacity 0.28s ease;
-  pointer-events: none;
-}
-.pack-tile:hover {
-  transform: translateY(-6px);
-  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
-  box-shadow: 0 22px 46px -22px var(--accent);
-}
-.pack-tile:hover::after { opacity: 0.55; }
+/* One booster per line: compact rows rather than big grid tiles. */
+.pack-list { display: grid; gap: 8px; }
+.pack-row-wrap { position: relative; }
 
-/* Keep tile content above the hover wash. */
-.pack-tile > * { position: relative; z-index: 1; }
-
-.pack-tile-icon { font-size: 2.1rem; display: block; margin-bottom: 12px; }
-.pack-tile-name {
-  display: block;
-  font-size: 1.12rem;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  margin-bottom: 6px;
-  color: var(--text);
-}
-.pack-tile-tagline { display: block; font-size: 0.86rem; color: var(--text-dim); line-height: 1.5; min-height: 3.1em; } /* keeps every tile's divider on the same line */
-.pack-tile-foot {
-  position: relative;
+.pack-row {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-top: 18px;
-  padding-top: 14px;
-  border-top: 1px solid var(--panel-line);
+  gap: 14px;
+  width: 100%;
+  text-align: left;
+  padding: 12px 16px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background:
+    linear-gradient(100deg, color-mix(in srgb, var(--accent) 16%, transparent), transparent 46%),
+    var(--panel);
+  transition: transform 0.16s var(--ease-out), border-color 0.16s ease, box-shadow 0.16s ease;
 }
-.pack-tile-count {
-  font-size: 0.76rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.pack-row:hover {
+  transform: translateX(3px);
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 10px 26px -18px var(--accent);
+}
+.pack-row-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: 11px;
   color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
 }
-.pack-tile-go { font-size: 0.86rem; color: var(--text-dim); }
+.pack-row-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.pack-row-name { font-size: 0.96rem; font-weight: 700; letter-spacing: -0.01em; }
+.pack-row-tagline {
+  font-size: 0.79rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pack-row-meta { display: flex; align-items: center; gap: 10px; flex: none; }
+.pack-row-count {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.pack-row-go { color: var(--text-dim); font-size: 1.2rem; line-height: 1; }
 
-/* 4. Idle pack + rip ------------------------------------------------------ */
-.back-button { margin-bottom: 8px; }
+.pack-row-delete {
+  position: absolute;
+  top: 50%;
+  right: -34px;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--panel-line);
+  border-radius: 50%;
+  background: var(--panel);
+  color: var(--text-dim);
+}
+.pack-row-delete:hover { color: #fca5a5; border-color: rgba(252, 165, 165, 0.5); }
 
+/* custom pack form */
+.custom-form {
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.custom-kinds { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.kind-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 14px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  background: transparent;
+  transition: color 0.16s ease, border-color 0.16s ease, background 0.16s ease;
+}
+.kind-chip.is-active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+.custom-row { display: flex; gap: 8px; }
+.custom-input {
+  flex: 1;
+  min-width: 0;
+  padding: 11px 14px;
+  font: inherit;
+  font-size: 0.92rem;
+  color: var(--text);
+  border: 1px solid var(--panel-line);
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.custom-input::placeholder { color: #64748b; }
+.custom-status { margin-top: 10px; font-size: 0.83rem; min-height: 1.3em; color: var(--text-dim); }
+.custom-status.is-error { color: #fca5a5; }
+.custom-status.is-ok { color: #86efac; }
+.custom-status.is-working { color: #fcd34d; }
+.custom-status.is-working::after {
+  content: '';
+  display: inline-block;
+  width: 9px; height: 9px;
+  margin-left: 8px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: spin 0.7s linear infinite;
+  vertical-align: -1px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 4. Opening: pack art + zipper ------------------------------------------- */
+.back-button { margin-bottom: 10px; }
 .open-stage {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 26px;
-  padding: clamp(20px, 5vh, 48px) 0 0;
+  padding: clamp(16px, 4vh, 40px) 0 0;
   perspective: 1100px;
 }
 
@@ -218,12 +294,14 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   position: relative;
   width: 250px;
   height: 350px;
-  transform-style: preserve-3d;
   animation: pack-float 5s ease-in-out infinite;
+  touch-action: none;
 }
+/* Hold still while it's being torn — floating fights the drag. */
+.pack-visual.is-tearing, .pack-visual.is-ripping { animation: none; }
 @keyframes pack-float {
-  0%, 100% { transform: translateY(0) rotateZ(-1.6deg) rotateY(-7deg); }
-  50% { transform: translateY(-20px) rotateZ(1.6deg) rotateY(7deg); }
+  0%, 100% { transform: translateY(0) rotate(-1.4deg); }
+  50% { transform: translateY(-18px) rotate(1.4deg); }
 }
 
 .pack-body {
@@ -231,25 +309,17 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   inset: 0;
   border-radius: 12px 12px 16px 16px;
   overflow: hidden;
-  background:
-    linear-gradient(150deg, color-mix(in srgb, var(--accent) 75%, #000), var(--accent2) 55%, #0d1018);
+  background: linear-gradient(150deg, color-mix(in srgb, var(--accent) 72%, #000), var(--accent2) 55%, #0d1018);
   box-shadow:
     0 30px 60px -24px rgba(0, 0, 0, 0.85),
     inset 0 0 0 1px rgba(255, 255, 255, 0.16),
     inset 0 -70px 90px -60px rgba(0, 0, 0, 0.9);
 }
 .pack-body::before {
-  /* glossy foil highlight sliding down the wrapper */
   content: "";
   position: absolute;
   inset: -30%;
-  background: linear-gradient(
-    105deg,
-    transparent 32%,
-    rgba(255, 255, 255, 0.42) 46%,
-    rgba(255, 255, 255, 0.06) 54%,
-    transparent 68%
-  );
+  background: linear-gradient(105deg, transparent 32%, rgba(255, 255, 255, 0.38) 46%, rgba(255, 255, 255, 0.05) 54%, transparent 68%);
   animation: pack-gloss 4.5s ease-in-out infinite;
 }
 @keyframes pack-gloss {
@@ -257,144 +327,236 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   50% { transform: translateX(38%); }
 }
 
-/* The tear-away strip along the top of the pack. */
+/* The open mouth of the pack, sitting directly under the foil strip. As the
+   strip is clipped away by the drag, this is what shows through — without it
+   a torn pack just looks like more wrapper. */
+.pack-inside {
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 22%;
+  z-index: 2;
+  background: linear-gradient(180deg, #04050a 0%, #090c15 55%, #11162a 100%);
+  box-shadow: inset 0 -14px 22px -12px #000, inset 0 3px 6px -3px #000;
+}
+/* Card tops peeking out of the opening. */
+.pack-inside::after {
+  content: "";
+  position: absolute;
+  left: 13%; right: 13%; bottom: 0;
+  height: 46%;
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(180deg, #39426a, #1b2038);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    -9px 3px 0 -3px #2a3152,
+    9px 3px 0 -3px #2a3152;
+}
+
+/* The strip that tears off. JS clips it with clip-path as you drag. */
 .pack-foil {
   position: absolute;
   inset: 0 0 auto 0;
-  height: 26%;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.05));
-  border-bottom: 2px dashed rgba(255, 255, 255, 0.4);
-  transform-origin: bottom center;
+  height: 22%;
+  z-index: 3;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.06)),
+    linear-gradient(150deg, color-mix(in srgb, var(--accent) 72%, #000), var(--accent2));
+  box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.3);
 }
-.pack-seam {
+.pack-foil-grip {
   position: absolute;
-  inset: 26% 0 auto 0;
-  height: 2px;
-  background: repeating-linear-gradient(
-    90deg,
-    rgba(255, 255, 255, 0.55) 0 7px,
-    transparent 7px 14px
-  );
+  inset: 30% 12% auto;
+  height: 30%;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.28) 0 3px, transparent 3px 7px);
+}
+/* Serrated edge, so the strip reads as torn rather than cut. */
+.pack-foil::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -2px;
+  height: 7px;
+  background: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.55) 0 4px, transparent 4px 8px);
 }
 
-.pack-label {
+/* Glowing front of the tear, moved along by JS. */
+.pack-tear-front {
   position: absolute;
-  inset: auto 0 0 0;
+  top: 0;
+  height: 24%;
+  width: 20px;
+  margin-left: -10px;
+  z-index: 4;
+  opacity: 0;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.1));
+  filter: blur(2px);
+  transition: opacity 0.15s ease;
+}
+.pack-tear-front::after {
+  content: "";
+  position: absolute;
+  inset: -6px -14px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--accent) 70%, white), transparent 70%);
+  opacity: 0.8;
+}
+
+.pack-art {
+  position: absolute;
+  inset: 26% 0 0 0;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 6px;
-  padding: 26px 18px 30px;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px;
   text-align: center;
-  background: linear-gradient(0deg, rgba(0, 0, 0, 0.62), transparent);
 }
-.pack-visual-icon { font-size: 2.6rem; }
-.pack-visual-name {
-  font-size: 1.15rem;
+.pack-logo { color: rgba(255, 255, 255, 0.9); }
+.pack-art-icon {
+  display: grid;
+  place-items: center;
+  width: 66px; height: 66px;
+  border-radius: 18px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+}
+.pack-art-name {
+  font-size: 1.1rem;
   font-weight: 800;
-  letter-spacing: 0.02em;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+  letter-spacing: 0.01em;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.75);
 }
-.pack-visual-count {
-  font-size: 0.72rem;
+.pack-art-count {
+  font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+/* The drag target sits over the perforation. */
+.zip {
+  position: absolute;
+  top: 22%;
+  left: -10px; right: -10px;
+  height: 0;
+  z-index: 6;
+}
+.zip-track {
+  position: absolute;
+  top: -1px; left: 10px; right: 10px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+}
+.zip-tab {
+  position: absolute;
+  top: -17px;
+  left: 50%;
+  margin-left: -26px;
+  width: 52px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  cursor: grab;
+  touch-action: none;
+  background: linear-gradient(180deg, #f1f5f9, #94a3b8);
+  box-shadow: 0 6px 18px -6px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  animation: zip-nudge 2.4s ease-in-out infinite;
+}
+.zip-tab:active { cursor: grabbing; }
+.pack-visual.is-tearing .zip-tab { animation: none; }
+.zip.is-spent { opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+@keyframes zip-nudge {
+  0%, 100% { transform: translateX(0); }
+  35% { transform: translateX(9px); }
+  70% { transform: translateX(-6px); }
+}
+.zip-tab-grip {
+  width: 22px; height: 12px;
+  border-radius: 3px;
+  background: repeating-linear-gradient(90deg, #475569 0 2px, transparent 2px 5px);
 }
 
 .pack-shadow {
   position: absolute;
-  left: 50%;
-  bottom: -46px;
-  width: 190px;
-  height: 26px;
+  left: 50%; bottom: -44px;
+  width: 190px; height: 26px;
   transform: translateX(-50%);
   border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.62), transparent);
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.6), transparent);
   filter: blur(5px);
-  animation: pack-shadow 5s ease-in-out infinite;
-}
-@keyframes pack-shadow {
-  0%, 100% { transform: translateX(-50%) scale(1); opacity: 0.75; }
-  50% { transform: translateX(-50%) scale(0.82); opacity: 0.45; }
 }
 
-/* Shake while the pack is being torn (and while cards are loading). */
-.pack-visual.is-shaking { animation: pack-shake 0.42s ease-in-out infinite; }
-@keyframes pack-shake {
-  0%, 100% { transform: translate(0, 0) rotate(-2deg); }
-  20% { transform: translate(-9px, 3px) rotate(3deg); }
-  40% { transform: translate(8px, -4px) rotate(-4deg); }
-  60% { transform: translate(-7px, -2px) rotate(3.5deg); }
-  80% { transform: translate(6px, 4px) rotate(-2.5deg); }
+/* Final burst once the tear completes. */
+.pack-visual.is-ripping .pack-foil { animation: foil-fly 0.62s var(--ease-out) forwards; }
+@keyframes foil-fly {
+  to { transform: translateY(-150px) rotate(-20deg); opacity: 0; }
 }
-
-/* The rip itself: the strip flies off, the pack blows out in light. */
-.pack-visual.is-ripping { animation: none; }
-.pack-visual.is-ripping .pack-foil {
-  animation: foil-tear 0.72s var(--ease-out) forwards;
-}
-@keyframes foil-tear {
-  to { transform: translateY(-180px) rotate(-26deg) scale(1.15); opacity: 0; }
-}
-.pack-visual.is-ripping .pack-body {
-  animation: pack-burst 0.72s var(--ease-out) forwards;
-}
+.pack-visual.is-ripping .pack-body { animation: pack-burst 0.66s var(--ease-out) forwards; }
 @keyframes pack-burst {
-  35% { transform: scale(1.09); box-shadow: 0 0 90px 26px color-mix(in srgb, var(--accent) 70%, transparent); }
-  100% { transform: scale(0.55) translateY(34px); opacity: 0; filter: blur(9px); }
+  35% { transform: scale(1.07); box-shadow: 0 0 90px 26px color-mix(in srgb, var(--accent) 70%, transparent); }
+  100% { transform: scale(0.55) translateY(30px); opacity: 0; filter: blur(9px); }
 }
-.pack-visual.is-ripping .pack-shadow { animation: none; opacity: 0; transition: opacity 0.5s ease; }
+.pack-visual.is-ripping .pack-shadow { opacity: 0; transition: opacity 0.4s ease; }
 
-.open-status {
-  min-height: 1.4em;
-  font-size: 0.92rem;
-  color: var(--text-dim);
-  text-align: center;
-}
+.open-hint { font-size: 0.9rem; color: var(--text-dim); text-align: center; }
+.open-status { min-height: 1.4em; font-size: 0.9rem; color: var(--text-dim); text-align: center; }
 .open-status.is-error { color: #fca5a5; }
 
-/* 5. Card row + flip mechanics -------------------------------------------- */
-.reveal-head { text-align: center; margin-bottom: 24px; }
-.reveal-hint { font-size: 0.86rem; color: var(--text-dim); margin-top: 8px; }
+/* 5. Cards ---------------------------------------------------------------- */
+.reveal-head { text-align: center; margin-bottom: 14px; }
+.reveal-progress { font-size: 0.82rem; color: var(--text-dim); margin-top: 6px; }
+.reveal-hint { text-align: center; font-size: 0.86rem; color: var(--text-dim); margin-top: 18px; }
 
-.card-row {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: flex-start;
-  gap: clamp(14px, 2.4vw, 30px);
-  perspective: 1600px;
-  min-height: 340px;
+.stack-area { display: grid; place-items: center; perspective: 1500px; }
+.card-stack {
+  position: relative;
+  width: var(--card-w);
+  height: calc(var(--card-w) * 1.4);
+  touch-action: none;
+  cursor: grab;
 }
+.card-stack:active { cursor: grabbing; }
 
 .card {
   position: relative;
   width: var(--card-w);
   aspect-ratio: 5 / 7;
-  /* Cards start invisible; JS deals them in one at a time. */
-  opacity: 0;
-  transform: translateY(38px) scale(0.86);
-  transition: opacity 0.4s ease, transform 0.5s var(--ease-back);
-  /* Own stacking context so .card-aura's z-index:-1 stays behind the card
-     rather than dropping behind the page background. */
   isolation: isolate;
 }
-.card.is-dealt { opacity: 1; transform: none; }
-.card.is-flippable { cursor: pointer; }
-.card.is-flippable:hover { transform: translateY(-9px); }
+.stack-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  transform:
+    translate(calc(var(--depth, 0) * 5px), calc(var(--depth, 0) * 9px))
+    rotate(calc(var(--depth, 0) * 1.3deg))
+    scale(calc(1 - var(--depth, 0) * 0.04));
+  transition: transform 0.4s var(--ease-out), opacity 0.3s ease;
+}
+.stack-card.is-dragging { transition: none; }
+.stack-card.is-retiring {
+  animation: card-fly 0.5s var(--ease-out) forwards;
+  pointer-events: none;
+}
+@keyframes card-fly {
+  to { transform: translateX(calc(var(--fly, 1) * 135%)) rotate(calc(var(--fly, 1) * 22deg)); opacity: 0; }
+}
 
 .card-inner {
   position: relative;
-  width: 100%;
-  height: 100%;
+  width: 100%; height: 100%;
   transform-style: preserve-3d;
-  /* Face down by default -- the reveal flips it to 0deg. */
   transform: rotateY(180deg);
-  transition: transform 0.72s var(--ease-out);
+  transition: transform 0.7s var(--ease-out);
 }
 .card.is-revealed .card-inner { transform: rotateY(0deg); }
+/* Collection cards have no back face, so they must not be mirrored. */
+.collection-card .card-inner { transform: none; transition: none; }
 
 .card-face {
   position: absolute;
@@ -405,33 +567,24 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   -webkit-backface-visibility: hidden;
 }
 
-/* --- card back --- */
 .card-back {
   transform: rotateY(180deg);
   display: grid;
   place-items: center;
+  color: #93a3c9;
   background:
     repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.04) 0 10px, transparent 10px 20px),
     linear-gradient(150deg, #2b3350, #141826 70%);
   box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 0 60px rgba(0, 0, 0, 0.6);
 }
-.back-logo {
-  font-size: 3rem;
-  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.8));
-  animation: back-breathe 2.6s ease-in-out infinite;
-}
+.collection-card .card-back { display: none; }
+.back-logo { animation: back-breathe 2.6s ease-in-out infinite; }
 @keyframes back-breathe {
-  0%, 100% { transform: scale(1); opacity: 0.85; }
-  50% { transform: scale(1.07); opacity: 1; }
+  0%, 100% { transform: scale(1); opacity: 0.8; }
+  50% { transform: scale(1.06); opacity: 1; }
 }
-.back-art {
-  position: absolute;
-  inset: 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-}
+.back-art { position: absolute; inset: 12px; border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.14); }
 
-/* --- card front --- */
 .card-front {
   display: flex;
   flex-direction: column;
@@ -439,22 +592,17 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   box-shadow:
     inset 0 0 0 2px color-mix(in srgb, var(--rarity) 55%, transparent),
     0 18px 40px -20px rgba(0, 0, 0, 0.9);
-  isolation: isolate; /* keeps fx blend modes inside the card */
+  isolation: isolate;
 }
 
 .card-art {
   position: relative;
-  height: 46%;
+  height: 42%;
   flex: none;
   overflow: hidden;
   background: linear-gradient(140deg, color-mix(in srgb, var(--rarity) 32%, #11131d), #0b0d14);
 }
-.card-art img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
+.card-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .card-art::after {
   content: "";
   position: absolute;
@@ -466,36 +614,55 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   inset: 0;
   display: grid;
   place-items: center;
-  font-size: 2.6rem;
-  opacity: 0.4;
+  color: color-mix(in srgb, var(--rarity) 70%, white);
+  opacity: 0.5;
+}
+
+/* Favourite star, top-right of every card face. */
+.fav-button {
+  position: absolute;
+  top: 9px; right: 9px;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.65);
+  background: rgba(6, 8, 14, 0.6);
+  backdrop-filter: blur(4px);
+  transition: color 0.16s ease, transform 0.16s var(--ease-back), border-color 0.16s ease;
+}
+.fav-button:hover { transform: scale(1.12); color: #fde68a; }
+.fav-button.is-on {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.65);
+  box-shadow: 0 0 14px -2px rgba(251, 191, 36, 0.8);
 }
 
 .card-body {
   position: relative;
-  z-index: 4; /* text sits above the foil effects -- see .fx below */
+  z-index: 4;
   display: flex;
   flex-direction: column;
-  padding: 12px 14px 8px;
+  padding: 11px 13px 4px;
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
-/* Scrim that dims the foil directly behind the text without hiding it. */
-.card-body::before,
-.card-footer::before {
+.card-body::before, .card-stats::before, .card-footer::before {
   content: "";
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(180deg, rgba(9, 11, 18, 0.5), rgba(9, 11, 18, 0.76));
+  background: linear-gradient(180deg, rgba(9, 11, 18, 0.5), rgba(9, 11, 18, 0.78));
 }
 .card-title {
-  font-size: 0.98rem;
+  font-size: 0.95rem;
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.25;
-  margin-bottom: 4px;
-  /* long article titles get two lines then ellipsis */
+  margin-bottom: 3px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
@@ -503,18 +670,18 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   overflow: hidden;
 }
 .card-desc {
-  font-size: 0.68rem;
+  font-size: 0.66rem;
   font-weight: 600;
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: var(--rarity);
-  margin-bottom: 7px;
+  margin-bottom: 6px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .card-extract {
-  font-size: 0.73rem;
+  font-size: 0.72rem;
   line-height: 1.45;
   color: #b9c2d4;
   display: -webkit-box;
@@ -522,12 +689,32 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  flex: 1;
+  /* Must NOT be `flex: 1`: stretching a -webkit-box past its clamp makes the
+     ellipsis land on line N while lines N+1.. keep painting. Let the clamp
+     decide the height and give the slack to the body instead. */
+  flex: 0 1 auto;
   min-height: 0;
-  /* Whatever the clamp can't fit fades out rather than ending mid-letter. */
   mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
   -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
 }
+
+.card-stats {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 13px 6px;
+}
+.card-price {
+  font-size: 0.92rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #86efac;
+  font-variant-numeric: tabular-nums;
+}
+.card-views { font-size: 0.66rem; font-weight: 600; color: var(--text-dim); }
 
 .card-footer {
   position: relative;
@@ -536,11 +723,11 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 9px 14px 12px;
+  padding: 7px 13px 11px;
   border-top: 1px solid rgba(255, 255, 255, 0.09);
 }
 .rarity-badge {
-  font-size: 0.6rem;
+  font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.11em;
   text-transform: uppercase;
@@ -551,18 +738,22 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   background: color-mix(in srgb, var(--rarity) 14%, transparent);
   white-space: nowrap;
 }
-.card-link {
-  font-size: 0.68rem;
-  font-weight: 700;
-  color: var(--text-dim);
-  text-decoration: none;
-  white-space: nowrap;
-}
+.card-link { font-size: 0.66rem; font-weight: 700; color: var(--text-dim); text-decoration: none; white-space: nowrap; }
 .card-link:hover { color: var(--text); }
 
-/* Effect layers. Every rarity block below drives these.
-   z-index 3 keeps them above the artwork but below .card-body / .card-footer,
-   so even the loudest foil never eats the article text. */
+.copy-badge {
+  position: absolute;
+  top: 9px; left: 9px;
+  z-index: 6;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #0b0d14;
+  background: #e2e8f0;
+}
+
+/* Effect layers: above the artwork, below the text, so foil never eats it. */
 .fx {
   position: absolute;
   inset: 0;
@@ -571,10 +762,8 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   border-radius: var(--card-radius);
   opacity: 0;
 }
-/* Effects only run once the card is face up. */
 .card.is-revealed .fx { opacity: 1; }
 
-/* Glow that sits behind the whole card. */
 .card-aura {
   position: absolute;
   inset: -14px;
@@ -585,6 +774,49 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   pointer-events: none;
 }
 .card.is-revealed .card-aura { opacity: 1; }
+
+/* revealed tray */
+.revealed-tray {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+  min-height: 34px;
+}
+.tray-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 230px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  text-align: left;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--rarity) 55%, transparent);
+  background: color-mix(in srgb, var(--rarity) 12%, rgba(0, 0, 0, 0.35));
+  animation: chip-in 0.4s var(--ease-back);
+}
+@keyframes chip-in {
+  from { opacity: 0; transform: translateY(-10px) scale(0.9); }
+  to { opacity: 1; transform: none; }
+}
+.tray-chip-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tray-chip-price { font-weight: 700; color: var(--rarity); font-variant-numeric: tabular-nums; }
+
+.reveal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 26px;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.4s ease, transform 0.4s var(--ease-out);
+  pointer-events: none;
+}
+.reveal-actions.is-ready { opacity: 1; transform: none; pointer-events: auto; }
 
 /* ==========================================================================
    6. RARITY TREATMENTS
@@ -942,7 +1174,88 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   animation: sheen-sweep 2s ease-in-out infinite;
 }
 
-/* 7. Flash, modal, responsive --------------------------------------------- */
+
+/* 7. Collection binder ---------------------------------------------------- */
+.collection-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.stat {
+  padding: 9px 15px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: var(--panel);
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+.stat b { color: var(--text); font-size: 0.95rem; margin-right: 4px; }
+
+.filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+  padding: 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.22);
+}
+.filter-input, .filter-select {
+  font: inherit;
+  font-size: 0.84rem;
+  color: var(--text);
+  padding: 9px 12px;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.filter-input { flex: 1 1 190px; min-width: 0; }
+.filter-input::placeholder { color: #64748b; }
+.filter-select { cursor: pointer; }
+/* Native dropdown lists inherit the page's dark background otherwise. */
+.filter-select option { background: #12141f; color: var(--text); }
+
+.chip-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 15px;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+}
+.chip-toggle.is-on {
+  color: #fbbf24;
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.empty-note {
+  padding: 44px 20px;
+  text-align: center;
+  font-size: 0.92rem;
+  color: var(--text-dim);
+}
+
+.collection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(172px, 1fr));
+  gap: 22px 18px;
+  align-items: start;
+}
+.collection-card { width: 100%; }
+/* The reveal-screen auras are sized for a 250px card; rein them in here so
+   neighbouring cards in the grid don't bleed into each other. */
+.collection-card .card-aura { inset: -8px; filter: blur(12px) saturate(1.3) !important; }
+.collection-card[data-rarity="mythic"] .card-aura { inset: -26px -14px -20px; filter: blur(8px) !important; }
+.collection-card[data-rarity="artifact"] .card-aura { inset: -10px; }
+
+/* 8. Flash, modal, responsive --------------------------------------------- */
 .flash {
   position: fixed;
   inset: 0;
@@ -958,20 +1271,6 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   100% { opacity: 0; }
 }
 
-.reveal-actions {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin-top: 40px;
-  opacity: 0;
-  transform: translateY(12px);
-  transition: opacity 0.5s ease, transform 0.5s var(--ease-out);
-  pointer-events: none;
-}
-.reveal-actions.is-ready { opacity: 1; transform: none; pointer-events: auto; }
-
 .modal {
   position: fixed;
   inset: 0;
@@ -984,7 +1283,7 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
 }
 .modal[hidden] { display: none; }
 .modal-card {
-  width: min(560px, 100%);
+  width: min(600px, 100%);
   max-height: 84vh;
   overflow: auto;
   border: 1px solid var(--panel-line);
@@ -993,70 +1292,55 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   background: linear-gradient(170deg, #171b28, #0d1017);
   box-shadow: 0 40px 80px -30px #000;
 }
-.modal-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
-}
-.odds-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.modal-note { margin-top: 16px; font-size: 0.78rem; color: var(--text-dim); line-height: 1.55; }
+.modal-note.top { margin: 0 0 16px; }
+
+.odds-table { width: 100%; border-collapse: collapse; font-size: 0.84rem; }
 .odds-table th {
   text-align: left;
-  font-size: 0.68rem;
-  letter-spacing: 0.1em;
+  font-size: 0.65rem;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--text-dim);
   padding-bottom: 10px;
   border-bottom: 1px solid var(--panel-line);
 }
-.odds-table td { padding: 9px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.055); }
-.odds-table td:nth-child(2) { font-variant-numeric: tabular-nums; text-align: right; padding-right: 18px; }
-.odds-table td:nth-child(3) { color: var(--text-dim); font-size: 0.8rem; }
+.odds-table th:nth-child(2), .odds-table th:nth-child(3) { text-align: right; }
+.odds-table td { padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.055); }
+.odds-pct { font-variant-numeric: tabular-nums; text-align: right; padding-right: 14px !important; }
+.odds-effect { color: var(--text-dim); font-size: 0.76rem; }
 .odds-name { display: flex; align-items: center; gap: 9px; font-weight: 700; }
-.odds-swatch {
-  width: 11px;
-  height: 11px;
-  border-radius: 50%;
-  flex: none;
-  box-shadow: 0 0 10px 1px currentColor;
-}
-.modal-note { margin-top: 16px; font-size: 0.78rem; color: var(--text-dim); }
+.odds-swatch { width: 11px; height: 11px; border-radius: 50%; flex: none; box-shadow: 0 0 10px 1px currentColor; }
 
-@media (max-width: 640px) {
-  :root { --card-w: 168px; }
-  .pack-visual { width: 210px; height: 296px; }
+@media (max-width: 720px) {
+  .topbar { gap: 10px; padding: 11px 14px; }
   .brand-sub { display: none; }
+  .brand h1 { font-size: 1.05rem; }
+  .tabs { order: 3; width: 100%; justify-content: center; }
+  .topbar-actions { gap: 6px; }
+  .ghost-button { padding: 7px 13px; font-size: 0.79rem; }
 
-  /* Reclaim vertical space from the header on a phone. */
-  .topbar { padding: 12px 16px; gap: 10px; }
-  .brand h1 { font-size: 1.1rem; }
-  .brand-mark { font-size: 1.5rem; }
-  .ghost-button { padding: 7px 14px; font-size: 0.8rem; }
-  .debug-chip { font-size: 0.62rem; padding: 5px 10px; }
+  :root { --card-w: min(74vw, 268px); }
+  .pack-row { padding: 11px 13px; gap: 11px; }
+  .pack-row-tagline { display: none; }
+  .pack-row-icon { width: 34px; height: 34px; }
+  .pack-row-delete { position: static; transform: none; margin-left: 6px; }
+  .pack-row-wrap { display: flex; align-items: center; }
 
-  /* Less art, smaller type, fewer lines -- the card is a third narrower, so
-     the desktop clamp overflows the body box. */
-  .card-art { height: 42%; }
+  .pack-visual { width: 224px; height: 314px; }
+  .collection-grid { grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 18px 12px; }
   .card-title { font-size: 0.88rem; }
-  .card-extract {
-    font-size: 0.69rem;
-    -webkit-line-clamp: 3;
-    line-clamp: 3;
-  }
-  .card-body { padding: 10px 11px 6px; }
-  .card-footer { padding: 8px 11px 10px; }
-  .rarity-badge { font-size: 0.55rem; padding: 3px 7px; }
+  .card-extract { font-size: 0.69rem; -webkit-line-clamp: 3; line-clamp: 3; }
+  .filters { padding: 10px; }
+  .filter-select, .chip-toggle, .filter-input { font-size: 0.8rem; padding: 8px 10px; }
 }
 
 /* Respect reduced-motion: keep the game playable, drop the churn. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     animation-duration: 0.001s !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.05s !important;
   }
-  .card { opacity: 1; transform: none; }
 }
