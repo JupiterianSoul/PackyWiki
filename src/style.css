@@ -32,6 +32,10 @@
 
 html, body { height: 100%; }
 
+/* The body gradient is `fixed`, so it only covers the viewport. Without this
+   the canvas below the fold falls back to white on a scrolling page. */
+html { background-color: var(--bg); }
+
 body {
   margin: 0;
   min-height: 100%;
@@ -520,6 +524,9 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   overflow: hidden;
   flex: 1;
   min-height: 0;
+  /* Whatever the clamp can't fit fades out rather than ending mid-letter. */
+  mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent 100%);
 }
 
 .card-footer {
@@ -1020,6 +1027,26 @@ main { padding: clamp(24px, 5vw, 56px) clamp(16px, 4vw, 42px) 80px; }
   :root { --card-w: 168px; }
   .pack-visual { width: 210px; height: 296px; }
   .brand-sub { display: none; }
+
+  /* Reclaim vertical space from the header on a phone. */
+  .topbar { padding: 12px 16px; gap: 10px; }
+  .brand h1 { font-size: 1.1rem; }
+  .brand-mark { font-size: 1.5rem; }
+  .ghost-button { padding: 7px 14px; font-size: 0.8rem; }
+  .debug-chip { font-size: 0.62rem; padding: 5px 10px; }
+
+  /* Less art, smaller type, fewer lines -- the card is a third narrower, so
+     the desktop clamp overflows the body box. */
+  .card-art { height: 42%; }
+  .card-title { font-size: 0.88rem; }
+  .card-extract {
+    font-size: 0.69rem;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+  }
+  .card-body { padding: 10px 11px 6px; }
+  .card-footer { padding: 8px 11px 10px; }
+  .rarity-badge { font-size: 0.55rem; padding: 3px 7px; }
 }
 
 /* Respect reduced-motion: keep the game playable, drop the churn. */
