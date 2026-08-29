@@ -517,11 +517,17 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 }
 .open-stage > * { grid-area: 1 / 1; }
 
-.booster-slot { display: grid; place-items: center; }
-#screen-open.phase-reveal .booster-slot { pointer-events: none; }
+.booster-slot { display: grid; place-items: center; z-index: 1; }
+/* While the pack is emptying it sits IN FRONT of the cards, so they read as
+   coming out of its mouth rather than sliding over its face. It has sunk and
+   faded out by the time they settle. */
+#screen-open.phase-opening .booster-slot { z-index: 3; }
+#screen-open.phase-reveal .booster-slot,
+#screen-open.phase-summary .booster-slot { z-index: 0; pointer-events: none; }
 
 .card-stack {
   position: relative;
+  z-index: 2;
   width: var(--card-w);
   height: calc(var(--card-w) * 1.4);
   touch-action: none;
