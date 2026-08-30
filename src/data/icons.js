@@ -148,12 +148,12 @@ const ICONS = {
  */
 export const LOGO_MARK = `
   <g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
-    <rect x="14" y="6" width="34" height="52" rx="7" stroke-width="3"/>
-    <path d="M14 17h34" stroke-width="3"/>
-    <path d="M21.5 27 26.5 46 31 35.5 35.5 46 40.5 27" stroke-width="3.8"/>
+    <rect x="12" y="6" width="33" height="52" rx="7" stroke-width="3"/>
+    <path d="M12 17h33" stroke-width="3"/>
+    <path d="M19.5 27 24.5 46 28.5 35.5 32.5 46 37.5 27" stroke-width="3.8"/>
   </g>
-  <circle cx="54" cy="13" r="3.2" fill="currentColor"/>
-  <circle cx="54" cy="13" r="7" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"/>`;
+  <circle cx="54" cy="12" r="3" fill="currentColor"/>
+  <circle cx="54" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"/>`;
 
 /**
  * The Buckarooz mark: a B with two bars running through it, top and bottom,
