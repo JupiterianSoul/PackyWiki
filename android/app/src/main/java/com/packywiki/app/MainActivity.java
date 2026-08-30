@@ -49,6 +49,18 @@ public class MainActivity extends Activity {
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        // Honour <meta name="viewport" content="width=device-width">. Without
+        // this the WebView lays the page out at its own default width rather
+        // than the device's, so every `max-width` media query in the
+        // stylesheet is measured against the wrong number and the app gets
+        // the desktop layout on a phone.
+        settings.setUseWideViewPort(true);
+        settings.setLoadWithOverviewMode(true);
+        // The layout is responsive; pinch-zooming a native-feeling app only
+        // ever produces a half-scrolled mess.
+        settings.setSupportZoom(false);
+        settings.setBuiltInZoomControls(false);
+        settings.setDisplayZoomControls(false);
         // The app gates its own AudioContext behind a tap, so this only stops
         // WebView from adding a second, redundant gesture requirement.
         settings.setMediaPlaybackRequiresUserGesture(false);

@@ -89,7 +89,7 @@ binary image assets.
 ## Project layout
 
 ```
-index.html            markup for all three screens + the odds modal
+index.html            markup for every screen and modal
 src/
   main.js             app controller: shelf, rip, opening animation, binder
   style.css           all styling, including one block per rarity treatment
@@ -99,6 +99,9 @@ src/
   economy.js          booster prices, sell rate, the house edge, the stipend
   shop.js             the two-hourly shop, generated from the window index
   booster.js          booster specs: identity, naming, colours, art
+  progression.js      XP, the 500-level curve, ranks and level rewards
+  daily.js            the 30-slot daily gift board and its claim rules
+  timed.js            timed boosters: accrual, the ten-level track, odds
   collection.js       localStorage: cards, wallet, inventory, profile
   i18n.js             English/French strings and the language lock
   data/
@@ -119,11 +122,80 @@ from them: the pack picker, the accent colours, the odds modal and the card
 effects are all generated, so neither table has a hard-coded counterpart
 anywhere in the UI code.
 
-### Screen flow
+### Tabs
 
-1. **Pack picker** — tiles built from `PACKS`, each in its own accent colour.
-2. **Open** — the pack floats idly, shakes while cards are fetched, then rips.
-3. **Reveal** — cards deal in and flip one at a time, worst pull first.
+**Boosters** what you own · **Timed** the free trickle · **Custom** build a pack
+from a subject's own wiki · **Shop** buy things · **Collection** the binder ·
+**Profile** level, rank and stats · **Settings** sound, battery, data. The
+daily-gift button lives in the top bar next to the balance.
+
+---
+
+## Timed boosters
+
+A three-card booster accrues on a timer whether the app is open or not, up to a
+cap. This is the floor of the game: a player with no cards and no money still
+has something to open in ten minutes.
+
+They must not become the whole game, so the odds start heavily nerfed. Level 1
+multiplies each tier's weight by `0.55^rank`, which barely moves the expected
+value — commons dominate that — but makes an Artifact **42x scarcer**, one in
+28,000 rather than one in 667. The nerf is entirely at the top, which is where
+it belongs.
+
+Levelling the track improves all three axes at once:
+
+| Level | Every | Holds | Top tier |
+|---|---|---|---|
+| 1 | 10 min | 7 | 42x scarcer |
+| 5 | 7 min | 13 | 7x scarcer |
+| 10 | 3 min | 20 | standard odds |
+
+Level 10 needs **2,100 opened boosters**, and the steps grow the whole way
+(20, 55, 110, 200, 340, 560, 900, 1,400, 2,100). At a realistic thirty to fifty
+a day that is a couple of months, which is the intent: it is a long track, not
+a weekend.
+
+---
+
+## Levels and XP
+
+XP comes from **cards**, never from money or from buying things, so the only
+way to level is to open boosters and see what is inside. A card is worth XP by
+its tier, on roughly the same curve as its price: 12 for a Common up to 1,300
+for an Artifact, averaging about 33 a card under the standard table.
+
+The requirement per level is mostly linear with a gentle curve on top
+(180 XP for level 1, ~2,400 at level 100, ~12,400 at level 499). Reaching the
+cap of **level 500** is around three million XP, or eighteen thousand boosters.
+
+Every level pays something: coins on most, a booster every fifth, a rarity
+booster every tenth, and coins plus a booster every twenty-fifth. The values
+are small next to the shop stipend on purpose — levelling sets a pace, it is
+not an income stream. Ten ranks (Newcomer through Encyclopedist) name where you
+are.
+
+Gaining XP shows a small rising number. A level-up waits for the pack to finish
+revealing, then walks the bar from the old level to the new one with the reward
+to claim.
+
+---
+
+## The daily gift
+
+Thirty slots to a board, one claim per calendar day, and you always claim **the
+next unclaimed slot** rather than the slot matching today's date. Miss Tuesday
+and Wednesday still hands you slot 2. Finish a board and the next one is
+generated, so the ladder never ends; later boards pay a little more, capped
+after ten of them.
+
+Boards come from a seeded PRNG keyed to the board number, so the whole month is
+visible in advance and the eleventh gift is the same gift whenever you get to
+it. Claimed days are replaced by a tick, so the board doubles as a record.
+
+A month of gifts is worth roughly two days of stipend. The feature exists so a
+player with nothing left can always get moving again, not so that logging in is
+the way to get rich.
 
 ---
 
@@ -165,10 +237,20 @@ fortune.
 ### The shop
 
 Stock is generated from the current two-hour window index, so it is stable
-across reloads and restocks on its own — no server involved. Shelves are
-grouped by tier, by subject, mixed, or just cheap, and each booster's size is
-rolled between 3 and 7 cards. Price scales with both size and tier
+across reloads and restocks on its own — no server involved. Each booster's
+size is rolled between 3 and 7 cards, and price scales with both size and tier
 automatically, because it is derived from the booster's own expected contents.
+
+Two shelves are always present: **Free every restock**, and **Boosters you
+built** if you have made any custom packs. The rest of the shop is five to
+seven shelves drawn from a pool of nine kinds — by tier, by subject, mixed,
+cheap, jumbo, a two-subject matchup, one subject climbing the tiers, wildcards
+only, and a single-size bundle — so no two windows look quite alike.
+
+The free shelf is the anti-lockout guarantee: two three-card boosters, one of
+each per restock, occasionally upgraded to a low tier. Selling everything out
+of both is worth around 230 Buckarooz, under half a single stipend, so it is a
+floor rather than a faucet.
 
 Scarcity is the other brake. Pricing alone would let a lucky player buy
 Artifact boosters back to back, so high tiers are also **rare on the shelves**:
@@ -243,12 +325,33 @@ handful of pages; the Terraria wiki has thousands.
 3. If no slug matches, fall back to Fandom's cross-wiki search.
 4. If nothing resolves: **"Booster cannot be created, try something else."**
 
-Building one gives you a copy for free — you designed it. After that they turn
-up in the shop like anything else.
+Building one does **not** give you a booster. It used to, which was a free
+openable pack out of thin air for anyone who typed a name, and the cards inside
+could be sold. Creating a pack now puts it on sale in the Shop, on its own
+shelf, where it is bought like anything else.
 
-Fandom's `pageimages` misses a lot, so when it comes back empty the app asks
-what images the page actually *uses* and resolves the first real one, skipping
-icons, logos and other chrome.
+### Getting a picture out of Fandom
+
+Three separate things made custom cards come out blurry, wrong, or blank, and
+all three are handled:
+
+- **`pageimages` returns a fifty-pixel thumbnail.** Blown up to fill a card
+  slot that is the blurry, over-zoomed mess it looked like. A thumbnail under
+  180px wide is now treated as no thumbnail, and the URL is asked for a bigger
+  version before it is believed.
+- **The picture list is led by chrome.** When `pageimages` is empty the app
+  asks what images the page actually *uses* — but that list is in page order,
+  and the first image on a Fandom article is usually a nav icon or an infobox
+  glyph. It now asks for each image's real dimensions, throws away anything
+  too small, too thin or named like furniture, and takes the largest, which on
+  a Fandom article is reliably the subject.
+- **The CDN URL says what size you get.** Fandom serves images through a
+  resizing CDN, so `/scale-to-width-down/50` really is fifty pixels and
+  `/smart/width/80/height/80` really is a hard square crop. Both are rewritten
+  to ask for 640px of the uncropped image.
+
+If a picture still arrives smaller than its frame, the card fits it inside
+rather than magnifying it.
 
 > Custom boosters depend on the target wiki allowing anonymous CORS
 > (`origin=*`), which standard MediaWiki does.
@@ -352,6 +455,44 @@ Every pull is saved to localStorage and shows up in the **Collection** tab.
   popularity band, minimum price, favourites and title; sort by newest, price
   ascending or descending, rarity, popularity or name.
 
+The **card detail sheet is built narrow-first** and only goes side-by-side at
+780px and up. It used to be the other way round — a row layout undone by a
+`max-width: 720px` query — which meant anything that made the layout viewport
+wider than 720px skipped the breakpoint entirely and a phone got the desktop
+layout: an 860px panel hanging off the side of a 400px screen. Building up
+rather than down means the narrow case is the one that cannot be missed.
+
+That is also why `MainActivity` now calls `setUseWideViewPort(true)`. Without
+it the Android WebView ignores `<meta name="viewport" content="width=device-width">`
+and lays the page out at its own default width, so **every** `max-width` query
+in the stylesheet is measured against the wrong number. That was the actual
+root cause of the sheet hanging off the screen in the APK.
+
+---
+
+## Battery
+
+Continuous animation is the single biggest thing this app can do to a battery:
+a shop shelf is twenty-odd boosters, several wearing a rarity treatment that
+never stops moving. Four brakes:
+
+- **One clock.** Everything that needs a timer shares a single 1 Hz interval,
+  and it only runs when the tab is visible *and* a screen that wants it is on
+  display. Rendering the shop once used to leave an interval running for the
+  life of the session, redrawing a countdown nobody was looking at.
+- **Off-screen screens animate nothing.** `animation-play-state: paused` on
+  anything inside an inactive screen, which is free.
+- **Audio parks itself.** A running `AudioContext` keeps the audio thread alive
+  even in silence, so it is suspended when the app goes to the background.
+- **Battery saver**, in Settings, stops the ambient motion everywhere and
+  flattens the fixed three-gradient page background. Transitions and one-shot
+  animations still run, so the app still feels alive; it just stops repainting
+  when nothing has happened.
+
+Playtime is measured between visibility changes rather than by a stopwatch —
+a timer ticking once a second purely to add one to a number is exactly the sort
+of background work this should not be doing.
+
 ---
 
 ## Language
@@ -369,6 +510,15 @@ cards are always in the selected language rather than whatever the wiki
 happened to return.
 
 To start over during development: `__packywiki.resetAll()`.
+
+## Settings
+
+Sound, screen flash on rare pulls, battery saver and on-screen hints, each with
+a line saying why you would touch it. The language is shown here but locked
+(see below), and **Erase everything** uses the same arm-then-confirm shape as
+selling a card: the button is its own dialog.
+
+---
 
 ## Sound
 
@@ -397,13 +547,16 @@ To start over during development: `__packywiki.resetAll()`.
 - **Rarity is not tied to the article.** It's an independent roll, so a stub
   can come out Artifact and a featured article can come out Common. Only the
   price knows how popular a page is.
+- **Timers trust the device clock.** Timed boosters and the daily gift are
+  measured against local time, so moving the clock forward moves them forward.
+  With no server there is nothing else to measure against.
 
 ## Natural next steps
 
 - **Trading** — export a card (or a whole binder) as a share code, import
   someone else's.
-- **Daily goals** — a reason to open a specific subject, and a second income
-  stream that isn't the stipend.
+- **Daily goals** — a reason to open a specific subject, on top of the daily
+  gift and the timed trickle.
 - **Set completion** — track which articles a pack *can* yield and show a
   completion percentage per pack.
 - **Quiz mode** — the article extract is already on the card, so blank out the

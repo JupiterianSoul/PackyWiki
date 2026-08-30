@@ -21,6 +21,18 @@ import {
   specId, specName, specTagline, specColours, specIcon, specHero, toDrawPack
 } from './booster.js';
 import * as store from './collection.js';
+import {
+  MAX_LEVEL, xpForCard, xpForLevel, rankFor, rewardForLevel, addXp, levelFraction
+} from './progression.js';
+import {
+  BOARD_SIZE, generateBoard, canClaim, claim as claimDaily, nextIndex as nextGiftIndex,
+  msUntilNextDay, dayNumber
+} from './daily.js';
+import {
+  MAX_TIMED_LEVEL, accrue, msToNext, timedLevel, timedSpec, maxHeld, regenMs,
+  levelBounds, levelProgress, timedRollOptions
+} from './timed.js';
+import { rarityChances } from './data/rarities.js';
 import { t, tx, getLanguage, setLanguage, languageChosen, LANGUAGES } from './i18n.js';
 import { synth } from './audio.js';
 
@@ -70,13 +82,15 @@ const el = {};
 const bind = (map) => Object.assign(el, map);
 bind({
   screens: {
-    boosters: $('#screen-boosters'), custom: $('#screen-custom'),
-    shop: $('#screen-shop'), open: $('#screen-open'), collection: $('#screen-collection')
+    boosters: $('#screen-boosters'), timed: $('#screen-timed'), custom: $('#screen-custom'),
+    shop: $('#screen-shop'), open: $('#screen-open'), collection: $('#screen-collection'),
+    profile: $('#screen-profile'), settings: $('#screen-settings')
   },
   brandMark: $('#brand-mark'), brandSub: $('#brand-sub'),
   tabs: [...document.querySelectorAll('.tab')], tabCount: $('#tab-count'),
   wallet: $('#wallet'), oddsButton: $('#odds-button'),
-  muteButton: $('#mute-button'),
+  dailyButton: $('#daily-button'), dailyButtonLabel: $('#daily-button-label'),
+  giftIcon: $('#gift-icon'), giftDot: $('#gift-dot'), timedCount: $('#timed-count'),
 
   rail: $('#pack-rail'), railPrev: $('#rail-prev'), railNext: $('#rail-next'),
   railName: $('#rail-name'), railTagline: $('#rail-tagline'), railOwned: $('#rail-owned'),
@@ -121,6 +135,35 @@ bind({
   langChoices: $('#lang-choices'), starterPanel: $('#starter-panel'), starterTitle: $('#starter-title'),
   starterBody: $('#starter-body'), starterLoot: $('#starter-loot'), starterGo: $('#starter-go'),
 
+  timedTitle: $('#timed-title'), timedIntro: $('#timed-intro'),
+  timedBoosterSlot: $('#timed-booster'), timedHeld: $('#timed-held'),
+  timedNext: $('#timed-next'), timedOpen: $('#timed-open'),
+  trackLevel: $('#track-level'), trackRemaining: $('#track-remaining'),
+  trackFill: $('#track-fill'), trackPerks: $('#track-perks'), trackNext: $('#track-next'),
+
+  profileAvatar: $('#profile-avatar'), profileLevel: $('#profile-level'),
+  profileRank: $('#profile-rank'), xpFill: $('#xp-fill'), xpLine: $('#xp-line'),
+  nextRewardTitle: $('#next-reward-title'), nextRewardBody: $('#next-reward-body'),
+  profileStatsTitle: $('#profile-stats-title'), profileStatGrid: $('#profile-stat-grid'),
+  profileRarityTitle: $('#profile-rarity-title'), profileRarity: $('#profile-rarity'),
+
+  settingsTitle: $('#settings-title'), settingsList: $('#settings-list'),
+  settingsDataTitle: $('#settings-data-title'),
+  settingsLanguageTitle: $('#settings-language-title'),
+  settingsLanguageNote: $('#settings-language-note'),
+  settingsLanguageValue: $('#settings-language-value'),
+  settingsResetTitle: $('#settings-reset-title'), settingsResetNote: $('#settings-reset-note'),
+  settingsReset: $('#settings-reset'),
+
+  dailyModal: $('#daily-modal'), dailyTitle: $('#daily-title'), dailyClose: $('#daily-close'),
+  dailyBody: $('#daily-body'), dailyClaim: $('#daily-claim'), dailyStatus: $('#daily-status'),
+  dailyBoardLabel: $('#daily-board-label'), giftBoard: $('#gift-board'),
+
+  levelModal: $('#level-modal'), levelTitle: $('#level-title'), levelBody: $('#level-body'),
+  levelFrom: $('#level-from'), levelTo: $('#level-to'), levelFill: $('#level-fill'),
+  levelReward: $('#level-reward'), levelClaim: $('#level-claim'),
+
+  xpPop: $('#xp-pop'),
   flash: $('#flash'), toast: $('#toast')
 });
 
@@ -156,12 +199,83 @@ function toast(message, kind = 'ok') {
   toast.timer = setTimeout(() => { el.toast.classList.remove('is-showing'); }, 2600);
 }
 
+/* --- the one timer -------------------------------------------------------- */
+
+/**
+ * Everything that needs a clock shares a single interval, and that interval
+ * only runs when the tab is visible AND something on screen actually wants it.
+ *
+ * The old code left a 1 Hz interval running for the life of the session the
+ * moment the shop rendered once, which kept the phone awake redrawing a
+ * countdown nobody was looking at. Waking once a second is cheap; waking once
+ * a second forever, in the background, is what warms a handset up.
+ */
+const ticker = { id: null, jobs: new Map() };
+
+function runTicker() {
+  for (const job of ticker.jobs.values()) job();
+}
+
+function setTickerJob(name, job) {
+  if (job) ticker.jobs.set(name, job);
+  else ticker.jobs.delete(name);
+  syncTicker();
+}
+
+function syncTicker() {
+  const wanted = document.visibilityState === 'visible' && ticker.jobs.size > 0;
+  if (wanted && ticker.id == null) ticker.id = setInterval(runTicker, 1000);
+  if (!wanted && ticker.id != null) { clearInterval(ticker.id); ticker.id = null; }
+}
+
+/* --- settings ------------------------------------------------------------- */
+
+const settings = () => state.profile.settings;
+
+/**
+ * Push the settings into the document. Everything visual is driven by data
+ * attributes on <html> so CSS can switch whole families of animation off at
+ * once rather than the app having to know about each one.
+ */
+function applySettings() {
+  const s = settings();
+  document.documentElement.dataset.lowpower = s.lowPower ? '1' : '0';
+  document.documentElement.dataset.hints = s.hints ? '1' : '0';
+  synth.setMuted(!s.sound);
+}
+
+/* --- playtime ------------------------------------------------------------- */
+
+/**
+ * Counted in chunks. A stopwatch ticking every second purely to add one to a
+ * number is exactly the sort of background work this app should not be doing,
+ * so time is measured between visibility changes instead.
+ */
+let visibleSince = document.visibilityState === 'visible' ? Date.now() : null;
+
+function flushPlaytime() {
+  if (visibleSince == null) return;
+  store.addPlaytime(state.profile, Date.now() - visibleSince);
+  visibleSince = Date.now();
+}
+
 /* --- shell ---------------------------------------------------------------- */
+
+/** Which screens want the shared clock, and what they want it to do. */
+function screenTicker(name) {
+  setTickerJob('shop', name === 'shop' ? tickRestock : null);
+  setTickerJob('timed', name === 'timed' ? tickTimed : null);
+}
 
 function showScreen(name) {
   Object.entries(el.screens).forEach(([key, node]) => node.classList.toggle('is-active', key === name));
   if (name !== 'open') state.tab = name;
   el.tabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === state.tab));
+  // Seven tabs do not fit across a phone, so bring the current one into view
+  // rather than leaving it off the end of the strip.
+  const active = el.tabs.find((tab) => tab.dataset.tab === state.tab);
+  active?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
+  screenTicker(name);
   window.scrollTo({ top: 0 });
 }
 
@@ -380,17 +494,21 @@ function initRail(tab) {
 
 /* --- shop ----------------------------------------------------------------- */
 
-let shopTimer = null;
-
 function renderShop() {
   el.shopIntro.textContent = t('shopIntro');
   const rows = generateShop(windowIndexAt(), state.customPacks);
 
   el.shopRows.replaceChildren(...rows.map((row) => {
     const section = document.createElement('section');
-    section.className = 'shop-row';
+    section.className = `shop-row${row.free ? ' is-free' : ''}`;
     section.innerHTML = `<h3 class="shop-row-title"></h3><div class="shop-shelf"></div>`;
     section.querySelector('.shop-row-title').textContent = row.title;
+    if (row.free) {
+      const note = document.createElement('p');
+      note.className = 'shop-row-note';
+      note.textContent = t('freeNote');
+      section.insertBefore(note, section.querySelector('.shop-shelf'));
+    }
     const shelf = section.querySelector('.shop-shelf');
 
     shelf.replaceChildren(...row.specs.map(({ id, spec, price }) => {
@@ -401,9 +519,12 @@ function renderShop() {
 
       const buy = document.createElement('button');
       buy.type = 'button';
-      buy.className = 'buy-button';
-      buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
-      buy.addEventListener('click', () => purchase(spec, price, buy));
+      buy.className = row.free ? 'buy-button is-free' : 'buy-button';
+      if (row.free) paintFreeButton(buy, id, spec);
+      else {
+        buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
+        buy.addEventListener('click', () => purchase(spec, price, buy));
+      }
       item.appendChild(buy);
       return item;
     }));
@@ -411,8 +532,6 @@ function renderShop() {
   }));
 
   tickRestock();
-  clearInterval(shopTimer);
-  shopTimer = setInterval(tickRestock, 1000);
 }
 
 function tickRestock() {
@@ -422,6 +541,31 @@ function tickRestock() {
     payStipend();
     renderShop();
   }
+}
+
+/**
+ * The free shelf. Each slot can be taken once per restock, which is what keeps
+ * it a safety net rather than an income: come back in two hours and there are
+ * two more, but standing in front of it does nothing.
+ */
+function paintFreeButton(button, id, spec) {
+  const available = store.freeAvailable(state.profile, id);
+  button.disabled = !available;
+  button.classList.toggle('is-taken', !available);
+  button.innerHTML = available
+    ? `<span class="buy-label">${t('claimFree')}</span><span class="buy-price">${t('free')}</span>`
+    : `<span class="buy-label">${t('freeTaken')}</span>`;
+  button.onclick = available ? () => takeFree(id, spec, button) : null;
+}
+
+function takeFree(id, spec, button) {
+  if (!store.freeAvailable(state.profile, id)) return;
+  store.markFreeTaken(state.profile, id);
+  store.addBooster(state.inventory, spec, 1);
+  synth.playPurchase();
+  toast(`${t('bought')} ${specName(spec)}`, 'ok');
+  paintFreeButton(button, id, spec);
+  renderRail('boosters');
 }
 
 function purchase(spec, price, button) {
@@ -448,6 +592,127 @@ function payStipend() {
     synth.playFanfare();
     toast(t('stipendPaid', { amount: money(paid) }), 'ok');
   }
+}
+
+/* --- timed boosters ------------------------------------------------------- */
+
+/** Save whatever `accrue` decided, so the timer survives a reload. */
+function syncTimed() {
+  accrue(state.profile.timed);
+  store.saveProfile(state.profile);
+  return state.profile.timed;
+}
+
+function currentTimedSpec() {
+  return timedSpec(timedLevel(state.profile.timed.opened ?? 0));
+}
+
+function renderTimed() {
+  const timed = syncTimed();
+  const level = timedLevel(timed.opened ?? 0);
+  const cap = maxHeld(level);
+  const spec = currentTimedSpec();
+
+  el.timedTitle.textContent = t('timedTitle');
+  el.timedIntro.textContent = t('timedIntro', { minutes: Math.round(regenMs(level) / 60000) });
+
+  const booster = buildBooster(spec, { size: 'is-small' });
+  booster.classList.toggle('is-empty', timed.count <= 0);
+  el.timedBoosterSlot.replaceChildren(booster);
+
+  el.timedOpen.textContent = t('timedOpen');
+  el.timedOpen.disabled = timed.count <= 0;
+  el.timedOpen.onclick = () => openTimed();
+
+  // The track. Levelling it is meant to be a long haul, so the bar shows the
+  // exact number still to go rather than a vague percentage.
+  const { from, to } = levelBounds(timed.opened ?? 0);
+  const atMax = level >= MAX_TIMED_LEVEL;
+  el.trackLevel.textContent = atMax ? t('timedTrackMax', { level }) : t('timedTrack', { level });
+  el.trackRemaining.textContent = atMax ? '' : t('timedToNext', { n: to - (timed.opened ?? 0), level: level + 1 });
+  el.trackFill.style.width = `${(levelProgress(timed.opened ?? 0) * 100).toFixed(1)}%`;
+  const scarcity = timedTopScarcity(level);
+  el.trackPerks.textContent = scarcity <= 1.05
+    ? t('timedPerksMax', { minutes: Math.round(regenMs(level) / 60000), max: cap })
+    : t('timedPerks', {
+        minutes: Math.round(regenMs(level) / 60000),
+        max: cap,
+        factor: scarcity >= 10 ? Math.round(scarcity) : scarcity.toFixed(1)
+      });
+  el.trackNext.textContent = atMax ? '' : t('timedNextPerks', {
+    minutes: Math.round(regenMs(level + 1) / 60000),
+    max: maxHeld(level + 1)
+  });
+  el.trackNext.hidden = atMax;
+
+  tickTimed();
+}
+
+/**
+ * How good a timed booster's odds are, as a share of a normal booster's, by
+ * expected value. Derived rather than asserted, so it stays true if the rarity
+ * table is ever retuned.
+ */
+function timedOddsShare(level) {
+  const value = (options) => rarityChances(options)
+    .reduce((sum, { rarity, chance }) => sum + chance * (1 + rarity.bonusPct / 100), 0);
+  return value(timedRollOptions(level)) / value({});
+}
+
+/**
+ * How much scarcer the best tier is on the timed table. This, not the value
+ * share, is the number worth showing: expected value barely moves because
+ * commons dominate it, while an Artifact goes from one in 667 to one in
+ * 28,000. The nerf is entirely at the top, which is where it should be.
+ */
+function timedTopScarcity(level) {
+  const top = (options) => rarityChances(options).at(-1).chance;
+  const timed = top(timedRollOptions(level));
+  return timed > 0 ? top({}) / timed : Infinity;
+}
+
+/** The 1 Hz part: counters only, and only while this tab is on screen. */
+function tickTimed() {
+  const timed = state.profile.timed;
+  const before = timed.count;
+  accrue(timed);
+  if (timed.count !== before) {
+    store.saveProfile(state.profile);
+    renderTimed();
+    return;
+  }
+
+  const level = timedLevel(timed.opened ?? 0);
+  const cap = maxHeld(level);
+  el.timedHeld.textContent = t('timedHeld', { n: timed.count, max: cap });
+  const remaining = msToNext(timed);
+  el.timedNext.textContent = remaining == null
+    ? t('timedFull')
+    : t('timedNext', { time: formatCountdown(remaining) });
+  el.timedOpen.disabled = timed.count <= 0;
+  updateTimedBadge();
+}
+
+function updateTimedBadge() {
+  const count = state.profile.timed.count ?? 0;
+  el.timedCount.textContent = String(count);
+  el.timedCount.classList.toggle('is-hot', count > 0);
+}
+
+function openTimed() {
+  const timed = syncTimed();
+  if ((timed.count ?? 0) <= 0) { synth.playDenied(); return; }
+  const spec = currentTimedSpec();
+  // The booster is spent when it is torn, like any other; put one in the
+  // inventory so the whole opening flow works unchanged. Track progress is
+  // credited when the pack actually produces cards, not here — a failed draw
+  // refunds the booster and should not also count as an opening.
+  store.addBooster(state.inventory, spec, 1);
+  timed.count -= 1;
+  timed.last = Number.isFinite(timed.last) ? timed.last : Date.now();
+  store.saveProfile(state.profile);
+  updateTimedBadge();
+  openScreenFor(spec);
 }
 
 /* --- opening: the rip ----------------------------------------------------- */
@@ -595,6 +860,10 @@ function drawFor(spec) {
   return drawArticles(toDrawPack(spec)).catch((error) => ({ error }));
 }
 
+/** Where "back" goes from the opening screen, for each kind of booster. */
+const homeTabFor = (spec) =>
+  spec?.kind === 'custom' ? 'custom' : spec?.kind === 'timed' ? 'timed' : 'boosters';
+
 function openScreenFor(spec) {
   state.spec = spec;
   applyAccent(specColours(spec));
@@ -608,7 +877,7 @@ function openScreenFor(spec) {
   el.packSummary.replaceChildren();
   el.revealActions.classList.remove('is-ready');
   el.cardStack.replaceChildren();
-  el.backButton.textContent = `← ${t('allBoosters')}`;
+  el.backButton.textContent = `← ${spec.kind === 'timed' ? t('tabTimed') : t('allBoosters')}`;
   el.backToShelf.textContent = t('back');
   state.pulls = []; state.cards = []; state.index = 0; state.seen = new Set();
 
@@ -699,6 +968,16 @@ async function openPack(booster) {
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
   updateTabCount();
 
+  // Stats, the timed track and XP are all credited here — after the draw has
+  // actually produced cards, so a failed pack costs nothing and counts for
+  // nothing.
+  store.recordOpening(state.profile, pulls);
+  if (state.spec.kind === 'timed') {
+    state.profile.timed.opened = (state.profile.timed.opened ?? 0) + 1;
+    store.saveProfile(state.profile);
+  }
+  awardXp(pulls);
+
   state.pulls = pulls;
   bindCards(pulls);
   el.openScreen.classList.replace('phase-opening', 'phase-reveal');
@@ -764,6 +1043,12 @@ function fillFront(front, data, rarity) {
     img.src = data.thumbnail;
     img.alt = '';
     img.addEventListener('error', () => { img.remove(); fallback(); });
+    // A picture smaller than the frame would be stretched into a blur by
+    // object-fit: cover, which is what a custom wiki's stray icons looked
+    // like. Fit those inside the frame instead of magnifying them.
+    img.addEventListener('load', () => {
+      if (img.naturalWidth && img.naturalWidth < 220) art.classList.add('is-small-art');
+    });
     art.appendChild(img);
   } else {
     fallback();
@@ -890,6 +1175,10 @@ function showSummary() {
   el.openProgress.textContent = t('packSummary', { n: state.pulls.length });
   el.openHint.textContent = t('packDone');
   el.revealActions.classList.add('is-ready');
+
+  // Levels earned by this pack are celebrated now the cards have all been
+  // seen, rather than interrupting the reveal.
+  setTimeout(drainLevelUps, 700);
 }
 
 function initSwipe() {
@@ -922,10 +1211,188 @@ function initSwipe() {
 }
 
 function fireFlash(intensity) {
+  if (!settings().flash) return;
   el.flash.style.setProperty('--flash-peak', String(intensity));
   el.flash.classList.remove('is-firing');
   void el.flash.offsetWidth;
   el.flash.classList.add('is-firing');
+}
+
+/* --- experience and levels ------------------------------------------------ */
+
+/**
+ * XP comes from the cards themselves, so opening is the only way to level.
+ * The gain is shown as a small rising number rather than a dialog, and the
+ * level-up itself waits for a quiet moment — walking a player through a
+ * level-up while cards are still flipping would step on the reveal.
+ */
+function awardXp(pulls) {
+  const gained = pulls.reduce((sum, pull) => sum + xpForCard(pull.rarity.id), 0);
+  const levels = addXp(state.profile.progress, gained);
+  if (levels.length) state.profile.pendingLevels.push(...levels);
+  store.saveProfile(state.profile);
+  showXpPop(gained);
+  return { gained, levels };
+}
+
+let xpPopTimer = null;
+function showXpPop(amount) {
+  if (amount <= 0) return;
+  el.xpPop.textContent = t('xpGained', { n: amount.toLocaleString() });
+  el.xpPop.hidden = false;
+  el.xpPop.classList.remove('is-rising');
+  void el.xpPop.offsetWidth;
+  el.xpPop.classList.add('is-rising');
+  clearTimeout(xpPopTimer);
+  xpPopTimer = setTimeout(() => {
+    el.xpPop.classList.remove('is-rising');
+    el.xpPop.hidden = true;
+  }, 1500);
+}
+
+/** Show the next queued level-up, if any. Called once the pack is done. */
+function drainLevelUps() {
+  const level = state.profile.pendingLevels[0];
+  if (level == null) return false;
+  showLevelUp(level);
+  return true;
+}
+
+function showLevelUp(level) {
+  const reward = rewardForLevel(level);
+  const rank = rankFor(level);
+
+  el.levelTitle.textContent = t('levelUpTitle');
+  el.levelBody.textContent = t('levelUpBody', { level, rank: tx(rank.name) });
+  el.levelFrom.textContent = String(level - 1);
+  el.levelTo.textContent = String(level);
+  el.levelReward.replaceChildren(rewardCard(reward));
+  el.levelClaim.textContent = t('claimReward');
+  el.levelClaim.onclick = () => claimLevel(level, reward);
+
+  el.levelFill.style.transition = 'none';
+  el.levelFill.style.width = '0%';
+  el.levelModal.hidden = false;
+  requestAnimationFrame(() => {
+    el.levelFill.style.transition = '';
+    el.levelFill.style.width = '100%';
+  });
+  synth.playFanfare();
+}
+
+/** A little panel describing a reward, used by both levels and daily gifts. */
+function rewardCard(reward) {
+  const wrap = document.createElement('div');
+  wrap.className = 'reward-card';
+
+  if (reward.spec) {
+    const art = document.createElement('div');
+    art.className = 'reward-art';
+    art.appendChild(buildBooster(reward.spec, { size: 'is-tiny' }));
+    wrap.appendChild(art);
+  }
+
+  const label = document.createElement('p');
+  label.className = 'reward-label';
+  if (reward.type === 'both') label.innerHTML = t('rewardBoth', { amount: money(reward.coins) });
+  else if (reward.coins) label.innerHTML = t('rewardCoins', { amount: money(reward.coins) });
+  else label.textContent = specName(reward.spec);
+  wrap.appendChild(label);
+  return wrap;
+}
+
+function claimLevel(level, reward) {
+  if (reward.coins) store.saveWallet(store.loadWallet() + reward.coins);
+  if (reward.spec) store.addBooster(state.inventory, reward.spec, 1);
+
+  state.profile.pendingLevels = state.profile.pendingLevels.filter((l) => l !== level);
+  store.saveProfile(state.profile);
+  refreshWallet();
+  renderRail('boosters');
+  synth.playCoins();
+  el.levelModal.hidden = true;
+
+  // More than one level at once is possible on a very good pack.
+  if (!drainLevelUps() && state.tab === 'profile') renderProfile();
+}
+
+/* --- profile -------------------------------------------------------------- */
+
+function formatDuration(ms) {
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
+}
+
+function renderProfile() {
+  const { progress, rarityCounts } = state.profile;
+  const level = progress.level ?? 1;
+  const rank = rankFor(level);
+  const atMax = level >= MAX_LEVEL;
+
+  el.profileAvatar.innerHTML = iconSvg('profile', { size: 26 });
+  el.profileLevel.textContent = atMax ? t('profileMax') : t('profileLevel', { n: level });
+  el.profileRank.textContent = tx(rank.name);
+  el.xpFill.style.width = `${(levelFraction(progress) * 100).toFixed(1)}%`;
+  el.xpLine.textContent = atMax
+    ? t('profileMax')
+    : t('profileXpLine', {
+        have: (progress.xp ?? 0).toLocaleString(),
+        need: xpForLevel(level).toLocaleString()
+      });
+
+  el.nextRewardTitle.textContent = t('profileNextReward');
+  el.nextRewardBody.replaceChildren(
+    atMax ? document.createTextNode(t('profileMax')) : rewardCard(rewardForLevel(level + 1))
+  );
+
+  el.profileStatsTitle.textContent = t('profileStats');
+  const entries = store.allEntries(state.collection);
+  const pulled = Object.values(rarityCounts).reduce((sum, n) => sum + n, 0);
+  const best = RARITIES.filter((r) => (rarityCounts[r.id] ?? 0) > 0).pop();
+
+  const stats = [
+    [t('statPlaytime'), formatDuration(state.profile.playMs ?? 0)],
+    [t('statAccountAge'), new Date(state.profile.createdAt ?? Date.now())
+      .toLocaleDateString(getLanguage(), { year: 'numeric', month: 'long', day: 'numeric' })],
+    [t('statBoosters'), (state.profile.boostersOpened ?? 0).toLocaleString()],
+    [t('statCards'), pulled.toLocaleString()],
+    [t('statValue'), formatAmount(entries.reduce((sum, e) => sum + e.price * e.count, 0))],
+    [t('statBest'), best ? tx(best.name) : t('none')]
+  ];
+  el.profileStatGrid.replaceChildren(...stats.map(([label, value]) => {
+    const cell = document.createElement('div');
+    cell.className = 'stat-cell';
+    cell.innerHTML = '<b></b><span></span>';
+    cell.querySelector('b').textContent = value;
+    cell.querySelector('span').textContent = label;
+    return cell;
+  }));
+
+  // Rarity breakdown: bars against the commonest tier, so the shape of a
+  // collection reads at a glance rather than as eight numbers.
+  el.profileRarityTitle.textContent = t('statRarity');
+  const peak = Math.max(1, ...RARITIES.map((r) => rarityCounts[r.id] ?? 0));
+  el.profileRarity.replaceChildren(...RARITIES.map((rarity) => {
+    const count = rarityCounts[rarity.id] ?? 0;
+    const row = document.createElement('div');
+    row.className = 'rarity-row';
+    row.innerHTML = `
+      <span class="rarity-name"></span>
+      <span class="rarity-track"><span class="rarity-fill"></span></span>
+      <span class="rarity-count"></span>`;
+    const name = row.querySelector('.rarity-name');
+    name.textContent = tx(rarity.name);
+    name.style.color = rarity.color;
+    const fill = row.querySelector('.rarity-fill');
+    fill.style.width = `${((count / peak) * 100).toFixed(1)}%`;
+    fill.style.background = rarity.color;
+    row.querySelector('.rarity-count').textContent = count.toLocaleString();
+    return row;
+  }));
 }
 
 /* --- card detail ---------------------------------------------------------- */
@@ -1085,7 +1552,6 @@ function renderCollection() {
   const stats = store.collectionStats(entries);
 
   el.collectionStats.innerHTML = `
-    <span class="stat"><b>${stats.unique}</b> ${t('unique')}</span>
     <span class="stat"><b>${stats.copies}</b> ${t('copies')}</span>
     <span class="stat"><b>${money(stats.value)}</b> ${t('total')}</span>
     <span class="stat"><b>${stats.favorites}</b> ${t('favourites')}</span>`;
@@ -1189,17 +1655,13 @@ async function createCustomPack(event) {
     };
     state.customPacks = store.saveCustomPack(pack);
 
-    // A newly built booster is free — you designed it.
-    store.addBooster(state.inventory, {
-      kind: 'custom', themeId: null, rarityId: null, cards: 5,
-      wiki, customName: pack.name, customTagline: pack.tagline, customId: pack.id,
-      icon: pack.icon, accent: pack.accent, accent2: pack.accent2, art: pack.art
-    }, 1);
-
+    // Building a pack does NOT hand over a booster. It used to, which meant a
+    // free openable pack out of thin air for anyone who typed a name — and
+    // the cards inside could be sold. Creating a pack now puts it on sale in
+    // the Shop, on its own shelf, where it is bought like anything else.
     renderRail('custom');
-    setCustomStatus(t('createOk', {
-      name: pack.name, n: wiki.articles.toLocaleString(), wiki: wiki.sitename
-    }), 'ok');
+    renderShop();
+    setCustomStatus(t('createdGoShop', { name: pack.name }), 'ok');
     el.customInput.value = '';
     synth.playPurchase();
   } catch (err) {
@@ -1210,6 +1672,189 @@ async function createCustomPack(event) {
     el.customSubmit.disabled = false;
     el.customInput.disabled = false;
   }
+}
+
+/* --- daily gift ----------------------------------------------------------- */
+
+/**
+ * A gift's one-line description. Returns MARKUP, not text: the coins case
+ * embeds the drawn Buckarooz glyph. Every caller renders it as HTML.
+ */
+function giftLabel(gift) {
+  if (gift.kind === 'coins') return t('giftCoins', { amount: money(gift.coins) });
+  if (gift.kind === 'card') return t('giftCard');
+  return t('giftBooster');
+}
+
+function giftTile(slot, status) {
+  const { gift } = slot;
+  const tile = document.createElement('div');
+  tile.className = `gift-tile is-${status} is-${gift.kind}`;
+  tile.innerHTML = `
+    <span class="gift-day"></span>
+    <span class="gift-art"></span>
+    <span class="gift-label"></span>
+    <span class="gift-check"></span>`;
+  tile.querySelector('.gift-day').textContent = String(slot.day);
+  // The coins label carries the Buckarooz glyph, which is drawn SVG from
+  // icons.js — our own markup, never anything remote.
+  tile.querySelector('.gift-label').innerHTML = giftLabel(gift);
+
+  const art = tile.querySelector('.gift-art');
+  if (gift.kind === 'coins') art.innerHTML = buckSvg({ size: 22 });
+  else if (gift.kind === 'card') art.innerHTML = iconSvg('collection', { size: 22 });
+  else art.innerHTML = iconSvg('packs', { size: 22 });
+
+  // A claimed day is replaced by its tick: the board is a record as well as
+  // a preview, so you can see at a glance how far in you are.
+  if (status === 'claimed') tile.querySelector('.gift-check').innerHTML = iconSvg('check', { size: 18 });
+  return tile;
+}
+
+function renderDaily() {
+  const daily = state.profile.daily;
+  const board = generateBoard(daily.board ?? 0);
+  const next = nextGiftIndex(daily);
+  const ready = canClaim(daily);
+
+  el.dailyTitle.textContent = t('dailyTitle');
+  el.dailyClose.textContent = t('close');
+  el.dailyBody.textContent = t('dailyBody');
+  el.dailyBoardLabel.textContent = t('dailyBoard', { n: (daily.board ?? 0) + 1 });
+
+  el.dailyClaim.textContent = t('dailyClaim');
+  el.dailyClaim.disabled = !ready;
+  el.dailyClaim.hidden = !ready;
+  el.dailyStatus.textContent = ready
+    ? ''
+    : `${t('dailyClaimed')} ${t('dailyNextIn', { time: formatCountdown(msUntilNextDay()) })}`;
+
+  el.giftBoard.replaceChildren(...board.map((slot) => giftTile(
+    slot,
+    slot.index < next ? 'claimed' : slot.index === next ? (ready ? 'ready' : 'next') : 'locked'
+  )));
+}
+
+function grantGift(gift) {
+  if (gift.kind === 'coins') {
+    store.saveWallet(store.loadWallet() + gift.coins);
+    refreshWallet();
+    synth.playCoins();
+  } else {
+    store.addBooster(state.inventory, gift.spec, 1);
+    renderRail('boosters');
+    synth.playFanfare();
+  }
+}
+
+function claimGift() {
+  const slot = claimDaily(state.profile.daily);
+  if (!slot) return;
+  store.saveProfile(state.profile);
+  grantGift(slot.gift);
+  toast(t('dailyGot', { reward: giftLabel(slot.gift) }), 'ok');
+  renderDaily();
+  updateDailyBadge();
+}
+
+function updateDailyBadge() {
+  const ready = canClaim(state.profile.daily);
+  el.giftDot.hidden = !ready;
+  el.dailyButton.classList.toggle('is-ready', ready);
+}
+
+function openDaily({ auto = false } = {}) {
+  // Auto-opening happens once a day. Dismissing without claiming leaves the
+  // gift waiting and the badge lit, but the dialog does not keep reappearing
+  // every time the app is reopened.
+  if (auto) {
+    const today = dayNumber();
+    if (state.profile.daily.shownDay === today) return;
+    state.profile.daily.shownDay = today;
+    store.saveProfile(state.profile);
+  }
+  renderDaily();
+  el.dailyModal.hidden = false;
+  synth.playTap();
+}
+
+/* --- settings ------------------------------------------------------------- */
+
+/** One switch. The label says what it is; the note says why you'd touch it. */
+function settingRow(key, titleKey, noteKey) {
+  const row = document.createElement('div');
+  row.className = 'setting-row';
+  row.innerHTML = `
+    <div class="setting-copy"><h4></h4><p></p></div>
+    <button class="switch" type="button" role="switch"><span class="switch-knob"></span></button>`;
+  row.querySelector('h4').textContent = t(titleKey);
+  row.querySelector('p').textContent = t(noteKey);
+
+  const button = row.querySelector('.switch');
+  const paint = () => {
+    const on = Boolean(settings()[key]);
+    button.classList.toggle('is-on', on);
+    button.setAttribute('aria-checked', String(on));
+    button.setAttribute('aria-label', `${t(titleKey)}: ${on ? t('on') : t('off')}`);
+  };
+  paint();
+  button.addEventListener('click', () => {
+    settings()[key] = !settings()[key];
+    store.saveProfile(state.profile);
+    applySettings();
+    paint();
+    if (settings().sound) synth.playTap();
+  });
+  return row;
+}
+
+function renderSettings() {
+  el.settingsTitle.textContent = t('settingsTitle');
+  el.settingsList.replaceChildren(
+    settingRow('sound', 'settingsSound', 'settingsSoundNote'),
+    settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
+    settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
+    settingRow('hints', 'settingsHints', 'settingsHintsNote')
+  );
+
+  el.settingsDataTitle.textContent = t('settingsData');
+  el.settingsLanguageTitle.textContent = t('settingsLanguage');
+  el.settingsLanguageNote.textContent = t('settingsLanguageNote');
+  el.settingsLanguageValue.innerHTML =
+    `${iconSvg('lock', { size: 14 })}<span>${LANGUAGES.find((l) => l.id === getLanguage())?.label ?? ''}</span>`;
+  el.settingsResetTitle.textContent = t('settingsReset');
+  el.settingsResetNote.textContent = t('settingsResetNote');
+  paintResetButton();
+}
+
+let resetArmed = false;
+let resetTimer = null;
+
+function paintResetButton() {
+  el.settingsReset.textContent = resetArmed ? t('settingsResetConfirm') : t('settingsReset');
+  el.settingsReset.classList.toggle('is-armed', resetArmed);
+}
+
+/** Same arm-then-confirm shape as selling a card: the button is the dialog. */
+function handleReset() {
+  if (!resetArmed) {
+    resetArmed = true;
+    paintResetButton();
+    synth.playTap();
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => { resetArmed = false; paintResetButton(); }, 5000);
+    return;
+  }
+  wipeEverything();
+}
+
+function wipeEverything() {
+  ['packywiki.collection.v3', 'packywiki.wallet.v1', 'packywiki.inventory.v1',
+   'packywiki.profile.v1', 'packywiki.customPacks.v2', 'packywiki.language',
+   'packywiki.ripDirection'].forEach((key) => {
+    try { localStorage.removeItem(key); } catch { /* nothing to remove */ }
+  });
+  location.reload();
 }
 
 /* --- odds ----------------------------------------------------------------- */
@@ -1305,6 +1950,8 @@ function showStarter() {
   renderRail('boosters');
   renderRail('custom');
   renderShop();
+  updateTimedBadge();
+  updateDailyBadge();
   loadPackArt();
 }
 
@@ -1314,14 +1961,17 @@ function applyStrings() {
   document.documentElement.lang = getLanguage();
   el.brandSub.textContent = t('tagline');
   el.oddsButton.textContent = t('odds');
-  const muted = el.muteButton.getAttribute('aria-pressed') === 'true';
-  el.muteButton.textContent = muted ? t('soundOff') : t('soundOn');
-  const TAB_KEYS = { boosters: 'tabBoosters', custom: 'tabCustom', shop: 'tabShop', collection: 'tabCollection' };
+  el.dailyButtonLabel.textContent = t('dailyOpen');
+  el.giftIcon.innerHTML = iconSvg('gift', { size: 15 });
+  const TAB_KEYS = {
+    boosters: 'tabBoosters', timed: 'tabTimed', custom: 'tabCustom', shop: 'tabShop',
+    collection: 'tabCollection', profile: 'tabProfile', settings: 'tabSettings'
+  };
   el.tabs.forEach((tab) => {
     tab.querySelector('.tab-label').textContent = t(TAB_KEYS[tab.dataset.tab]);
   });
   el.railHint.textContent = t('swipeShelf');
-  el.customIntro.textContent = t('customIntro');
+  el.customIntro.textContent = `${t('customIntro')} ${t('customOwnNote')}`;
   el.customInput.placeholder = t('customPlaceholder');
   el.customSubmit.textContent = t('create');
   el.customOpen.textContent = t('openPack');
@@ -1360,9 +2010,12 @@ function specFromId(id) {
 
 function init() {
   el.brandMark.innerHTML = logoSvg({ size: 30 });
+  applySettings();
   applyStrings();
   refreshWallet();
   updateTabCount();
+  updateTimedBadge();
+  updateDailyBadge();
   initRail('boosters');
   initRail('custom');
   initSwipe();
@@ -1378,14 +2031,22 @@ function init() {
   el.railPrev.addEventListener('click', () => scrollRailTo('boosters', (state.rails.boosters?.focusIndex ?? 0) - 1));
   el.railNext.addEventListener('click', () => scrollRailTo('boosters', (state.rails.boosters?.focusIndex ?? 0) + 1));
   el.customForm.addEventListener('submit', createCustomPack);
-  el.backButton.addEventListener('click', () => showScreen(state.spec?.kind === 'custom' ? 'custom' : 'boosters'));
-  el.backToShelf.addEventListener('click', () => showScreen(state.spec?.kind === 'custom' ? 'custom' : 'boosters'));
+  const leaveOpenScreen = () => {
+    const home = homeTabFor(state.spec);
+    if (home === 'timed') renderTimed();
+    showScreen(home);
+  };
+  el.backButton.addEventListener('click', leaveOpenScreen);
+  el.backToShelf.addEventListener('click', leaveOpenScreen);
 
   el.tabs.forEach((tab) => tab.addEventListener('click', () => {
     const name = tab.dataset.tab;
     synth.playTap();
     if (name === 'collection') renderCollection();
     if (name === 'shop') { payStipend(); renderShop(); }
+    if (name === 'timed') renderTimed();
+    if (name === 'profile') renderProfile();
+    if (name === 'settings') renderSettings();
     showScreen(name);
   }));
 
@@ -1405,31 +2066,53 @@ function init() {
     if (e.key !== 'Escape') return;
     el.oddsModal.hidden = true;
     el.walletModal.hidden = true;
+    el.dailyModal.hidden = true;
     if (!el.cardModal.hidden) closeCardDetail();
   });
 
-  el.muteButton.addEventListener('click', () => {
-    const next = el.muteButton.getAttribute('aria-pressed') !== 'true';
-    synth.resume();
-    synth.setMuted(next);
-    el.muteButton.setAttribute('aria-pressed', String(next));
-    el.muteButton.textContent = next ? t('soundOff') : t('soundOn');
+  el.dailyButton.addEventListener('click', openDaily);
+  el.dailyClose.addEventListener('click', () => { el.dailyModal.hidden = true; });
+  el.dailyModal.addEventListener('click', (e) => { if (e.target === el.dailyModal) el.dailyModal.hidden = true; });
+  el.dailyClaim.addEventListener('click', () => { synth.resume(); claimGift(); });
+  el.settingsReset.addEventListener('click', handleReset);
+
+  // Playtime is measured between visibility changes, and the shared clock is
+  // parked entirely while the app is in the background.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      visibleSince = Date.now();
+      syncTimed();
+      updateTimedBadge();
+      updateDailyBadge();
+    } else {
+      flushPlaytime();
+      visibleSince = null;
+      // Nothing is playing in the background, so let the audio hardware go.
+      synth.suspend();
+    }
+    syncTicker();
   });
+  window.addEventListener('pagehide', flushPlaytime);
 
   el.starterGo.addEventListener('click', () => {
     el.welcomeModal.hidden = true;
     synth.playTap();
     showScreen('boosters');
+    if (canClaim(state.profile.daily)) openDaily({ auto: true });
   });
 
   if (!languageChosen() || !state.profile.started) showWelcome();
-  else payStipend();
+  else {
+    payStipend();
+    // A gift waiting is the first thing a returning player should see.
+    if (canClaim(state.profile.daily)) openDaily({ auto: true });
+  }
 }
 
 init();
 
 window.__packywiki = {
-  state, store, RARITIES,
+  state, store, RARITIES, synth, draw: drawArticles,
   debugRarity(id) {
     const forced = rarityById(id);
     document.querySelectorAll('.card').forEach((card) => {
@@ -1441,10 +2124,19 @@ window.__packywiki = {
   },
   grant(amount = 10000) { store.saveWallet(store.loadWallet() + amount); refreshWallet(); },
   giveBooster(spec) { store.addBooster(state.inventory, spec, 1); renderRail('boosters'); renderRail('custom'); },
-  resetAll() {
-    ['packywiki.collection.v3', 'packywiki.wallet.v1', 'packywiki.inventory.v1',
-     'packywiki.profile.v1', 'packywiki.customPacks.v2', 'packywiki.language',
-     'packywiki.ripDirection'].forEach((k) => { try { localStorage.removeItem(k); } catch { /* ignore */ } });
-    location.reload();
+  resetAll: wipeEverything,
+  addXp(amount = 5000) {
+    const levels = addXp(state.profile.progress, amount);
+    if (levels.length) state.profile.pendingLevels.push(...levels);
+    store.saveProfile(state.profile);
+    drainLevelUps();
+    return state.profile.progress;
+  },
+  timedShare: timedOddsShare,
+  timedScarcity: timedTopScarcity,
+  giveTimed(n = 5) {
+    state.profile.timed.count += n;
+    store.saveProfile(state.profile);
+    renderTimed();
   }
 };

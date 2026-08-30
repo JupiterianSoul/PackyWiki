@@ -17,6 +17,7 @@
  */
 import { expectedMultiplier, rarityRank, rarityById } from './data/rarities.js';
 import { basePrice } from './pricing.js';
+import { timedRollOptions } from './timed.js';
 
 /** A card sells for this fraction of its listed price. */
 export const SELL_RATE = 0.3;
@@ -45,6 +46,9 @@ export const CARD_COUNT_RANGE = [3, 7];
  * booster never yields a Common.
  */
 export function rollOptionsFor(spec) {
+  // Timed boosters run on their own nerfed table, which only reaches the
+  // normal odds at the top of their track. See src/timed.js.
+  if (spec?.kind === 'timed') return timedRollOptions(spec.timedLevel ?? 1);
   if (!spec?.rarityId) return {};
   const rank = rarityRank(spec.rarityId);
   return { tierShift: 1 + rank * 0.16, floorTier: Math.max(0, rank - 3) };
@@ -87,3 +91,14 @@ export const nextRefreshAt = (now = Date.now()) => (windowIndexAt(now) + 1) * RE
 export const STARTER_COINS = 1500;
 export const STARTER_PACKS = 3;
 export const STARTER_PACK_CARDS = 5;
+
+/* --- the free shelf ------------------------------------------------------- */
+
+/**
+ * The shop always carries something free, so a player with an empty wallet is
+ * never stuck. Two small boosters a window is worth roughly 230 Buckarooz if
+ * you sell every card — under half a single stipend, and under a tenth of what
+ * a day of stipends pays — so it is a floor, not a faucet.
+ */
+export const FREE_SLOTS = 2;
+export const FREE_CARDS = 3;

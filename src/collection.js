@@ -14,6 +14,8 @@ import { rarityRank } from './data/rarities.js';
 import { bandFor } from './pricing.js';
 import { specId } from './booster.js';
 import { STARTER_COINS, STIPEND, STIPEND_MAX_BANKED, windowIndexAt } from './economy.js';
+import { emptyDaily } from './daily.js';
+import { emptyTimed, accrue } from './timed.js';
 import { t } from './i18n.js';
 
 const CARDS_KEY = 'packywiki.collection.v3';
@@ -155,7 +157,6 @@ export function filterEntries(entries, filters) {
 }
 
 export const collectionStats = (entries) => ({
-  unique: entries.length,
   copies: entries.reduce((sum, e) => sum + e.count, 0),
   value: entries.reduce((sum, e) => sum + e.price * e.count, 0),
   favorites: entries.filter((e) => e.favorite).length
@@ -204,9 +205,35 @@ export const ownedBoosters = (inventory) =>
 
 /* --- profile ------------------------------------------------------------- */
 
+/**
+ * The profile carries everything that is about the player rather than about
+ * the cards: how far along they are, what they have claimed, and how they
+ * want the app to behave. Every field is defaulted on read, so a profile
+ * written by an older build loads without a migration step.
+ */
 export function loadProfile() {
   const data = readJson(PROFILE_KEY, null);
-  return data && typeof data === 'object' ? data : { started: false, stipendWindow: null };
+  const profile = data && typeof data === 'object' ? data : {};
+  profile.started ??= false;
+  profile.stipendWindow ??= null;
+  profile.createdAt ??= Date.now();
+  profile.playMs ??= 0;
+  profile.boostersOpened ??= 0;
+  profile.rarityCounts ??= {};
+  profile.progress ??= { level: 1, xp: 0 };
+  profile.progress.level ??= 1;
+  profile.progress.xp ??= 0;
+  profile.pendingLevels ??= [];
+  profile.daily ??= emptyDaily();
+  profile.timed ??= emptyTimed();
+  profile.freeTaken ??= { window: null, ids: [] };
+  profile.settings ??= {};
+  profile.settings.sound ??= true;
+  profile.settings.lowPower ??= false;
+  profile.settings.flash ??= true;
+  profile.settings.hints ??= true;
+  accrue(profile.timed);
+  return profile;
 }
 
 export const saveProfile = (profile) => writeJson(PROFILE_KEY, profile);
@@ -235,9 +262,48 @@ export function claimStipend(profile, wallet) {
 export function grantStarter(profile) {
   profile.started = true;
   profile.stipendWindow = windowIndexAt();
+  profile.createdAt = Date.now();
   saveProfile(profile);
   saveWallet(STARTER_COINS);
   return STARTER_COINS;
+}
+
+/* --- stats --------------------------------------------------------------- */
+
+/** Record what a booster produced. Drives the profile page and the XP award. */
+export function recordOpening(profile, pulls) {
+  profile.boostersOpened = (profile.boostersOpened ?? 0) + 1;
+  for (const pull of pulls) {
+    const id = pull.rarity.id;
+    profile.rarityCounts[id] = (profile.rarityCounts[id] ?? 0) + 1;
+  }
+  saveProfile(profile);
+}
+
+/**
+ * Playtime, accumulated in chunks rather than continuously — a timer running
+ * every second just to count seconds is exactly the kind of thing that warms
+ * a phone up for nothing.
+ */
+export function addPlaytime(profile, ms) {
+  if (!(ms > 0)) return;
+  profile.playMs = (profile.playMs ?? 0) + ms;
+  saveProfile(profile);
+}
+
+/* --- the free shelf ------------------------------------------------------ */
+
+export function freeAvailable(profile, id, windowIndex = windowIndexAt()) {
+  if (profile.freeTaken.window !== windowIndex) return true;
+  return !profile.freeTaken.ids.includes(id);
+}
+
+export function markFreeTaken(profile, id, windowIndex = windowIndexAt()) {
+  if (profile.freeTaken.window !== windowIndex) {
+    profile.freeTaken = { window: windowIndex, ids: [] };
+  }
+  if (!profile.freeTaken.ids.includes(id)) profile.freeTaken.ids.push(id);
+  saveProfile(profile);
 }
 
 /* --- custom boosters ----------------------------------------------------- */

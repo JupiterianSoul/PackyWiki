@@ -52,6 +52,18 @@ class Synth {
     if (ctx && ctx.state === 'suspended') ctx.resume();
   }
 
+  /**
+   * Park the audio hardware while the app is in the background. A running
+   * AudioContext keeps the audio thread alive and the device awake even with
+   * nothing playing, which is a pure waste of battery in a backgrounded tab.
+   * Note this suspends an EXISTING context only: it must never be the thing
+   * that creates one, or a hidden tab would spin an audio graph up for no
+   * reason.
+   */
+  suspend() {
+    if (this.ctx && this.ctx.state === 'running') this.ctx.suspend();
+  }
+
   setMuted(muted) {
     this.muted = muted;
     if (this.master) {

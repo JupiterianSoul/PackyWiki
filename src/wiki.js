@@ -350,26 +350,85 @@ function htmlToText(html) {
 }
 
 /** File names that are chrome rather than illustration. */
-const JUNK_IMAGE = /(icon|logo|wiki-wordmark|favicon|badge|stub|placeholder|button|sprite|ui[-_])/i;
+const JUNK_IMAGE =
+  /(icon|logo|wiki-wordmark|favicon|badge|stub|placeholder|button|sprite|ui[-_]|site-?background|community|discord|twitter|facebook|edit|arrow|bullet|spacer|blank|transparent|nav|banner|header|footer)/i;
+
+/** Below this, an image is chrome or a sprite, not a picture of anything. */
+const MIN_IMAGE_EDGE = 180;
+const MIN_IMAGE_AREA = 60000;
 
 /**
- * Resolve an image for a page the hard way. Fandom pages very often have a
- * picture that `pageimages` doesn't surface, so when it comes back empty we
- * ask what images the page actually uses and resolve the first real one.
+ * Ask a Fandom image URL for a bigger version of itself.
+ *
+ * Fandom serves images through a resizing CDN, and the URL says what size you
+ * are getting: `/revision/latest/scale-to-width-down/50` is a fifty-pixel
+ * thumbnail. Dropped straight into a 300px card slot that is the blurry,
+ * over-zoomed mess it looks like. Rewriting the width asks the CDN for a
+ * usable size instead, and stripping a `smart` crop stops the CDN returning a
+ * hard-cropped square where the subject has been cut in half.
+ */
+function upgradeImageUrl(url, width = 640) {
+  if (typeof url !== 'string' || !url) return url;
+  if (!/static\.wikia\.nocookie\.net|\/revision\/latest/.test(url)) return url;
+  return url
+    .replace(/\/scale-to-width-down\/\d+/, `/scale-to-width-down/${width}`)
+    .replace(/\/scale-to-width\/\d+/, `/scale-to-width/${width}`)
+    .replace(/\/smart\/width\/\d+\/height\/\d+/, `/scale-to-width-down/${width}`)
+    .replace(/\/window-crop\/width\/\d+\/[^?]*/, `/scale-to-width-down/${width}`);
+}
+
+/** A thumbnail the API gave us, only if it is actually big enough to use. */
+function usableThumb(page, width = 640) {
+  const thumb = page?.thumbnail;
+  if (!thumb?.source) return null;
+  // pageimages reports the size it produced. A 60px one is a favicon.
+  if (Number.isFinite(thumb.width) && thumb.width < MIN_IMAGE_EDGE) {
+    // It may still be a big picture served small: ask for it larger and check.
+    const bigger = upgradeImageUrl(thumb.source, width);
+    return bigger !== thumb.source ? bigger : null;
+  }
+  return upgradeImageUrl(thumb.source, width);
+}
+
+/**
+ * Resolve an image for a page the hard way.
+ *
+ * Fandom pages very often have a picture that `pageimages` doesn't surface, so
+ * when it comes back empty we ask what images the page actually *uses*. That
+ * list is in page order, which is why taking the first one so often produced
+ * the wrong picture: the first image on a Fandom article is usually a nav
+ * icon or an infobox glyph. We ask for each image's real dimensions instead,
+ * throw away anything too small to be an illustration, and take the largest.
  */
 async function customPageImage(wiki, pageId) {
   try {
     const params = new URLSearchParams({
-      action: 'query', pageids: String(pageId), generator: 'images', gimlimit: '12',
-      prop: 'imageinfo', iiprop: 'url', iiurlwidth: '480', format: 'json', origin: '*'
+      action: 'query', pageids: String(pageId), generator: 'images', gimlimit: '24',
+      prop: 'imageinfo', iiprop: 'url|size|mime', iiurlwidth: '640',
+      format: 'json', origin: '*'
     });
     const pages = Object.values((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages ?? {});
     const usable = pages
-      .filter((p) => p.title && !JUNK_IMAGE.test(p.title))
-      .filter((p) => /\.(jpe?g|png|webp)$/i.test(p.title))
-      .map((p) => p.imageinfo?.[0]?.thumburl ?? p.imageinfo?.[0]?.url)
-      .filter(Boolean);
-    return usable[0] ?? null;
+      .map((p) => ({ title: p.title ?? '', info: p.imageinfo?.[0] }))
+      .filter(({ title, info }) => info && title && !JUNK_IMAGE.test(title))
+      .filter(({ title, info }) =>
+        /^image\/(jpeg|png|webp)$/i.test(info.mime ?? '') || /\.(jpe?g|png|webp)$/i.test(title))
+      .filter(({ info }) => {
+        const w = info.width ?? 0;
+        const h = info.height ?? 0;
+        // No dimensions reported: keep it rather than lose a good picture.
+        if (!w || !h) return true;
+        if (w < MIN_IMAGE_EDGE || h < MIN_IMAGE_EDGE * 0.6) return false;
+        // Long thin strips are page furniture, whatever they are called.
+        if (w / h > 4 || h / w > 4) return false;
+        return w * h >= MIN_IMAGE_AREA;
+      })
+      // Biggest wins: on a Fandom article that is reliably the subject.
+      .sort((a, b) => (b.info.width ?? 0) * (b.info.height ?? 0) - (a.info.width ?? 0) * (a.info.height ?? 0));
+
+    const best = usable[0]?.info;
+    if (!best) return null;
+    return upgradeImageUrl(best.thumburl ?? best.url, 640);
   } catch {
     return null;
   }
@@ -382,10 +441,12 @@ export async function fetchCustomPackArt(wiki) {
     try {
       const params = new URLSearchParams({
         action: 'query', titles: wiki.mainPage, prop: 'pageimages',
-        piprop: 'thumbnail', pithumbsize: '640', format: 'json', origin: '*'
+        piprop: 'thumbnail|original', pithumbsize: '640', format: 'json', origin: '*'
       });
       const page = Object.values((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages ?? {})[0];
-      if (page?.thumbnail?.source) return page.thumbnail.source;
+      const art = usableThumb(page, 640) ?? (page?.original?.source
+        ? upgradeImageUrl(page.original.source, 640) : null);
+      if (art) return art;
     } catch { /* fall through */ }
   }
 
@@ -393,14 +454,17 @@ export async function fetchCustomPackArt(wiki) {
   try {
     const params = new URLSearchParams({
       action: 'query', generator: 'random', grnnamespace: '0', grnlimit: '16',
-      prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '640',
+      prop: 'pageimages', piprop: 'thumbnail|original', pithumbsize: '640',
       format: 'json', origin: '*'
     });
     const pages = Object.values((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages ?? {});
-    const withArt = pages.find((p) => p.thumbnail?.source);
-    if (withArt) return withArt.thumbnail.source;
-    if (pages.length) {
-      const deep = await customPageImage(wiki, pages[0].pageid);
+    for (const page of pages) {
+      const art = usableThumb(page, 640);
+      if (art) return art;
+    }
+    // Nothing surfaced a thumbnail: go digging on the first couple of pages.
+    for (const page of pages.slice(0, 3)) {
+      const deep = await customPageImage(wiki, page.pageid);
       if (deep) return deep;
     }
   } catch { /* fall through */ }
@@ -413,7 +477,7 @@ async function customPageDetail(wiki, pageId) {
     action: 'query', pageids: String(pageId),
     prop: 'extracts|pageimages|info',
     exintro: '1', explaintext: '1', exchars: '600',
-    piprop: 'thumbnail', pithumbsize: '480', inprop: 'url',
+    piprop: 'thumbnail|original', pithumbsize: '640', inprop: 'url',
     format: 'json', origin: '*'
   });
   return (await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages?.[pageId] ?? null;
@@ -451,8 +515,12 @@ async function drawCustomCard(pack, seen) {
       if (!isUsableText(page.title, extract) || seen.has(page.title)) continue;
       seen.add(page.title);
 
-      // pageimages misses a lot on Fandom; go digging before giving up on art.
-      const thumbnail = page.thumbnail?.source ?? await customPageImage(wiki, page.pageid);
+      // pageimages misses a lot on Fandom, and what it does return is often
+      // a fifty-pixel icon, so a too-small thumbnail is treated as no
+      // thumbnail and we go digging rather than stretch it across the card.
+      const thumbnail = usableThumb(page, 640)
+        ?? (page.original?.source ? upgradeImageUrl(page.original.source, 640) : null)
+        ?? await customPageImage(wiki, page.pageid);
 
       return toCard({
         sourceId: `wiki:${new URL(wiki.apiUrl).host}${new URL(wiki.apiUrl).pathname.replace('/api.php', '')}`,

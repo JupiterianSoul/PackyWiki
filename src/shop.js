@@ -13,7 +13,7 @@
  */
 import { THEME_PACKS } from './data/packs.js';
 import { RARITIES, rarityRank } from './data/rarities.js';
-import { CARD_COUNT_RANGE, windowIndexAt, boosterPrice } from './economy.js';
+import { CARD_COUNT_RANGE, windowIndexAt, boosterPrice, FREE_SLOTS, FREE_CARDS } from './economy.js';
 import { specId } from './booster.js';
 import { t, tx } from './i18n.js';
 
@@ -132,20 +132,139 @@ function customSpec(rng, customPacks) {
   };
 }
 
+/* --- more shelves --------------------------------------------------------- */
+
+/** Only the biggest boosters. Expensive, but the best cards-per-tear ratio. */
+function jumboShelf(rng) {
+  const specs = [];
+  for (let i = 0; i < between(rng, 3, 4); i++) {
+    specs.push({
+      kind: 'theme',
+      themeId: pick(rng, THEME_PACKS).id,
+      rarityId: rng() < 0.45 ? weightedTier(rng, { max: 'mythic' }) : null,
+      cards: between(rng, 6, CARD_COUNT_RANGE[1])
+    });
+  }
+  return { id: 'jumbo', title: t('shopJumboRow'), specs };
+}
+
+/** Two subjects, side by side, so the row reads as a matchup. */
+function duoShelf(rng) {
+  const a = pick(rng, THEME_PACKS);
+  const b = pick(rng, THEME_PACKS.filter((theme) => theme.id !== a.id));
+  const specs = [a, b, a, b].map((theme, i) => ({
+    kind: 'theme',
+    themeId: theme.id,
+    rarityId: i < 2 ? null : weightedTier(rng, { max: 'legendary' }),
+    cards: cardCount(rng)
+  }));
+  return { id: `duo-${a.id}-${b.id}`, title: t('shopDuoRow', { a: tx(a.name), b: tx(b.name) }), specs };
+}
+
+/** One subject, climbing the tiers, so you can see what the ladder costs. */
+function ladderShelf(rng) {
+  const theme = pick(rng, THEME_PACKS);
+  const cards = cardCount(rng);
+  const top = rarityRank(weightedTier(rng, { max: 'exotic' }));
+  const specs = [{ kind: 'theme', themeId: theme.id, rarityId: null, cards }];
+  for (let rank = 1; rank <= top; rank++) {
+    specs.push({ kind: 'theme', themeId: theme.id, rarityId: RARITIES[rank].id, cards });
+  }
+  return { id: `ladder-${theme.id}`, title: t('shopLadderRow', { theme: tx(theme.name) }), specs };
+}
+
+/** No subject at all: the whole of Wikipedia, at every size. */
+function wildShelf(rng) {
+  const specs = [];
+  for (let i = 0; i < between(rng, 3, 5); i++) {
+    specs.push({
+      kind: 'open', themeId: null,
+      rarityId: rng() < 0.4 ? weightedTier(rng, { max: 'legendary' }) : null,
+      cards: cardCount(rng)
+    });
+  }
+  return { id: 'wild', title: t('shopWildRow'), specs };
+}
+
+/** Everything in the row is the same size, at a slight discount for buying blind. */
+function bundleShelf(rng) {
+  const cards = between(rng, 4, 6);
+  const specs = [];
+  for (let i = 0; i < between(rng, 4, 5); i++) {
+    specs.push({ kind: 'theme', themeId: pick(rng, THEME_PACKS).id, rarityId: null, cards });
+  }
+  return { id: `bundle-${cards}`, title: t('shopBundleRow', { n: cards }), specs };
+}
+
+/**
+ * Everything the player has built. Custom boosters were free once, which was
+ * an obvious hole — build a pack, open it, sell the cards, repeat. They are
+ * bought here like anything else now, and this shelf guarantees a pack you
+ * just made is immediately available rather than waiting on a lucky roll.
+ */
+function customShelf(rng, customPacks) {
+  if (!customPacks.length) return null;
+  const specs = customPacks.slice(0, 8).map((pack, i) => ({
+    ...customSpec(rng, [pack]),
+    cards: i === 0 ? 5 : cardCount(rng)
+  }));
+  return { id: 'custom-built', title: t('shopCustomRow'), specs, pinned: true };
+}
+
+/**
+ * The free shelf, which is always here. Small boosters, no tier most of the
+ * time, one per window each. This is the anti-lockout guarantee: whatever
+ * happens to your wallet, there is always something to open.
+ */
+function freeShelf(rng) {
+  const specs = [];
+  for (let i = 0; i < FREE_SLOTS; i++) {
+    specs.push({
+      kind: 'theme',
+      themeId: pick(rng, THEME_PACKS).id,
+      // A tenth of the time the free pack is a low-tier upgrade, which is the
+      // whole reason to come back and look at it.
+      rarityId: rng() < 0.1 ? RARITIES[1].id : null,
+      cards: FREE_CARDS,
+      free: true
+    });
+  }
+  return { id: 'free', title: t('shopFreeRow'), specs, free: true, pinned: true };
+}
+
 /* --- assembly ------------------------------------------------------------- */
 
 /**
  * The shelves for a window. Rows are deduped by spec so the same booster never
  * appears twice, and each entry carries its price so the UI doesn't recompute.
  */
+const ROTATING = [
+  rarityShelf, themeShelf, mixedShelf, valueShelf,
+  jumboShelf, duoShelf, ladderShelf, wildShelf, bundleShelf
+];
+
 export function generateShop(windowIndex = windowIndexAt(), customPacks = []) {
   const rng = seeded(windowIndex);
-  const builders = [rarityShelf, themeShelf, mixedShelf, rarityShelf, themeShelf, valueShelf];
+
+  // The free shelf and the player's own custom boosters are always here; the
+  // rest of the shop is a rotating draw from the pool, so no two windows look
+  // quite alike.
+  const pool = [...ROTATING];
+  const rotating = [];
+  const wanted = between(rng, 5, 7);
+  while (rotating.length < wanted && pool.length) {
+    rotating.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
+  }
+  // A rarity shelf always earns its place: it is where the top of the game is.
+  if (!rotating.includes(rarityShelf)) rotating.unshift(rarityShelf);
+
+  const builders = [freeShelf, customShelf, ...rotating];
   const seen = new Set();
   const rows = [];
 
   for (const build of builders) {
     const row = build(rng, customPacks);
+    if (!row) continue;
     const specs = [];
     for (const spec of row.specs) {
       // Enforce the card-count range even if a builder drifts.
@@ -153,7 +272,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = []) {
       const id = specId(spec);
       if (seen.has(id)) continue;
       seen.add(id);
-      specs.push({ id, spec, price: boosterPrice(spec) });
+      specs.push({ id, spec, price: row.free ? 0 : boosterPrice(spec) });
     }
     if (specs.length) rows.push({ ...row, specs });
   }

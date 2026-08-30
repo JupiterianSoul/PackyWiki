@@ -104,25 +104,37 @@ button { font: inherit; color: inherit; cursor: pointer; }
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
+  max-width: 100%;
   /* Sits clear of the status bar / notch and gives every control a real
      touch target rather than a sliver at the top of the screen. */
   padding: calc(18px + env(safe-area-inset-top, 0px)) clamp(14px, 3vw, 36px) 18px;
   border-bottom: 1px solid var(--panel-line);
   backdrop-filter: blur(8px);
 }
-.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; }
+.brand { display: flex; align-items: center; gap: 12px; margin-right: auto; min-width: 0; }
 .brand-mark { color: #c7d2fe; filter: drop-shadow(0 4px 14px rgba(129, 140, 248, 0.5)); }
 .brand h1 { font-size: 1.2rem; letter-spacing: -0.02em; }
 .brand-sub { font-size: 0.78rem; color: var(--text-dim); }
 
+/* Seven tabs do not fit across a phone, so the strip scrolls sideways inside
+   itself. `min-width: 0` is what keeps it from stretching the top bar — and
+   the page — to the width of its contents. */
 .tabs {
   display: flex; gap: 4px; padding: 4px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
   border: 1px solid var(--panel-line);
   border-radius: 999px;
   background: rgba(0, 0, 0, 0.3);
 }
+.tabs::-webkit-scrollbar { display: none; }
 .tab {
-  border: 0; border-radius: 999px; padding: 11px 20px;
+  flex: none;
+  white-space: nowrap;
+  border: 0; border-radius: 999px; padding: 11px 18px;
   font-size: 0.88rem; font-weight: 600; color: var(--text-dim);
   background: transparent;
   transition: color 0.18s ease, background 0.18s ease;
@@ -134,6 +146,8 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: rgba(0, 0, 0, 0.25);
 }
 .tab.is-active .tab-count { background: rgba(0, 0, 0, 0.18); }
+.tab-count.is-hot { color: #0b0d14; background: #4ade80; }
+.tab.is-active .tab-count.is-hot { background: #22c55e; }
 .topbar-actions { display: flex; align-items: center; gap: 8px; }
 
 main { padding: clamp(18px, 3vw, 34px) 0 90px; }
@@ -1230,6 +1244,14 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   .topbar-actions { gap: 6px; }
   .ghost-button { padding: 10px 14px; font-size: 0.79rem; }
 
+  .tabs { justify-content: flex-start; }
+  .timed-stage { gap: 16px; }
+  .rarity-row { grid-template-columns: 88px 1fr 48px; gap: 8px; }
+  .rarity-name { font-size: 0.72rem; }
+  .gift-board { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 6px; }
+  .setting-row { gap: 12px; }
+  .stat-grid { grid-template-columns: repeat(auto-fill, minmax(128px, 1fr)); }
+
   :root { --pack-w: 208px; --pack-h: 374px; --card-w: min(74vw, 268px); }
   .rail-arrow { display: none; }
   .rail-name { font-size: 1.35rem; }
@@ -1384,18 +1406,47 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 
 /* --- card detail --------------------------------------------------------- */
 .card-modal { padding: 0; }
+/*
+ * Stacked by default and side-by-side only when there is genuinely room.
+ *
+ * This used to be the other way round: a row layout with a 720px breakpoint
+ * to undo it. Anything that made the layout viewport wider than 720px — an
+ * Android WebView not honouring `width=device-width`, say — skipped the
+ * breakpoint entirely and the phone got the desktop layout: an 860px panel
+ * hanging off the side of a 400px screen. Building up rather than down means
+ * the narrow case is the one that cannot be missed.
+ */
 .card-modal-inner {
   position: relative;
   display: flex;
-  gap: clamp(16px, 3vw, 34px);
+  flex-direction: column;
   align-items: center;
-  width: min(860px, 100%);
-  max-height: 92vh;
-  padding: clamp(18px, 3vw, 32px);
+  gap: 14px;
+  width: 100%;
+  max-width: 860px;
+  /* dvh where it exists: a mobile browser's toolbar must not push the
+     actions off the bottom of the sheet. */
+  max-height: 100vh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: calc(48px + env(safe-area-inset-top, 0px)) 16px calc(20px + env(safe-area-inset-bottom, 0px));
   border-radius: 22px;
   border: 1px solid var(--panel-line);
   background: linear-gradient(170deg, #161a26, #0b0e15);
   box-shadow: 0 50px 90px -40px #000;
+}
+.card-modal-inner > * { max-width: 100%; }
+
+@media (min-width: 780px) and (min-height: 560px) {
+  .card-modal-inner {
+    flex-direction: row;
+    align-items: center;
+    gap: clamp(16px, 3vw, 34px);
+    max-height: 92vh;
+    padding: clamp(18px, 3vw, 32px);
+  }
+  .card-detail-side { max-height: 74vh; }
 }
 .modal-x {
   position: absolute;
@@ -1411,12 +1462,16 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 }
 .modal-x:hover { color: var(--text); }
 
-.card-detail { flex: none; perspective: 1100px; }
+.card-detail { flex: none; perspective: 1100px; max-width: 100%; }
 .card.detail-card {
-  width: min(260px, 40vw);
+  width: min(240px, 62vw, 30vh);
+  max-width: 100%;
   cursor: grab;
   touch-action: none;
   transition: transform 0.35s var(--ease-out);
+}
+@media (min-width: 780px) and (min-height: 560px) {
+  .card.detail-card { width: min(260px, 34vw); }
 }
 .card.detail-card.is-tilting { transition: none; cursor: grabbing; }
 
@@ -1425,8 +1480,8 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   flex-direction: column;
   gap: 10px;
   min-width: 0;
+  width: 100%;
   flex: 1;
-  max-height: 74vh;
 }
 .detail-title { font-size: clamp(1.1rem, 3vw, 1.5rem); letter-spacing: -0.02em; }
 .detail-sub {
@@ -1542,10 +1597,7 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 .toast.is-ok { color: #86efac; border-color: rgba(134, 239, 172, 0.4); }
 
 @media (max-width: 720px) {
-  .card-modal-inner { flex-direction: column; gap: 14px; overflow-y: auto; padding: 44px 16px 20px; }
-  .card.detail-card { width: min(200px, 52vw); }
-  .card-detail-side { max-height: none; width: 100%; }
-  .detail-scroll { max-height: 30vh; flex: none; }
+  .detail-scroll { max-height: 34vh; flex: none; }
   .shop-item, .buy-button { width: 120px; }
   .booster.is-small { --pack-w: 120px; --pack-h: 216px; width: 120px; height: 216px; }
   .pack-summary { max-width: 100%; gap: 12px 8px; }
@@ -1580,3 +1632,330 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   margin-bottom: 6px;
 }
 .wallet-row p { font-size: 0.86rem; line-height: 1.55; color: #c2cbdc; }
+
+/* ==========================================================================
+   10. Timed boosters, progression, daily gifts, settings
+   ========================================================================== */
+
+/* --- timed boosters ------------------------------------------------------ */
+#screen-timed { padding: 0 clamp(14px, 3vw, 36px); max-width: 900px; margin: 0 auto; }
+.timed-head { margin-bottom: 18px; }
+.timed-title { font-size: clamp(1.3rem, 4vw, 1.8rem); letter-spacing: -0.02em; margin-bottom: 6px; }
+
+.timed-stage {
+  display: flex;
+  gap: clamp(16px, 4vw, 34px);
+  align-items: center;
+  flex-wrap: wrap;
+  padding: clamp(16px, 3vw, 26px);
+  border: 1px solid var(--panel-line);
+  border-radius: 20px;
+  background: rgba(0, 0, 0, 0.26);
+}
+.timed-booster { flex: none; }
+/* An empty slot is drawn as an outline of the pack that isn't there yet. */
+.timed-booster .booster.is-empty { opacity: 0.3; filter: grayscale(0.7); }
+.timed-panel { flex: 1; min-width: 190px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.timed-held { font-size: clamp(1.2rem, 4vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; }
+.timed-next { font-size: 0.86rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.timed-panel .primary-button { margin-top: 6px; }
+
+/* --- the timed track (a levelling bar) ----------------------------------- */
+.track {
+  margin-top: 22px;
+  padding: clamp(14px, 3vw, 22px);
+  border: 1px solid var(--panel-line);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.03);
+}
+.track-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.track-level { font-size: 1rem; font-weight: 800; letter-spacing: -0.01em; }
+.track-remaining { font-size: 0.78rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.track-bar, .xp-bar, .level-bar {
+  position: relative;
+  height: 12px;
+  margin: 12px 0 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.track-fill, .xp-fill, .level-fill {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #38bdf8, #a78bfa);
+  transition: width 0.6s var(--ease-out);
+}
+.track-perks, .track-next { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; }
+.track-next { margin-top: 4px; opacity: 0.8; }
+
+/* --- profile ------------------------------------------------------------- */
+#screen-profile { padding: 0 clamp(14px, 3vw, 36px); max-width: 900px; margin: 0 auto; }
+.profile-card {
+  padding: clamp(16px, 3vw, 26px);
+  border: 1px solid var(--panel-line);
+  border-radius: 20px;
+  background: linear-gradient(160deg, rgba(56, 189, 248, 0.09), rgba(167, 139, 250, 0.07));
+}
+.profile-id { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; }
+.profile-avatar {
+  display: grid; place-items: center;
+  width: 52px; height: 52px; flex: none;
+  border-radius: 50%;
+  color: #c7d2fe;
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.35);
+}
+.profile-level { font-size: clamp(1.3rem, 4vw, 1.7rem); letter-spacing: -0.02em; }
+.profile-rank { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: #a5b4fc; }
+.xp-line { font-size: 0.8rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+.next-reward { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--panel-line); }
+.next-reward h3, .section-heading {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--text-dim);
+}
+.section-heading { margin: 28px 0 12px; }
+.next-reward-body { margin-top: 10px; }
+
+.reward-card {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.reward-art { flex: none; }
+.reward-label { font-size: 0.95rem; font-weight: 700; display: flex; align-items: baseline; gap: 2px; flex-wrap: wrap; }
+
+.stat-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.stat-cell {
+  padding: 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.26);
+}
+.stat-cell b { display: block; font-size: 1.15rem; letter-spacing: -0.02em; }
+.stat-cell span { font-size: 0.74rem; color: var(--text-dim); }
+
+.rarity-bars { display: grid; gap: 8px; }
+.rarity-row { display: grid; grid-template-columns: 110px 1fr 60px; align-items: center; gap: 12px; }
+.rarity-name { font-size: 0.8rem; font-weight: 700; }
+.rarity-track { height: 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.45); overflow: hidden; }
+.rarity-fill { display: block; height: 100%; border-radius: 999px; min-width: 2px; }
+.rarity-count { font-size: 0.8rem; text-align: right; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+/* --- settings ------------------------------------------------------------ */
+#screen-settings { padding: 0 clamp(14px, 3vw, 36px); max-width: 760px; margin: 0 auto; }
+#screen-settings .section-heading:first-child { margin-top: 0; }
+.settings-list { display: grid; gap: 10px; }
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--panel-line);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.26);
+}
+.setting-copy { min-width: 0; }
+.setting-copy h4 { font-size: 0.95rem; margin-bottom: 3px; }
+.setting-copy p { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; }
+.setting-value {
+  display: inline-flex; align-items: center; gap: 6px; flex: none;
+  font-size: 0.82rem; font-weight: 700; color: var(--text-dim);
+}
+
+.switch {
+  position: relative; flex: none;
+  width: 52px; height: 30px;
+  border-radius: 999px;
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.5);
+  transition: background 0.2s ease, border-color 0.2s ease;
+  cursor: pointer;
+}
+.switch-knob {
+  position: absolute; top: 3px; left: 3px;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #64748b;
+  transition: transform 0.22s var(--ease-out), background 0.2s ease;
+}
+.switch.is-on { background: rgba(74, 222, 128, 0.28); border-color: rgba(74, 222, 128, 0.5); }
+.switch.is-on .switch-knob { transform: translateX(22px); background: #4ade80; }
+
+.danger-button {
+  flex: none;
+  padding: 10px 18px;
+  border-radius: 999px;
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: #fca5a5;
+  border: 1px solid rgba(252, 165, 165, 0.35);
+  background: rgba(127, 29, 29, 0.25);
+  cursor: pointer;
+}
+.danger-button.is-armed { color: #0b0d14; background: #f87171; border-color: #f87171; }
+
+/* --- daily gift ---------------------------------------------------------- */
+.gift-button { position: relative; display: inline-flex; align-items: center; gap: 7px; }
+.gift-button.is-ready { color: #fde68a; border-color: rgba(253, 230, 138, 0.45); }
+.gift-icon { display: inline-flex; }
+.gift-dot {
+  position: absolute; top: 6px; right: 8px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #f87171;
+  box-shadow: 0 0 0 2px rgba(10, 11, 18, 0.9);
+}
+.daily-card { width: min(640px, 100%); }
+.daily-action { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.daily-status { font-size: 0.82rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.daily-board-label {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.11em;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px;
+}
+.gift-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.gift-tile {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 6px 9px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  text-align: center;
+}
+.gift-day { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.08em; color: var(--text-dim); }
+.gift-art { color: var(--text-dim); display: inline-flex; }
+.gift-label {
+  font-size: 0.7rem; font-weight: 700; line-height: 1.25;
+  display: inline-flex; align-items: baseline; gap: 1px; flex-wrap: wrap; justify-content: center;
+}
+.gift-tile.is-booster .gift-art, .gift-tile.is-card .gift-art { color: #a5b4fc; }
+.gift-tile.is-coins .gift-art { color: #86efac; }
+
+/* The one you get next: lit, and the only one that looks live. */
+.gift-tile.is-ready {
+  border-color: rgba(253, 230, 138, 0.6);
+  background: rgba(253, 230, 138, 0.12);
+  box-shadow: 0 0 0 1px rgba(253, 230, 138, 0.25);
+}
+.gift-tile.is-next { border-color: rgba(255, 255, 255, 0.22); }
+.gift-tile.is-locked { opacity: 0.55; }
+
+/* A claimed day is replaced by its tick, so the board doubles as a record. */
+.gift-tile.is-claimed > :not(.gift-check) { opacity: 0.15; }
+.gift-tile.is-claimed {
+  border-color: rgba(74, 222, 128, 0.4);
+  background: rgba(74, 222, 128, 0.09);
+}
+.gift-check {
+  position: absolute; inset: 0;
+  display: none; place-items: center;
+  color: #4ade80;
+}
+.gift-tile.is-claimed .gift-check { display: grid; }
+
+/* --- level up ------------------------------------------------------------ */
+.level-card { width: min(420px, 100%); text-align: center; }
+.level-card h2 {
+  font-size: 0.72rem; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--text-dim); margin-bottom: 14px;
+}
+.level-jump { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; }
+.level-from, .level-to {
+  display: grid; place-items: center;
+  width: 46px; height: 46px; flex: none;
+  border-radius: 50%;
+  font-size: 1.05rem; font-weight: 800;
+  border: 1px solid var(--panel-line);
+  background: rgba(0, 0, 0, 0.35);
+}
+.level-to {
+  color: #0b0d14;
+  border-color: transparent;
+  background: linear-gradient(135deg, #a5b4fc, #38bdf8);
+  animation: level-pop 0.5s var(--ease-back) 0.55s backwards;
+}
+@keyframes level-pop {
+  from { transform: scale(0.6); opacity: 0.3; }
+  to { transform: scale(1); opacity: 1; }
+}
+.level-bar { flex: 1; margin: 0; }
+.level-fill { transition: width 0.75s var(--ease-out) 0.1s; }
+.level-reward { margin: 16px 0 18px; text-align: left; }
+.level-card .primary-button { width: 100%; }
+
+/* --- the XP pop ---------------------------------------------------------- */
+.xp-pop {
+  position: fixed;
+  left: 50%; bottom: 96px;
+  z-index: 600;
+  transform: translateX(-50%);
+  padding: 7px 16px;
+  border-radius: 999px;
+  font-size: 0.9rem; font-weight: 800;
+  color: #c7d2fe;
+  border: 1px solid rgba(165, 180, 252, 0.4);
+  background: rgba(12, 14, 22, 0.92);
+  pointer-events: none;
+  opacity: 0;
+}
+.xp-pop.is-rising { animation: xp-rise 1.5s var(--ease-out) forwards; }
+@keyframes xp-rise {
+  0% { opacity: 0; transform: translate(-50%, 14px) scale(0.9); }
+  18% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  70% { opacity: 1; transform: translate(-50%, -10px); }
+  100% { opacity: 0; transform: translate(-50%, -34px); }
+}
+
+/* --- the free shelf ------------------------------------------------------ */
+.shop-row.is-free .shop-row-title { color: #86efac; }
+.shop-row-note { font-size: 0.76rem; color: var(--text-dim); margin: -6px 0 10px; }
+.buy-button.is-free { border-color: rgba(74, 222, 128, 0.4); color: #86efac; }
+.buy-button.is-free .buy-price { color: #86efac; }
+.buy-button.is-taken { opacity: 0.4; }
+
+/* --- an image too small for its frame ------------------------------------ */
+/* Blowing a 50px wiki icon up to fill a card is what made custom boosters
+   look blurry and over-zoomed. Fit it instead, on its own dark ground. */
+.card-art.is-small-art img { object-fit: contain; padding: 12%; background: rgba(0, 0, 0, 0.35); }
+
+/* --- hints can be switched off ------------------------------------------- */
+/* Only the coaching lines. The notes that explain what a feature IS stay:
+   turning hints off should quiet the app, not hide half of it. */
+[data-hints="0"] .open-hint,
+[data-hints="0"] .rail-hint,
+[data-hints="0"] .shop-row-note { display: none; }
+
+/* ==========================================================================
+   11. Power
+   --------------------------------------------------------------------------
+   Continuous animation is the single biggest thing this app can do to a
+   battery: a shop shelf is twenty-odd boosters, several of them wearing a
+   rarity treatment that never stops moving. Two brakes:
+
+     - a screen that is not on display animates nothing, and neither does a
+       backgrounded tab. Both are free wins with no visible cost.
+     - battery saver stops the ambient motion everywhere. Transitions and
+       one-shot animations (the rip, the flip, the emerge) still run, so the
+       app still feels alive; it just stops repainting when nothing happened.
+   ========================================================================== */
+
+.screen:not(.is-active) *,
+.screen:not(.is-active)::before,
+.screen:not(.is-active)::after { animation-play-state: paused !important; }
+
+html[data-lowpower="1"] .fx,
+html[data-lowpower="1"] .booster-face::after,
+html[data-lowpower="1"] .booster-body::before,
+html[data-lowpower="1"] .booster-body::after { animation: none !important; }
+
+html[data-lowpower="1"] .card .fx,
+html[data-lowpower="1"] .card-front::before,
+html[data-lowpower="1"] .card-front::after { animation: none !important; }
+
+/* The page background is three stacked gradients pinned to the viewport,
+   which is a repaint on every scroll. Flatten it. */
+html[data-lowpower="1"] body { background: var(--bg); background-attachment: scroll; }
+html[data-lowpower="1"] .topbar { backdrop-filter: none; }
+html[data-lowpower="1"] .modal { backdrop-filter: none; background: rgba(4, 5, 10, 0.92); }

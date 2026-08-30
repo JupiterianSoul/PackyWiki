@@ -22,17 +22,25 @@
 
       <nav class="tabs" id="tabs" aria-label="Sections">
         <button class="tab is-active" data-tab="boosters" type="button"><span class="tab-label"></span></button>
+        <button class="tab" data-tab="timed" type="button">
+          <span class="tab-label"></span><span class="tab-count" id="timed-count">0</span>
+        </button>
         <button class="tab" data-tab="custom" type="button"><span class="tab-label"></span></button>
         <button class="tab" data-tab="shop" type="button"><span class="tab-label"></span></button>
         <button class="tab" data-tab="collection" type="button">
           <span class="tab-label"></span><span class="tab-count" id="tab-count">0</span>
         </button>
+        <button class="tab" data-tab="profile" type="button"><span class="tab-label"></span></button>
+        <button class="tab" data-tab="settings" type="button"><span class="tab-label"></span></button>
       </nav>
 
       <div class="topbar-actions">
         <button class="wallet" id="wallet" type="button" aria-haspopup="dialog"></button>
         <button id="odds-button" class="ghost-button" type="button"></button>
-        <button id="mute-button" class="ghost-button" type="button" aria-pressed="false"></button>
+        <button id="daily-button" class="ghost-button gift-button" type="button" aria-haspopup="dialog">
+          <span class="gift-icon" id="gift-icon"></span><span id="daily-button-label"></span>
+          <span class="gift-dot" id="gift-dot" hidden></span>
+        </button>
       </div>
     </header>
 
@@ -52,6 +60,33 @@
           <p class="rail-hint" id="rail-hint"></p>
         </div>
         <p class="empty-note" id="boosters-empty" hidden></p>
+      </section>
+
+      <!-- SCREEN: timed boosters -------------------------------------------->
+      <section id="screen-timed" class="screen">
+        <div class="timed-head">
+          <h2 class="timed-title" id="timed-title"></h2>
+          <p class="section-note" id="timed-intro"></p>
+        </div>
+
+        <div class="timed-stage">
+          <div class="timed-booster" id="timed-booster"></div>
+          <div class="timed-panel">
+            <p class="timed-held" id="timed-held"></p>
+            <p class="timed-next" id="timed-next"></p>
+            <button id="timed-open" class="primary-button" type="button"></button>
+          </div>
+        </div>
+
+        <div class="track">
+          <div class="track-head">
+            <span class="track-level" id="track-level"></span>
+            <span class="track-remaining" id="track-remaining"></span>
+          </div>
+          <div class="track-bar"><span class="track-fill" id="track-fill"></span></div>
+          <p class="track-perks" id="track-perks"></p>
+          <p class="track-next" id="track-next"></p>
+        </div>
       </section>
 
       <!-- SCREEN: custom boosters ------------------------------------------>
@@ -132,6 +167,59 @@
         <p id="collection-empty" class="empty-note" hidden></p>
         <div id="collection-grid" class="collection-grid"></div>
       </section>
+
+      <!-- SCREEN: profile --------------------------------------------------->
+      <section id="screen-profile" class="screen">
+        <div class="profile-card">
+          <div class="profile-id">
+            <span class="profile-avatar" id="profile-avatar"></span>
+            <div>
+              <h2 class="profile-level" id="profile-level"></h2>
+              <p class="profile-rank" id="profile-rank"></p>
+            </div>
+          </div>
+
+          <div class="xp-row">
+            <div class="xp-bar"><span class="xp-fill" id="xp-fill"></span></div>
+            <p class="xp-line" id="xp-line"></p>
+          </div>
+
+          <div class="next-reward">
+            <h3 id="next-reward-title"></h3>
+            <div class="next-reward-body" id="next-reward-body"></div>
+          </div>
+        </div>
+
+        <h3 class="section-heading" id="profile-stats-title"></h3>
+        <div class="stat-grid" id="profile-stat-grid"></div>
+
+        <h3 class="section-heading" id="profile-rarity-title"></h3>
+        <div class="rarity-bars" id="profile-rarity"></div>
+      </section>
+
+      <!-- SCREEN: settings -------------------------------------------------->
+      <section id="screen-settings" class="screen">
+        <h2 class="section-heading" id="settings-title"></h2>
+        <div class="settings-list" id="settings-list"></div>
+
+        <h3 class="section-heading" id="settings-data-title"></h3>
+        <div class="settings-list">
+          <div class="setting-row">
+            <div class="setting-copy">
+              <h4 id="settings-language-title"></h4>
+              <p id="settings-language-note"></p>
+            </div>
+            <span class="setting-value" id="settings-language-value"></span>
+          </div>
+          <div class="setting-row">
+            <div class="setting-copy">
+              <h4 id="settings-reset-title"></h4>
+              <p id="settings-reset-note"></p>
+            </div>
+            <button id="settings-reset" class="danger-button" type="button"></button>
+          </div>
+        </div>
+      </section>
     </main>
 
     <!-- Card detail ------------------------------------------------------->
@@ -205,6 +293,39 @@
       </div>
     </div>
 
+    <!-- Daily gift -------------------------------------------------------->
+    <div id="daily-modal" class="modal" hidden>
+      <div class="modal-card daily-card" role="dialog" aria-modal="true" aria-labelledby="daily-title">
+        <div class="modal-head">
+          <h2 id="daily-title"></h2>
+          <button id="daily-close" class="ghost-button" type="button"></button>
+        </div>
+        <p class="modal-note top" id="daily-body"></p>
+        <div class="daily-action">
+          <button id="daily-claim" class="primary-button" type="button"></button>
+          <p class="daily-status" id="daily-status"></p>
+        </div>
+        <p class="daily-board-label" id="daily-board-label"></p>
+        <div class="gift-board" id="gift-board"></div>
+      </div>
+    </div>
+
+    <!-- Level up ------------------------------------------------------------>
+    <div id="level-modal" class="modal" hidden>
+      <div class="modal-card level-card" role="dialog" aria-modal="true" aria-labelledby="level-title">
+        <h2 id="level-title"></h2>
+        <div class="level-jump">
+          <span class="level-from" id="level-from"></span>
+          <div class="level-bar"><span class="level-fill" id="level-fill"></span></div>
+          <span class="level-to" id="level-to"></span>
+        </div>
+        <p class="modal-note top" id="level-body"></p>
+        <div class="level-reward" id="level-reward"></div>
+        <button id="level-claim" class="primary-button" type="button"></button>
+      </div>
+    </div>
+
+    <div id="xp-pop" class="xp-pop" hidden></div>
     <div id="toast" class="toast" hidden></div>
 
     <script type="module" src="/src/main.js"></script>

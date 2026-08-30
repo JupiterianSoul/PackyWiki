@@ -26,6 +26,8 @@ const OPEN_ACCENT = { accent: '#94a3b8', accent2: '#334155' };
 
 export function specId(spec) {
   const rarity = spec.rarityId ?? 'std';
+  // A timed booster is defined entirely by its track level.
+  if (spec.kind === 'timed') return `timed|${spec.timedLevel ?? 1}|std|${spec.cards}`;
   if (spec.kind === 'custom') {
     const host = spec.wiki ? new URL(spec.wiki.apiUrl).host + new URL(spec.wiki.apiUrl).pathname.replace('/api.php', '') : spec.customId;
     return `custom|${host}|${rarity}|${spec.cards}`;
@@ -41,6 +43,7 @@ export function specId(spec) {
 export function specName(spec) {
   const tier = spec.rarityId ? tx(rarityById(spec.rarityId).name) : null;
 
+  if (spec.kind === 'timed') return t('timedBooster');
   if (spec.kind === 'custom') {
     const base = spec.customName ?? spec.wiki?.sitename ?? 'Custom';
     return tier ? `${base} · ${tier}` : base;
@@ -53,6 +56,7 @@ export function specName(spec) {
 }
 
 export function specTagline(spec) {
+  if (spec.kind === 'timed') return t('timedTagline');
   if (spec.kind === 'custom') return spec.customTagline ?? '';
   if (spec.themeId) return tx(themeById(spec.themeId)?.tagline);
   return '';
@@ -64,6 +68,7 @@ export function specTagline(spec) {
  * takes the tier's own colour.
  */
 export function specColours(spec) {
+  if (spec.kind === 'timed') return { accent: '#38bdf8', accent2: '#0c4a6e' };
   if (spec.kind === 'custom') return { accent: spec.accent ?? '#a78bfa', accent2: spec.accent2 ?? '#4c1d95' };
   const theme = themeById(spec.themeId);
   if (theme) return { accent: theme.accent, accent2: theme.accent2 };
@@ -75,8 +80,9 @@ export function specColours(spec) {
 }
 
 export const specIcon = (spec) =>
-  spec.kind === 'custom' ? (spec.icon ?? 'wand')
-    : themeById(spec.themeId)?.icon ?? (spec.rarityId ? 'gem' : 'packs');
+  spec.kind === 'timed' ? 'clock'
+    : spec.kind === 'custom' ? (spec.icon ?? 'wand')
+      : themeById(spec.themeId)?.icon ?? (spec.rarityId ? 'gem' : 'packs');
 
 /** Hero article whose photo becomes the pack art, in the current language. */
 export function specHero(spec) {
