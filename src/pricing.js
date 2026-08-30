@@ -54,7 +54,7 @@ export function formatAmount(price) {
 
 /** Compact view count for the card face and collection filters. */
 export function formatViews(views) {
-  if (!Number.isFinite(views) || views <= 0) return '—';
+  if (!Number.isFinite(views) || views <= 0) return '?';
   if (views >= 1_000_000) return `${(views / 1_000_000).toFixed(1)}M`;
   if (views >= 1_000) return `${(views / 1_000).toFixed(views >= 10_000 ? 0 : 1)}k`;
   return String(Math.round(views));

@@ -109,6 +109,11 @@ bind({
   detailTitle: $('#detail-title'), detailSub: $('#detail-sub'), detailFacts: $('#detail-facts'),
   detailExtract: $('#detail-extract'), detailRead: $('#detail-read'), detailSell: $('#detail-sell'),
 
+  walletModal: $('#wallet-modal'), walletClose: $('#wallet-close'), walletTitle: $('#wallet-title'),
+  walletBalance: $('#wallet-balance'), walletWhat: $('#wallet-what'), walletNote: $('#wallet-note'),
+  walletEarnTitle: $('#wallet-earn-title'), walletEarn: $('#wallet-earn'),
+  walletSpendTitle: $('#wallet-spend-title'), walletSpend: $('#wallet-spend'),
+
   oddsModal: $('#odds-modal'), oddsClose: $('#odds-close'), oddsBody: $('#odds-body'),
   oddsHeading: $('#odds-heading'), oddsNote: $('#odds-note'), oddsH1: $('#odds-h1'), oddsH2: $('#odds-h2'),
 
@@ -168,6 +173,7 @@ function applyAccent(colours) {
 function refreshWallet() {
   state.wallet = store.loadWallet();
   el.wallet.innerHTML = money(state.wallet);
+  el.wallet.setAttribute('aria-label', `${t('walletTitle')}: ${formatAmount(state.wallet)}`);
 }
 
 /* --- booster art ---------------------------------------------------------- */
@@ -1230,6 +1236,21 @@ function renderOdds() {
   }));
 }
 
+/** What the currency is, where it comes from and what it buys. */
+function showWalletInfo() {
+  el.walletTitle.textContent = t('walletTitle');
+  el.walletClose.textContent = t('close');
+  el.walletBalance.innerHTML = money(state.wallet);
+  el.walletWhat.textContent = t('walletWhat');
+  el.walletEarnTitle.textContent = t('walletEarnTitle');
+  el.walletEarn.textContent = t('walletEarn');
+  el.walletSpendTitle.textContent = t('walletSpendTitle');
+  el.walletSpend.textContent = t('walletSpend');
+  el.walletNote.textContent = t('walletNote');
+  el.walletModal.hidden = false;
+  synth.playTap();
+}
+
 /* --- first run ------------------------------------------------------------ */
 
 function showWelcome() {
@@ -1368,6 +1389,10 @@ function init() {
     showScreen(name);
   }));
 
+  el.wallet.addEventListener('click', showWalletInfo);
+  el.walletClose.addEventListener('click', () => { el.walletModal.hidden = true; });
+  el.walletModal.addEventListener('click', (e) => { if (e.target === el.walletModal) el.walletModal.hidden = true; });
+
   el.oddsButton.addEventListener('click', () => { el.oddsModal.hidden = false; synth.playTap(); });
   el.oddsClose.addEventListener('click', () => { el.oddsModal.hidden = true; });
   el.oddsModal.addEventListener('click', (e) => { if (e.target === el.oddsModal) el.oddsModal.hidden = true; });
@@ -1379,6 +1404,7 @@ function init() {
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
     el.oddsModal.hidden = true;
+    el.walletModal.hidden = true;
     if (!el.cardModal.hidden) closeCardDetail();
   });
 

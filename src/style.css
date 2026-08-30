@@ -33,11 +33,23 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
-html { background-color: var(--bg); }
+
+/* An explicit `display` beats the `hidden` attribute, so a flex or grid
+   element stays on screen when hidden. Everything that toggles `hidden` in JS
+   relies on this. */
+[hidden] { display: none !important; }
+html {
+  background-color: var(--bg);
+  /* Sideways swipes belong to whichever shelf is under the finger; the page
+     itself must not pan or trigger a navigation gesture. */
+  overscroll-behavior-x: none;
+}
 
 body {
   margin: 0;
   min-height: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--text);
   background:
@@ -76,7 +88,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .ghost-button {
   border: 1px solid var(--panel-line);
   border-radius: 999px;
-  padding: 8px 16px;
+  padding: 11px 18px;
   font-size: 0.85rem;
   font-weight: 600;
   background: var(--panel);
@@ -92,7 +104,9 @@ button { font: inherit; color: inherit; cursor: pointer; }
   align-items: center;
   gap: 16px;
   flex-wrap: wrap;
-  padding: 14px clamp(14px, 3vw, 36px);
+  /* Sits clear of the status bar / notch and gives every control a real
+     touch target rather than a sliver at the top of the screen. */
+  padding: calc(18px + env(safe-area-inset-top, 0px)) clamp(14px, 3vw, 36px) 18px;
   border-bottom: 1px solid var(--panel-line);
   backdrop-filter: blur(8px);
 }
@@ -108,7 +122,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
   background: rgba(0, 0, 0, 0.3);
 }
 .tab {
-  border: 0; border-radius: 999px; padding: 8px 18px;
+  border: 0; border-radius: 999px; padding: 11px 20px;
   font-size: 0.88rem; font-weight: 600; color: var(--text-dim);
   background: transparent;
   transition: color 0.18s ease, background 0.18s ease;
@@ -528,7 +542,11 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 .card-stack {
   position: relative;
   z-index: 2;
-  transform-style: preserve-3d;
+  /* `perspective`, NOT `transform-style: preserve-3d`: preserve-3d makes the
+     stacked cards 3D siblings, which retires z-index and lets the face-down
+     cards behind the top one paint straight through it as soon as it leans.
+     Perspective gives each card its depth while keeping the stack flat. */
+  perspective: 1400px;
   width: var(--card-w);
   height: calc(var(--card-w) * 1.4);
   touch-action: none;
@@ -556,6 +574,9 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   width: var(--card-w);
   aspect-ratio: 5 / 7;
   isolation: isolate;
+  /* Keeps the flip looking three-dimensional now that the stack itself is
+     flat rather than a shared 3D context. */
+  perspective: 1000px;
 }
 .stack-card {
   position: absolute;
@@ -618,6 +639,15 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   overflow: hidden;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
+}
+
+/* Once the flip has finished, the back has no reason to render at all.
+   Leaving it in the 3D context let it bleed through the front when the card
+   was leaned: `.card` flattens while sitting inside a preserve-3d stack, so
+   backface-visibility alone does not cull it. The delay covers the flip. */
+.card.is-revealed .card-back {
+  visibility: hidden;
+  transition: visibility 0s linear 0.36s;
 }
 
 /* The back is dressed in the booster's own colours and icon, so a card looks
@@ -1193,12 +1223,12 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 .odds-swatch { width: 11px; height: 11px; border-radius: 50%; flex: none; box-shadow: 0 0 10px 1px currentColor; }
 
 @media (max-width: 720px) {
-  .topbar { gap: 10px; padding: 11px 14px; }
+  .topbar { gap: 10px; padding: calc(14px + env(safe-area-inset-top, 0px)) 14px 14px; }
   .brand-sub { display: none; }
   .brand h1 { font-size: 1.05rem; }
   .tabs { order: 3; width: 100%; justify-content: center; }
   .topbar-actions { gap: 6px; }
-  .ghost-button { padding: 7px 13px; font-size: 0.79rem; }
+  .ghost-button { padding: 10px 14px; font-size: 0.79rem; }
 
   :root { --pack-w: 208px; --pack-h: 374px; --card-w: min(74vw, 268px); }
   .rail-arrow { display: none; }
@@ -1226,7 +1256,8 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 .wallet {
   display: inline-flex;
   align-items: center;
-  padding: 7px 14px;
+  padding: 11px 16px;
+  cursor: pointer;
   border-radius: 999px;
   font-size: 0.88rem;
   font-weight: 800;
@@ -1273,6 +1304,10 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   font-variant-numeric: tabular-nums;
 }
 .shop-rows { display: grid; gap: 30px; }
+/* A grid item defaults to min-width:auto, so each row would stretch to fit its
+   whole shelf and push the page wider than the screen instead of letting the
+   shelf scroll. This is what made a sideways swipe drag the entire app. */
+.shop-row { min-width: 0; }
 .shop-row-title {
   font-size: 1rem;
   letter-spacing: -0.01em;
@@ -1285,6 +1320,10 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   padding: 4px 2px 14px;
   scrollbar-width: thin;
   scroll-snap-type: x proximity;
+  /* Keep the horizontal swipe inside the shelf: no page pan, no back gesture,
+     while vertical scrolling still passes through to the page. */
+  overscroll-behavior-x: contain;
+  touch-action: pan-x pan-y;
 }
 .shop-item {
   flex: none;
@@ -1510,7 +1549,34 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
   .shop-item, .buy-button { width: 120px; }
   .booster.is-small { --pack-w: 120px; --pack-h: 216px; width: 120px; height: 216px; }
   .pack-summary { max-width: 100%; gap: 12px 8px; }
-  .wallet { padding: 6px 11px; font-size: 0.8rem; }
+  .wallet { padding: 10px 13px; font-size: 0.8rem; }
   .tabs { order: 3; width: 100%; }
-  .tab { padding: 7px 12px; font-size: 0.8rem; }
+  .tab { padding: 10px 14px; font-size: 0.8rem; }
 }
+
+/* --- what the currency is ------------------------------------------------- */
+.wallet-balance {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #86efac;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 4px;
+}
+.wallet-rows { display: grid; gap: 14px; margin: 16px 0 4px; }
+.wallet-row {
+  padding: 12px 14px;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.wallet-row h3 {
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  margin-bottom: 6px;
+}
+.wallet-row p { font-size: 0.86rem; line-height: 1.55; color: #c2cbdc; }

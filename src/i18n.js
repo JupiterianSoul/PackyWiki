@@ -35,7 +35,7 @@ const STRINGS = {
     cancel: 'Cancel',
 
     // shelf
-    shelfEmpty: 'No boosters yet — visit the Shop to buy some.',
+    shelfEmpty: 'No boosters yet. Visit the Shop to buy some.',
     shelfEmptyCustom: 'No custom boosters yet. Name a subject below to build one.',
     openPack: 'Open pack',
     owned: 'Owned',
@@ -69,7 +69,7 @@ const STRINGS = {
     anyPrice: 'Any price',
     priceOver: '{amount}+',
     reset: 'Reset',
-    emptyCollection: 'Nothing here yet — open a booster and your pulls land in this binder.',
+    emptyCollection: 'Nothing here yet. Open a booster and your pulls land in this binder.',
     noMatches: 'No cards match these filters.',
     sortRecent: 'Newest first',
     sortPriceDesc: 'Price: high to low',
@@ -92,7 +92,7 @@ const STRINGS = {
     create: 'Create',
     creating: 'Booster Pack is being created…',
     createFailed: 'Booster cannot be created, try something else.',
-    createOk: '“{name}” booster ready — {n} pages on {wiki}.',
+    createOk: '“{name}” booster ready: {n} pages on {wiki}.',
     typeNameFirst: 'Type a name first.',
     deleteBooster: 'Delete the {name} booster',
 
@@ -110,14 +110,22 @@ const STRINGS = {
 
     // first run
     welcomeTitle: 'Welcome to PackyWiki',
-    welcomeBody: 'Pick a language — this one is permanent, because every card is stored in the language it was pulled in.',
+    welcomeBody: 'Pick a language. This one is permanent, because every card is stored in the language it was pulled in.',
     starterTitle: 'Here’s your starter kit',
     starterBody: 'You get {coins} and {packs} boosters to begin with. Sell duplicates, and check the Shop every couple of hours for new stock and a restock bonus.',
     letsGo: 'Let’s go',
 
     // odds modal
+    walletTitle: 'Buckarooz',
+    walletWhat: 'Buckarooz are the currency of PackyWiki. Your balance is shown in the top bar.',
+    walletEarn: 'Earn them by selling cards from your collection, and from the restock bonus paid every time the Shop refreshes.',
+    walletSpend: 'Spend them in the Shop on boosters. Bigger boosters and rarer ones cost more.',
+    walletNote: 'Selling a whole booster never pays back what it cost, so collecting gets you further than churning.',
+    walletEarnTitle: 'Earning',
+    walletSpendTitle: 'Spending',
+
     pullRates: 'Pull rates',
-    oddsNote: 'Rarity is rolled per card. Every article has the same chance at every tier — how many people read it changes what the card is worth, not how rare it is.',
+    oddsNote: 'Rarity is rolled per card. Every article has the same chance at every tier. How many people read it changes what the card is worth, not how rare it is.',
     rarity: 'Rarity',
     chance: 'Chance'
   },
@@ -135,7 +143,7 @@ const STRINGS = {
     back: 'Retour',
     cancel: 'Annuler',
 
-    shelfEmpty: 'Aucun booster — passez à la Boutique pour en acheter.',
+    shelfEmpty: 'Aucun booster. Passez à la Boutique pour en acheter.',
     shelfEmptyCustom: 'Aucun booster personnalisé. Indiquez un sujet ci-dessous.',
     openPack: 'Ouvrir le booster',
     owned: 'Possédés',
@@ -167,7 +175,7 @@ const STRINGS = {
     anyPrice: 'Tout prix',
     priceOver: '{amount}+',
     reset: 'Réinitialiser',
-    emptyCollection: 'Rien ici pour l’instant — ouvrez un booster et vos cartes arriveront dans ce classeur.',
+    emptyCollection: 'Rien ici pour l’instant. Ouvrez un booster et vos cartes arriveront dans ce classeur.',
     noMatches: 'Aucune carte ne correspond à ces filtres.',
     sortRecent: 'Plus récentes',
     sortPriceDesc: 'Prix : décroissant',
@@ -188,7 +196,7 @@ const STRINGS = {
     create: 'Créer',
     creating: 'Création du booster en cours…',
     createFailed: 'Impossible de créer le booster, essayez autre chose.',
-    createOk: 'Booster « {name} » prêt — {n} pages sur {wiki}.',
+    createOk: 'Booster « {name} » prêt : {n} pages sur {wiki}.',
     typeNameFirst: 'Entrez d’abord un nom.',
     deleteBooster: 'Supprimer le booster {name}',
 
@@ -204,13 +212,21 @@ const STRINGS = {
     shopValueRow: 'Petits prix',
 
     welcomeTitle: 'Bienvenue dans PackyWiki',
-    welcomeBody: 'Choisissez une langue — ce choix est définitif, car chaque carte est stockée dans la langue où elle a été tirée.',
+    welcomeBody: 'Choisissez une langue. Ce choix est définitif, car chaque carte est stockée dans la langue où elle a été tirée.',
     starterTitle: 'Voici votre kit de départ',
     starterBody: 'Vous commencez avec {coins} et {packs} boosters. Vendez les doublons, et passez à la Boutique toutes les deux heures pour du nouveau stock et un bonus de réassort.',
     letsGo: 'C’est parti',
 
+    walletTitle: 'Buckarooz',
+    walletWhat: 'Les Buckarooz sont la monnaie de PackyWiki. Votre solde est affiché en haut de l’écran.',
+    walletEarn: 'Vous en gagnez en vendant des cartes de votre collection, et grâce au bonus versé à chaque réassort de la Boutique.',
+    walletSpend: 'Vous les dépensez à la Boutique pour acheter des boosters. Les boosters plus gros ou plus rares coûtent plus cher.',
+    walletNote: 'Revendre un booster entier ne rembourse jamais son prix : collectionner rapporte plus que tout revendre.',
+    walletEarnTitle: 'Gagner',
+    walletSpendTitle: 'Dépenser',
+
     pullRates: 'Taux de tirage',
-    oddsNote: 'La rareté est tirée par carte. Chaque article a les mêmes chances à chaque palier — le nombre de lecteurs change la valeur de la carte, pas sa rareté.',
+    oddsNote: 'La rareté est tirée par carte. Chaque article a les mêmes chances à chaque palier. Le nombre de lecteurs change la valeur de la carte, pas sa rareté.',
     rarity: 'Rareté',
     chance: 'Chance'
   }

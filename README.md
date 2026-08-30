@@ -295,6 +295,12 @@ price = base(popularity) × (1 + rarity.bonusPct / 100)
 A Common and an Artifact of the same article share a base — the Artifact is
 simply worth 33× more of it.
 
+The **balance button in the top bar** is also the explainer: tap it and a panel
+says what Buckarooz are, the two ways to get them (selling duplicates, and the
+free stipend that accrues over time) and what they are for (boosters in the
+Shop). It is there because the currency is invented and nothing else on screen
+would otherwise say so.
+
 ---
 
 ## Opening a booster
@@ -319,6 +325,13 @@ rather than sliding around. Pull order is **random**.
 
 **The summary.** Once every card has been turned, the single-card view is
 replaced by the whole booster laid out three to a row, with a Back button.
+
+The stack that the cards settle into uses `perspective`, deliberately *not*
+`transform-style: preserve-3d`. A shared 3D context makes the stacked cards
+coplanar siblings, which retires `z-index` and lets the face-down cards behind
+the top one paint straight through it the moment it leans. Each card carries
+its own perspective instead, so the flip still reads as three-dimensional while
+the stack itself stays flat and correctly ordered.
 
 ---
 

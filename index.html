@@ -30,7 +30,7 @@
       </nav>
 
       <div class="topbar-actions">
-        <span class="wallet" id="wallet" title="Buckarooz"></span>
+        <button class="wallet" id="wallet" type="button" aria-haspopup="dialog"></button>
         <button id="odds-button" class="ghost-button" type="button"></button>
         <button id="mute-button" class="ghost-button" type="button" aria-pressed="false"></button>
       </div>
@@ -164,6 +164,29 @@
           <thead><tr><th id="odds-h1"></th><th id="odds-h2"></th></tr></thead>
           <tbody id="odds-body"></tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- What the currency is ---------------------------------------------->
+    <div id="wallet-modal" class="modal" hidden>
+      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
+        <div class="modal-head">
+          <h2 id="wallet-title"></h2>
+          <button id="wallet-close" class="ghost-button" type="button"></button>
+        </div>
+        <p class="wallet-balance" id="wallet-balance"></p>
+        <p class="modal-note top" id="wallet-what"></p>
+        <div class="wallet-rows">
+          <div class="wallet-row">
+            <h3 id="wallet-earn-title"></h3>
+            <p id="wallet-earn"></p>
+          </div>
+          <div class="wallet-row">
+            <h3 id="wallet-spend-title"></h3>
+            <p id="wallet-spend"></p>
+          </div>
+        </div>
+        <p class="modal-note" id="wallet-note"></p>
       </div>
     </div>
 
