@@ -13,11 +13,19 @@
 import { rarityRank } from './data/rarities.js';
 import { bandFor } from './pricing.js';
 import { specId } from './booster.js';
-import { STARTER_COINS, STIPEND, STIPEND_MAX_BANKED, windowIndexAt } from './economy.js';
+import {
+  STARTER_COINS, STIPEND, STIPEND_MAX_BANKED, windowIndexAt, freeWindowAt
+} from './economy.js';
 import { emptyDaily } from './daily.js';
 import { emptyTimed, accrue } from './timed.js';
 import { t } from './i18n.js';
 
+/*
+ * The storage keys keep the old `packywiki.` prefix after the rename to
+ * Wiklodo, on purpose: they are what an existing player's collection, wallet
+ * and progress are filed under, and renaming them would silently wipe every
+ * save on the next launch.
+ */
 const CARDS_KEY = 'packywiki.collection.v3';
 const WALLET_KEY = 'packywiki.wallet.v1';
 const INVENTORY_KEY = 'packywiki.inventory.v1';
@@ -293,14 +301,19 @@ export function addPlaytime(profile, ms) {
 
 /* --- the free shelf ------------------------------------------------------ */
 
-export function freeAvailable(profile, id, windowIndex = windowIndexAt()) {
-  if (profile.freeTaken.window !== windowIndex) return true;
+/*
+ * Keyed to the FOUR-hour free window, not the shop's two-hour one. Using the
+ * shop window here would hand out a fresh pair of free boosters on every
+ * restock and halve the cooldown.
+ */
+export function freeAvailable(profile, id, freeWindow = freeWindowAt()) {
+  if (profile.freeTaken.window !== freeWindow) return true;
   return !profile.freeTaken.ids.includes(id);
 }
 
-export function markFreeTaken(profile, id, windowIndex = windowIndexAt()) {
-  if (profile.freeTaken.window !== windowIndex) {
-    profile.freeTaken = { window: windowIndex, ids: [] };
+export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
+  if (profile.freeTaken.window !== freeWindow) {
+    profile.freeTaken = { window: freeWindow, ids: [] };
   }
   if (!profile.freeTaken.ids.includes(id)) profile.freeTaken.ids.push(id);
   saveProfile(profile);

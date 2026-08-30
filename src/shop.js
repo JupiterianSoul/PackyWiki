@@ -13,7 +13,9 @@
  */
 import { THEME_PACKS } from './data/packs.js';
 import { RARITIES, rarityRank } from './data/rarities.js';
-import { CARD_COUNT_RANGE, windowIndexAt, boosterPrice, FREE_SLOTS, FREE_CARDS } from './economy.js';
+import {
+  CARD_COUNT_RANGE, windowIndexAt, boosterPrice, FREE_SLOTS, FREE_CARDS, freeWindowAt
+} from './economy.js';
 import { specId } from './booster.js';
 import { t, tx } from './i18n.js';
 
@@ -216,7 +218,14 @@ function customShelf(rng, customPacks) {
  * time, one per window each. This is the anti-lockout guarantee: whatever
  * happens to your wallet, there is always something to open.
  */
-function freeShelf(rng) {
+/**
+ * Seeded from the FOUR-hour free window rather than the shop's two-hour one,
+ * so the free boosters stay put through a restock and only change on their own
+ * cadence. Using the shop's rng here would reshuffle them every two hours and
+ * quietly halve the cooldown.
+ */
+function freeShelf(_rng, _customPacks, freeWindow) {
+  const rng = seeded(freeWindow * 104729 + 7);
   const specs = [];
   for (let i = 0; i < FREE_SLOTS; i++) {
     specs.push({
@@ -243,7 +252,7 @@ const ROTATING = [
   jumboShelf, duoShelf, ladderShelf, wildShelf, bundleShelf
 ];
 
-export function generateShop(windowIndex = windowIndexAt(), customPacks = []) {
+export function generateShop(windowIndex = windowIndexAt(), customPacks = [], freeWindow = freeWindowAt()) {
   const rng = seeded(windowIndex);
 
   // The free shelf and the player's own custom boosters are always here; the
@@ -263,7 +272,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = []) {
   const rows = [];
 
   for (const build of builders) {
-    const row = build(rng, customPacks);
+    const row = build(rng, customPacks, freeWindow);
     if (!row) continue;
     const specs = [];
     for (const spec of row.specs) {

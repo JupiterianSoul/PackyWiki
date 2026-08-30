@@ -53,13 +53,13 @@ jobs:
         run: ./gradlew --no-daemon assembleDebug
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk packywiki-debug.apk
+        run: cp android/app/build/outputs/apk/debug/app-debug.apk wiklodo-debug.apk
 
       - name: Upload APK as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: packywiki-apk
-          path: packywiki-debug.apk
+          name: wiklodo-apk
+          path: wiklodo-debug.apk
           if-no-files-found: error
 
       # A release asset gives a direct, tappable .apk link — an artifact only
@@ -69,14 +69,14 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest packywiki-debug.apk \
+          gh release create apk-latest wiklodo-debug.apk \
             --target "$GITHUB_SHA" \
-            --title "PackyWiki — latest debug APK" \
+            --title "Wiklodo — latest debug APK" \
             --notes "Sideloadable debug build of \`$GITHUB_SHA\`.
 
-          **Install:** download \`packywiki-debug.apk\` below, tap it, and allow
+          **Install:** download \`wiklodo-debug.apk\` below, tap it, and allow
           your browser to install unknown apps when prompted.
 
-          Debug-signed, so if an existing PackyWiki install refuses to update,
+          Debug-signed, so if an existing Wiklodo install refuses to update,
           uninstall it first. Needs a network connection — cards are fetched
           live from Wikipedia."

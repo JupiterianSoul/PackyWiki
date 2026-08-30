@@ -102,3 +102,16 @@ export const STARTER_PACK_CARDS = 5;
  */
 export const FREE_SLOTS = 2;
 export const FREE_CARDS = 3;
+
+/**
+ * The free shelf runs on its own, slower clock than the rest of the shop: the
+ * shelves rotate every two hours, but a free booster comes round every four.
+ * Its contents therefore sit still through one restock before changing, which
+ * is deliberate — you can see what is coming, and the shop turning over does
+ * not hand out another one.
+ */
+export const FREE_REFRESH_MS = 4 * 60 * 60 * 1000;
+
+export const freeWindowAt = (now = Date.now()) => Math.floor(now / FREE_REFRESH_MS);
+
+export const nextFreeAt = (now = Date.now()) => (freeWindowAt(now) + 1) * FREE_REFRESH_MS;

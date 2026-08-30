@@ -1,4 +1,4 @@
-# PackyWiki
+# Wiklodo
 
 A WikiMaster-style booster pack opener where the cards are **real Wikipedia
 articles**. Buy boosters from a shop that restocks every two hours, slide the rip line to
@@ -12,6 +12,12 @@ Available in English and French, including the articles themselves.
 No backend, no API key, no build-time data. Everything is fetched live from
 Wikipedia's public API and every sound is generated at runtime with the Web
 Audio API.
+
+> The app was called PackyWiki until the rename. Two things deliberately kept
+> the old name: the Android `applicationId` (`com.packywiki.app`) and the
+> `packywiki.` localStorage prefix. Both are identity rather than branding —
+> changing the first installs a second, empty app alongside the first, and
+> changing the second wipes every existing collection on the next launch.
 
 ---
 
@@ -51,7 +57,7 @@ around the same web build, so there is no second codebase to maintain.
 
 **Getting it:** every push builds one in CI and publishes it to the rolling
 [`apk-latest`](../../releases/tag/apk-latest) release. Download
-`packywiki-debug.apk` on your phone, tap it, and allow your browser to install
+`wiklodo-debug.apk` on your phone, tap it, and allow your browser to install
 unknown apps when prompted.
 
 It's debug-signed, so if an existing install refuses to update, uninstall it
@@ -247,10 +253,14 @@ seven shelves drawn from a pool of nine kinds — by tier, by subject, mixed,
 cheap, jumbo, a two-subject matchup, one subject climbing the tiers, wildcards
 only, and a single-size bundle — so no two windows look quite alike.
 
-The free shelf is the anti-lockout guarantee: two three-card boosters, one of
-each per restock, occasionally upgraded to a low tier. Selling everything out
-of both is worth around 230 Buckarooz, under half a single stipend, so it is a
-floor rather than a faucet.
+The free shelf is the anti-lockout guarantee: two three-card boosters,
+occasionally upgraded to a low tier. It runs on its own **four-hour** clock
+rather than the shop's two-hour one, so its contents sit still through a
+restock and the shop turning over does not hand out another pair. Both the
+shelf's seed and the record of what you have taken key off that four-hour
+window; using the shop's window for either would quietly halve the cooldown.
+Selling everything out of both is worth around 230 Buckarooz, well under a
+single stipend, so it is a floor rather than a faucet.
 
 Scarcity is the other brake. Pricing alone would let a lucky player buy
 Artifact boosters back to back, so high tiers are also **rare on the shelves**:
@@ -312,7 +322,7 @@ filled in. The shop will start stocking it on the next restock.
 
 ## Custom boosters
 
-Name a game, book, film or show and PackyWiki builds a booster entirely out of
+Name a game, book, film or show and Wiklodo builds a booster entirely out of
 that subject's **own wiki**. Searching Wikipedia for "Terraria" yields a
 handful of pages; the Terraria wiki has thousands.
 
@@ -468,6 +478,11 @@ and lays the page out at its own default width, so **every** `max-width` query
 in the stylesheet is measured against the wrong number. That was the actual
 root cause of the sheet hanging off the screen in the APK.
 
+There is exactly **one** fullscreen card view, reached three ways: off the
+reveal stack, off the pack summary, and out of the binder. All three call the
+same function and are styled by the same rules, and a test asserts the three
+are identical down to the pixel, so one cannot drift from the others.
+
 ---
 
 ## Battery
@@ -513,25 +528,39 @@ To start over during development: `__packywiki.resetAll()`.
 
 ## Settings
 
-Sound, screen flash on rare pulls, battery saver and on-screen hints, each with
-a line saying why you would touch it. The language is shown here but locked
-(see below), and **Erase everything** uses the same arm-then-confirm shape as
-selling a card: the button is its own dialog.
+Four switches, each with a line saying what turning it off actually does
+rather than how it is built:
+
+| Setting | What it does |
+|---|---|
+| Sound | Mutes the app completely, menu taps included |
+| Screen flash | Stops the screen lighting up on a rare pull |
+| Battery saver | Stops the glow, shimmer and drift; plainer, cooler, cheaper |
+| On-screen hints | Hides the swipe tips once you no longer need them |
+
+Below them, the language is shown but locked (see below), and **Erase
+everything** uses the same arm-then-confirm shape as selling a card: the button
+is its own dialog.
 
 ---
 
 ## Sound
 
-`src/audio.js` synthesises everything — there are no audio files in this repo.
+Every sound is **synthesised at runtime** with the Web Audio API. The repo
+ships no audio files at all: a rip is filtered noise whose pitch and grit
+follow the drag, a reveal is a pentatonic chord that grows partials, sub-bass
+and shimmer with the tier, and the reverb is a generated impulse response.
 
-- **Rip** — two overlapping bandpass noise sweeps, a scatter of short
-  high-frequency crinkles, and a low sine thump as the pack lands.
-- **Card flip** — a short filtered noise burst.
-- **Reveal chime** — a pentatonic arpeggio through a convolution reverb whose
-  impulse response is generated from decaying noise. Rank drives everything:
-  2 → 6 partials, a rising root note, a longer tail and more reverb send. From
-  Epic up a sub-octave comes in; from Legendary a metallic sawtooth shimmer;
-  from Mythic a riser; and the top two tiers add a bloom of detuned octaves.
+Twenty-odd distinct sounds cover the whole app rather than just the opening:
+tearing, card flips and the per-tier reveal chime; taps, tab switches with a
+sense of direction, modals opening and closing, a shelf snapping to a booster;
+buying, selling, a refusal, arming a destructive button; a gift, a level-up, a
+small tick when XP lands, and a chime when a timed booster becomes ready while
+you are watching the tab.
+
+The AudioContext is created on the first tap (browsers require a gesture) and
+suspended whenever the app goes to the background. **Sound** in Settings mutes
+everything.
 
 ---
 

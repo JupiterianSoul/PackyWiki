@@ -251,6 +251,102 @@ class Synth {
     this.#tone({ freq: 165, type: 'square', at: 0.11, dur: 0.2, gain: 0.09 });
   }
 
+  /* --- the rest of the app -------------------------------------------------
+   *
+   * Opening a pack had a voice and nothing else did, which made the rest of
+   * the app feel like a different, quieter program. These cover the actions a
+   * player actually spends most of their time on.
+   */
+
+  /** Moving between tabs. Direction gives it a sense of travel. */
+  playSwitch(forward = true) {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: forward ? 520 : 660, type: 'sine', at: 0, dur: 0.09, gain: 0.05,
+      sweepTo: forward ? 700 : 490 });
+    this.#noise({ at: 0, dur: 0.09, gain: 0.035, type: 'highpass', from: 2600, to: 5000 });
+  }
+
+  /** A switch in Settings. Two clicks, on and off, so the state is audible. */
+  playToggle(on) {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: on ? 660 : 440, type: 'square', at: 0, dur: 0.035, gain: 0.05 });
+    this.#tone({ freq: on ? 990 : 330, type: 'sine', at: 0.045, dur: 0.09, gain: 0.06 });
+    this.#noise({ at: 0, dur: 0.04, gain: 0.04, type: 'highpass', from: 3500, to: 6000 });
+  }
+
+  /** A modal opening or closing. Softer and wider than a tap. */
+  playModal(open = true) {
+    if (!this.ensure() || this.muted) return;
+    this.#noise({
+      at: 0, dur: 0.34, gain: 0.07, type: 'bandpass',
+      from: open ? 500 : 2400, to: open ? 2400 : 500, q: 0.8, send: 0.18
+    });
+    this.#tone({ freq: open ? 330 : 440, type: 'sine', at: 0, dur: 0.22, gain: 0.05,
+      sweepTo: open ? 494 : 294, send: 0.2 });
+  }
+
+  /** A card turning face up in the binder or the detail view. */
+  playCardOpen() {
+    if (!this.ensure() || this.muted) return;
+    this.#noise({ at: 0, dur: 0.14, gain: 0.1, type: 'bandpass', from: 1800, to: 900, q: 1.4 });
+    this.#tone({ freq: 587, type: 'sine', at: 0.03, dur: 0.24, gain: 0.06, send: 0.2 });
+  }
+
+  /** A shelf snapping to the booster under the finger. */
+  playSnap() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 1200, type: 'sine', at: 0, dur: 0.045, gain: 0.045 });
+    this.#noise({ at: 0, dur: 0.045, gain: 0.03, type: 'highpass', from: 4000, to: 7000 });
+  }
+
+  /** Arming a destructive button: sell, or erase everything. */
+  playArm() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 330, type: 'triangle', at: 0, dur: 0.1, gain: 0.08, sweepTo: 415 });
+    this.#tone({ freq: 660, type: 'sine', at: 0.06, dur: 0.14, gain: 0.05 });
+  }
+
+  /** A gift or reward being taken. Brighter and shorter than the fanfare. */
+  playGift() {
+    if (!this.ensure() || this.muted) return;
+    this.resume();
+    [659, 880, 1175].forEach((freq, i) => {
+      this.#tone({ freq, type: 'triangle', at: i * 0.07, dur: 0.42, gain: 0.12, send: 0.3 });
+    });
+    this.#noise({ at: 0.1, dur: 0.45, gain: 0.04, type: 'highpass', from: 5000, to: 10000, send: 0.35 });
+  }
+
+  /** Crossing a level. Rising, and unmistakably an achievement. */
+  playLevelUp() {
+    if (!this.ensure() || this.muted) return;
+    this.resume();
+    [392, 523, 659, 784, 1046].forEach((freq, i) => {
+      this.#tone({ freq, type: 'triangle', at: i * 0.085, dur: 0.75, gain: 0.13, send: 0.38 });
+    });
+    this.#tone({ freq: 196, type: 'sine', at: 0, dur: 1.2, gain: 0.13, send: 0.2 });
+    this.#noise({ at: 0.3, dur: 0.9, gain: 0.05, type: 'highpass', from: 4000, to: 12000, send: 0.45 });
+  }
+
+  /** XP landing. Deliberately tiny — it fires on every pack. */
+  playXp() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 784, type: 'sine', at: 0, dur: 0.13, gain: 0.05, sweepTo: 1175, send: 0.25 });
+  }
+
+  /** A timed booster becoming available while you are watching the tab. */
+  playReady() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 880, type: 'sine', at: 0, dur: 0.2, gain: 0.07, send: 0.25 });
+    this.#tone({ freq: 1318, type: 'sine', at: 0.09, dur: 0.28, gain: 0.06, send: 0.3 });
+  }
+
+  /** Typing has produced something usable — the custom wiki resolved. */
+  playResolved() {
+    if (!this.ensure() || this.muted) return;
+    this.#tone({ freq: 523, type: 'triangle', at: 0, dur: 0.24, gain: 0.09, send: 0.25 });
+    this.#tone({ freq: 784, type: 'triangle', at: 0.09, dur: 0.34, gain: 0.09, send: 0.3 });
+  }
+
   /** Starter kit / restock bonus. */
   playFanfare() {
     if (!this.ensure() || this.muted) return;

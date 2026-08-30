@@ -1,5 +1,5 @@
 /* ==========================================================================
-   PackyWiki
+   Wiklodo
    --------------------------------------------------------------------------
      1. Tokens & reset
      2. Shell: top bar, tabs, screens
@@ -33,6 +33,12 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+
+/* The browser's own heading and paragraph margins have no place in a layout
+   this component-driven: an <h4> carries a 1.33em top margin by default, which
+   is what pushed every settings row's text down the box and left a gap above
+   it. Spacing here is always stated explicitly by the rule that wants it. */
+h1, h2, h3, h4, h5, h6, p, figure { margin: 0; }
 
 /* An explicit `display` beats the `hidden` attribute, so a flex or grid
    element stays on screen when hidden. Everything that toggles `hidden` in JS
@@ -83,7 +89,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .primary-button.small { padding: 11px 22px; font-size: 0.9rem; }
 .primary-button:hover:not(:disabled) { transform: translateY(-2px); filter: brightness(1.08); }
 .primary-button:active:not(:disabled) { transform: translateY(1px) scale(0.98); }
-.primary-button:disabled { opacity: 0.45; cursor: not-allowed; }
+/* Greyed as well as faded: a 45%-opacity orange gradient still reads as a
+   live button, which made the timed Open button look tappable with nothing
+   to open. */
+.primary-button:disabled {
+  opacity: 0.4;
+  filter: grayscale(0.85);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.primary-button:disabled:hover { transform: none; filter: grayscale(0.85); }
 
 .ghost-button {
   border: 1px solid var(--panel-line);
@@ -1642,23 +1657,39 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 .timed-head { margin-bottom: 18px; }
 .timed-title { font-size: clamp(1.3rem, 4vw, 1.8rem); letter-spacing: -0.02em; margin-bottom: 6px; }
 
+/* Stacked and centred: the pack sits in the middle of its panel with the
+   counter and the button under it, rather than shoved against the left edge
+   with the text beside it. Goes side by side only when there is real room. */
 .timed-stage {
   display: flex;
-  gap: clamp(16px, 4vw, 34px);
+  flex-direction: column;
+  gap: clamp(14px, 3vw, 22px);
   align-items: center;
-  flex-wrap: wrap;
-  padding: clamp(16px, 3vw, 26px);
+  justify-content: center;
+  text-align: center;
+  padding: clamp(18px, 3vw, 28px);
   border: 1px solid var(--panel-line);
   border-radius: 20px;
   background: rgba(0, 0, 0, 0.26);
 }
-.timed-booster { flex: none; }
+.timed-booster { flex: none; display: flex; justify-content: center; }
 /* An empty slot is drawn as an outline of the pack that isn't there yet. */
 .timed-booster .booster.is-empty { opacity: 0.3; filter: grayscale(0.7); }
-.timed-panel { flex: 1; min-width: 190px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.timed-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
 .timed-held { font-size: clamp(1.2rem, 4vw, 1.6rem); font-weight: 800; letter-spacing: -0.02em; }
 .timed-next { font-size: 0.86rem; color: var(--text-dim); font-variant-numeric: tabular-nums; }
 .timed-panel .primary-button { margin-top: 6px; }
+
+@media (min-width: 720px) {
+  .timed-stage { flex-direction: row; gap: 34px; text-align: left; }
+  .timed-panel { align-items: flex-start; }
+}
 
 /* --- the timed track (a levelling bar) ----------------------------------- */
 .track {
@@ -1751,12 +1782,16 @@ main { padding: clamp(18px, 3vw, 34px) 0 90px; }
 #screen-settings .section-heading:first-child { margin-top: 0; }
 .settings-list { display: grid; gap: 10px; }
 .setting-row {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  /* Top-aligned: the name and its explanation start at the top of the box and
+     the switch lines up with the name, instead of the whole block floating in
+     the middle of a taller container. */
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 16px;
   padding: 14px 16px;
   border: 1px solid var(--panel-line);
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.26);
 }
+.setting-row .switch, .setting-row .setting-value, .setting-row .danger-button { margin-top: 2px; }
 .setting-copy { min-width: 0; }
 .setting-copy h4 { font-size: 0.95rem; margin-bottom: 3px; }
 .setting-copy p { font-size: 0.78rem; color: var(--text-dim); line-height: 1.5; }

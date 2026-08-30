@@ -1,5 +1,5 @@
 /**
- * PackyWiki — app controller.
+ * Wiklodo — app controller.
  *
  * Four tabs: the boosters you own, custom boosters you've built, the shop that
  * sells them, and the collection binder. Opening a booster happens on its own
@@ -14,7 +14,7 @@ import { drawArticles, resolveCustomWiki, fetchPackArt, fetchCustomPackArt } fro
 import { priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS } from './pricing.js';
 import {
   boosterPrice, rollOptionsFor, sellPriceFor, nextRefreshAt, windowIndexAt,
-  STARTER_PACKS, STARTER_PACK_CARDS, STARTER_COINS
+  nextFreeAt, freeWindowAt, STARTER_PACKS, STARTER_PACK_CARDS, STARTER_COINS
 } from './economy.js';
 import { generateShop, formatCountdown } from './shop.js';
 import {
@@ -484,6 +484,7 @@ function initRail(tab) {
         dragging = false;
         rail.classList.remove('is-dragging');
         scrollRailTo(tab, state.rails[tab]?.focusIndex ?? 0);
+        synth.playSnap();
       }
     });
   });
@@ -496,7 +497,7 @@ function initRail(tab) {
 
 function renderShop() {
   el.shopIntro.textContent = t('shopIntro');
-  const rows = generateShop(windowIndexAt(), state.customPacks);
+  const rows = generateShop(windowIndexAt(), state.customPacks, freeWindowAt());
 
   el.shopRows.replaceChildren(...rows.map((row) => {
     const section = document.createElement('section');
@@ -506,7 +507,8 @@ function renderShop() {
     if (row.free) {
       const note = document.createElement('p');
       note.className = 'shop-row-note';
-      note.textContent = t('freeNote');
+      note.id = 'free-note';
+      note.textContent = freeNoteText();
       section.insertBefore(note, section.querySelector('.shop-shelf'));
     }
     const shelf = section.querySelector('.shop-shelf');
@@ -534,9 +536,17 @@ function renderShop() {
   tickRestock();
 }
 
+/** The free shelf runs on its own four-hour clock, so it gets its own line. */
+const freeNoteText = () =>
+  `${t('freeNote')} ${t('freeAgainIn', { time: formatCountdown(nextFreeAt() - Date.now()) })}`;
+
 function tickRestock() {
   const remaining = nextRefreshAt() - Date.now();
   el.restock.textContent = t('restockIn', { time: formatCountdown(remaining) });
+
+  const note = document.getElementById('free-note');
+  if (note) note.textContent = freeNoteText();
+
   if (remaining <= 0) {
     payStipend();
     renderShop();
@@ -678,6 +688,9 @@ function tickTimed() {
   accrue(timed);
   if (timed.count !== before) {
     store.saveProfile(state.profile);
+    // Only when the player is actually looking at this tab, which is the only
+    // time this branch runs: the clock is parked otherwise.
+    if (timed.count > before) synth.playReady();
     renderTimed();
     return;
   }
@@ -1238,6 +1251,7 @@ function awardXp(pulls) {
 let xpPopTimer = null;
 function showXpPop(amount) {
   if (amount <= 0) return;
+  synth.playXp();
   el.xpPop.textContent = t('xpGained', { n: amount.toLocaleString() });
   el.xpPop.hidden = false;
   el.xpPop.classList.remove('is-rising');
@@ -1277,7 +1291,7 @@ function showLevelUp(level) {
     el.levelFill.style.transition = '';
     el.levelFill.style.width = '100%';
   });
-  synth.playFanfare();
+  synth.playLevelUp();
 }
 
 /** A little panel describing a reward, used by both levels and daily gifts. */
@@ -1438,7 +1452,7 @@ function openCardDetail(entryKey, data, rarity) {
   if (entry) paintSellButton();
 
   el.cardModal.hidden = false;
-  synth.playWhoosh(true);
+  synth.playCardOpen();
 }
 
 function paintSellButton() {
@@ -1460,7 +1474,7 @@ function handleSell() {
   if (!detail.sellArmed) {
     detail.sellArmed = true;
     paintSellButton();
-    synth.playTap();
+    synth.playArm();
     setTimeout(() => {
       if (state.detail === detail && detail.sellArmed) {
         detail.sellArmed = false;
@@ -1484,7 +1498,7 @@ function handleSell() {
 function closeCardDetail() {
   el.cardModal.hidden = true;
   state.detail = null;
-  synth.playWhoosh(false);
+  synth.playModal(false);
 }
 
 /** Hold and move to lean the card — it turns on its axes, it doesn't travel. */
@@ -1612,7 +1626,7 @@ function initFilters() {
     state.filtersOpen = !state.filtersOpen;
     el.filters.hidden = !state.filtersOpen;
     el.filterToggle.setAttribute('aria-expanded', String(state.filtersOpen));
-    synth.playWhoosh(state.filtersOpen);
+    synth.playModal(state.filtersOpen);
     renderCollection();
   });
 }
@@ -1663,7 +1677,7 @@ async function createCustomPack(event) {
     renderShop();
     setCustomStatus(t('createdGoShop', { name: pack.name }), 'ok');
     el.customInput.value = '';
-    synth.playPurchase();
+    synth.playResolved();
   } catch (err) {
     setCustomStatus(t('createFailed'), 'error');
     synth.playDenied();
@@ -1739,11 +1753,11 @@ function grantGift(gift) {
   if (gift.kind === 'coins') {
     store.saveWallet(store.loadWallet() + gift.coins);
     refreshWallet();
-    synth.playCoins();
+    synth.playGift();
   } else {
     store.addBooster(state.inventory, gift.spec, 1);
     renderRail('boosters');
-    synth.playFanfare();
+    synth.playGift();
   }
 }
 
@@ -1775,7 +1789,7 @@ function openDaily({ auto = false } = {}) {
   }
   renderDaily();
   el.dailyModal.hidden = false;
-  synth.playTap();
+  synth.playModal(true);
 }
 
 /* --- settings ------------------------------------------------------------- */
@@ -1803,7 +1817,9 @@ function settingRow(key, titleKey, noteKey) {
     store.saveProfile(state.profile);
     applySettings();
     paint();
-    if (settings().sound) synth.playTap();
+    // Fires after the setting is applied, so turning sound ON is audible and
+    // turning it off is the last thing you hear.
+    if (settings()[key] || key !== 'sound') synth.playToggle(Boolean(settings()[key]));
   });
   return row;
 }
@@ -1840,7 +1856,7 @@ function handleReset() {
   if (!resetArmed) {
     resetArmed = true;
     paintResetButton();
-    synth.playTap();
+    synth.playArm();
     clearTimeout(resetTimer);
     resetTimer = setTimeout(() => { resetArmed = false; paintResetButton(); }, 5000);
     return;
@@ -1893,7 +1909,7 @@ function showWalletInfo() {
   el.walletSpend.textContent = t('walletSpend');
   el.walletNote.textContent = t('walletNote');
   el.walletModal.hidden = false;
-  synth.playTap();
+  synth.playModal(true);
 }
 
 /* --- first run ------------------------------------------------------------ */
@@ -2039,9 +2055,11 @@ function init() {
   el.backButton.addEventListener('click', leaveOpenScreen);
   el.backToShelf.addEventListener('click', leaveOpenScreen);
 
+  const TAB_ORDER = el.tabs.map((tab) => tab.dataset.tab);
   el.tabs.forEach((tab) => tab.addEventListener('click', () => {
     const name = tab.dataset.tab;
-    synth.playTap();
+    synth.resume();
+    synth.playSwitch(TAB_ORDER.indexOf(name) >= TAB_ORDER.indexOf(state.tab));
     if (name === 'collection') renderCollection();
     if (name === 'shop') { payStipend(); renderShop(); }
     if (name === 'timed') renderTimed();
@@ -2051,11 +2069,11 @@ function init() {
   }));
 
   el.wallet.addEventListener('click', showWalletInfo);
-  el.walletClose.addEventListener('click', () => { el.walletModal.hidden = true; });
+  el.walletClose.addEventListener('click', () => { el.walletModal.hidden = true; synth.playModal(false); });
   el.walletModal.addEventListener('click', (e) => { if (e.target === el.walletModal) el.walletModal.hidden = true; });
 
-  el.oddsButton.addEventListener('click', () => { el.oddsModal.hidden = false; synth.playTap(); });
-  el.oddsClose.addEventListener('click', () => { el.oddsModal.hidden = true; });
+  el.oddsButton.addEventListener('click', () => { el.oddsModal.hidden = false; synth.resume(); synth.playModal(true); });
+  el.oddsClose.addEventListener('click', () => { el.oddsModal.hidden = true; synth.playModal(false); });
   el.oddsModal.addEventListener('click', (e) => { if (e.target === el.oddsModal) el.oddsModal.hidden = true; });
 
   el.cardModalClose.addEventListener('click', closeCardDetail);
@@ -2071,7 +2089,7 @@ function init() {
   });
 
   el.dailyButton.addEventListener('click', openDaily);
-  el.dailyClose.addEventListener('click', () => { el.dailyModal.hidden = true; });
+  el.dailyClose.addEventListener('click', () => { el.dailyModal.hidden = true; synth.playModal(false); });
   el.dailyModal.addEventListener('click', (e) => { if (e.target === el.dailyModal) el.dailyModal.hidden = true; });
   el.dailyClaim.addEventListener('click', () => { synth.resume(); claimGift(); });
   el.settingsReset.addEventListener('click', handleReset);
@@ -2112,7 +2130,7 @@ function init() {
 init();
 
 window.__packywiki = {
-  state, store, RARITIES, synth, draw: drawArticles,
+  state, store, RARITIES, synth, draw: drawArticles, generateShop,
   debugRarity(id) {
     const forced = rarityById(id);
     document.querySelectorAll('.card').forEach((card) => {

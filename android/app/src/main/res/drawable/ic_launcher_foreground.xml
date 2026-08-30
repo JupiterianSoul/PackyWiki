@@ -1,32 +1,35 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- A card with a star on it. Vector-only, so the repo carries no binary art;
-     minSdk 26 means the adaptive icon is the only launcher icon needed. -->
+<!-- The Wiklodo mark: a foil booster pack with a W across its face.
+     Vector-only, so the repo carries no binary art; minSdk 26 means the
+     adaptive icon is the only launcher icon needed. Everything is kept inside
+     the centre 72x72 safe zone, because a launcher is free to mask this to a
+     circle, a squircle or anything else. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- Back card, tilted, in the accent indigo. -->
-    <group
-        android:pivotX="54"
-        android:pivotY="56"
-        android:rotation="-14">
-        <path
-            android:fillColor="#6366F1"
-            android:pathData="M40,28 L68,28 A6,6 0 0 1 74,34 L74,78 A6,6 0 0 1 68,84 L40,84 A6,6 0 0 1 34,78 L34,34 A6,6 0 0 1 40,28 Z" />
-    </group>
+    <!-- The pack: dark body, light edge. -->
+    <path
+        android:fillColor="#151827"
+        android:strokeColor="#C7D2FE"
+        android:strokeWidth="4.5"
+        android:strokeLineJoin="round"
+        android:pathData="M40,22 L68,22 A9,9 0 0 1 77,31 L77,77 A9,9 0 0 1 68,86 L40,86 A9,9 0 0 1 31,77 L31,31 A9,9 0 0 1 40,22 Z" />
 
-    <!-- Front card. -->
-    <group
-        android:pivotX="54"
-        android:pivotY="56"
-        android:rotation="6">
-        <path
-            android:fillColor="#F8FAFC"
-            android:pathData="M40,28 L68,28 A6,6 0 0 1 74,34 L74,78 A6,6 0 0 1 68,84 L40,84 A6,6 0 0 1 34,78 L34,34 A6,6 0 0 1 40,28 Z" />
-        <path
-            android:fillColor="#FBBF24"
-            android:pathData="M54,43 L57.41,52.31 L67.31,52.67 L59.52,58.79 L62.23,68.33 L54,62.8 L45.77,68.33 L48.48,58.79 L40.69,52.67 L50.59,52.31 Z" />
-    </group>
+    <!-- The crimped seam across the top of the pack. -->
+    <path
+        android:strokeColor="#C7D2FE"
+        android:strokeWidth="4.5"
+        android:strokeLineCap="round"
+        android:pathData="M33,38 L75,38" />
+
+    <!-- The W, in the accent amber. -->
+    <path
+        android:strokeColor="#FBBF24"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M40,50 L46,74 L54,60 L62,74 L68,50" />
 </vector>

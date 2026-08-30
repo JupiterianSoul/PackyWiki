@@ -142,18 +142,18 @@ const ICONS = {
 };
 
 /**
- * The PackyWiki mark used on the booster art itself — a card with a star,
- * matching the Android launcher icon.
+ * The Wiklodo mark: a foil booster pack with a W cut across its face and a
+ * spark beside it. Drawn with `currentColor` so it takes the colour of
+ * whatever it sits in, the same as every other icon here.
  */
 export const LOGO_MARK = `
-  <g transform="rotate(-12 32 32)">
-    <rect x="14" y="8" width="36" height="48" rx="6" fill="none" stroke="currentColor" stroke-width="3" opacity="0.5"/>
+  <g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="14" y="6" width="34" height="52" rx="7" stroke-width="3"/>
+    <path d="M14 17h34" stroke-width="3"/>
+    <path d="M21.5 27 26.5 46 31 35.5 35.5 46 40.5 27" stroke-width="3.8"/>
   </g>
-  <g transform="rotate(5 32 32)">
-    <rect x="14" y="8" width="36" height="48" rx="6" fill="none" stroke="currentColor" stroke-width="3"/>
-    <path fill="currentColor" stroke="none"
-      d="M32 18 35.4 27.3 45.3 27.7 37.5 33.8 40.2 43.3 32 37.8 23.8 43.3 26.5 33.8 18.7 27.7 28.6 27.3Z"/>
-  </g>`;
+  <circle cx="54" cy="13" r="3.2" fill="currentColor"/>
+  <circle cx="54" cy="13" r="7" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"/>`;
 
 /**
  * The Buckarooz mark: a B with two bars running through it, top and bottom,
