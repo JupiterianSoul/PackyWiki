@@ -44,6 +44,7 @@ import {
   levelBounds, levelProgress, timedRollOptions
 } from './timed.js';
 import { t, tx, getLanguage, setLanguage, languageChosen, LANGUAGES } from './i18n.js';
+import { exportSave, importSave, describeSave, parseSave, copyText, readText } from './save.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { synth } from './ui/sound.js';
@@ -1692,6 +1693,20 @@ function renderSettings() {
   language.querySelector('.chip').innerHTML =
     `${iconSvg('lock', { size: 13 })}<span>${LANGUAGES.find((l) => l.id === getLanguage())?.label ?? ''}</span>`;
 
+  // Transferring a save is the only bridge across a reinstall or a new phone,
+  // so it sits above the button that destroys one.
+  const transferRow = document.createElement('div');
+  transferRow.className = 'row';
+  transferRow.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="btn btn-sm btn-ghost row-action" type="button"></button>`;
+  transferRow.querySelector('h4').textContent = t('saveTitle');
+  transferRow.querySelector('p').textContent = t('saveNote');
+  const transferBtn = transferRow.querySelector('button');
+  transferBtn.textContent = t('saveOpen');
+  press(transferBtn, { sound: null });
+  transferBtn.addEventListener('click', openTransfer);
+
   const resetRow = document.createElement('div');
   resetRow.className = 'row';
   resetRow.innerHTML = `
@@ -1704,7 +1719,119 @@ function renderSettings() {
   paintResetButton(resetBtn);
   resetBtn.addEventListener('click', () => handleReset(resetBtn));
 
-  el.dataList.replaceChildren(language, resetRow);
+  el.dataList.replaceChildren(language, transferRow, resetRow);
+}
+
+/**
+ * Copy the save out, or paste one back in.
+ *
+ * Presented as text rather than a file because a WebView cannot reliably hand
+ * the player a download, and because text survives being pasted into a note,
+ * a message to yourself, or anywhere else that will still be there after the
+ * app is gone.
+ */
+function openTransfer() {
+  openSheet(t('saveTitle'), (body) => {
+    body.innerHTML = `
+      <p style="margin-bottom:16px" data-intro></p>
+
+      <div class="row" style="display:grid;gap:12px">
+        <div class="row-copy"><h4 data-out-t></h4><p data-out-n></p></div>
+        <textarea class="filter-input no-drag" data-out rows="4" readonly spellcheck="false"
+                  style="font-family:ui-monospace,monospace;font-size:.7rem;resize:none"></textarea>
+        <button class="btn btn-sm btn-primary" type="button" data-copy></button>
+      </div>
+
+      <div class="row" style="display:grid;gap:12px;margin-top:10px">
+        <div class="row-copy"><h4 data-in-t></h4><p data-in-n></p></div>
+        <textarea class="filter-input no-drag" data-in rows="4" spellcheck="false"
+                  style="font-family:ui-monospace,monospace;font-size:.7rem;resize:none"></textarea>
+        <p class="muted" style="font-size:.76rem;min-height:1.2em" data-status></p>
+        <button class="btn btn-sm btn-ghost" type="button" data-load></button>
+      </div>`;
+
+    body.querySelector('[data-intro]').textContent = t('saveIntro');
+    body.querySelector('[data-out-t]').textContent = t('saveExport');
+    body.querySelector('[data-out-n]').textContent = t('saveExportNote');
+    body.querySelector('[data-in-t]').textContent = t('saveImport');
+    body.querySelector('[data-in-n]').textContent = t('saveImportNote');
+
+    const out = body.querySelector('[data-out]');
+    out.value = exportSave();
+    out.addEventListener('focus', () => out.select());
+
+    const copy = body.querySelector('[data-copy]');
+    copy.textContent = t('saveCopy');
+    press(copy, { sound: null });
+    copy.addEventListener('click', async () => {
+      const ok = await copyText(out.value);
+      copy.textContent = ok ? t('saveCopied') : t('saveCopyManually');
+      if (ok) synth.playCoins(); else { out.focus(); out.select(); synth.playDenied(); }
+      setTimeout(() => { copy.textContent = t('saveCopy'); }, 2600);
+    });
+
+    const input = body.querySelector('[data-in]');
+    input.placeholder = t('savePastePlaceholder');
+    const status = body.querySelector('[data-status]');
+    const load = body.querySelector('[data-load]');
+    load.textContent = t('saveLoad');
+    press(load, { sound: null });
+
+    let armed = false;
+    const paint = () => {
+      load.textContent = armed ? t('saveLoadConfirm') : t('saveLoad');
+      load.classList.toggle('btn-danger', armed);
+      load.classList.toggle('is-armed', armed);
+    };
+
+    // Offer to fill it from the clipboard where the WebView allows it.
+    readText().then((text) => {
+      if (text && parseSave(text) && !input.value) {
+        input.value = text;
+        input.dispatchEvent(new Event('input'));
+      }
+    });
+
+    input.addEventListener('input', () => {
+      armed = false;
+      paint();
+      const text = input.value.trim();
+      if (!text) { status.textContent = ''; status.style.color = ''; return; }
+      const summary = describeSave(text);
+      if (!summary) {
+        status.textContent = t('saveUnreadable');
+        status.style.color = 'var(--negative)';
+        return;
+      }
+      status.innerHTML = t('saveFound', {
+        cards: summary.cards.toLocaleString(),
+        level: summary.level,
+        amount: money(summary.wallet)
+      });
+      status.style.color = 'var(--positive)';
+    });
+
+    // Arm then confirm: importing replaces everything already here.
+    load.addEventListener('click', () => {
+      const text = input.value.trim();
+      if (!describeSave(text)) {
+        status.textContent = t('saveUnreadable');
+        status.style.color = 'var(--negative)';
+        synth.playDenied();
+        return;
+      }
+      if (!armed) {
+        armed = true;
+        paint();
+        synth.playArm();
+        setTimeout(() => { armed = false; paint(); }, 5000);
+        return;
+      }
+      if (importSave(text)) location.reload();
+      else { status.textContent = t('saveUnreadable'); synth.playDenied(); }
+    });
+    paint();
+  });
 }
 
 let resetArmed = false;

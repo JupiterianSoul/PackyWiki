@@ -3,8 +3,11 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
 
+    <!-- allowBackup is on: the app's data is a card collection, not secrets,
+         and Android's own backup is what carries a save to a new phone. The
+         in-app save transfer in Settings is the manual equivalent. -->
     <application
-        android:allowBackup="false"
+        android:allowBackup="true"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"

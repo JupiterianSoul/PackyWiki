@@ -6,6 +6,32 @@ android {
     namespace 'com.packywiki.app'
     compileSdk 35
 
+    /*
+     * A FIXED signing key, committed to the repo.
+     *
+     * Without this, `assembleDebug` falls back to ~/.android/debug.keystore —
+     * and a CI runner is a fresh machine every time, so Gradle generated a
+     * brand new random key on every single build. Android identifies an app by
+     * its signature, so every build looked like a different app: no update
+     * would install over the last one, and uninstalling to make room took the
+     * player's whole collection with it.
+     *
+     * The key lives in the repo on purpose. It is a debug key for a
+     * sideloaded app, the password is right here, and it protects nothing: a
+     * debug-signed APK is not trustworthy to begin with. What it buys is the
+     * one thing that actually matters here — every build updates in place and
+     * keeps your save. If this ever ships properly, generate a real key and
+     * pass it in through CI secrets instead.
+     */
+    signingConfigs {
+        debug {
+            storeFile file('../keystore/wiklodo-debug.keystore')
+            storePassword 'wiklodo'
+            keyAlias 'wiklodo'
+            keyPassword 'wiklodo'
+        }
+    }
+
     defaultConfig {
         // Deliberately unchanged by the rename to Wiklodo. The applicationId
         // is the app's identity to Android AND the key to the WebView's
@@ -14,11 +40,17 @@ android {
         applicationId 'com.packywiki.app'
         minSdk 26
         targetSdk 35
-        versionCode 1
+        // Rises with every CI build so Android always sees a newer version.
+        // Falls back to 1 for a local build, which is fine: a local build is
+        // never installed over a released one.
+        versionCode (System.getenv('BUILD_NUMBER') ?: '1') as int
         versionName '0.1.0'
     }
 
     buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
         release {
             minifyEnabled false
         }

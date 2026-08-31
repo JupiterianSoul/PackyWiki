@@ -50,6 +50,12 @@ jobs:
 
       - name: Assemble debug APK
         working-directory: android
+        # BUILD_NUMBER feeds versionCode, so each build is newer than the last.
+        # The signing key is committed (see android/app/build.gradle), which is
+        # what makes every build update in place instead of demanding an
+        # uninstall and taking the player's collection with it.
+        env:
+          BUILD_NUMBER: ${{ github.run_number }}
         run: ./gradlew --no-daemon assembleDebug
 
       - name: Rename APK

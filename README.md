@@ -94,6 +94,33 @@ Config: `minSdk 26` (Android 8.0), `targetSdk 35`. minSdk 26 also means the
 vector adaptive icon is the only launcher icon needed, so the repo carries no
 binary image assets.
 
+### Signing, and why the key is in the repo
+
+`android/keystore/wiklodo-debug.keystore` is committed, and every build is
+signed with it.
+
+It has to be. Android identifies an app by its signing certificate. There was
+no `signingConfig` at first, so `assembleDebug` fell back to
+`~/.android/debug.keystore` — and a CI runner is a fresh machine every time, so
+Gradle **generated a new random key on every build**. Every APK looked like a
+different app: none would install over the last, and uninstalling to make room
+took the WebView's localStorage, and with it the player's whole collection.
+
+The key is a debug key for a sideloaded app, the password is in the Gradle file
+next to it, and it protects nothing — a debug-signed APK is not trustworthy to
+begin with. What it buys is the only thing that matters here: **every build
+updates in place and keeps the save.** If this ever ships properly, generate a
+real key and pass it through CI secrets instead of committing it.
+
+`versionCode` comes from `BUILD_NUMBER` (the CI run number), so each build is
+newer than the last, and `allowBackup` is on so Android's own backup carries a
+save to a new phone.
+
+Installs made before this was fixed cannot be updated in place — the key that
+signed them is gone. **`RESCUE.md`** has the one-time procedure for getting
+that collection out through `chrome://inspect` and back in through the new
+save transfer.
+
 ---
 
 ## The interface
@@ -197,6 +224,7 @@ src/
     sound.js          the synthesiser: four voices, one signal chain
     backdrop.js       one live canvas renderer per theme
     components.js     press, Odometer, Ring, Bar, Segmented, Sheet, NavBar, Rail
+  save.js             export/import of the whole save, as inspectable text
   wiki.js             Wikipedia + custom-wiki fetching, filtering, de-duplication
   pricing.js          popularity model and card prices
   economy.js          booster prices, sell rate, the house edge, the stipend
@@ -655,6 +683,16 @@ rather than how it is built:
 
 Above them sits the theme picker (see **Themes**).
 
+**Data → Transfer your save** turns everything you own into one block of text
+you can copy out and paste back. It is the only bridge across a reinstall or a
+move to another phone, and the format is deliberately dull — a JSON envelope
+with a version and the raw stored strings — because a save you cannot inspect
+is a save you cannot rescue by hand.
+
+Importing validates before it touches anything and replaces the whole save
+rather than merging, so a half-recognised blob cannot leave you with neither
+your old save nor the new one. It arms and then confirms, like selling a card.
+
 Below them, the language is shown but locked (see below), and **Erase
 everything** uses the same arm-then-confirm shape as selling a card: the button
 is its own dialog.
@@ -664,8 +702,9 @@ is its own dialog.
 ## Intentionally missing (this is a debug build)
 
 - **Local persistence only.** The collection lives in this browser's
-  localStorage. No account, no server, no sync between devices; clearing site
-  data wipes it.
+  localStorage. No account, no server, no automatic sync between devices;
+  clearing site data wipes it. **Settings → Data → Transfer your save** is the
+  manual way across, and on Android the system backup covers the rest.
 - **No cross-pack dedupe.** Titles are de-duplicated *within* one pack. Open
   two Animals packs and you can pull Tardigrade twice — it becomes a `×2`.
 - **Two languages**, English and French, chosen once and then locked.
