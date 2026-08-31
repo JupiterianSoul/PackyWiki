@@ -1,7 +1,7 @@
 /* ==========================================================================
    COMPONENTS
    The app's own controls. Each one is styled once from tokens, then given a
-   per-theme variant only where a theme genuinely behaves differently — Paper
+   per-theme variant only where a theme genuinely behaves differently - Paper
    presses into its shadow, Arcade has no radius and a scan sweep, Noir uses
    a rule instead of a fill.
    ========================================================================== */

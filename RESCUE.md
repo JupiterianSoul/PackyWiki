@@ -8,10 +8,10 @@ the throwaway keys the CI used to generate (anything built before the
 
 Android identifies an app by the certificate that signed it. Until that
 commit the Android build had no `signingConfig`, so Gradle fell back to
-`~/.android/debug.keystore` — and a CI runner is a fresh machine every time,
+`~/.android/debug.keystore` - and a CI runner is a fresh machine every time,
 so it **generated a brand new random key on every build**. Every APK therefore
 looked like a different app: none would install over the last, and uninstalling
-to make room took the WebView's localStorage — the whole collection — with it.
+to make room took the WebView's localStorage - the whole collection - with it.
 
 That is fixed. The key now lives in the repo at
 `android/keystore/wiklodo-debug.keystore` and every build is signed with it, so
@@ -47,7 +47,7 @@ copy(JSON.stringify({
 ```
 
 `copy()` puts the result on the computer's clipboard. Paste it into a text file
-and keep it. (If `copy()` is unavailable, drop it and use the printed string —
+and keep it. (If `copy()` is unavailable, drop it and use the printed string -
 right-click the result and *Copy string contents*.)
 
 ## Putting it back
@@ -55,8 +55,8 @@ right-click the result and *Copy string contents*.)
 1. Uninstall Wiklodo, install the new APK, and go through the first-run
    language choice.
 2. **Profile → Settings → Data → Transfer your save → Open**.
-3. Paste the text into the lower box. It will tell you what it found — card
-   count, level, balance — before it does anything.
+3. Paste the text into the lower box. It will tell you what it found - card
+   count, level, balance - before it does anything.
 4. **Load this save**, then tap again to confirm. The app reloads with
    everything back, including the language and theme.
 

@@ -12,7 +12,7 @@ android {
     /*
      * A FIXED signing key, committed to the repo.
      *
-     * Without this, `assembleDebug` falls back to ~/.android/debug.keystore —
+     * Without this, `assembleDebug` falls back to ~/.android/debug.keystore -
      * and a CI runner is a fresh machine every time, so Gradle generated a
      * brand new random key on every single build. Android identifies an app by
      * its signature, so every build looked like a different app: no update
@@ -22,7 +22,7 @@ android {
      * The key lives in the repo on purpose. It is a debug key for a
      * sideloaded app, the password is right here, and it protects nothing: a
      * debug-signed APK is not trustworthy to begin with. What it buys is the
-     * one thing that actually matters here — every build updates in place and
+     * one thing that actually matters here - every build updates in place and
      * keeps your save. If this ever ships properly, generate a real key and
      * pass it in through CI secrets instead.
      */
@@ -49,7 +49,7 @@ android {
         //
         // Computed into a variable first, deliberately. Written inline as
         // `versionCode (expr) as int`, Groovy reads it as
-        // `versionCode(expr) as int` — the cast lands on the setter's null
+        // `versionCode(expr) as int` - the cast lands on the setter's null
         // return value, and the build dies with "Value is null".
         versionCode buildNumber
         versionName '0.1.0'
@@ -71,7 +71,7 @@ android {
 }
 
 dependencies {
-    // WebViewAssetLoader — serves the bundled web build over a real https
+    // WebViewAssetLoader - serves the bundled web build over a real https
     // origin instead of file://, so fetch() to Wikipedia obeys normal CORS.
     implementation 'androidx.webkit:webkit:1.12.1'
 }

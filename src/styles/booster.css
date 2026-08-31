@@ -1,5 +1,5 @@
 /* ==========================================================================
-   THE BOOSTER — PRISM FOIL
+   THE BOOSTER - PRISM FOIL
    A serrated mylar bag: metallic body in the subject's palette, the subject's
    own pattern embossed into the foil, holographic interference bands drifting
    over it, the category's drawn emblem in its own mounting, and a
@@ -132,7 +132,7 @@
 
 /*
  * The emblem: the category's own drawn artwork, mounted in one of six
- * constructions ("families") so each subject's pack is built differently —
+ * constructions ("families") so each subject's pack is built differently -
  * a racing sash, a porthole roundel, a library plate, a theatre marquee,
  * an organic arch, or a hard pixel panel. data-family on .booster picks one.
  */
@@ -156,7 +156,7 @@
 .emblem-art svg { width: 100%; height: auto; display: block; }
 .emblem-deco { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
 
-/* roundel — a porthole: double ring, glass glow, four compass ticks. */
+/* roundel - a porthole: double ring, glass glow, four compass ticks. */
 .booster[data-family='roundel'] .emblem-deco::before {
   content: "";
   position: absolute;
@@ -189,7 +189,7 @@
   opacity: 0.85;
 }
 
-/* sash — a racing ribbon crossing behind the art, stitched edges. */
+/* sash - a racing ribbon crossing behind the art, stitched edges. */
 .booster[data-family='sash'] .emblem-deco::before {
   content: "";
   position: absolute;
@@ -219,7 +219,7 @@
   opacity: 0.7;
 }
 
-/* plate — a library plaque: double-ruled frame with clipped corners. */
+/* plate - a library plaque: double-ruled frame with clipped corners. */
 .booster[data-family='plate'] .emblem-deco::before {
   content: "";
   position: absolute;
@@ -242,7 +242,7 @@
   box-shadow: 0 0.055em 0 -0.008em color-mix(in srgb, var(--e1) 55%, transparent);
 }
 
-/* marquee — a lit theatre beam behind the art with two bulb columns. */
+/* marquee - a lit theatre beam behind the art with two bulb columns. */
 .booster[data-family='marquee'] .emblem-deco::before {
   content: "";
   position: absolute;
@@ -268,7 +268,7 @@
   opacity: 0.9;
 }
 
-/* arch — a garden window: round-topped opening with a sun vignette. */
+/* arch - a garden window: round-topped opening with a sun vignette. */
 .booster[data-family='arch'] .emblem-deco::before {
   content: "";
   position: absolute;
@@ -291,7 +291,7 @@
   background: radial-gradient(50% 100% at 50% 50%, rgba(0, 0, 0, 0.5), transparent 70%);
 }
 
-/* panel — hard game-cartridge geometry: split blocks, pixel corners. */
+/* panel - hard game-cartridge geometry: split blocks, pixel corners. */
 .booster[data-family='panel'] .emblem-deco::before {
   content: "";
   position: absolute;
@@ -567,7 +567,7 @@
 }
 
 /* ==========================================================================
-   THE OPENING — anticipation, burst, emergence
+   THE OPENING - anticipation, burst, emergence
    ========================================================================== */
 
 .booster.is-idle { animation: pack-float 5.5s ease-in-out infinite; }
@@ -671,7 +671,7 @@
 .pcl-comma  { background: var(--c); border-radius: 50% 50% 50% 4%; }
 
 /* ==========================================================================
-   APP THEMES — the same bag under four lights
+   APP THEMES - the same bag under four lights
    ========================================================================== */
 
 [data-theme='paper'] .booster { filter: saturate(0.92); }
@@ -699,7 +699,7 @@ html[data-lowpower='1'] .rip-front::after,
 
 /* Only the pack in your hand shimmers. A shelf or a shop full of tiny packs
    each running its own holo drift and gloss sweep keeps the GPU hot for
-   nothing — at that size the animation is invisible anyway. */
+   nothing - at that size the animation is invisible anyway. */
 .booster.is-small .booster-holo,
 .booster.is-tiny .booster-holo,
 .booster.is-small .booster-shine::after,

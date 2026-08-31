@@ -1,12 +1,12 @@
 /**
  * Data layer. Two sources hide behind one `drawArticles(pack)`:
  *
- *  1. WIKIPEDIA — theme boosters and open boosters, on the Wikipedia of the
+ *  1. WIKIPEDIA - theme boosters and open boosters, on the Wikipedia of the
  *     language the player chose. Queries are language-specific too (see
  *     src/data/packs.js), so a French booster pulls French articles rather
  *     than English ones with French chrome around them.
  *
- *  2. A SUBJECT'S OWN WIKI — custom boosters. Searching Wikipedia for
+ *  2. A SUBJECT'S OWN WIKI - custom boosters. Searching Wikipedia for
  *     "Terraria" yields a handful of pages; the Terraria wiki has thousands.
  *     Fandom runs MediaWiki, so the same action API works once the wiki is
  *     resolved.
@@ -146,7 +146,7 @@ function pageviewRange() {
   ];
 }
 
-/** Average monthly pageviews, or null — a new article legitimately has none. */
+/** Average monthly pageviews, or null - a new article legitimately has none. */
 async function fetchMonthlyViews(title) {
   try {
     const [start, end] = pageviewRange();
@@ -293,7 +293,7 @@ async function searchFandom(name) {
  *
  * Fandom puts non-English communities on a language path
  * (`terraria.fandom.com/fr/api.php`), so those are tried first and the English
- * community is only the fallback — a French booster should hold French cards.
+ * community is only the fallback - a French booster should hold French cards.
  */
 export async function resolveCustomWiki(name) {
   const lang = getLanguage();

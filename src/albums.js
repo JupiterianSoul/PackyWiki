@@ -222,7 +222,7 @@ function decorate(album) {
   return album;
 }
 
-/** How many albums are complete — the profile stat and achievement hook. */
+/** How many albums are complete - the profile stat and achievement hook. */
 export function albumsCompleted(entries, customPacks = []) {
   return buildAlbums(entries, customPacks).filter((a) => a.complete).length;
 }

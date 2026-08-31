@@ -2,14 +2,14 @@
  * ACHIEVEMENTS
  * ============================================================================
  * A ladder of goals across the whole game. Each achievement is COMPUTED from
- * the player's real state — nothing is "awarded" at some moment that could be
+ * the player's real state - nothing is "awarded" at some moment that could be
  * missed; if the condition holds, the achievement is unlocked. The only thing
  * stored is which ones have been REDEEMED (the reward taken), on the profile:
  *
  *   profile.achievements = { redeemed: ['first-pack', ...] }
  *
- * Rewards scale with difficulty: coins for the easy rungs, boosters — up to
- * high-tier rarity boosters — for the hard ones.
+ * Rewards scale with difficulty: coins for the easy rungs, boosters - up to
+ * high-tier rarity boosters - for the hard ones.
  */
 import { tx } from './i18n.js';
 

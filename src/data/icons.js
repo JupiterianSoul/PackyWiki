@@ -6,8 +6,8 @@
  * platform and can't inherit the pack's accent colour, while these are drawn
  * with `currentColor` and scale cleanly onto the booster art.
  *
- * All markup here is authored in this file — never interpolated from remote
- * data — so injecting it with innerHTML is safe.
+ * All markup here is authored in this file - never interpolated from remote
+ * data - so injecting it with innerHTML is safe.
  */
 
 const ICONS = {
@@ -231,7 +231,7 @@ const ICONS = {
   bell: `
     <path d="M18 9.4a6 6 0 0 0-12 0c0 5-2.2 6.4-2.2 6.4h16.4S18 14.4 18 9.4z"/>
     <path d="M13.6 19.2a1.9 1.9 0 0 1-3.2 0"/>`,
-  /* A comic starburst, filled — the card back's emblem plate. */
+  /* A comic starburst, filled - the card back's emblem plate. */
   burst: `
     <path fill="currentColor" stroke="none" d="M12 .6 13.9 6.4 18.3 1.9 17.8 8 23.7 6.7 19.8 11.6 24 14 18.2 15 21.1 20.4 15.3 18 14.9 24 12 18.9 9.1 24 8.7 18 2.9 20.4 5.8 15 0 14 4.2 11.6.3 6.7 6.2 8 5.7 1.9 10.1 6.4z"/>`,
   hourglass: `
@@ -247,7 +247,7 @@ const ICONS = {
 /*
  * The Wiklodo mark: a foil booster torn open, a star bursting out of the
  * mouth, the W stamped on the face. The same drawing ships as the Android
- * launcher icon (ic_launcher_foreground.xml) — one identity everywhere.
+ * launcher icon (ic_launcher_foreground.xml) - one identity everywhere.
  */
 export const LOGO_MARK = `
   <defs>
@@ -277,7 +277,7 @@ export const LOGO_MARK = `
 
 /**
  * The Buckarooz mark: a B with two bars running through it, top and bottom,
- * the way a dollar sign wears its strokes. Drawn rather than borrowed — no
+ * the way a dollar sign wears its strokes. Drawn rather than borrowed - no
  * Unicode currency character is this shape without being another currency.
  */
 export function buckSvg({ size = 13, className = '' } = {}) {

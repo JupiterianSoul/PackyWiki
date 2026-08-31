@@ -2,7 +2,7 @@
  * UI PRIMITIVES
  * ============================================================================
  * The app's own controls, built here rather than borrowed. Nothing in this
- * file knows anything about boosters or cards — these are the parts the
+ * file knows anything about boosters or cards - these are the parts the
  * screens are assembled from.
  *
  *   press()        physical press feedback on any element
@@ -61,8 +61,8 @@ export function trackDrag(event, { onMove, onEnd }) {
   /*
    * Drop the gesture without running onEnd.
    *
-   * A pointerup does not always arrive — the system takes the gesture (a
-   * notification pull, a back swipe), or the app is backgrounded mid-drag —
+   * A pointerup does not always arrive - the system takes the gesture (a
+   * notification pull, a back swipe), or the app is backgrounded mid-drag -
    * and the listeners then sit on window belonging to a finger that is no
    * longer down. The next drag would run alongside that ghost, measuring from
    * an origin two gestures old. Callers that own a single drag at a time
@@ -77,7 +77,7 @@ export function trackDrag(event, { onMove, onEnd }) {
  * Make an element feel like a physical control: it takes the press on the way
  * down, not on the way up, and the sound lands with the finger rather than
  * after it. The `is-pressed` class carries the visual half, which each theme
- * styles its own way — Paper drops it onto its shadow, Arcade shifts it down
+ * styles its own way - Paper drops it onto its shadow, Arcade shifts it down
  * a hard two pixels, Aurora scales it.
  */
 export function press(node, { sound = 'tap', scale = true } = {}) {
@@ -390,7 +390,7 @@ export class Sheet {
 
 /**
  * The destination bar. The indicator is one element that travels, and the
- * active icon lifts — so the bar reads as a single object with a position in
+ * active icon lifts - so the bar reads as a single object with a position in
  * it, rather than five buttons that light up independently.
  */
 export class NavBar {

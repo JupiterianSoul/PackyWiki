@@ -1,7 +1,7 @@
 /**
  * Booster specs.
  *
- * A booster is no longer a fixed entry in a table — the shop invents them, so
+ * A booster is no longer a fixed entry in a table - the shop invents them, so
  * one is described by a small spec that can be stored, counted in an inventory
  * and rebuilt into something openable:
  *
@@ -58,7 +58,7 @@ export function specName(spec) {
 }
 
 /**
- * The two halves of the name, for surfaces that lay them out separately —
+ * The two halves of the name, for surfaces that lay them out separately -
  * the pack face prints the subject at the top and the tier at the bottom
  * rather than jamming them into one line.
  */
@@ -82,8 +82,8 @@ export function specTagline(spec) {
 /**
  * Colours. A rarity booster keeps its subject's colours and wears the rarity
  * as an effect on top; a pure rarity booster has nothing else to go on, so it
- * takes the tier's own colour. A custom pack's palette is PROCEDURAL — derived
- * from its wiki's identity by src/packstyle.js — so the accents stored on old
+ * takes the tier's own colour. A custom pack's palette is PROCEDURAL - derived
+ * from its wiki's identity by src/packstyle.js - so the accents stored on old
  * packs are ignored: every custom pack owns its own colours now, and they
  * regenerate identically on every device.
  */

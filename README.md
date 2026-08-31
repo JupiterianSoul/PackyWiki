@@ -2,7 +2,7 @@
 
 A WikiMaster-style booster pack opener where the cards are **real Wikipedia
 articles**. Buy boosters from a shop that restocks every two hours, slide the rip line to
-tear one open, watch the cards fly out of it, then swipe through them — each
+tear one open, watch the cards fly out of it, then swipe through them - each
 rolled against an eight-tier rarity table with its own visual treatment and its
 own synthesised chime, priced in Buckarooz by how many people actually read the
 article, and saved to a collection you can filter, favourite and sell from.
@@ -19,7 +19,7 @@ Audio API.
 
 > The app was called PackyWiki until the rename. Two things deliberately kept
 > the old name: the Android `applicationId` (`com.packywiki.app`) and the
-> `packywiki.` localStorage prefix. Both are identity rather than branding —
+> `packywiki.` localStorage prefix. Both are identity rather than branding -
 > changing the first installs a second, empty app alongside the first, and
 > changing the second wipes every existing collection on the next launch.
 
@@ -49,7 +49,7 @@ npm run build     # production bundle into dist/
 npm run preview   # serve the built bundle
 ```
 
-Requires Node 18+ (for `fetch`) and a browser with Web Audio — any current
+Requires Node 18+ (for `fetch`) and a browser with Web Audio - any current
 Chrome, Firefox, Safari or Edge.
 
 > **Sound:** browsers refuse to start audio before a user gesture, so the
@@ -60,7 +60,7 @@ Chrome, Firefox, Safari or Edge.
 
 ## Android APK
 
-The app also ships as a sideloadable Android APK — a thin WebView wrapper
+The app also ships as a sideloadable Android APK - a thin WebView wrapper
 around the same web build, so there is no second codebase to maintain.
 
 **Getting it:** every push builds one in CI and publishes it to the rolling
@@ -69,7 +69,7 @@ around the same web build, so there is no second codebase to maintain.
 unknown apps when prompted.
 
 It's debug-signed, so if an existing install refuses to update, uninstall it
-first. The app needs a network connection — only the shell is bundled; cards
+first. The app needs a network connection - only the shell is bundled; cards
 are still fetched live from Wikipedia.
 
 **Building it yourself** (needs the Android SDK, which CI provides):
@@ -105,13 +105,13 @@ signed with it.
 
 It has to be. Android identifies an app by its signing certificate. There was
 no `signingConfig` at first, so `assembleDebug` fell back to
-`~/.android/debug.keystore` — and a CI runner is a fresh machine every time, so
+`~/.android/debug.keystore` - and a CI runner is a fresh machine every time, so
 Gradle **generated a new random key on every build**. Every APK looked like a
 different app: none would install over the last, and uninstalling to make room
 took the WebView's localStorage, and with it the player's whole collection.
 
 The key is a debug key for a sideloaded app, the password is in the Gradle file
-next to it, and it protects nothing — a debug-signed APK is not trustworthy to
+next to it, and it protects nothing - a debug-signed APK is not trustworthy to
 begin with. What it buys is the only thing that matters here: **every build
 updates in place and keeps the save.** If this ever ships properly, generate a
 real key and pass it through CI secrets instead of committing it.
@@ -120,7 +120,7 @@ real key and pass it through CI secrets instead of committing it.
 newer than the last, and `allowBackup` is on so Android's own backup carries a
 save to a new phone.
 
-Installs made before this was fixed cannot be updated in place — the key that
+Installs made before this was fixed cannot be updated in place - the key that
 signed them is gone. **`RESCUE.md`** has the one-time procedure for getting
 that collection out through `chrome://inspect` and back in through the new
 save transfer.
@@ -139,7 +139,7 @@ and one sheet that every panel in the app uses. Opening a pack is a
 **takeover**: the frame gets out of the way and the backdrop stops, so the
 whole frame budget goes to the cards. A launch is covered by the opening
 animation, which also hides the moment the account gate spends deciding
-whether there is a stored session — without it a sign-in card flashed up on
+whether there is a stored session - without it a sign-in card flashed up on
 every single launch.
 
 **The controls**, all in `src/ui/components.js`:
@@ -179,7 +179,7 @@ typeface, pace, texture, backdrop and instrument**:
 
 Colour and shape live in `styles/themes.css`, one block per theme; the canvas
 and synth parameters live in `ui/themes.js` under the same ids. Adding a theme
-is a row in one, a block in the other, and a renderer — nothing else in the app
+is a row in one, a block in the other, and a renderer - nothing else in the app
 knows the list.
 
 The picker in Settings gives each option its own `data-theme`, so **the token
@@ -221,14 +221,14 @@ src/
   main.js             app controller: screens, opening flow, wiring
   style.css           imports the six stylesheets below
   styles/
-    themes.css        ONE BLOCK PER THEME — the only place colour lives
+    themes.css        ONE BLOCK PER THEME - the only place colour lives
     base.css          reset, typography, frame, backdrop, texture
     components.css    the app's own controls and their per-theme variants
     booster.css       the foil pack and the rip
     cards.css         the card, the flip, one block per rarity tier
     screens.css       layout for each destination
   ui/
-    themes.js         THEME TABLE — canvas and synth parameters
+    themes.js         THEME TABLE - canvas and synth parameters
     sound.js          the synthesiser: four voices, one signal chain
     backdrop.js       one live canvas renderer per theme
     components.js     press, Odometer, Ring, Bar, Segmented, Sheet, NavBar, Rail
@@ -245,9 +245,9 @@ src/
   collection.js       localStorage: cards, wallet, inventory, profile
   i18n.js             English/French strings and the language lock
   data/
-    packs.js          PACK TABLE    — themes and custom-pack kinds
-    rarities.js       RARITY TABLE  — one row per tier, with weights
-    icons.js          ICON SET      — fallback art, logo, Buckarooz glyph
+    packs.js          PACK TABLE    - themes and custom-pack kinds
+    rarities.js       RARITY TABLE  - one row per tier, with weights
+    icons.js          ICON SET      - fallback art, logo, Buckarooz glyph
 vite.config.js
 supabase/schema.sql   the three tables, and the row-level rules that guard them
 android/              WebView wrapper that packages the web build as an APK
@@ -269,7 +269,7 @@ Five, in the bottom bar: **Boosters** (owned, and the custom builder behind a
 segmented control) · **Free Packs** · **Shop** · **Collection** · **Profile**.
 
 Everything the bar has no room for lives in the **drawer** behind the menu
-button — the same five, plus Friends, the daily gift and Settings. That
+button - the same five, plus Friends, the daily gift and Settings. That
 replaces a "More" list that used to sit at the bottom of the Profile, which is
 a strange place to keep the way to Settings.
 
@@ -277,7 +277,7 @@ The app bar is the menu, the app name, your balance, notifications and your
 level ring, in that order. The name is the first thing dropped when the row is
 tight, because it is the only item that tells you nothing you did not know.
 The odds moved onto the Boosters tab as a button, and the explanation of
-Buckarooz opens from the balance itself — both were entries in a list of links
+Buckarooz opens from the balance itself - both were entries in a list of links
 before, one tap further from the thing they describe.
 
 Each screen carries a **?** that explains what it is for in three numbered
@@ -291,7 +291,7 @@ than the offer.
 A collection lives on an account, not on a phone. Sign in on a new build or a
 new device and everything comes back: cards, coins, level, boosters, settings.
 
-The backend is [Supabase](https://supabase.com) — Postgres with row-level
+The backend is [Supabase](https://supabase.com) - Postgres with row-level
 security and email/password auth. Rolling my own authentication would have
 meant storing passwords, which is not a thing to do casually or at all.
 
@@ -306,13 +306,13 @@ To point a build at a **different** project:
 1. Create one at supabase.com (the free tier is plenty).
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
    and run it. That creates the tables, the policies and the three functions,
-   and ends by telling PostgREST to reload its schema cache — without that
+   and ends by telling PostgREST to reload its schema cache - without that
    last step the API can answer "Could not find the table" for a while even
    though everything exists.
 3. Take the **Project URL** and the **publishable** key (`sb_publishable_...`)
    from **Project Settings → API** and put them in `.env.production`, which is
    what this repo does. To override it for one machine without committing, use
-   `.env.production.local` — Vite loads `.env`, `.env.local`, `.env.production`,
+   `.env.production.local` - Vite loads `.env`, `.env.local`, `.env.production`,
    `.env.production.local` in that order and the last one wins, so a plain
    `.env.local` will NOT override `.env.production`. `.env.example` is the
    template for either.
@@ -322,7 +322,7 @@ policy below, and the app has no need of it.
 
 Do not also pass these in as CI environment variables: Vite gives `process.env`
 precedence over `.env` files, so a variable set from an unset repository secret
-arrives as an empty string and silently blanks them out — which ships an APK
+arrives as an empty string and silently blanks them out - which ships an APK
 whose sign-in screen cannot work. The workflow greps the built bundle for the
 project URL and fails the build rather than publishing one of those.
 
@@ -334,8 +334,8 @@ from that:
 
 - **Turn off "Confirm email"** under **Authentication → Providers → Email**.
   Sign-up then hands you straight in. Leave it on and the app still behaves
-  correctly — it tells you to go and confirm, and creates the profile on your
-  first sign-in instead — but you have to open the link on the same device and
+  correctly - it tells you to go and confirm, and creates the profile on your
+  first sign-in instead - but you have to open the link on the same device and
   then come back, which is a poor first minute.
 - **Password reset is a link too.** It goes to the project's **Site URL**
   (Authentication → URL Configuration), which by default is `localhost`. Set it
@@ -356,7 +356,7 @@ Three tables:
 
 | table | what | who can read it |
 | --- | --- | --- |
-| `profiles` | username and the stats a friend sees | any signed-in player — this is what username search *is* |
+| `profiles` | username and the stats a friend sees | any signed-in player - this is what username search *is* |
 | `saves` | the whole save blob | **only its owner** |
 | `friendships` | one row per request | the two people in it |
 
@@ -364,7 +364,7 @@ A friend's cards do **not** come from reading their save row: nobody can read
 anyone else's. They come from `friend_cards()`, a `security definer` function
 that checks the friendship itself and returns the one key holding the
 collection. The wallet, the settings, the daily-gift record and the language
-are in the same blob and stay unreadable — which is the difference between
+are in the same blob and stay unreadable - which is the difference between
 "a friend can see your cards" and "a friend can see everything".
 
 Both functions pin `search_path` and are revoked from `public` before being
@@ -386,7 +386,7 @@ The local save stays authoritative while you play; the server is a copy.
 - **On sign-in**, the account's save replaces the device's. That is what makes
   a fresh install come up with the collection already in it. The one exception
   is an account with nothing stored yet, where the device's save is uploaded
-  instead of being thrown away — which is how a pre-account collection is
+  instead of being thrown away - which is how a pre-account collection is
   carried in.
 - **While playing**, every write to game state is noticed in one place
   (`writeJson` in `collection.js`, which every save goes through) and a push is
@@ -419,7 +419,7 @@ has something to open in ten minutes.
 
 They must not become the whole game, so the odds start heavily nerfed. Level 1
 multiplies each tier's weight by `0.55^rank`, which barely moves the expected
-value — commons dominate that — but makes an Artifact **42x scarcer**, one in
+value - commons dominate that - but makes an Artifact **42x scarcer**, one in
 28,000 rather than one in 667. The nerf is entirely at the top, which is where
 it belongs.
 
@@ -451,7 +451,7 @@ cap of **level 500** is around three million XP, or eighteen thousand boosters.
 
 Every level pays something: coins on most, a booster every fifth, a rarity
 booster every tenth, and coins plus a booster every twenty-fifth. The values
-are small next to the shop stipend on purpose — levelling sets a pace, it is
+are small next to the shop stipend on purpose - levelling sets a pace, it is
 not an income stream. Ten ranks (Newcomer through Encyclopedist) name where you
 are.
 
@@ -484,8 +484,8 @@ the way to get rich.
 This is the part that had to be right, so it is worth stating plainly.
 
 **You cannot get rich by churning boosters.** Selling a booster's entire
-contents returns a fixed fraction of what the booster cost — the same fraction
-at every tier — so sell-and-reinvest always leaks value instead of compounding:
+contents returns a fixed fraction of what the booster cost - the same fraction
+at every tier - so sell-and-reinvest always leaks value instead of compounding:
 
 ```
 sell value of a card  = 30% of its price
@@ -495,7 +495,7 @@ price of a booster    = its expected sell value ÷ 0.72
 A simulation of the obvious exploit (start with the starter kit, always buy the
 most expensive booster you can afford, open it, sell everything, repeat) goes
 broke in **100% of runs**, averaging 3.9 boosters before the money is gone. The
-measured return is ~0.80 at every tier — Common through Artifact — so no rung
+measured return is ~0.80 at every tier - Common through Artifact - so no rung
 of the ladder is a better deal than any other.
 
 A lucky Artifact can still pay for several packs. That is variance around a
@@ -517,15 +517,15 @@ fortune.
 ### The shop
 
 Stock is generated from the current two-hour window index, so it is stable
-across reloads and restocks on its own — no server involved. Each booster's
+across reloads and restocks on its own - no server involved. Each booster's
 size is rolled between 3 and 7 cards, and price scales with both size and tier
 automatically, because it is derived from the booster's own expected contents.
 
 Two shelves are always present: **Free every restock**, and **Boosters you
 built** if you have made any custom packs. The rest of the shop is five to
-seven shelves drawn from a pool of nine kinds — by tier, by subject, mixed,
+seven shelves drawn from a pool of nine kinds - by tier, by subject, mixed,
 cheap, jumbo, a two-subject matchup, one subject climbing the tiers, wildcards
-only, and a single-size bundle — so no two windows look quite alike.
+only, and a single-size bundle - so no two windows look quite alike.
 
 The free shelf is the anti-lockout guarantee: two three-card boosters,
 occasionally upgraded to a low tier. It runs on its own **four-hour** clock
@@ -560,7 +560,7 @@ Space, Physics, Nature, Animals, Plants, History, Philosophy, Celebrities,
 Quotes, Art, Cactus, Sport.
 
 The **Boosters** tab shows only the ones you own, with a count. Each carries a
-real photograph — its `hero` field names a Wikipedia article, and all 18 lead
+real photograph - its `hero` field names a Wikipedia article, and all 18 lead
 images are fetched in a single batched `pageimages` request. The drawn icon in
 `src/data/icons.js` is only the fallback for when that image is missing.
 
@@ -600,7 +600,7 @@ Name a game, book, film or show and Wiklodo builds a booster entirely out of
 that subject's **own wiki**. Searching Wikipedia for "Terraria" yields a
 handful of pages; the Terraria wiki has thousands.
 
-1. Normalise the input — `Terraria`, `terraria` and `TERRARIA` all collapse to
+1. Normalise the input - `Terraria`, `terraria` and `TERRARIA` all collapse to
    the same candidates, as do `The Legend of Zelda` → `legendofzelda`.
 2. Probe each guessed Fandom subdomain's `api.php`. In a non-English session
    the **language path** (`terraria.fandom.com/fr/api.php`) is tried first, so
@@ -624,7 +624,7 @@ all three are handled:
   180px wide is now treated as no thumbnail, and the URL is asked for a bigger
   version before it is believed.
 - **The picture list is led by chrome.** When `pageimages` is empty the app
-  asks what images the page actually *uses* — but that list is in page order,
+  asks what images the page actually *uses* - but that list is in page order,
   and the first image on a Fandom article is usually a nav icon or an infobox
   glyph. It now asks for each image's real dimensions, throws away anything
   too small, too thin or named like furniture, and takes the largest, which on
@@ -646,7 +646,7 @@ rather than magnifying it.
 
 ### Rarity
 
-Eight tiers. **Odds do not depend on the article** — a page with 100 views a
+Eight tiers. **Odds do not depend on the article** - a page with 100 views a
 month has exactly the same chance at every tier as one with 100k.
 
 | Tier | Chance | Price bonus | Visual treatment |
@@ -670,7 +670,7 @@ Two rules hold for every treatment, and both are enforced by tests:
 
 ### Money
 
-Prices are in **Buckarooz** (Ᏸ — a B wearing the two bars a dollar sign wears,
+Prices are in **Buckarooz** (Ᏸ - a B wearing the two bars a dollar sign wears,
 drawn as SVG). Popularity sets the **base price**; rarity is a **percentage on
 top**:
 
@@ -679,7 +679,7 @@ price = base(popularity) × (1 + rarity.bonusPct / 100)
 ```
 
 `base` runs from Ᏸ20 for an unread article to Ᏸ500 for a front-page-famous one.
-A Common and an Artifact of the same article share a base — the Artifact is
+A Common and an Artifact of the same article share a base - the Artifact is
 simply worth 33× more of it.
 
 The **balance button in the top bar** is also the explainer: tap it and a panel
@@ -692,7 +692,7 @@ would otherwise say so.
 
 ## Opening a booster
 
-**The rip.** No button, no pull-tab — the perforation line *is* the control.
+**The rip.** No button, no pull-tab - the perforation line *is* the control.
 Grab it near either end and slide; the foil parts in step with the drag behind
 a glowing tear front, revealing the pack's mouth and the card tops inside. Let
 go before 60% and it springs shut, complaining as it goes. Whichever direction
@@ -701,13 +701,13 @@ that way. Finish the tear and the torn scrap tumbles away under gravity.
 
 **No loading screen.** Cards start being fetched as soon as a booster reaches
 the middle of the shelf, and the opening animation runs on card *backs*, which
-need no data — so it begins the instant the pack tears. Cards fly up out of the
+need no data - so it begins the instant the pack tears. Cards fly up out of the
 pack's mouth one by one from *behind* it, while the pack sinks away, then
 settle into a stack. Card backs take the booster's own colours and icon.
 
 **The reveal.** The current card turns itself over. Swipe **right-to-left** for
 the next card and **left-to-right** to go back, freely. Tapping does not
-advance; holding and moving makes the card *lean* — it turns on its own axes
+advance; holding and moving makes the card *lean* - it turns on its own axes
 rather than sliding around. Pull order is **random**.
 
 **The summary.** Once every card has been turned, the single-card view is
@@ -740,8 +740,8 @@ Every pull is saved to localStorage and shows up in the **Collection** tab.
   ascending or descending, rarity, popularity or name.
 
 The **card detail sheet is built narrow-first** and only goes side-by-side at
-780px and up. It used to be the other way round — a row layout undone by a
-`max-width: 720px` query — which meant anything that made the layout viewport
+780px and up. It used to be the other way round - a row layout undone by a
+`max-width: 720px` query - which meant anything that made the layout viewport
 wider than 720px skipped the breakpoint entirely and a phone got the desktop
 layout: an 860px panel hanging off the side of a 400px screen. Building up
 rather than down means the narrow case is the one that cannot be missed.
@@ -776,7 +776,7 @@ never stops moving. Four brakes:
 - **The backdrop is governed hard.** It stops when the document is hidden, and
   it stops during a takeover, so the frame budget while cards are flying goes
   entirely to the cards. It renders at a capped pixel ratio, and at half
-  resolution on the themes whose look survives it — they are soft, blurred
+  resolution on the themes whose look survives it - they are soft, blurred
   fields, and nobody sees the difference at arm's length.
 - **Battery saver**, in Settings, paints one static backdrop frame and never
   runs the loop, stops the ambient motion everywhere, and drops the blurs.
@@ -795,7 +795,7 @@ The rest of the app pulls in the same direction: the theme's `--motion-scale`
 means Arcade's animations are less than half the length of Aurora's, so the
 snappiest theme is also the cheapest.
 
-Playtime is measured between visibility changes rather than by a stopwatch —
+Playtime is measured between visibility changes rather than by a stopwatch -
 a timer ticking once a second purely to add one to a number is exactly the sort
 of background work this should not be doing.
 
@@ -807,7 +807,7 @@ English and French, chosen on first launch and then **locked**.
 
 That is a deliberate limitation. Cards are stored with the text the wiki gave
 us, so re-translating a collection would mean re-fetching every card through
-langlinks — slow, lossy, and liable to fail halfway, leaving a binder in two
+langlinks - slow, lossy, and liable to fail halfway, leaving a binder in two
 languages. Locking keeps every card consistent with every other.
 
 The language decides which Wikipedia is queried, which search terms a booster
@@ -833,8 +833,8 @@ Above them sits the theme picker (see **Themes**).
 
 **Data → Transfer your save** turns everything you own into one block of text
 you can copy out and paste back. It is the only bridge across a reinstall or a
-move to another phone, and the format is deliberately dull — a JSON envelope
-with a version and the raw stored strings — because a save you cannot inspect
+move to another phone, and the format is deliberately dull - a JSON envelope
+with a version and the raw stored strings - because a save you cannot inspect
 is a save you cannot rescue by hand.
 
 Importing validates before it touches anything and replaces the whole save
@@ -854,7 +854,7 @@ is its own dialog.
   clearing site data wipes it. **Settings → Data → Transfer your save** is the
   manual way across, and on Android the system backup covers the rest.
 - **No cross-pack dedupe.** Titles are de-duplicated *within* one pack. Open
-  two Animals packs and you can pull Tardigrade twice — it becomes a `×2`.
+  two Animals packs and you can pull Tardigrade twice - it becomes a `×2`.
 - **Two languages**, English and French, chosen once and then locked.
 - **No trading, no accounts, no sync.** Everything is one browser.
 - **Rarity is not tied to the article.** It's an independent roll, so a stub
@@ -866,17 +866,17 @@ is its own dialog.
 
 ## Natural next steps
 
-- **Trading** — export a card (or a whole binder) as a share code, import
+- **Trading** - export a card (or a whole binder) as a share code, import
   someone else's.
-- **Daily goals** — a reason to open a specific subject, on top of the daily
+- **Daily goals** - a reason to open a specific subject, on top of the daily
   gift and the timed trickle.
-- **Set completion** — track which articles a pack *can* yield and show a
+- **Set completion** - track which articles a pack *can* yield and show a
   completion percentage per pack.
-- **Quiz mode** — the article extract is already on the card, so blank out the
+- **Quiz mode** - the article extract is already on the card, so blank out the
   title and make the player name it; scale the points by rarity.
-- **Duplicate handling** — a "shiny" upgrade path, or dust/crafting from
+- **Duplicate handling** - a "shiny" upgrade path, or dust/crafting from
   repeats.
-- **More packs** — the table makes this a one-row change; the interesting work
+- **More packs** - the table makes this a one-row change; the interesting work
   is finding categories with deep direct membership.
 
 ---

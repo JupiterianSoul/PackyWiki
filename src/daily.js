@@ -2,7 +2,7 @@
  * The daily gift board.
  *
  * Thirty slots. You claim one per calendar day, and you always claim the NEXT
- * UNCLAIMED slot — never the slot matching today's date. Miss a day and you
+ * UNCLAIMED slot - never the slot matching today's date. Miss a day and you
  * lose the day, not the gift: log in on Wednesday having skipped Tuesday and
  * you still get slot 2, not slot 3. Once all thirty are taken a fresh board is
  * generated, so the ladder never runs out.
@@ -47,7 +47,7 @@ export function msUntilNextDay(now = Date.now()) {
 /**
  * One slot's gift. `index` is 0-based within the board and `board` is how many
  * boards have already been completed, so gifts keep creeping up forever
- * without ever running away — the board bonus is capped.
+ * without ever running away - the board bonus is capped.
  */
 function giftFor(rng, index, board) {
   const day = index + 1;

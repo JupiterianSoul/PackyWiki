@@ -12,7 +12,7 @@
  *   - and the track is long. Levelling all ten takes 2,100 opened boosters,
  *     which at a realistic thirty to fifty a day is a couple of months.
  *
- * Levelling improves all three axes at once — odds, cap and speed — so the
+ * Levelling improves all three axes at once - odds, cap and speed - so the
  * track is felt rather than read.
  */
 import { RARITIES } from './data/rarities.js';

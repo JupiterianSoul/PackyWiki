@@ -1,7 +1,7 @@
 /**
  * EMBLEM LIBRARY
  * ============================================================================
- * One drawn illustration per subject. These are the app's own artwork — no
+ * One drawn illustration per subject. These are the app's own artwork - no
  * photographs: every booster face, card back and album cover is built from
  * the emblem of its category, tinted by the category's palette.
  *
@@ -426,7 +426,7 @@ export const EMBLEMS = {
 
 /**
  * The emblem for a custom pack: its subject's initial, cut into a faceted
- * seal. Deterministic — the letter and the seal's rotation come from the
+ * seal. Deterministic - the letter and the seal's rotation come from the
  * pack, so each custom pack keeps its own mark forever.
  */
 export function monogramEmblem(letter, spin = 0) {

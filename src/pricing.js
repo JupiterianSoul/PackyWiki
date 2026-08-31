@@ -1,7 +1,7 @@
 /**
  * Card pricing, in Buckarooz (Ᏸ).
  *
- * Popularity sets the BASE price — how many people actually read the article
+ * Popularity sets the BASE price - how many people actually read the article
  * each month. Rarity is then a percentage bonus on top of that base, so the
  * tier scales the card rather than replacing its value:
  *
@@ -50,7 +50,7 @@ export function priceFor(popularity, rarity) {
 
 export const CURRENCY_NAME = 'Buckarooz';
 
-/** Plain-text amount. The Ᏸ glyph itself is drawn as SVG — see icons.js. */
+/** Plain-text amount. The Ᏸ glyph itself is drawn as SVG - see icons.js. */
 export function formatAmount(price) {
   return Math.round(price).toLocaleString('en-US');
 }

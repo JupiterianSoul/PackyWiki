@@ -1,9 +1,9 @@
 /**
  * PACK STYLE ENGINE
  * ============================================================================
- * Every booster in the app wears the same design language — the Prism Foil
+ * Every booster in the app wears the same design language - the Prism Foil
  * bag: serrated crimps, metallic body, holographic interference bands, a
- * foil-stamped name — but no two categories wear it the same way. This module
+ * foil-stamped name - but no two categories wear it the same way. This module
  * is the single place that decides what a given pack is MADE of:
  *
  *   styleForSpec(spec) -> {
@@ -18,7 +18,7 @@
  * Subjects get a hand-picked identity below. Custom packs get a PROCEDURAL
  * one: their wiki's identity is hashed into a palette, a pattern with its own
  * parameters, a finish and a particle language, so every custom pack is
- * visually its own thing without a single stored byte — the same pack always
+ * visually its own thing without a single stored byte - the same pack always
  * regenerates the same look, on any device.
  */
 import { themeById } from './data/packs.js';
@@ -110,7 +110,7 @@ const P = {
     repeating-linear-gradient(45deg, rgba(255,255,255,${a}) 0 1.5px, transparent 1.5px ${13 * s}px),
     repeating-linear-gradient(-45deg, rgba(255,255,255,${a}) 0 1.5px, transparent 1.5px ${13 * s}px)`,
 
-  /** Facet lattice. Rarity boosters — a cut gem. */
+  /** Facet lattice. Rarity boosters - a cut gem. */
   facets: (s = 1, a = 0.14) => `
     repeating-linear-gradient(60deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${21 * s}px),
     repeating-linear-gradient(-60deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${21 * s}px),

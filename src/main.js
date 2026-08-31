@@ -1,5 +1,5 @@
 /**
- * WIKLODO — application shell.
+ * WIKLODO - application shell.
  * ============================================================================
  * This file owns the interface and nothing else. Every rule about what a
  * booster costs, what a card is worth, when a gift is due or how a level is
@@ -380,7 +380,7 @@ function updateBadges() {
  *
  * Everything you can go to, in one list. The bottom bar holds five; the app has
  * more than five places, and the ones that did not fit were previously hidden
- * behind a "More" heading on the Profile — which is a strange place to keep the
+ * behind a "More" heading on the Profile - which is a strange place to keep the
  * way to Settings.
  */
 
@@ -477,8 +477,8 @@ function closeDrawer() {
 
 /**
  * A persistent local feed for one-off events (a gift arrived, a trade was
- * answered), capped so it cannot grow forever. Live rows — friend requests,
- * unread chats, trades awaiting your answer — are derived fresh every time.
+ * answered), capped so it cannot grow forever. Live rows - friend requests,
+ * unread chats, trades awaiting your answer - are derived fresh every time.
  */
 function pushNote(icon, title, screen = 'friends') {
   const feed = state.profile.notifFeed ??= [];
@@ -574,7 +574,7 @@ function openNotifications() {
   markRead(list.map((n) => n.id));
 }
 
-/** "3 min ago", "2 days ago" — enough to place it, no more. */
+/** "3 min ago", "2 days ago" - enough to place it, no more. */
 function whenText(iso) {
   const at = Date.parse(iso ?? '');
   if (!Number.isFinite(at)) return '';
@@ -890,8 +890,8 @@ const currentTimedSpec = () => timedSpec(timedLevel(state.profile.timed.opened ?
  * FREE PACKS
  * ----------------------------------------------------------------------------
  * Rebuilt around the only two things anyone comes to this screen for: how many
- * are waiting, and when the next one lands. The dial answers both at once —
- * the number is the count, the ring is the fill towards the next — and the
+ * are waiting, and when the next one lands. The dial answers both at once -
+ * the number is the count, the ring is the fill towards the next - and the
  * pips give the cap a shape, so "5 of 7" is something you see before you read.
  *
  * The old screen led with a paragraph of rules and a pack sitting off-centre.
@@ -1228,8 +1228,8 @@ function payStipend() {
  *
  * The pack does not fade out; it ERUPTS. When the tear completes, the bag
  * snaps, a column of the pack's own light stands up out of the mouth, and the
- * subject's particles — checker confetti for F1, pages for Books, stars for
- * Space, whatever packstyle.js says this pack throws — blow outward. Then the
+ * subject's particles - checker confetti for F1, pages for Books, stars for
+ * Space, whatever packstyle.js says this pack throws - blow outward. Then the
  * cards climb out through the light.
  *
  * All of it is spawned into one layer over the stage and driven by custom
@@ -1372,7 +1372,7 @@ function setRip(progress) {
  *
  * The finger writes rip.target; this spring drags rip.progress after it. On
  * the way it catches on each unpopped snag: progress holds at the snag while
- * the finger keeps going, strain builds (the pack tilts and lifts — CSS reads
+ * the finger keeps going, strain builds (the pack tilts and lifts - CSS reads
  * --shear/--strain off the booster), and once the finger is far enough past,
  * the snag pops, the spring gets a kick, and the tear leaps forward. That
  * catch-and-release is the whole feel of the thing.
@@ -1629,7 +1629,7 @@ function openScreenFor(spec) {
  * The whole body runs inside a try/finally for one reason: `state.busy` used
  * to be cleared on the happy path and on the one handled error, so ANY other
  * throw left it set for the rest of the session. Nothing clears it again, and
- * every later open returns at the guard above — so no booster could be opened
+ * every later open returns at the guard above - so no booster could be opened
  * at all until the app was restarted, with the tear itself silently doing
  * nothing. A flag that gates the whole feature has to be released by the
  * language, not by remembering to.
@@ -2113,7 +2113,7 @@ function openSheet(title, build, { dismissible = true, onClose = null } = {}) {
 /** A face-up card with no back and no flip: summary, binder and detail. */
 function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = false } = {}) {
   // `lit` runs the tier's animations. Only the one card you are actually
-  // looking at (reveal, detail) earns it — a binder page of forty lit cards
+  // looking at (reveal, detail) earns it - a binder page of forty lit cards
   // is forty looping animations and a hot phone.
   const card = document.createElement('article');
   card.className = `card is-revealed${lit ? ' is-lit' : ''}`;
@@ -2139,7 +2139,7 @@ function openCardDetail(entryKey, data, rarity) {
 
   openSheet(data.title, (body) => {
     // The detail IS the card, blown up: same frame, same tier treatment,
-    // with the full text and the actions living inside it — not a small
+    // with the full text and the actions living inside it - not a small
     // card floating over a separate description.
     const card = document.createElement('article');
     card.className = 'card giant-card is-revealed is-lit';
@@ -2781,7 +2781,7 @@ function buildGateForm() {
   press(submit, { sound: null });
 
   // Email and password only. The username is its own step, after the account
-  // exists — see showNameGate().
+  // exists - see showNameGate().
   el.gateForm.replaceChildren(
     field('email', 'gateEmail', { type: 'email', icon: 'mail', autocomplete: 'email' }),
     field('password', 'gatePassword', {
@@ -2881,7 +2881,7 @@ async function gateAltAction() {
 /**
  * Step two of creating an account: take a username.
  *
- * Reached whenever a signed-in account has no profile — which is every new
+ * Reached whenever a signed-in account has no profile - which is every new
  * account, and also an older one whose chosen name was taken while its email
  * was being confirmed. There is no way past it but to pick a name or sign out,
  * because everything social is keyed on having one.
@@ -2952,7 +2952,7 @@ function currentStats() {
  *
  * Debounced hard: opening a booster writes storage half a dozen times in a
  * second, and every one of those is the same save a moment apart. A failure is
- * recorded and left for the next change or the next foreground to retry —
+ * recorded and left for the next change or the next foreground to retry -
  * losing a sync is survivable, and blocking the game on one is not.
  */
 async function flushSync() {
@@ -2988,7 +2988,7 @@ function syncSoon() {
  *
  * A friend request is the one thing in the app that happens without you doing
  * it, so waiting until you next open the Friends screen to find out is no use
- * — the bell would only ever be right by accident. One read a minute while the
+ * - the bell would only ever be right by accident. One read a minute while the
  * app is actually on screen is cheap, and it stops entirely in the background.
  */
 const SOCIAL_POLL = 60000;
@@ -3024,7 +3024,7 @@ async function resumeAccount() {
 
 /**
  * Sign in has happened. Pull the account's save over the local one, then start
- * the app on whatever that turns out to contain — which is what makes a fresh
+ * the app on whatever that turns out to contain - which is what makes a fresh
  * install on a new phone come up with the collection already in it.
  */
 async function enterApp() {
@@ -3188,7 +3188,7 @@ function personRow(profile, actions, { onOpen = null, note = null } = {}) {
  *
  * Names are escaped on the way into a toast. The database constrains a
  * username to letters, digits and underscores, so there is nothing to escape
- * in practice — but toast() takes markup, and a value that came off the
+ * in practice - but toast() takes markup, and a value that came off the
  * network should not be the one place that relies on a constraint holding.
  */
 async function socialAction(run, doneKey = null, vars = {}) {
@@ -3218,7 +3218,7 @@ async function loadFriends() {
 
 /**
  * The full social heartbeat: friendships, presence, post, trades, unread.
- * Runs on resume and once a minute. Every part is best-effort — a dead
+ * Runs on resume and once a minute. Every part is best-effort - a dead
  * network costs freshness, never state.
  */
 async function syncSocial() {
@@ -3240,7 +3240,7 @@ async function syncSocial() {
  * Claim everything in my postbox: gifted cards, gifted boosters, and the
  * goods side of accepted trades. Each item lands in the local save first and
  * is marked claimed second, so a crash in between duplicates rather than
- * destroys — the kinder failure.
+ * destroys - the kinder failure.
  */
 async function collectDeliveries() {
   const waiting = await account.pendingDeliveries(userId());
@@ -4564,7 +4564,7 @@ function accountRows() {
   });
 
   // A project still on the older schema cannot store a picture, a visibility
-  // or a presence — so rather than offering controls that fail on tap, say
+  // or a presence - so rather than offering controls that fail on tap, say
   // plainly what is missing and what fixes it. Changing your name works on
   // every schema, so that row always stays.
   if (!account.socialSchemaReady()) {
@@ -4801,7 +4801,7 @@ function handleReset(button) {
 }
 
 /**
- * Erase everything — including the copy on the server.
+ * Erase everything - including the copy on the server.
  *
  * Clearing only the device would erase nothing: the account's save would be
  * pulled straight back down on the next launch. The server goes first, so a
@@ -5318,7 +5318,7 @@ function init() {
  *
  * With a backend: nothing until there is a session, because the account is
  * what everything else is filed under. Without one, the app is exactly what it
- * was before accounts existed — local, and honest about it in Settings.
+ * was before accounts existed - local, and honest about it in Settings.
  */
 async function startSession() {
   if (!account.configured) {

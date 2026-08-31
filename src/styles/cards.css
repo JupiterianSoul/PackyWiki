@@ -1,6 +1,6 @@
 /* ==========================================================================
    CARDS
-   The card shell, the flip, the stack — and one visual treatment per rarity,
+   The card shell, the flip, the stack - and one visual treatment per rarity,
    each its own KIND of effect, not the same effect turned up.
 
    Two rules hold for every treatment:
@@ -49,7 +49,7 @@
 }
 
 /* ==========================================================================
-   THE BACK — ONE PER CATEGORY
+   THE BACK - ONE PER CATEGORY
    The pack's identity, folded onto a card: the same family construction,
    palette, foil pattern and drawn emblem the booster wears, scaled down.
    A face-down card says which shelf it came from and nothing else.
@@ -185,7 +185,7 @@
   color: color-mix(in srgb, var(--e1) 80%, transparent);
 }
 
-/* The frame: a thin double keyline that every back shares — the one thing
+/* The frame: a thin double keyline that every back shares - the one thing
    that says "same game" across eighteen different backs. */
 .cb-frame {
   position: absolute;
@@ -297,7 +297,7 @@
   text-overflow: ellipsis;
 }
 .card-extract {
-  /* flex: 0 1 auto, never flex: 1 — stretching a -webkit-box makes the
+  /* flex: 0 1 auto, never flex: 1 - stretching a -webkit-box makes the
      ellipsis land on the clamp line while the next line keeps painting. */
   flex: 0 1 auto;
   min-height: 0;
@@ -405,7 +405,7 @@
 }
 
 /* ==========================================================================
-   RARITY TREATMENTS — eight tiers, eight different KINDS of effect
+   RARITY TREATMENTS - eight tiers, eight different KINDS of effect
      1 common     matte print
      2 uncommon   a living mint edge
      3 rare       lacquered glass
@@ -416,7 +416,7 @@
      8 artifact   a relic awake
 
    DISCIPLINE: every animation in this section moves ONLY transform and
-   opacity. No animated filters, no animated gradients, no animated masks —
+   opacity. No animated filters, no animated gradients, no animated masks -
    those repaint the layer every frame and cook the phone. A layer is painted
    once and then slid, spun or faded by the compositor.
    ========================================================================== */
@@ -432,7 +432,7 @@
   pointer-events: none;
 }
 
-/* --- 1. COMMON — honest matte stock -------------------------------------- */
+/* --- 1. COMMON - honest matte stock -------------------------------------- */
 [data-rarity="common"] .card-front {
   background:
     linear-gradient(180deg,
@@ -447,7 +447,7 @@
   opacity: 0.6;
 }
 
-/* --- 2. UNCOMMON — a living mint edge ------------------------------------- */
+/* --- 2. UNCOMMON - a living mint edge ------------------------------------- */
 [data-rarity="uncommon"] .fx-ring::before {
   background: conic-gradient(
     transparent 0turn 0.82turn,
@@ -467,7 +467,7 @@
   opacity: 0.8;
 }
 
-/* --- 3. RARE — lacquered glass -------------------------------------------- */
+/* --- 3. RARE - lacquered glass -------------------------------------------- */
 /* One clean gloss bar crosses the art, rests, and crosses again. */
 [data-rarity="rare"] .fx-art::before {
   content: '';
@@ -504,7 +504,7 @@
   50% { opacity: 1; transform: rotate(45deg) scale(1.35); }
 }
 
-/* --- 4. EPIC — charged energy --------------------------------------------- */
+/* --- 4. EPIC - charged energy --------------------------------------------- */
 [data-rarity="epic"] .fx-a {
   background:
     radial-gradient(70% 55% at 20% 8%, color-mix(in srgb, var(--rarity) 34%, transparent), transparent 70%),
@@ -547,9 +547,9 @@
   50% { opacity: 0.55; transform: scale(1.06); }
 }
 
-/* --- 5. LEGENDARY — gilded radiance --------------------------------------- */
+/* --- 5. LEGENDARY - gilded radiance --------------------------------------- */
 /* The sunburst is a square, dead-centred in the art window, spinning about
-   its own middle — the beams pivot in place instead of wandering. */
+   its own middle - the beams pivot in place instead of wandering. */
 [data-rarity="legendary"] .fx-art::before {
   content: '';
   position: absolute;
@@ -615,7 +615,7 @@
   color: transparent;
 }
 
-/* --- 6. MYTHIC — molten fire ----------------------------------------------- */
+/* --- 6. MYTHIC - molten fire ----------------------------------------------- */
 [data-rarity="mythic"] .card-front {
   background:
     radial-gradient(120% 60% at 50% 108%, color-mix(in srgb, var(--rarity) 42%, transparent), transparent 60%),
@@ -669,7 +669,7 @@
   50% { opacity: 0.62; }
 }
 
-/* --- 7. EXOTIC — dimensional holofoil -------------------------------------- */
+/* --- 7. EXOTIC - dimensional holofoil -------------------------------------- */
 /* A wide rainbow sheet slides over the art diagonally: painted once, moved
    by the compositor. */
 [data-rarity="exotic"] .fx-art { overflow: hidden; }
@@ -709,7 +709,7 @@
   color: transparent;
 }
 
-/* --- 8. ARTIFACT — a relic awake ------------------------------------------- */
+/* --- 8. ARTIFACT - a relic awake ------------------------------------------- */
 [data-rarity="artifact"] .card-front {
   background:
     radial-gradient(120% 70% at 50% 0%, rgba(254, 240, 138, 0.14), transparent 55%),
@@ -806,7 +806,7 @@ html[data-lowpower='1'] .fx-c { animation: none !important; }
 /* --- the giant card (the detail view) --------------------------------------
    The same card, at full width and natural height: the faces stop being
    absolutely stacked so the content sets the size, the art keeps a wide
-   ratio, and the type — in container units — scales up with it. */
+   ratio, and the type - in container units - scales up with it. */
 
 .giant-card {
   width: 100%;

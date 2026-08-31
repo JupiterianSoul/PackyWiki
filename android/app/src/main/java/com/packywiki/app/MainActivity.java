@@ -81,7 +81,7 @@ public class MainActivity extends Activity {
                 if (APP_HOST.equals(url.getHost())) {
                     return false;
                 }
-                // "Read →" points at wikipedia.org — hand it to the browser
+                // "Read →" points at wikipedia.org - hand it to the browser
                 // rather than navigating away from the app.
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, url));

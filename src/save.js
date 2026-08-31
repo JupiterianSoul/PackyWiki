@@ -2,14 +2,14 @@
  * SAVE TRANSFER
  * ============================================================================
  * Everything the player has lives in this device's localStorage, which is tied
- * to the app install. Reinstalling — or moving to another phone — loses it.
+ * to the app install. Reinstalling - or moving to another phone - loses it.
  *
  * This turns the whole save into one block of text that can be copied out and
  * pasted back. It is the only bridge across an uninstall, and the only way to
  * move a collection between devices.
  *
  * The format is deliberately dull: a JSON envelope with a version, a
- * timestamp and the raw stored strings. No compression, no encoding tricks —
+ * timestamp and the raw stored strings. No compression, no encoding tricks -
  * a save you cannot inspect is a save you cannot rescue by hand when
  * something goes wrong with it.
  */
@@ -37,8 +37,8 @@ const VERSION = 1;
  * Everything that writes game state calls touch(); a listener decides what to
  * do about it (in practice: debounce, then push).
  *
- * The alternative — calling a sync function from each of the thirty-odd places
- * that write state — is one missed call site away from silently not syncing.
+ * The alternative - calling a sync function from each of the thirty-odd places
+ * that write state - is one missed call site away from silently not syncing.
  */
 const listeners = new Set();
 

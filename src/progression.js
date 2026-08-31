@@ -9,7 +9,7 @@
  * The curve is deliberately long. Level 500 is an endgame number: at the
  * average of ~33 XP per card it takes on the order of eighteen thousand
  * boosters, so the last levels are years of casual play rather than a weekend.
- * Early levels are quick — the first booster nearly finishes level 1 — because
+ * Early levels are quick - the first booster nearly finishes level 1 - because
  * the point of the first hour is to feel the system working.
  */
 import { RARITIES, rarityRank } from './data/rarities.js';
@@ -59,7 +59,7 @@ export const rankFor = (level) =>
 /**
  * What level `level` pays out. Every level gives something; the shape varies
  * so the ladder has texture, but the value stays modest next to the shop
- * stipend — levelling is a pace-setter, not an income stream.
+ * stipend - levelling is a pace-setter, not an income stream.
  */
 export function rewardForLevel(level) {
   const coins = Math.round((90 + level * 11) / 5) * 5;

@@ -4,7 +4,7 @@
  * The choice is made once, in the first-run dialog, and then locked. That is a
  * deliberate limitation rather than an oversight: cards are stored with the
  * text the wiki gave us, and re-translating a whole collection would mean
- * re-fetching every card through langlinks — slow, lossy, and liable to fail
+ * re-fetching every card through langlinks - slow, lossy, and liable to fail
  * halfway. Locking keeps every card in the binder consistent with every other.
  *
  * The language decides which Wikipedia is queried, which search terms a pack
@@ -186,7 +186,7 @@ const STRINGS = {
     notifGiftBooster: '{name} sent you a booster!',
     notifGiftCard: '{name} gave you {card}!',
     notifTradeDone: 'Trade with {name} completed',
-    notifTradeDeclined: '{name} declined your trade — your cards are back',
+    notifTradeDeclined: '{name} declined your trade. Your cards are back',
     friendSomeone: 'A friend',
     friendOnline: 'Online',
     friendOffline: 'Offline',
@@ -244,7 +244,7 @@ const STRINGS = {
     presence_hidden: 'Appear offline',
         authSchemaOld: 'Your database needs updating for this. Re-run supabase/schema.sql in the Supabase SQL editor.',
     schemaOldTitle: 'Database needs updating',
-    schemaOldNote: 'Chat, trading, gifts, profile pictures and online status need the newer database. Re-run supabase/schema.sql in your Supabase SQL editor — friends and everything else keep working meanwhile.',
+    schemaOldNote: 'Chat, trading, gifts, profile pictures and online status need the newer database. Re-run supabase/schema.sql in your Supabase SQL editor. Friends and everything else keep working meanwhile.',
     achTitle: 'Achievements',
     achSub: '{done} of {total} unlocked. Redeem the finished ones for rewards.',
     achRedeem: 'Redeem',
@@ -444,7 +444,7 @@ const STRINGS = {
 
     // free packs (the tab formerly called Timed)
     freeOf: 'of {max}',
-    freeFull: 'Full — open one to start the clock',
+    freeFull: 'Full. Open one to start the clock',
     freeNextIn: 'Next one in {time}',
     freeFoot: '{cards} cards each, and one arrives every {minutes} minutes whether the app is open or not.',
     freeTrackLabel: 'Track',
@@ -482,7 +482,7 @@ const STRINGS = {
     help_timed_title: 'Free packs',
     help_timed_lead: 'A small pack builds up on its own, so you always have something to open.',
     help_timed_1: 'One arrives *every few minutes*, whether or not the app is open.',
-    help_timed_2: 'They *stack up to a limit*, so a day away is not wasted — but a week away is.',
+    help_timed_2: 'They *stack up to a limit*, so a day away is not wasted, but a week away is.',
     help_timed_3: 'Opening them *levels the track*, which makes them faster, hold more, and pull better.',
     help_timed_tip: 'The odds start well below a bought pack. That is on purpose: these are a floor, not a shortcut.',
 
@@ -497,7 +497,7 @@ const STRINGS = {
     help_binder_lead: 'Every card you have ever pulled, in one place.',
     help_binder_1: '*Tap a card* to read the article, favourite it, or sell it.',
     help_binder_2: 'Use *Filters* to narrow by pack, rarity, price or popularity.',
-    help_binder_3: 'Selling a duplicate returns *part of its value* — enough to keep you moving.',
+    help_binder_3: 'Selling a duplicate returns *part of its value*, enough to keep you moving.',
     help_binder_tip: 'A duplicate keeps the best rarity you have pulled for that article.',
 
     help_friends_title: 'Friends',
@@ -666,7 +666,7 @@ const STRINGS = {
     notifGiftBooster: '{name} vous a envoyé un booster !',
     notifGiftCard: '{name} vous a donné {card} !',
     notifTradeDone: 'Échange avec {name} terminé',
-    notifTradeDeclined: '{name} a refusé votre échange — vos cartes sont de retour',
+    notifTradeDeclined: '{name} a refusé votre échange. Vos cartes sont de retour',
     friendSomeone: 'Un ami',
     friendOnline: 'En ligne',
     friendOffline: 'Hors ligne',
@@ -724,7 +724,7 @@ const STRINGS = {
     presence_hidden: 'Paraître hors ligne',
         authSchemaOld: 'Votre base de données doit être mise à jour. Relancez supabase/schema.sql dans l’éditeur SQL Supabase.',
     schemaOldTitle: 'Base de données à mettre à jour',
-    schemaOldNote: 'Le chat, les échanges, les cadeaux, les photos de profil et le statut en ligne nécessitent la nouvelle base. Relancez supabase/schema.sql dans l’éditeur SQL Supabase — les amis et le reste continuent de fonctionner.',
+    schemaOldNote: 'Le chat, les échanges, les cadeaux, les photos de profil et le statut en ligne nécessitent la nouvelle base. Relancez supabase/schema.sql dans l’éditeur SQL Supabase. Les amis et le reste continuent de fonctionner.',
     achTitle: 'Succès',
     achSub: '{done} sur {total} débloqués. Récupérez les récompenses des succès terminés.',
     achRedeem: 'Récupérer',
@@ -918,7 +918,7 @@ const STRINGS = {
     notifDaysAgo: 'il y a {n} j',
 
     freeOf: 'sur {max}',
-    freeFull: 'Plein — ouvrez-en un pour relancer le compteur',
+    freeFull: 'Plein. Ouvrez-en un pour relancer le compteur',
     freeNextIn: 'Prochain dans {time}',
     freeFoot: '{cards} cartes chacun, et il en arrive un toutes les {minutes} minutes, que l’application soit ouverte ou non.',
     freeTrackLabel: 'Progression',
@@ -968,7 +968,7 @@ const STRINGS = {
     help_binder_lead: 'Toutes les cartes que vous avez tirées, au même endroit.',
     help_binder_1: '*Touchez une carte* pour lire l’article, la mettre en favori ou la vendre.',
     help_binder_2: 'Les *Filtres* permettent de trier par pack, rareté, prix ou popularité.',
-    help_binder_3: 'Vendre un doublon rend *une partie de sa valeur* — de quoi repartir.',
+    help_binder_3: 'Vendre un doublon rend *une partie de sa valeur*, de quoi repartir.',
     help_binder_tip: 'Un doublon conserve la meilleure rareté que vous avez tirée pour cet article.',
 
     help_friends_title: 'Amis',
@@ -994,7 +994,7 @@ export function storedLanguage() {
 }
 
 /**
- * A guess for the strings shown BEFORE the choice is made — the account gate
+ * A guess for the strings shown BEFORE the choice is made - the account gate
  * and the language dialog itself. It is never stored, so the choice is still
  * the player's; it only stops a French phone being greeted in English.
  */
@@ -1009,7 +1009,7 @@ export function getLanguage() {
   return current;
 }
 
-/** Locked after the first choice — see the note at the top of this file. */
+/** Locked after the first choice - see the note at the top of this file. */
 export function setLanguage(id) {
   if (!LANGUAGES.some((l) => l.id === id)) return getLanguage();
   current = id;

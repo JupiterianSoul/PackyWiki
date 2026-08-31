@@ -173,7 +173,7 @@
 }
 
 /* --- free packs ---------------------------------------------------------------
-   Rebuilt around one question — how many have I got, and when is the next?
+   Rebuilt around one question - how many have I got, and when is the next?
    The dial answers both at once: the number in the middle, the ring filling
    towards the one that is coming. The pips under it give the cap a shape, so
    "5 of 7" is something you see rather than read. */
@@ -443,7 +443,7 @@
 
 /*
  * The summary is a glance, not a read: two to a row so each card is big enough
- * to recognise, carrying only the three things you compare across a pack —
+ * to recognise, carrying only the three things you compare across a pack -
  * what it is, how rare, what it is worth. The article text, the readership and
  * the category are one tap away in the card itself.
  */

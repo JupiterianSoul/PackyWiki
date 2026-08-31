@@ -21,7 +21,7 @@ import {
 } from './economy.js';
 import { specId } from './booster.js';
 
-/** Deterministic PRNG — same window, same shop, on every device and reload. */
+/** Deterministic PRNG - same window, same shop, on every device and reload. */
 function seeded(seed) {
   let a = (seed >>> 0) + 0x6d2b79f5;
   return () => {
@@ -92,7 +92,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
   };
 
   // THE SPOTLIGHT: one booster, a real discount. The discount is safe by
-  // construction — even at 25% off, opening and selling still loses money.
+  // construction - even at 25% off, opening and selling still loses money.
   const featSpec = {
     kind: 'theme',
     themeId: pick(rng, THEME_PACKS).id,
@@ -160,7 +160,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
   vault.sort((a, b) => rarityRank(a.rarity.id) - rarityRank(b.rarity.id));
 
   // YOUR PACKS: everything the player has built, always buyable. Custom
-  // boosters were free once, which was an obvious hole — build, open, sell,
+  // boosters were free once, which was an obvious hole - build, open, sell,
   // repeat. They cost like anything else now.
   const customs = [];
   for (const pack of customPacks.slice(0, 8)) {
@@ -171,7 +171,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
   return { featured, free, subjects, vault, customs };
 }
 
-/** "1h 24m" — how long until the shelves change. */
+/** "1h 24m" - how long until the shelves change. */
 export function formatCountdown(ms) {
   const total = Math.max(0, Math.floor(ms / 1000));
   const hours = Math.floor(total / 3600);

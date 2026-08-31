@@ -1,5 +1,5 @@
 -- ============================================================================
--- WIKLODO — database schema
+-- WIKLODO - database schema
 -- ============================================================================
 -- Run this once, whole, in your Supabase project's SQL editor
 -- (Dashboard -> SQL Editor -> New query -> paste -> Run).
@@ -21,8 +21,8 @@
 -- --- profiles ---------------------------------------------------------------
 --
 -- Usernames are plain text with a unique index on lower(username), rather than
--- the citext extension. Same effect — one person may hold "Ada" and nobody
--- else may hold "ada" — with nothing to install, so this script cannot fail on
+-- the citext extension. Same effect - one person may hold "Ada" and nobody
+-- else may hold "ada" - with nothing to install, so this script cannot fail on
 -- an extension the project will not grant.
 
 create table if not exists public.profiles (
@@ -256,7 +256,7 @@ create trigger saves_touch before update on public.saves
 notify pgrst, 'reload schema';
 
 -- ============================================================================
--- V2 — social: visibility, presence, avatars, chat, trades, gifts
+-- V2 - social: visibility, presence, avatars, chat, trades, gifts
 -- ============================================================================
 -- Everything below is idempotent; re-run the whole file freely.
 

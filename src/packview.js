@@ -2,7 +2,7 @@
  * PACK VIEW
  * ============================================================================
  * Builds the DOM for one Prism Foil booster. Pulled out of main.js so the
- * same element — the exact one the app opens — can be rendered by the dev
+ * same element - the exact one the app opens - can be rendered by the dev
  * gallery (gallery.html) without dragging the whole controller in.
  *
  * The caller owns everything that needs the app around it: fetching the pack
@@ -78,7 +78,7 @@ export function buildPackElement(spec, { interactive = false, size = '' } = {}) 
 /**
  * The back of a card from this pack. Every category's cards wear their own
  * back: the pack's family construction, palette, foil pattern and emblem,
- * scaled down to card size — so a face-down card already says where it came
+ * scaled down to card size - so a face-down card already says where it came
  * from, without giving anything about the pull away.
  */
 export function buildCardBack(spec) {

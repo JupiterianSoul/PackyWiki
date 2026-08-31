@@ -44,21 +44,21 @@ export const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/;
  * Turn whatever the server said into something a player can act on. Supabase
  * messages are accurate but written for developers.
  *
- * Returns a string key, or NULL when the message is not one this knows — the
+ * Returns a string key, or NULL when the message is not one this knows - the
  * caller then shows what the server actually said. That matters more than it
  * sounds: a guess dressed up as an explanation sends you looking in the wrong
  * place, and "this does not look like an email address" is a very confident
  * thing to say about an address that is fine.
  *
  * Each test is therefore as narrow as the message allows, and the order is
- * deliberate — "Email rate limit exceeded" is about the rate limit, not the
+ * deliberate - "Email rate limit exceeded" is about the rate limit, not the
  * address, so the broader tests come last.
  */
 export function readableError(error) {
   const raw = String(error?.message ?? error ?? '').toLowerCase();
   if (!raw) return 'authUnknown';
 
-  // The project IS set up — it is just running the older schema, which is a
+  // The project IS set up - it is just running the older schema, which is a
   // different problem with a different fix (re-run schema.sql), and saying
   // "not set up yet" about a working database sends the owner nowhere.
   if (raw.includes(SCHEMA_OUTDATED.toLowerCase())) return 'authSchemaOld';
@@ -110,7 +110,7 @@ export async function signIn(email, password) {
  *
  * The username is claimed afterwards, as its own step, because the two are
  * different kinds of question: one is credentials, the other is identity in
- * the game. It also removes a failure mode — a name taken between typing it
+ * the game. It also removes a failure mode - a name taken between typing it
  * and submitting no longer wastes the whole form.
  *
  * An account therefore exists for a moment with no profile. That is the same
@@ -164,7 +164,7 @@ export async function getProfile(userId) {
  * Create the profile row if this account has not got one yet.
  *
  * Returns null rather than throwing when there is no name to use, or when the
- * wanted name has been taken since sign-up — both are recoverable by asking
+ * wanted name has been taken since sign-up - both are recoverable by asking
  * the player for a different one, which is what the gate does.
  */
 export async function ensureProfile(userId, username = null) {
@@ -224,7 +224,7 @@ export async function pushSave(userId) {
  *
  * "Erase everything" has to reach the server or it erases nothing: the local
  * save would be wiped and then pulled straight back down on the next sign-in.
- * An empty blob fails parseSave() on the way back, which is exactly right —
+ * An empty blob fails parseSave() on the way back, which is exactly right -
  * syncOnLogin treats it as an account with nothing stored and uploads whatever
  * the player starts over with.
  */
@@ -252,7 +252,7 @@ export async function fetchSave(userId) {
  * Sign-in is required, so the account is authoritative: whatever is on the
  * server replaces what is on the device. The one exception is a brand new
  * account with nothing stored yet, where the local save is uploaded instead of
- * being thrown away — that is what carries a pre-account collection in.
+ * being thrown away - that is what carries a pre-account collection in.
  */
 export async function syncOnLogin(userId) {
   const remote = await fetchSave(userId);
@@ -268,7 +268,7 @@ export async function syncOnLogin(userId) {
  *
  * The social release (chat, trades, gifts, presence, avatars) added columns
  * to `profiles` and three new tables. A project running the older schema is
- * a normal state — the owner has not re-run schema.sql yet — and it must NOT
+ * a normal state - the owner has not re-run schema.sql yet - and it must NOT
  * take the friends list down with it.
  *
  * So the shape of the database is DETECTED rather than assumed: the first
@@ -340,7 +340,7 @@ async function readProfiles(baseCols, build) {
 
 /**
  * Run a read against one of the v2 tables. A missing table is not an error
- * here — it is an answer: this project has nothing to report yet.
+ * here - it is an answer: this project has nothing to report yet.
  */
 async function readSocialTable(run, empty) {
   if (socialTables === false) return empty;
@@ -467,7 +467,7 @@ export const hasPresence = (profile) => Boolean(profile) && 'presence' in profil
 
 /**
  * Whether a friend counts as online right now. Returns null when the
- * database cannot say — which is not the same as "offline", and the UI shows
+ * database cannot say - which is not the same as "offline", and the UI shows
  * nothing rather than claiming everyone is away.
  */
 export function isOnline(profile) {
@@ -497,7 +497,7 @@ export async function changeUsername(userId, username) {
   return data;
 }
 
-/** Visibility, presence switch, avatar — the player's own row only. */
+/** Visibility, presence switch, avatar - the player's own row only. */
 export async function updateProfileFields(userId, fields) {
   return writeSocial(async () => {
     const { error } = await supabase.from('profiles').update(fields).eq('id', userId);

@@ -302,7 +302,7 @@ class Synth {
 
   /**
    * Synthwave: two saws detuned against each other, a sine sub an octave
-   * down, and a slow filter sweep — the fat analogue stack under every
+   * down, and a slow filter sweep - the fat analogue stack under every
    * 1984 sunset. The vibrato arrives late, like a hand reaching for the
    * mod wheel.
    */
@@ -345,7 +345,7 @@ class Synth {
   }
 
   /**
-   * Keys: a felt piano — triangle body, a sine an octave up fading faster,
+   * Keys: a felt piano - triangle body, a sine an octave up fading faster,
    * a soft thump underneath, everything through its own gentle lowpass.
    * Warm, round, incapable of harshness. Noir speaks in this now.
    */
@@ -429,7 +429,7 @@ class Synth {
 
   /* --- the app's vocabulary ---------------------------------------------- */
 
-  /** Any press. The smallest sound in the app, and the most frequent —
+  /** Any press. The smallest sound in the app, and the most frequent -
    *  so it is never exactly the same twice: the degree wanders between
    *  three chord tones and the gain breathes a little. */
   playTap() {
@@ -540,7 +540,7 @@ class Synth {
   }
 
   /**
-   * A snag in the foil letting go — the weld the tear was caught on popping
+   * A snag in the foil letting go - the weld the tear was caught on popping
    * loose. Louder and snappier than a tick, so the catch-and-release of the
    * drag reads through the speaker as well as the finger.
    */

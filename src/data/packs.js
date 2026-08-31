@@ -5,7 +5,7 @@
  * search queries: a booster has to pull French articles when the app is in
  * French, not English ones with French chrome around them.
  *
- * queries — used verbatim as the search API's `srsearch`, so a row can mix:
+ * queries - used verbatim as the search API's `srsearch`, so a row can mix:
  *
  *     'incategory:"Sports cars"'   only DIRECT members of that category
  *     'sports car model'           ordinary full-text search
@@ -15,8 +15,8 @@
  * travel between languages far better than category names do, which is why the
  * French lists lean on them.
  *
- * hero  — the article whose lead photograph becomes the booster's pack art.
- * icon  — key in src/data/icons.js, used only when that photo is unavailable.
+ * hero  - the article whose lead photograph becomes the booster's pack art.
+ * icon  - key in src/data/icons.js, used only when that photo is unavailable.
  */
 
 export const THEME_PACKS = [

@@ -5,7 +5,7 @@
  * churning boosters.** Selling a booster's entire contents returns a fixed
  * fraction of what the booster cost, whatever tier it was, so the
  * sell-buy-bigger-sell loop always leaks value instead of compounding. A lucky
- * Artifact can still pay for several packs — that's the thrill — but it is
+ * Artifact can still pay for several packs - that's the thrill - but it is
  * variance around a losing mean, not a strategy.
  *
  * Concretely:
@@ -28,7 +28,7 @@ export const RETURN_RATE = 0.72;
 /**
  * Assumed popularity of a typical draw from an untiered pack, used to price
  * boosters before we know which articles they'll contain. Real pulls vary
- * around it — that variance is the gambling texture — but prices stay
+ * around it - that variance is the gambling texture - but prices stay
  * predictable.
  */
 const TYPICAL_POP = 0.56;
@@ -87,7 +87,7 @@ export const sellPriceFor = (price) => Math.max(1, Math.round(price * SELL_RATE)
 /** The shop restocks on this cadence, and pays a stipend each time. */
 export const REFRESH_MS = 2 * 60 * 60 * 1000;
 
-/** Credited once per elapsed restock, so time — not grinding — is the income. */
+/** Credited once per elapsed restock, so time - not grinding - is the income. */
 export const STIPEND = 500;
 
 /** Stipends stop accruing past this many missed restocks. */
@@ -109,8 +109,8 @@ export const STARTER_PACK_CARDS = 5;
 /**
  * The shop always carries something free, so a player with an empty wallet is
  * never stuck. Two small boosters a window is worth roughly 230 Buckarooz if
- * you sell every card — under half a single stipend, and under a tenth of what
- * a day of stipends pays — so it is a floor, not a faucet.
+ * you sell every card - under half a single stipend, and under a tenth of what
+ * a day of stipends pays - so it is a floor, not a faucet.
  */
 export const FREE_SLOTS = 2;
 export const FREE_CARDS = 3;
@@ -119,7 +119,7 @@ export const FREE_CARDS = 3;
  * The free shelf runs on its own, slower clock than the rest of the shop: the
  * shelves rotate every two hours, but a free booster comes round every four.
  * Its contents therefore sit still through one restock before changing, which
- * is deliberate — you can see what is coming, and the shop turning over does
+ * is deliberate - you can see what is coming, and the shop turning over does
  * not hand out another one.
  */
 export const FREE_REFRESH_MS = 4 * 60 * 60 * 1000;

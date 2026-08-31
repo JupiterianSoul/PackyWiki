@@ -130,7 +130,7 @@ class Backdrop {
   /* --- renderers --------------------------------------------------------- */
 
   /**
-   * AURORA — slow ribbons of light folding over a deep field. Each ribbon is
+   * AURORA - slow ribbons of light folding over a deep field. Each ribbon is
    * a vertical gradient stroked along a sine path whose phase, amplitude and
    * frequency all drift at different rates, so the pattern never repeats.
    */
@@ -191,7 +191,7 @@ class Backdrop {
   }
 
   /**
-   * PAPER — a warm sheet with fibre flecks and two faint ruled lines that
+   * PAPER - a warm sheet with fibre flecks and two faint ruled lines that
    * drift so slowly you only notice if you stare. The flecks are generated
    * once and reused; regenerating them every frame would be both slower and
    * visually wrong, because paper does not shimmer.
@@ -241,7 +241,7 @@ class Backdrop {
   }
 
   /**
-   * ARCADE — a receding grid horizon under scanlines. The grid lines are
+   * ARCADE - a receding grid horizon under scanlines. The grid lines are
    * spaced by a power curve so they bunch up towards the horizon the way a
    * perspective floor does, and the whole field scrolls towards the viewer.
    */
@@ -297,7 +297,7 @@ class Backdrop {
   }
 
   /**
-   * NOIR — a dark room with one light. A slow drifting light leak, a hard
+   * NOIR - a dark room with one light. A slow drifting light leak, a hard
    * vignette, and film grain re-scattered every few frames rather than every
    * frame, because real grain flickers at about twelve frames a second.
    */
@@ -377,7 +377,7 @@ class Backdrop {
   }
 
   /**
-   * SUNSET '84 — a neon horizon: banded sun sinking behind a perspective
+   * SUNSET '84 - a neon horizon: banded sun sinking behind a perspective
    * grid that rolls slowly toward the viewer, purple sky above.
    */
   #sunset(ctx, w, h, t) {

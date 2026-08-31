@@ -77,7 +77,7 @@ jobs:
           path: wiklodo-debug.apk
           if-no-files-found: error
 
-      # A release asset gives a direct, tappable .apk link — an artifact only
+      # A release asset gives a direct, tappable .apk link - an artifact only
       # downloads as a zip, which is awkward on a phone.
       - name: Publish to the rolling "apk-latest" release
         env:
@@ -86,12 +86,12 @@ jobs:
           gh release delete apk-latest --yes --cleanup-tag || true
           gh release create apk-latest wiklodo-debug.apk \
             --target "$GITHUB_SHA" \
-            --title "Wiklodo — latest debug APK" \
+            --title "Wiklodo - latest debug APK" \
             --notes "Sideloadable debug build of \`$GITHUB_SHA\`.
 
           **Install:** download \`wiklodo-debug.apk\` below, tap it, and allow
           your browser to install unknown apps when prompted.
 
           Debug-signed, so if an existing Wiklodo install refuses to update,
-          uninstall it first. Needs a network connection — cards are fetched
+          uninstall it first. Needs a network connection - cards are fetched
           live from Wikipedia."

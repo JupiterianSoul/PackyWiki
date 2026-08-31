@@ -7,7 +7,7 @@
  *   profile     first-run state and the last stipend paid
  *
  * Duplicates are kept as a copy count rather than separate entries, and the
- * stored rarity is always the BEST pull of that article — pulling Tardigrade
+ * stored rarity is always the BEST pull of that article - pulling Tardigrade
  * again as a Legendary upgrades the entry.
  */
 import { rarityRank } from './data/rarities.js';
@@ -121,7 +121,7 @@ export function recordPulls(collection, pulls, spec) {
 
 /**
  * One-time cleanup: every card must carry a picture now, and draws enforce
- * it — this sweeps out the pictureless cards players already own. Their
+ * it - this sweeps out the pictureless cards players already own. Their
  * copies are simply removed (they were the cards nobody wanted to look at).
  * Returns how many entries were dropped.
  */
@@ -347,7 +347,7 @@ export function recordOpening(profile, pulls) {
 }
 
 /**
- * Playtime, accumulated in chunks rather than continuously — a timer running
+ * Playtime, accumulated in chunks rather than continuously - a timer running
  * every second just to count seconds is exactly the kind of thing that warms
  * a phone up for nothing.
  */
