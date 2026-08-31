@@ -19,6 +19,7 @@ import {
 import { emptyDaily } from './daily.js';
 import { emptyTimed, accrue } from './timed.js';
 import { t } from './i18n.js';
+import { touch } from './save.js';
 
 /*
  * The storage keys keep the old `packywiki.` prefix after the rename to
@@ -45,6 +46,9 @@ function readJson(key, fallback) {
 function writeJson(key, value) {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    // Every write to game state passes through here, which makes it the one
+    // place cloud sync has to be told about a change.
+    touch();
     return true;
   } catch {
     return false;

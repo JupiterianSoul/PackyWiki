@@ -146,6 +146,70 @@
           <div class="settings-list" id="profile-links"></div>
         </section>
 
+        <!-- FRIENDS ------------------------------------------------------------ -->
+        <section id="screen-friends" class="screen">
+          <div class="screen-head">
+            <h2 id="friends-title"></h2>
+            <p id="friends-intro"></p>
+          </div>
+
+          <form id="find" class="find panel" autocomplete="off">
+            <span class="find-mark" id="find-mark" aria-hidden="true"></span>
+            <input id="find-input" class="find-input" type="text" maxlength="20" aria-label="Find a player" />
+            <button id="find-go" class="btn btn-primary btn-sm" type="submit"></button>
+          </form>
+          <p id="find-status" class="find-status" role="status" aria-live="polite"></p>
+          <div id="find-results" class="people"></div>
+
+          <div class="section-head" id="incoming-head" hidden>
+            <h3 class="label" id="incoming-label"></h3>
+          </div>
+          <div id="incoming-list" class="people"></div>
+
+          <div class="section-head" id="friends-head" hidden>
+            <h3 class="label" id="friends-label"></h3>
+          </div>
+          <div id="friends-list" class="people"></div>
+
+          <div class="section-head" id="outgoing-head" hidden>
+            <h3 class="label" id="outgoing-label"></h3>
+          </div>
+          <div id="outgoing-list" class="people"></div>
+
+          <div class="empty" id="friends-empty" hidden>
+            <span class="empty-mark" id="friends-empty-mark"></span>
+            <p id="friends-empty-text"></p>
+          </div>
+        </section>
+
+        <!-- A FRIEND'S PROFILE AND COLLECTION ---------------------------------- -->
+        <section id="screen-friend" class="screen">
+          <div class="open-top">
+            <button id="friend-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 class="open-title" id="friend-name"></h2>
+            <span style="width:42px"></span>
+          </div>
+
+          <div class="hero-card panel">
+            <div class="hero-id">
+              <span id="friend-ring"></span>
+              <div>
+                <h2 id="friend-level"></h2>
+                <p class="hero-rank" id="friend-rank"></p>
+              </div>
+            </div>
+            <div class="stat-grid" id="friend-stats"></div>
+          </div>
+
+          <div class="section-head"><h3 class="label" id="friend-cards-label"></h3></div>
+          <p id="friend-cards-status" class="find-status" role="status" aria-live="polite"></p>
+          <div id="friend-grid" class="binder-grid"></div>
+
+          <div class="hero-actions">
+            <button id="friend-remove" class="btn btn-ghost btn-sm" type="button"></button>
+          </div>
+        </section>
+
         <!-- SETTINGS ---------------------------------------------------------- -->
         <section id="screen-settings" class="screen">
           <div class="screen-head"><h2 id="settings-title"></h2></div>
@@ -209,6 +273,20 @@
           <div class="starter-loot" id="starter-loot"></div>
           <button id="starter-go" class="btn btn-primary btn-block" type="button"></button>
         </div>
+      </div>
+    </div>
+
+    <!-- The account gate: sits in front of everything until you are signed in. -->
+    <div id="gate" class="gate" hidden>
+      <div class="gate-card panel">
+        <div class="gate-mark" id="gate-mark"></div>
+        <h1 id="gate-title"></h1>
+        <p id="gate-body"></p>
+        <div class="seg-wrap"><div id="gate-seg"></div></div>
+        <form id="gate-form" class="gate-form" autocomplete="on"></form>
+        <p id="gate-status" class="gate-status" role="status" aria-live="polite"></p>
+        <button id="gate-alt" class="gate-alt" type="button"></button>
+        <p class="gate-foot" id="gate-foot"></p>
       </div>
     </div>
 

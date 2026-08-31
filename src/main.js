@@ -44,7 +44,10 @@ import {
   levelBounds, levelProgress, timedRollOptions
 } from './timed.js';
 import { t, tx, getLanguage, setLanguage, languageChosen, LANGUAGES } from './i18n.js';
-import { exportSave, importSave, describeSave, parseSave, copyText, readText } from './save.js';
+import {
+  exportSave, importSave, describeSave, parseSave, copyText, readText, onSaveChanged
+} from './save.js';
+import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { synth } from './ui/sound.js';
@@ -98,11 +101,20 @@ const state = {
   pulls: [], cards: [], index: 0, seen: new Set(),
   detail: null,
   packSlots: [],
-  filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false }
+  filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false },
+
+  // Who is signed in, and what the server last told us about them.
+  account: { session: null, profile: null, mode: 'signin', syncing: false, syncedAt: null, failed: false },
+  // The friends screen, and whichever friend is being looked at.
+  social: { friends: [], incoming: [], outgoing: [], results: [], loaded: false },
+  viewing: null
 };
 
 const settings = () => state.profile.settings;
 const money = (amount) => `${buckSvg({ size: 12 })}${formatAmount(amount)}`;
+/** For the few places that put a value into markup rather than textContent. */
+const esc = (value) => String(value ?? '').replace(/[&<>"']/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /* --- elements --------------------------------------------------------------- */
 
@@ -112,7 +124,8 @@ bind({
   screens: {
     packs: $('#screen-packs'), timed: $('#screen-timed'), shop: $('#screen-shop'),
     binder: $('#screen-binder'), profile: $('#screen-profile'),
-    settings: $('#screen-settings'), open: $('#screen-open')
+    settings: $('#screen-settings'), friends: $('#screen-friends'),
+    friend: $('#screen-friend'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   levelBadge: $('#level-badge'), appbarTitle: $('#appbar-title'), appbarSub: $('#appbar-sub'),
@@ -155,6 +168,24 @@ bind({
 
   sheet: $('#sheet'), sheetTitle: $('#sheet-title'), sheetBody: $('#sheet-body'), sheetClose: $('#sheet-close'),
 
+  friendsTitle: $('#friends-title'), friendsIntro: $('#friends-intro'),
+  find: $('#find'), findMark: $('#find-mark'), findInput: $('#find-input'),
+  findGo: $('#find-go'), findStatus: $('#find-status'), findResults: $('#find-results'),
+  incomingHead: $('#incoming-head'), incomingLabel: $('#incoming-label'), incomingList: $('#incoming-list'),
+  friendsHead: $('#friends-head'), friendsLabel: $('#friends-label'), friendsList: $('#friends-list'),
+  outgoingHead: $('#outgoing-head'), outgoingLabel: $('#outgoing-label'), outgoingList: $('#outgoing-list'),
+  friendsEmpty: $('#friends-empty'), friendsEmptyMark: $('#friends-empty-mark'),
+  friendsEmptyText: $('#friends-empty-text'),
+
+  friendBack: $('#friend-back'), friendName: $('#friend-name'), friendRing: $('#friend-ring'),
+  friendLevel: $('#friend-level'), friendRank: $('#friend-rank'), friendStats: $('#friend-stats'),
+  friendCardsLabel: $('#friend-cards-label'), friendCardsStatus: $('#friend-cards-status'),
+  friendGrid: $('#friend-grid'), friendRemove: $('#friend-remove'),
+
+  gate: $('#gate'), gateMark: $('#gate-mark'), gateTitle: $('#gate-title'), gateBody: $('#gate-body'),
+  gateSeg: $('#gate-seg'), gateForm: $('#gate-form'), gateStatus: $('#gate-status'),
+  gateAlt: $('#gate-alt'), gateFoot: $('#gate-foot'),
+
   welcome: $('#welcome'), welcomeMark: $('#welcome-mark'), welcomeTitle: $('#welcome-title'),
   welcomeBody: $('#welcome-body'), langChoices: $('#lang-choices'), starter: $('#starter'),
   starterTitle: $('#starter-title'), starterBody: $('#starter-body'),
@@ -163,7 +194,7 @@ bind({
   flash: $('#flash'), toast: $('#toast'), xpPop: $('#xp-pop')
 });
 
-let nav, sheet, walletOdo, levelRing, profileRing, xpBar, trackBar, packsSeg;
+let nav, sheet, walletOdo, levelRing, profileRing, xpBar, trackBar, packsSeg, gateSeg, friendRing;
 
 /* --- the one timer ----------------------------------------------------------- */
 
@@ -234,7 +265,8 @@ function useTheme(id, { announce = false } = {}) {
 
 const SCREEN_TITLES = {
   packs: 'tabBoosters', timed: 'tabTimed', shop: 'tabShop',
-  binder: 'tabCollection', profile: 'tabProfile', settings: 'tabSettings'
+  binder: 'tabCollection', profile: 'tabProfile', settings: 'tabSettings',
+  friends: 'tabFriends', friend: 'tabFriends'
 };
 
 function showScreen(name) {
@@ -256,8 +288,12 @@ function showScreen(name) {
   window.scrollTo({ top: 0 });
 }
 
-/** Settings has no destination of its own; it lives under Profile. */
-const navTabFor = (screen) => (screen === 'settings' ? 'profile' : screen);
+/**
+ * Settings and Friends have no destination of their own; both hang off the
+ * Profile, so the bottom bar stays at five.
+ */
+const navTabFor = (screen) =>
+  (screen === 'settings' || screen === 'friends' || screen === 'friend' ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -282,6 +318,9 @@ function updateBadges() {
   const ready = canClaim(state.profile.daily);
   el.giftDot.hidden = !ready;
   el.gift.classList.toggle('is-hot', ready);
+  // Friend requests live two taps down, so the count is carried up to the bar.
+  const waiting = state.social.incoming.length;
+  nav.setBadge('profile', waiting ? String(waiting) : '');
 }
 
 /* --- booster art ------------------------------------------------------------------ */
@@ -1593,12 +1632,16 @@ function renderProfile() {
   // Everything that is not a destination of its own hangs off the profile.
   el.moreLabel.textContent = t('moreTitle');
   const links = [
+    ...(account.configured
+      ? [['friends', 'tabFriends', () => { renderFriends(); showScreen('friends'); loadFriends(); },
+          state.social.incoming.length]]
+      : []),
     ['settings', 'tabSettings', () => { renderSettings(); showScreen('settings'); }],
     ['gift', 'dailyTitle', () => openDaily()],
     ['gem', 'pullRates', () => openOdds()],
     ['spark', 'walletTitle', () => openWallet()]
   ];
-  el.profileLinks.replaceChildren(...links.map(([icon, key, go]) => {
+  el.profileLinks.replaceChildren(...links.map(([icon, key, go, badge = 0]) => {
     const row = document.createElement('button');
     row.type = 'button';
     row.className = 'row';
@@ -1606,11 +1649,572 @@ function renderProfile() {
     row.innerHTML = `<span style="display:flex;align-items:center;gap:12px">
       <span style="color:var(--accent)">${iconSvg(icon, { size: 20 })}</span>
       <span style="font-weight:700">${t(key)}</span></span>
-      <span class="muted">${iconSvg('chevron', { size: 18 })}</span>`;
+      <span style="display:flex;align-items:center;gap:8px">
+        ${badge ? `<span class="chip">${badge}</span>` : ''}
+        <span class="muted">${iconSvg('chevron', { size: 18 })}</span></span>`;
     press(row, { sound: null });
     row.addEventListener('click', () => { synth.playTap(); go(); });
     return row;
   }));
+}
+
+/* --- the account gate -------------------------------------------------------------------------------------- */
+
+/*
+ * Signing in is required, so this sits in front of everything until there is a
+ * session. The one exception is a build with no backend configured at all
+ * (see account.configured): shipping a gate no key can open would be a brick,
+ * so those builds play offline and say so in Settings.
+ */
+
+const signedIn = () => Boolean(state.account.session);
+const userId = () => state.account.session?.user?.id ?? null;
+
+function gateStatus(key, kind = '', vars = {}) {
+  el.gateStatus.textContent = key ? t(key, vars) : '';
+  el.gateStatus.className = `gate-status${kind ? ` is-${kind}` : ''}`;
+}
+
+/** One labelled input, built here rather than in the HTML because the set changes. */
+function field(name, labelKey, { type = 'text', icon = 'profile', hintKey = null, autocomplete = '' } = {}) {
+  const wrap = document.createElement('label');
+  wrap.className = 'field';
+  wrap.innerHTML = `
+    <span class="field-label"></span>
+    <span class="field-box"><span>${iconSvg(icon, { size: 17 })}</span>
+      <input name="${name}" type="${type}" autocomplete="${autocomplete}" spellcheck="false" />
+    </span>
+    ${hintKey ? '<span class="field-hint"></span>' : ''}`;
+  wrap.querySelector('.field-label').textContent = t(labelKey);
+  if (hintKey) wrap.querySelector('.field-hint').textContent = t(hintKey);
+  return wrap;
+}
+
+function buildGateForm() {
+  const creating = state.account.mode === 'signup';
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn-primary btn-block';
+  submit.textContent = t(creating ? 'gateSignUp' : 'gateSignIn');
+  press(submit, { sound: null });
+
+  el.gateForm.replaceChildren(
+    ...(creating
+      ? [field('username', 'gateUsername', { icon: 'profile', hintKey: 'gateUsernameHint', autocomplete: 'username' })]
+      : []),
+    field('email', 'gateEmail', { type: 'email', icon: 'mail', autocomplete: 'email' }),
+    field('password', 'gatePassword', {
+      type: 'password', icon: 'key',
+      hintKey: creating ? 'gatePasswordHint' : null,
+      autocomplete: creating ? 'new-password' : 'current-password'
+    }),
+    submit
+  );
+
+  el.gateAlt.textContent = t(creating ? 'gateHaveAccount' : 'gateForgot');
+  gateStatus(null);
+}
+
+function setGateMode(mode) {
+  state.account.mode = mode;
+  gateSeg?.select(mode, { silent: true });
+  buildGateForm();
+}
+
+function showGate() {
+  el.gateMark.innerHTML = logoSvg({ size: 56 });
+  el.gateTitle.textContent = t('gateTitle');
+  el.gateBody.textContent = t('gateBody');
+  el.gateFoot.textContent = t('gateFoot');
+  // showNameGate() borrows this card; put back what it changed.
+  el.gateSeg.parentElement.hidden = false;
+  el.gateForm.onsubmit = submitGate;
+  el.gateAlt.onclick = gateAltAction;
+
+  if (!gateSeg) {
+    gateSeg = new Segmented(el.gateSeg, [
+      { id: 'signin', label: t('gateSignIn') },
+      { id: 'signup', label: t('gateSignUp') }
+    ], (mode) => setGateMode(mode));
+  }
+  setGateMode(state.account.mode);
+  el.gate.hidden = false;
+}
+
+const hideGate = () => { el.gate.hidden = true; };
+
+const fieldValue = (name) => el.gateForm.elements[name]?.value ?? '';
+
+let gateBusy = false;
+
+async function submitGate(event) {
+  event.preventDefault();
+  if (gateBusy) return;
+
+  const email = fieldValue('email').trim();
+  const password = fieldValue('password');
+  const username = fieldValue('username').trim();
+  const creating = state.account.mode === 'signup';
+
+  if (creating && !account.USERNAME_RE.test(username)) return gateStatus('authBadName', 'error');
+  if (!email || !password) return gateStatus('authUnknown', 'error');
+
+  gateBusy = true;
+  gateStatus('gateWorking', 'working');
+  synth.playTap();
+  try {
+    if (creating) {
+      const result = await account.signUp(email, password, username);
+      if (result.needsConfirmation) {
+        gateStatus('gateConfirm', 'ok');
+        setGateMode('signin');
+        return;
+      }
+      gateStatus('gateSignedUp', 'ok');
+    } else {
+      await account.signIn(email, password);
+    }
+    synth.playFanfare();
+    // onAuthChange takes it from here: it pulls the save and starts the app.
+  } catch (error) {
+    gateStatus(account.readableError(error), 'error');
+    synth.playDenied();
+  } finally {
+    gateBusy = false;
+  }
+}
+
+/** The alternate action under the form: reset a password, or go and sign in. */
+async function gateAltAction() {
+  if (state.account.mode === 'signup') { setGateMode('signin'); synth.playTap(); return; }
+
+  const email = fieldValue('email').trim();
+  if (!email) return gateStatus('gateResetNeedEmail', 'error');
+  try {
+    gateStatus('gateWorking', 'working');
+    await account.sendReset(email);
+  } catch { /* deliberately not reported: it would say whether the address exists */ }
+  // Always the same answer, for the same reason.
+  gateStatus('gateResetSent', 'ok');
+}
+
+/**
+ * The one case where a signed-in account still has no profile: the username
+ * chosen at sign-up was taken while the email was being confirmed.
+ */
+function showNameGate() {
+  el.gateMark.innerHTML = logoSvg({ size: 56 });
+  el.gateTitle.textContent = t('gateNameTitle');
+  el.gateBody.textContent = t('gateNameBody');
+  el.gateFoot.textContent = t('gateFoot');
+  el.gateSeg.parentElement.hidden = true;
+  el.gateAlt.textContent = t('accountSignOut');
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'btn btn-primary btn-block';
+  submit.textContent = t('gateNameSave');
+  press(submit, { sound: null });
+  el.gateForm.replaceChildren(
+    field('username', 'gateUsername', { hintKey: 'gateUsernameHint', autocomplete: 'username' }),
+    submit
+  );
+  gateStatus(null);
+  el.gate.hidden = false;
+
+  el.gateForm.onsubmit = async (event) => {
+    event.preventDefault();
+    const name = fieldValue('username').trim();
+    if (!account.USERNAME_RE.test(name)) return gateStatus('authBadName', 'error');
+    gateStatus('gateWorking', 'working');
+    try {
+      const profile = await account.ensureProfile(userId(), name);
+      if (!profile) return gateStatus('authNameTaken', 'error');
+      state.account.profile = profile;
+      synth.playFanfare();
+      await enterApp();
+    } catch (error) {
+      gateStatus(account.readableError(error), 'error');
+    }
+  };
+  el.gateAlt.onclick = () => leaveAccount();
+}
+
+/* --- session and cloud sync --------------------------------------------------------------------------------- */
+
+const SYNC_DEBOUNCE = 4000;
+let syncTimer = null;
+let syncQueued = false;
+
+/** What a friend is allowed to see about you. Published with every push. */
+function currentStats() {
+  const entries = store.allEntries(state.collection);
+  const counts = state.profile.rarityCounts ?? {};
+  const best = RARITIES.filter((r) => (counts[r.id] ?? 0) > 0).pop();
+  return {
+    level: state.profile.progress.level ?? 1,
+    rank: rankFor(state.profile.progress.level ?? 1).name.en,
+    cards: entries.reduce((sum, e) => sum + e.count, 0),
+    uniqueCards: entries.length,
+    boostersOpened: state.profile.boostersOpened ?? 0,
+    value: entries.reduce((sum, e) => sum + e.price * e.count, 0),
+    bestRarity: best?.id ?? null,
+    playMs: state.profile.playMs ?? 0
+  };
+}
+
+/**
+ * Push the save and the public stats.
+ *
+ * Debounced hard: opening a booster writes storage half a dozen times in a
+ * second, and every one of those is the same save a moment apart. A failure is
+ * recorded and left for the next change or the next foreground to retry —
+ * losing a sync is survivable, and blocking the game on one is not.
+ */
+async function flushSync() {
+  if (!signedIn() || !state.account.profile) return;
+  clearTimeout(syncTimer);
+  syncTimer = null;
+  if (state.account.syncing) { syncQueued = true; return; }
+
+  state.account.syncing = true;
+  renderAccountRow();
+  try {
+    await account.pushSave(userId());
+    await account.publishStats(userId(), currentStats());
+    state.account.syncedAt = Date.now();
+    state.account.failed = false;
+  } catch {
+    state.account.failed = true;
+  } finally {
+    state.account.syncing = false;
+    renderAccountRow();
+    if (syncQueued) { syncQueued = false; syncSoon(); }
+  }
+}
+
+function syncSoon() {
+  if (!signedIn() || !state.account.profile) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(flushSync, SYNC_DEBOUNCE);
+}
+
+/**
+ * Sign in has happened. Pull the account's save over the local one, then start
+ * the app on whatever that turns out to contain — which is what makes a fresh
+ * install on a new phone come up with the collection already in it.
+ */
+async function enterApp() {
+  try {
+    await account.syncOnLogin(userId());
+  } catch {
+    // Offline at sign-in: play on what is on the device and push when it
+    // reconnects, rather than refusing to start.
+    state.account.failed = true;
+  }
+  hideGate();
+  reloadFromStorage();
+  if (!state.account.failed) state.account.syncedAt = Date.now();
+  loadFriends();
+
+  if (!languageChosen() || !state.profile.started) showWelcome();
+  else {
+    payStipend();
+    if (canClaim(state.profile.daily)) openDaily({ auto: true });
+  }
+}
+
+/** Re-read everything from storage, after an import or a sign-in pull. */
+function reloadFromStorage() {
+  state.collection = store.loadCollection();
+  state.inventory = store.loadInventory();
+  state.profile = store.loadProfile();
+  state.customPacks = store.loadCustomPacks();
+  state.wallet = store.loadWallet();
+  applySettings();
+  applyStrings();
+  refreshWallet();
+  refreshLevelBadge();
+  renderPacks();
+  renderShop();
+  renderBinder();
+  updateBadges();
+  if (languageChosen()) loadPackArt();
+}
+
+/** Sign out, and put the gate back. Local state is left for the next sign-in. */
+async function leaveAccount() {
+  await flushSync().catch(() => {});
+  try { await account.signOut(); } catch { /* already gone */ }
+  state.account.session = null;
+  state.account.profile = null;
+  // Cleared here rather than waiting on the sign-out event, so signing back
+  // in as the same account is not mistaken for a repeat of the same session.
+  handledUser = null;
+  state.social = { friends: [], incoming: [], outgoing: [], results: [], loaded: false };
+  el.welcome.hidden = true;
+  showScreen('packs');
+  showGate();
+}
+
+/**
+ * Called on every auth change, including the one that restores a stored
+ * session at launch.
+ *
+ * Idempotent by user id, because a token refresh reports the same session
+ * again and must not re-run the sign-in pull over live play. That also makes
+ * it safe to drive from both the listener and an explicit session check.
+ */
+let handledUser;
+
+async function onSession(session) {
+  const id = session?.user?.id ?? null;
+  if (handledUser === id) return;
+  handledUser = id;
+
+  state.account.session = session ?? null;
+  if (!session) { showGate(); return; }
+
+  try {
+    const profile = await account.profileForSession(session);
+    if (!profile) { showNameGate(); return; }
+    state.account.profile = profile;
+  } catch {
+    // The profile read failed (usually offline). Play on the local save; the
+    // next successful sync will publish.
+    state.account.failed = true;
+  }
+  await enterApp();
+}
+
+/* --- friends -------------------------------------------------------------------------------------------------- */
+
+/** One person, however they are related to you: result, friend or request. */
+function personRow(profile, actions, { onOpen = null } = {}) {
+  const row = document.createElement(onOpen ? 'button' : 'div');
+  if (onOpen) row.type = 'button';
+  row.className = 'person';
+  row.innerHTML = `
+    <span class="person-mark"></span>
+    <span class="person-copy"><b></b><span></span></span>
+    <span class="person-actions"></span>`;
+
+  row.querySelector('.person-mark').textContent = String(profile.username ?? '?').slice(0, 1);
+  row.querySelector('b').textContent = profile.username ?? '';
+  row.querySelector('.person-copy span').textContent = t('friendsLevelLine', {
+    n: profile.level ?? 1,
+    rank: tx(rankFor(profile.level ?? 1).name)
+  });
+
+  const bay = row.querySelector('.person-actions');
+  for (const [labelKey, kind, run] of actions) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn btn-sm ${kind}`;
+    button.textContent = t(labelKey);
+    press(button, { sound: null });
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();          // the row itself may be a link
+      run(button);
+    });
+    bay.appendChild(button);
+  }
+  if (!actions.length) bay.innerHTML = `<span class="muted">${iconSvg('chevron', { size: 18 })}</span>`;
+
+  if (onOpen) {
+    press(row, { sound: null });
+    row.addEventListener('click', () => { synth.playTap(); onOpen(); });
+  }
+  return row;
+}
+
+/**
+ * Guard every network action behind one place that reports what went wrong.
+ *
+ * Names are escaped on the way into a toast. The database constrains a
+ * username to letters, digits and underscores, so there is nothing to escape
+ * in practice — but toast() takes markup, and a value that came off the
+ * network should not be the one place that relies on a constraint holding.
+ */
+async function socialAction(run, doneKey = null, vars = {}) {
+  const safe = Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, esc(v)]));
+  try {
+    await run();
+    await loadFriends();
+    if (doneKey) toast(t(doneKey, safe));
+  } catch (error) {
+    toast(t(account.readableError(error)), 'error');
+    synth.playDenied();
+  }
+}
+
+async function loadFriends() {
+  if (!signedIn() || !state.account.profile) return;
+  try {
+    const lists = await account.listFriendships(userId());
+    Object.assign(state.social, lists, { loaded: true });
+  } catch {
+    state.social.loaded = false;
+  }
+  updateBadges();
+  if (state.tab === 'friends') renderFriends();
+  if (state.tab === 'profile') renderProfile();
+}
+
+function findStatus(key, kind = 'muted', vars = {}) {
+  el.findStatus.textContent = key ? t(key, vars) : '';
+  el.findStatus.className = `find-status${kind ? ` is-${kind}` : ''}`;
+}
+
+async function runSearch(event) {
+  event?.preventDefault();
+  const term = el.findInput.value.trim();
+  if (term.length < 2) {
+    state.social.results = [];
+    el.findResults.replaceChildren();
+    return findStatus('friendsTypeMore');
+  }
+  findStatus('friendsSearching', 'working');
+  synth.playTap();
+  try {
+    state.social.results = await account.searchPlayers(term, userId());
+    findStatus(state.social.results.length ? null : 'friendsNoResults');
+    renderFriends();
+  } catch (error) {
+    findStatus(account.readableError(error), 'error');
+  }
+}
+
+function renderFriends() {
+  el.friendsTitle.textContent = t('tabFriends');
+  el.friendsIntro.textContent = t('friendsIntro');
+  el.findMark.innerHTML = iconSvg('search', { size: 18 });
+  el.findInput.placeholder = t('friendsFindPlaceholder');
+  el.findInput.setAttribute('aria-label', t('friendsFind'));
+  el.findGo.textContent = t('friendsSearch');
+  el.incomingLabel.textContent = t('friendsIncoming');
+  el.friendsLabel.textContent = t('friendsYours');
+  el.outgoingLabel.textContent = t('friendsOutgoing');
+
+  const { friends, incoming, outgoing, results } = state.social;
+  // Anyone already connected to is shown by their section, not as a result.
+  const connected = new Set([...friends, ...incoming, ...outgoing].map((entry) => entry.otherId));
+
+  el.findResults.replaceChildren(...results.map((person) =>
+    personRow(person, connected.has(person.id)
+      ? []
+      : [['friendsAdd', 'btn-primary', () => socialAction(
+          () => account.sendRequest(userId(), person.id), 'friendsSent', { name: person.username })]])));
+
+  el.incomingList.replaceChildren(...incoming.map((entry) =>
+    personRow(entry.profile, [
+      ['friendsAccept', 'btn-primary', () => socialAction(
+        () => account.acceptRequest(entry.id), 'friendsAccepted', { name: entry.profile.username })],
+      ['friendsDecline', 'btn-ghost', () => socialAction(
+        () => account.removeFriendship(entry.id), 'friendsRemoved')]
+    ])));
+
+  el.friendsList.replaceChildren(...friends.map((entry) =>
+    personRow(entry.profile, [], { onOpen: () => openFriend(entry) })));
+
+  el.outgoingList.replaceChildren(...outgoing.map((entry) =>
+    personRow(entry.profile, [
+      ['friendsCancel', 'btn-ghost', () => socialAction(
+        () => account.removeFriendship(entry.id), 'friendsRemoved')]
+    ])));
+
+  el.incomingHead.hidden = !incoming.length;
+  el.friendsHead.hidden = !friends.length;
+  el.outgoingHead.hidden = !outgoing.length;
+
+  const nothing = !friends.length && !incoming.length && !outgoing.length && !results.length;
+  el.friendsEmpty.hidden = !nothing;
+  if (nothing) {
+    el.friendsEmptyMark.innerHTML = iconSvg('friends', { size: 46 });
+    el.friendsEmptyText.textContent = t('friendsEmpty');
+  }
+  reveal(el.friendsList.children, { step: 26, from: 10 });
+}
+
+/* --- a friend's profile ----------------------------------------------------------------------------------------- */
+
+function openFriend(entry) {
+  state.viewing = entry;
+  renderFriend();
+  showScreen('friend');
+  loadFriendCards(entry);
+}
+
+function renderFriend() {
+  const entry = state.viewing;
+  if (!entry) return;
+  const person = entry.profile;
+  const level = person.level ?? 1;
+
+  el.friendBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  el.friendName.textContent = person.username ?? '';
+  friendRing.set(0, String(level));
+  el.friendLevel.textContent = t('profileLevel', { n: level });
+  el.friendRank.textContent = tx(rankFor(level).name);
+  el.friendCardsLabel.textContent = t('friendCollection');
+  el.friendRemove.textContent = t('friendsRemove');
+
+  const best = rarityById(person.best_rarity);
+  const stats = [
+    [t('statCards'), (person.cards ?? 0).toLocaleString()],
+    [t('statBoosters'), (person.boosters_opened ?? 0).toLocaleString()],
+    [t('statValue'), formatAmount(person.collection_value ?? 0)],
+    [t('statBest'), person.best_rarity && best ? tx(best.name) : t('none')],
+    [t('statPlaytime'), formatDuration(person.play_ms ?? 0)],
+    [t('statAccountAge'), new Date(person.created_at ?? Date.now())
+      .toLocaleDateString(getLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })]
+  ];
+  el.friendStats.replaceChildren(...stats.map(([label, value]) => {
+    const cell = document.createElement('div');
+    cell.className = 'stat-cell';
+    cell.innerHTML = '<b></b><span></span>';
+    cell.querySelector('b').textContent = value;
+    cell.querySelector('span').textContent = label;
+    return cell;
+  }));
+}
+
+/**
+ * Their cards. The server hands back the collection key alone, so this cannot
+ * see their wallet or their settings even though they are in the same blob.
+ */
+async function loadFriendCards(entry) {
+  el.friendGrid.replaceChildren();
+  el.friendCardsStatus.textContent = t('friendLoading');
+  el.friendCardsStatus.className = 'find-status is-working';
+  try {
+    const cards = await account.friendCollection(entry.otherId);
+    // Guard against a slow read landing after the player has moved on.
+    if (state.viewing !== entry) return;
+    if (cards === null) {
+      el.friendCardsStatus.textContent = t('friendPrivate');
+      el.friendCardsStatus.className = 'find-status is-muted';
+      return;
+    }
+    const sorted = [...cards].sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+    el.friendCardsStatus.textContent = sorted.length ? '' : t('friendNoCards');
+    el.friendCardsStatus.className = 'find-status is-muted';
+    el.friendGrid.replaceChildren(...sorted.map((card) => {
+      const node = buildStaticCard(card, rarityById(card.rarityId), null, { fav: false });
+      if ((card.count ?? 1) > 1) {
+        const badge = document.createElement('span');
+        badge.className = 'copy-badge';
+        badge.textContent = `×${card.count}`;
+        node.appendChild(badge);
+      }
+      return node;
+    }));
+    reveal(el.friendGrid.children, { step: 22, from: 10 });
+  } catch (error) {
+    if (state.viewing !== entry) return;
+    el.friendCardsStatus.textContent = t(account.readableError(error));
+    el.friendCardsStatus.className = 'find-status is-error';
+  }
 }
 
 /* --- settings ------------------------------------------------------------------------------------------- */
@@ -1719,8 +2323,72 @@ function renderSettings() {
   paintResetButton(resetBtn);
   resetBtn.addEventListener('click', () => handleReset(resetBtn));
 
-  el.dataList.replaceChildren(language, transferRow, resetRow);
+  el.dataList.replaceChildren(...accountRows(), language, transferRow, resetRow);
 }
+
+/**
+ * The account block at the top of Data: who you are, whether the last change
+ * reached the server, and the way out.
+ *
+ * A build with no backend says so plainly instead of pretending to have one:
+ * there is nothing the player can do about it, but knowing their collection is
+ * device-only is what tells them to use the save transfer below.
+ */
+function accountRows() {
+  if (!account.configured) {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>
+      <span class="chip row-action">${iconSvg('cloud', { size: 13 })}</span>`;
+    row.querySelector('h4').textContent = t('accountOfflineTitle');
+    row.querySelector('p').textContent = t('accountOfflineNote');
+    return [row];
+  }
+
+  const who = document.createElement('div');
+  who.className = 'row';
+  who.dataset.account = 'sync';
+  who.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="btn btn-sm btn-ghost row-action" type="button"></button>`;
+  who.querySelector('h4').textContent = t('accountSyncTitle');
+  const syncBtn = who.querySelector('button');
+  syncBtn.textContent = t('accountSyncNow');
+  press(syncBtn, { sound: null });
+  syncBtn.addEventListener('click', () => { synth.playTap(); flushSync(); });
+
+  const out = document.createElement('div');
+  out.className = 'row';
+  out.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="btn btn-sm btn-ghost row-action" type="button"></button>`;
+  out.querySelector('h4').textContent =
+    t('accountSignedInAs', { name: state.account.profile?.username ?? '' });
+  out.querySelector('p').textContent = t('accountSignOutNote');
+  const outBtn = out.querySelector('button');
+  outBtn.textContent = t('accountSignOut');
+  press(outBtn, { sound: null });
+  outBtn.addEventListener('click', () => { synth.playTap(); leaveAccount(); });
+
+  paintSyncLine(who);
+  return [who, out];
+}
+
+/** When the save last reached the server, in words. */
+function paintSyncLine(row) {
+  const line = row?.querySelector('p');
+  if (!line) return;
+  if (state.account.syncing) { line.textContent = t('accountSyncing'); return; }
+  if (state.account.failed) { line.textContent = t('accountSyncFailed'); return; }
+  if (!state.account.syncedAt) { line.textContent = t('accountSyncNote'); return; }
+  const mins = Math.floor((Date.now() - state.account.syncedAt) / 60000);
+  line.textContent = t('accountSynced', {
+    when: mins < 1 ? t('accountJustNow') : t('accountMinsAgo', { n: mins })
+  });
+}
+
+/** Repaint just the sync line, which changes without the screen being rebuilt. */
+const renderAccountRow = () => paintSyncLine(el.dataList.querySelector('[data-account="sync"]'));
 
 /**
  * Copy the save out, or paste one back in.
@@ -1812,7 +2480,7 @@ function openTransfer() {
     });
 
     // Arm then confirm: importing replaces everything already here.
-    load.addEventListener('click', () => {
+    load.addEventListener('click', async () => {
       const text = input.value.trim();
       if (!describeSave(text)) {
         status.textContent = t('saveUnreadable');
@@ -1827,8 +2495,31 @@ function openTransfer() {
         setTimeout(() => { armed = false; paint(); }, 5000);
         return;
       }
-      if (importSave(text)) location.reload();
-      else { status.textContent = t('saveUnreadable'); synth.playDenied(); }
+      const before = exportSave();
+      if (!importSave(text)) {
+        status.textContent = t('saveUnreadable');
+        synth.playDenied();
+        return;
+      }
+      // Signed in, the account is what gets read on the next launch, so an
+      // import that only reached the device would be overwritten by it. Take
+      // the imported save up before reloading, and put the old one back if
+      // that fails rather than leaving a save that is about to be discarded.
+      if (signedIn() && state.account.profile) {
+        clearTimeout(syncTimer);
+        status.textContent = t('accountSyncing');
+        status.style.color = '';
+        try {
+          await account.pushSave(userId());
+        } catch (error) {
+          importSave(before);
+          status.textContent = t(account.readableError(error));
+          status.style.color = 'var(--negative)';
+          synth.playDenied();
+          return;
+        }
+      }
+      location.reload();
     });
     paint();
   });
@@ -1855,7 +2546,25 @@ function handleReset(button) {
   wipeEverything();
 }
 
-function wipeEverything() {
+/**
+ * Erase everything — including the copy on the server.
+ *
+ * Clearing only the device would erase nothing: the account's save would be
+ * pulled straight back down on the next launch. The server goes first, so a
+ * failure there leaves the player exactly where they were rather than
+ * half-erased.
+ */
+async function wipeEverything() {
+  if (signedIn() && state.account.profile) {
+    clearTimeout(syncTimer);
+    try {
+      await account.clearSave(userId());
+    } catch (error) {
+      toast(t(account.readableError(error)), 'error');
+      synth.playDenied();
+      return;
+    }
+  }
   ['packywiki.collection.v3', 'packywiki.wallet.v1', 'packywiki.inventory.v1',
    'packywiki.profile.v1', 'packywiki.customPacks.v2', 'packywiki.language',
    'packywiki.ripDirection', THEME_KEY].forEach((key) => {
@@ -2092,6 +2801,8 @@ function applyStrings() {
     binder: t('tabCollection'), profile: t('tabProfile')
   });
   packsSeg?.relabel([{ label: t('owned') }, { label: t('tabCustom') }]);
+  gateSeg?.relabel([{ label: t('gateSignIn') }, { label: t('gateSignUp') }]);
+  if (!el.gate.hidden) showGate();
 }
 
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
@@ -2127,6 +2838,7 @@ function init() {
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
   profileRing = new Ring(el.profileRing, { size: 62, width: 4 });
+  friendRing = new Ring(el.friendRing, { size: 62, width: 4 });
   xpBar = new Bar(el.xpBar);
   trackBar = new Bar(el.trackBar);
 
@@ -2151,7 +2863,9 @@ function init() {
     if (id === 'binder') renderBinder();
     if (id === 'shop') { payStipend(); renderShop(); }
     if (id === 'timed') renderTimed();
-    if (id === 'profile') renderProfile();
+    // A friend request arrives while you are elsewhere, so the count on the
+    // way past the Profile is refreshed rather than remembered.
+    if (id === 'profile') { renderProfile(); loadFriends(); }
     showScreen(id);
   });
 
@@ -2170,7 +2884,8 @@ function init() {
 
   [el.wallet, el.gift, el.levelBadge, el.packsOpen, el.timedOpen,
    el.filterOpen, el.openBack, el.openDone, el.sheetClose, el.starterGo,
-   el.packsEmptyCta, el.creatorGo].forEach((node) => press(node, { sound: null }));
+   el.packsEmptyCta, el.creatorGo, el.findGo, el.friendBack,
+   el.friendRemove, el.gateAlt].forEach((node) => press(node, { sound: null }));
 
   el.wallet.addEventListener('click', openWallet);
   el.gift.addEventListener('click', () => openDaily());
@@ -2193,6 +2908,40 @@ function init() {
     if (e.key === 'Escape' && sheet.open) sheet.hide();
   });
 
+  // Accounts and friends.
+  el.gateForm.onsubmit = submitGate;
+  el.gateAlt.onclick = gateAltAction;
+  el.find.addEventListener('submit', runSearch);
+  el.friendBack.addEventListener('click', () => {
+    state.viewing = null;
+    synth.playTap();
+    renderFriends();
+    showScreen('friends');
+  });
+  el.friendRemove.addEventListener('click', () => {
+    const entry = state.viewing;
+    if (!entry) return;
+    // Armed the same way selling a card is: the second tap is the one that acts.
+    if (el.friendRemove.dataset.armed !== '1') {
+      el.friendRemove.dataset.armed = '1';
+      el.friendRemove.textContent = t('friendsRemoveConfirm');
+      el.friendRemove.classList.add('btn-danger');
+      synth.playArm();
+      setTimeout(() => {
+        el.friendRemove.dataset.armed = '';
+        el.friendRemove.textContent = t('friendsRemove');
+        el.friendRemove.classList.remove('btn-danger');
+      }, 4000);
+      return;
+    }
+    el.friendRemove.dataset.armed = '';
+    el.friendRemove.textContent = t('friendsRemove');
+    el.friendRemove.classList.remove('btn-danger');
+    state.viewing = null;
+    showScreen('friends');
+    socialAction(() => account.removeFriendship(entry.id), 'friendsRemoved');
+  });
+
   el.starterGo.addEventListener('click', () => {
     el.welcome.hidden = true;
     synth.playTap();
@@ -2208,23 +2957,53 @@ function init() {
       visibleSince = Date.now();
       syncTimed();
       updateBadges();
+      // Coming back is the natural moment to retry a sync that did not land,
+      // and to pick up anything that happened while the app was away.
+      if (state.account.failed) syncSoon();
+      loadFriends();
     } else {
       flushPlaytime();
       visibleSince = null;
       synth.suspend();
+      // Leaving is the last chance to get the save up before the WebView is
+      // frozen, so this one does not wait out the debounce.
+      flushSync();
     }
     backdrop.setPaused(!visible || document.documentElement.classList.contains('is-immersive'));
     syncTicker();
   });
-  window.addEventListener('pagehide', flushPlaytime);
+  window.addEventListener('pagehide', () => { flushPlaytime(); flushSync(); });
 
   backdrop.start();
+  startSession();
+}
 
-  if (!languageChosen() || !state.profile.started) showWelcome();
-  else {
-    payStipend();
-    if (canClaim(state.profile.daily)) openDaily({ auto: true });
+/**
+ * Decide what the player sees first.
+ *
+ * With a backend: nothing until there is a session, because the account is
+ * what everything else is filed under. Without one, the app is exactly what it
+ * was before accounts existed — local, and honest about it in Settings.
+ */
+function startSession() {
+  if (!account.configured) {
+    if (!languageChosen() || !state.profile.started) showWelcome();
+    else {
+      payStipend();
+      if (canClaim(state.profile.daily)) openDaily({ auto: true });
+    }
+    return;
   }
+
+  onSaveChanged(syncSoon);
+  // Fires on every sign-in and sign-out, so there is one path into the app
+  // rather than two. It also reports the stored session at launch, but that
+  // is not guaranteed across client versions, so the session is read directly
+  // as well; onSession() ignores the second of the two.
+  account.onAuthChange((session) => { onSession(session); });
+  account.currentSession().then((session) => onSession(session)).catch(() => showGate());
+  // Until one of those lands there is nothing to show but the gate.
+  showGate();
 }
 
 let packsRail;

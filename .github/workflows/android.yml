@@ -24,10 +24,21 @@ jobs:
           node-version: '20'
           cache: npm
 
+      # VITE_ variables are compiled into the bundle, so they have to be set
+      # here rather than at runtime. Both are public by design (see
+      # .env.example); if the secrets are not set the build still succeeds and
+      # ships an offline-only app that says so in Settings, rather than an APK
+      # with a sign-in screen no key can open.
       - name: Build the web app
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
         run: |
           npm ci
           npm run build
+          if [ -z "$VITE_SUPABASE_URL" ]; then
+            echo "::warning::No SUPABASE_URL/SUPABASE_ANON_KEY secrets set — this APK plays offline only."
+          fi
 
       # The APK is a WebView wrapper around dist/, so the web build has to be
       # staged into the Android assets folder before Gradle packages it.

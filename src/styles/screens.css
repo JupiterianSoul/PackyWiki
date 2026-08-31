@@ -482,10 +482,174 @@
   100% { opacity: 0; }
 }
 
+/* --- the account gate ---------------------------------------------------------------------- */
+
+/*
+ * Sits above the welcome flow, because a language is a preference and an
+ * account is the thing everything else is filed under. Everything below is
+ * built from the same tokens as the rest of the app, so the gate is the first
+ * thing that tells you which theme you are in.
+ */
+.gate {
+  position: fixed;
+  inset: 0;
+  z-index: 420;
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  /* Slightly translucent, so the theme's live backdrop shows through and the
+     gate is already the app rather than a form in front of it. */
+  background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
+  backdrop-filter: var(--blur);
+  overflow-y: auto;
+}
+.gate-card {
+  width: min(430px, 100%);
+  padding: 26px 22px;
+  display: grid;
+  gap: 14px;
+  margin: auto;
+}
+.gate-mark { display: grid; justify-items: center; color: var(--accent); }
+.gate-card h1 { font-size: clamp(1.6rem, 7.5vw, 2.1rem); text-align: center; }
+.gate-card > p { font-size: 0.86rem; line-height: 1.6; color: var(--ink-dim); text-align: center; }
+
+.gate-form { display: grid; gap: 10px; }
+.field { display: grid; gap: 6px; }
+.field-label {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.field-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+[data-theme='paper'] .field-box { background: transparent; }
+.field-box:focus-within { border-color: var(--accent); }
+.field-box > span:first-child { color: var(--ink-faint); display: flex; }
+.field-box input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+}
+.field-box input:focus { outline: none; }
+.field-box input::placeholder { color: var(--ink-faint); }
+.field-hint { font-size: 0.74rem; color: var(--ink-faint); line-height: 1.5; }
+
+.gate-status { font-size: 0.82rem; font-weight: 700; min-height: 1.2em; text-align: center; }
+.gate-status.is-working { color: var(--warning); }
+.gate-status.is-ok { color: var(--positive); }
+.gate-status.is-error { color: var(--negative); }
+
+.gate-alt {
+  justify-self: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--ink-dim);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.gate-foot {
+  font-size: 0.76rem;
+  line-height: 1.55;
+  color: var(--ink-faint);
+  text-align: center;
+  border-top: var(--border) var(--border-style) var(--line);
+  padding-top: 12px;
+}
+
+/* --- friends -------------------------------------------------------------------------------- */
+
+.find {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 var(--gutter);
+  padding: 8px 8px 8px 14px;
+}
+.find-mark { color: var(--ink-faint); display: flex; }
+.find-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.95rem;
+  padding: 8px 0;
+}
+.find-input:focus { outline: none; }
+.find-input::placeholder { color: var(--ink-faint); }
+.find-status {
+  margin: 8px var(--gutter) 0;
+  font-size: 0.82rem;
+  font-weight: 700;
+  min-height: 1.2em;
+}
+.find-status.is-working { color: var(--warning); }
+.find-status.is-error { color: var(--negative); }
+.find-status.is-muted { color: var(--ink-faint); font-weight: 600; }
+
+.people { display: grid; gap: 8px; padding: 0 var(--gutter); }
+.people:not(:empty) { margin-top: 10px; }
+
+.person {
+  display: flex;
+  align-items: center;
+  /* Two actions and a long username do not fit a phone on one line, and a
+     truncated name is worse than a second row: let the buttons drop below. */
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  text-align: left;
+  width: 100%;
+}
+.person-mark {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line-strong);
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+}
+[data-theme='arcade'] .person-mark { border-radius: var(--radius); }
+.person-copy { flex: 1 1 55%; min-width: 0; display: grid; gap: 2px; }
+.person-copy b {
+  font-weight: 800;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.person-copy span { font-size: 0.76rem; color: var(--ink-faint); }
+.person-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; margin-left: auto; }
+
 /* --- wider screens ------------------------------------------------------------------------ */
 
 @media (min-width: 700px) {
   .binder-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); }
   .theme-grid { grid-template-columns: repeat(4, 1fr); }
   .summary { grid-template-columns: repeat(5, 1fr); }
+  .people { grid-template-columns: repeat(2, 1fr); }
 }

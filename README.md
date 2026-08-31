@@ -38,6 +38,10 @@ On first launch you pick a language and get a starter kit. Buy boosters in the
 **Shop**, open them from **Boosters**, and your pulls land in the
 **Collection**, where you can sell duplicates back for Buckarooz.
 
+Accounts, cloud save and friends need a Supabase project; see
+[Accounts, cloud save and friends](#accounts-cloud-save-and-friends). Without
+one, everything else works and the collection simply stays on the device.
+
 Other scripts:
 
 ```bash
@@ -224,6 +228,7 @@ src/
     sound.js          the synthesiser: four voices, one signal chain
     backdrop.js       one live canvas renderer per theme
     components.js     press, Odometer, Ring, Bar, Segmented, Sheet, NavBar, Rail
+  account.js          the only file that talks to a server: auth, sync, friends
   save.js             export/import of the whole save, as inspectable text
   wiki.js             Wikipedia + custom-wiki fetching, filtering, de-duplication
   pricing.js          popularity model and card prices
@@ -240,6 +245,7 @@ src/
     rarities.js       RARITY TABLE  — one row per tier, with weights
     icons.js          ICON SET      — fallback art, logo, Buckarooz glyph
 vite.config.js
+supabase/schema.sql   the three tables, and the row-level rules that guard them
 android/              WebView wrapper that packages the web build as an APK
   app/src/main/
     java/.../MainActivity.java   hosts the WebView, serves assets over https
@@ -257,9 +263,94 @@ anywhere in the UI code.
 
 Five, in the bottom bar: **Packs** (owned, and the custom builder behind a
 segmented control) · **Timed** · **Shop** · **Binder** · **Profile**. The
-wallet and the daily gift live in the app bar; Settings, the odds and the
-wallet explainer hang off the Profile, because none of them is somewhere you
-go — they are things you look at once.
+wallet and the daily gift live in the app bar; Settings, Friends, the odds and
+the wallet explainer hang off the Profile, because none of them is somewhere
+you go — they are things you look at once. Friends keeps a badge on the
+Profile tab when someone is waiting, so a request does not need finding.
+
+---
+
+## Accounts, cloud save and friends
+
+A collection lives on an account, not on a phone. Sign in on a new build or a
+new device and everything comes back: cards, coins, level, boosters, settings.
+
+The backend is [Supabase](https://supabase.com) — Postgres with row-level
+security and email/password auth. Rolling my own authentication would have
+meant storing passwords, which is not a thing to do casually or at all.
+
+### Setting it up
+
+1. Create a project at supabase.com (the free tier is plenty).
+2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
+   and run it. That creates the tables, the policies and the two functions.
+3. Copy `.env.example` to `.env.local` and fill in the project URL and the
+   **anon public** key from **Project Settings → API**.
+4. For the APK, add the same two values as repository secrets named
+   `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The workflow compiles them in.
+
+Optionally turn off "Confirm email" under **Authentication → Providers →
+Email** if you would rather sign-up let you straight in; the app handles both.
+
+**A build with no keys still works.** It skips the gate entirely, plays
+offline, hides Friends, and says so in Settings. Shipping an APK whose sign-in
+screen no key can open would be shipping a brick.
+
+### What is stored, and who can read it
+
+Three tables:
+
+| table | what | who can read it |
+| --- | --- | --- |
+| `profiles` | username and the stats a friend sees | any signed-in player — this is what username search *is* |
+| `saves` | the whole save blob | **only its owner** |
+| `friendships` | one row per request | the two people in it |
+
+A friend's cards do **not** come from reading their save row: nobody can read
+anyone else's. They come from `friend_cards()`, a `security definer` function
+that checks the friendship itself and returns the one key holding the
+collection. The wallet, the settings, the daily-gift record and the language
+are in the same blob and stay unreadable — which is the difference between
+"a friend can see your cards" and "a friend can see everything".
+
+Both functions pin `search_path` and are revoked from `public` before being
+granted to `authenticated`, so neither can be reached anonymously or hijacked
+by a schema the caller controls.
+
+The anon key ships inside the APK. That is how it is designed to work: it
+identifies the project, not the player, and grants nothing on its own. The
+policies are the security boundary. The `service_role` key, which bypasses
+them, is never used by this app and must never be put in `.env`.
+
+### How syncing works
+
+The local save stays authoritative while you play; the server is a copy.
+
+- **On sign-in**, the account's save replaces the device's. That is what makes
+  a fresh install come up with the collection already in it. The one exception
+  is an account with nothing stored yet, where the device's save is uploaded
+  instead of being thrown away — which is how a pre-account collection is
+  carried in.
+- **While playing**, every write to game state is noticed in one place
+  (`writeJson` in `collection.js`, which every save goes through) and a push is
+  debounced by four seconds. Opening a booster writes storage half a dozen
+  times in a second; that is one upload, not six.
+- **Leaving the app** flushes immediately rather than waiting out the
+  debounce, because the WebView is about to be frozen.
+- **A failed push is not fatal.** It is recorded, shown in Settings, and
+  retried on the next change or the next time the app comes to the
+  foreground. Losing a sync is survivable; blocking the game on one is not.
+
+Public stats go up alongside every push, so a friend list is one read rather
+than one save download per friend.
+
+### What this does not do
+
+The client is authoritative. There is no server-side validation of what a card
+is worth or how a booster was obtained, so a determined player can edit their
+own save and their friends will see the result. For a single-player collecting
+game played among people who know each other, that is the right trade; it
+would be the wrong one for anything with a leaderboard.
 
 ---
 

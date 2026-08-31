@@ -13,6 +13,8 @@
  * happened to return.
  */
 
+import { touch } from './save.js';
+
 const LANG_KEY = 'packywiki.language';
 
 export const LANGUAGES = [
@@ -241,7 +243,88 @@ const STRINGS = {
     pullRates: 'Pull rates',
     oddsNote: 'Rarity is rolled per card. Every article has the same chance at every tier. How many people read it changes what the card is worth, not how rare it is.',
     rarity: 'Rarity',
-    chance: 'Chance'
+    chance: 'Chance',
+
+    // account gate
+    gateTitle: 'Wiklodo',
+    gateBody: 'Sign in to keep your collection. It lives on your account, so a new build or a new phone gets it all back.',
+    gateSignIn: 'Sign in',
+    gateSignUp: 'Create account',
+    gateEmail: 'Email',
+    gatePassword: 'Password',
+    gateUsername: 'Username',
+    gateUsernameHint: '3 to 20 characters: letters, numbers and underscores. This is how friends find you, and it cannot be changed.',
+    gatePasswordHint: 'At least 6 characters.',
+    gateForgot: 'Forgot your password?',
+    gateHaveAccount: 'Already have an account? Sign in',
+    gateNeedAccount: 'No account yet? Create one',
+    gateFoot: 'Your collection, coins and progress are saved to your account and restored whenever you sign in.',
+    gateWorking: 'One moment…',
+    gateSignedUp: 'Account created. Signing you in…',
+    gateConfirm: 'Check your inbox to confirm your address, then sign in.',
+    gateResetSent: 'If that address has an account, a reset link is on its way.',
+    gateResetNeedEmail: 'Enter your email address first.',
+    gateNameTitle: 'Choose a username',
+    gateNameBody: 'This is the name friends will search for. It cannot be changed later.',
+    gateNameSave: 'Claim it',
+
+    authBadLogin: 'That email and password do not match an account.',
+    authEmailTaken: 'There is already an account with that email address.',
+    authNameTaken: 'That username is taken. Try another.',
+    authWeakPassword: 'That password is too short. Use at least 6 characters.',
+    authBadEmail: 'That does not look like an email address.',
+    authBadName: 'Usernames are 3 to 20 characters: letters, numbers and underscores.',
+    authTooMany: 'Too many attempts. Wait a minute and try again.',
+    authOffline: 'Cannot reach the server. Check your connection.',
+    authUnknown: 'That did not work. Try again.',
+
+    // account, in settings
+    settingsAccount: 'Account',
+    accountSignedInAs: 'Signed in as {name}',
+    accountSignOut: 'Sign out',
+    accountSignOutNote: 'Your collection stays on your account. Sign back in on any device to get it.',
+    accountSyncTitle: 'Cloud save',
+    accountSyncNote: 'Your collection is uploaded automatically whenever it changes.',
+    accountSyncNow: 'Sync now',
+    accountSynced: 'Saved {when}',
+    accountSyncing: 'Saving…',
+    accountSyncFailed: 'Not saved yet. It will retry.',
+    accountNever: 'not yet',
+    accountJustNow: 'just now',
+    accountMinsAgo: '{n} min ago',
+    accountOfflineTitle: 'No account on this build',
+    accountOfflineNote: 'This build was made without a server, so it plays offline only and your collection stays on this device. Use Transfer save to move it.',
+
+    // friends
+    tabFriends: 'Friends',
+    friendsIntro: 'Search for a player by username, then look through their collection.',
+    friendsFind: 'Find a player',
+    friendsFindPlaceholder: 'Username',
+    friendsSearch: 'Search',
+    friendsSearching: 'Searching…',
+    friendsNoResults: 'No player by that name.',
+    friendsTypeMore: 'Type at least 2 characters.',
+    friendsResults: 'Results',
+    friendsYours: 'Your friends',
+    friendsIncoming: 'Wants to be friends',
+    friendsOutgoing: 'Waiting for them',
+    friendsEmpty: 'No friends yet. Search for a username above.',
+    friendsAdd: 'Add',
+    friendsAccept: 'Accept',
+    friendsDecline: 'Decline',
+    friendsCancel: 'Cancel',
+    friendsRemove: 'Remove friend',
+    friendsRemoveConfirm: 'Remove for good?',
+    friendsPending: 'Request sent',
+    friendsSent: 'Request sent to {name}.',
+    friendsAccepted: 'You and {name} are friends.',
+    friendsRemoved: 'Removed.',
+    friendsLevelLine: 'Level {n} · {rank}',
+    friendsCardsLine: '{n} cards',
+    friendCollection: 'Their collection',
+    friendLoading: 'Loading their collection…',
+    friendNoCards: 'They have not pulled any cards yet.',
+    friendPrivate: 'You need to be friends to see this collection.'
   },
 
   fr: {
@@ -456,7 +539,86 @@ const STRINGS = {
     pullRates: 'Taux de tirage',
     oddsNote: 'La rareté est tirée par carte. Chaque article a les mêmes chances à chaque palier. Le nombre de lecteurs change la valeur de la carte, pas sa rareté.',
     rarity: 'Rareté',
-    chance: 'Chance'
+    chance: 'Chance',
+
+    // compte
+    gateTitle: 'Wiklodo',
+    gateBody: 'Connectez-vous pour conserver votre collection. Elle est liée à votre compte : une nouvelle version ou un nouveau téléphone la retrouve entièrement.',
+    gateSignIn: 'Connexion',
+    gateSignUp: 'Créer un compte',
+    gateEmail: 'E-mail',
+    gatePassword: 'Mot de passe',
+    gateUsername: 'Pseudo',
+    gateUsernameHint: 'De 3 à 20 caractères : lettres, chiffres et tirets bas. C’est ainsi que vos amis vous trouvent, et il ne peut pas être modifié.',
+    gatePasswordHint: 'Au moins 6 caractères.',
+    gateForgot: 'Mot de passe oublié ?',
+    gateHaveAccount: 'Vous avez déjà un compte ? Connectez-vous',
+    gateNeedAccount: 'Pas encore de compte ? Créez-en un',
+    gateFoot: 'Votre collection, vos pièces et votre progression sont enregistrées sur votre compte et restaurées à chaque connexion.',
+    gateWorking: 'Un instant…',
+    gateSignedUp: 'Compte créé. Connexion en cours…',
+    gateConfirm: 'Confirmez votre adresse depuis votre boîte mail, puis connectez-vous.',
+    gateResetSent: 'Si un compte existe pour cette adresse, un lien de réinitialisation vient de partir.',
+    gateResetNeedEmail: 'Saisissez d’abord votre adresse e-mail.',
+    gateNameTitle: 'Choisissez un pseudo',
+    gateNameBody: 'C’est le nom que vos amis rechercheront. Il ne pourra pas être modifié.',
+    gateNameSave: 'Le prendre',
+
+    authBadLogin: 'Cet e-mail et ce mot de passe ne correspondent à aucun compte.',
+    authEmailTaken: 'Un compte existe déjà avec cette adresse e-mail.',
+    authNameTaken: 'Ce pseudo est déjà pris. Essayez-en un autre.',
+    authWeakPassword: 'Ce mot de passe est trop court. Utilisez au moins 6 caractères.',
+    authBadEmail: 'Cela ne ressemble pas à une adresse e-mail.',
+    authBadName: 'Les pseudos font de 3 à 20 caractères : lettres, chiffres et tirets bas.',
+    authTooMany: 'Trop de tentatives. Attendez une minute et réessayez.',
+    authOffline: 'Serveur injoignable. Vérifiez votre connexion.',
+    authUnknown: 'Cela n’a pas fonctionné. Réessayez.',
+
+    settingsAccount: 'Compte',
+    accountSignedInAs: 'Connecté en tant que {name}',
+    accountSignOut: 'Se déconnecter',
+    accountSignOutNote: 'Votre collection reste sur votre compte. Reconnectez-vous sur n’importe quel appareil pour la retrouver.',
+    accountSyncTitle: 'Sauvegarde en ligne',
+    accountSyncNote: 'Votre collection est envoyée automatiquement à chaque changement.',
+    accountSyncNow: 'Synchroniser',
+    accountSynced: 'Enregistré {when}',
+    accountSyncing: 'Enregistrement…',
+    accountSyncFailed: 'Pas encore enregistré. Nouvelle tentative à venir.',
+    accountNever: 'pas encore',
+    accountJustNow: 'à l’instant',
+    accountMinsAgo: 'il y a {n} min',
+    accountOfflineTitle: 'Aucun compte sur cette version',
+    accountOfflineNote: 'Cette version a été compilée sans serveur : elle fonctionne hors ligne et votre collection reste sur cet appareil. Utilisez Transférer la sauvegarde pour la déplacer.',
+
+    tabFriends: 'Amis',
+    friendsIntro: 'Cherchez un joueur par son pseudo, puis parcourez sa collection.',
+    friendsFind: 'Trouver un joueur',
+    friendsFindPlaceholder: 'Pseudo',
+    friendsSearch: 'Chercher',
+    friendsSearching: 'Recherche…',
+    friendsNoResults: 'Aucun joueur à ce nom.',
+    friendsTypeMore: 'Saisissez au moins 2 caractères.',
+    friendsResults: 'Résultats',
+    friendsYours: 'Vos amis',
+    friendsIncoming: 'Veulent être vos amis',
+    friendsOutgoing: 'En attente de réponse',
+    friendsEmpty: 'Pas encore d’amis. Cherchez un pseudo ci-dessus.',
+    friendsAdd: 'Ajouter',
+    friendsAccept: 'Accepter',
+    friendsDecline: 'Refuser',
+    friendsCancel: 'Annuler',
+    friendsRemove: 'Retirer cet ami',
+    friendsRemoveConfirm: 'Retirer définitivement ?',
+    friendsPending: 'Demande envoyée',
+    friendsSent: 'Demande envoyée à {name}.',
+    friendsAccepted: 'Vous êtes maintenant amis avec {name}.',
+    friendsRemoved: 'Retiré.',
+    friendsLevelLine: 'Niveau {n} · {rank}',
+    friendsCardsLine: '{n} cartes',
+    friendCollection: 'Sa collection',
+    friendLoading: 'Chargement de sa collection…',
+    friendNoCards: 'Il n’a encore tiré aucune carte.',
+    friendPrivate: 'Vous devez être amis pour voir cette collection.'
   }
 };
 
@@ -472,8 +634,19 @@ export function storedLanguage() {
   }
 }
 
+/**
+ * A guess for the strings shown BEFORE the choice is made — the account gate
+ * and the language dialog itself. It is never stored, so the choice is still
+ * the player's; it only stops a French phone being greeted in English.
+ */
+function guessLanguage() {
+  const wanted = (navigator.languages ?? [navigator.language ?? '']).map((tag) =>
+    String(tag).slice(0, 2).toLowerCase());
+  return wanted.find((code) => LANGUAGES.some((l) => l.id === code)) ?? 'en';
+}
+
 export function getLanguage() {
-  if (!current) current = storedLanguage() ?? 'en';
+  if (!current) current = storedLanguage() ?? guessLanguage();
   return current;
 }
 
@@ -482,6 +655,7 @@ export function setLanguage(id) {
   if (!LANGUAGES.some((l) => l.id === id)) return getLanguage();
   current = id;
   try { localStorage.setItem(LANG_KEY, id); } catch { /* session-only */ }
+  touch();
   return current;
 }
 

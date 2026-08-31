@@ -29,6 +29,30 @@ export const SAVE_KEYS = [
 const FORMAT = 'wiklodo-save';
 const VERSION = 1;
 
+/* --- change notification ------------------------------------------------- */
+
+/**
+ * Cloud sync needs to know when the save changed, and the honest place to
+ * answer that is here, where the definition of "the save" already lives.
+ * Everything that writes game state calls touch(); a listener decides what to
+ * do about it (in practice: debounce, then push).
+ *
+ * The alternative — calling a sync function from each of the thirty-odd places
+ * that write state — is one missed call site away from silently not syncing.
+ */
+const listeners = new Set();
+
+export function onSaveChanged(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
+
+export function touch() {
+  for (const fn of listeners) {
+    try { fn(); } catch { /* a broken listener must not break saving */ }
+  }
+}
+
 /** The current save, as text. */
 export function exportSave() {
   const data = {};
