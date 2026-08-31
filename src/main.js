@@ -1676,6 +1676,25 @@ function gateStatus(key, kind = '', vars = {}) {
   el.gateStatus.className = `gate-status${kind ? ` is-${kind}` : ''}`;
 }
 
+/**
+ * What to show for a failure.
+ *
+ * A message this build recognises is translated; anything else is shown as the
+ * server wrote it. Passing an unrecognised failure off as a known one is worse
+ * than being technical: it sends the reader looking in the wrong place.
+ */
+function describeError(error) {
+  const key = account.readableError(error);
+  if (key) return t(key);
+  const raw = String(error?.message ?? error ?? '').trim();
+  return raw || t('authUnknown');
+}
+
+function gateMessage(text, kind = 'error') {
+  el.gateStatus.textContent = text;
+  el.gateStatus.className = `gate-status${kind ? ` is-${kind}` : ''}`;
+}
+
 /** One labelled input, built here rather than in the HTML because the set changes. */
 function field(name, labelKey, { type = 'text', icon = 'profile', hintKey = null, autocomplete = '' } = {}) {
   const wrap = document.createElement('label');
@@ -1778,7 +1797,7 @@ async function submitGate(event) {
     synth.playFanfare();
     // onAuthChange takes it from here: it pulls the save and starts the app.
   } catch (error) {
-    gateStatus(account.readableError(error), 'error');
+    gateMessage(describeError(error));
     synth.playDenied();
   } finally {
     gateBusy = false;
@@ -1835,7 +1854,7 @@ function showNameGate() {
       synth.playFanfare();
       await enterApp();
     } catch (error) {
-      gateStatus(account.readableError(error), 'error');
+      gateMessage(describeError(error));
     }
   };
   el.gateAlt.onclick = () => leaveAccount();
@@ -2081,7 +2100,7 @@ async function socialAction(run, doneKey = null, vars = {}) {
     await loadFriends();
     if (doneKey) toast(t(doneKey, safe));
   } catch (error) {
-    toast(t(account.readableError(error)), 'error');
+    toast(esc(describeError(error)), 'error');
     synth.playDenied();
   }
 }
@@ -2104,6 +2123,11 @@ function findStatus(key, kind = 'muted', vars = {}) {
   el.findStatus.className = `find-status${kind ? ` is-${kind}` : ''}`;
 }
 
+function findMessage(text, kind = 'error') {
+  el.findStatus.textContent = text;
+  el.findStatus.className = `find-status${kind ? ` is-${kind}` : ''}`;
+}
+
 async function runSearch(event) {
   event?.preventDefault();
   const term = el.findInput.value.trim();
@@ -2119,7 +2143,7 @@ async function runSearch(event) {
     findStatus(state.social.results.length ? null : 'friendsNoResults');
     renderFriends();
   } catch (error) {
-    findStatus(account.readableError(error), 'error');
+    findMessage(describeError(error));
   }
 }
 
@@ -2264,7 +2288,7 @@ async function loadFriendCards(entry) {
     reveal(el.friendGrid.children, { step: 22, from: 10 });
   } catch (error) {
     if (state.viewing !== entry) return;
-    el.friendCardsStatus.textContent = t(account.readableError(error));
+    el.friendCardsStatus.textContent = describeError(error);
     el.friendCardsStatus.className = 'find-status is-error';
   }
 }
@@ -2565,7 +2589,7 @@ function openTransfer() {
           await account.pushSave(userId());
         } catch (error) {
           importSave(before);
-          status.textContent = t(account.readableError(error));
+          status.textContent = describeError(error);
           status.style.color = 'var(--negative)';
           synth.playDenied();
           return;
@@ -2612,7 +2636,7 @@ async function wipeEverything() {
     try {
       await account.clearSave(userId());
     } catch (error) {
-      toast(t(account.readableError(error)), 'error');
+      toast(esc(describeError(error)), 'error');
       synth.playDenied();
       return;
     }
