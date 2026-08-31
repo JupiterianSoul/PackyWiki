@@ -1,0 +1,199 @@
+/* ==========================================================================
+   THEME TOKENS
+   --------------------------------------------------------------------------
+   One block per theme. A theme owns far more than colour here: the radius
+   scale, the border weight and style, how a surface is made (glass, ink,
+   neon, shadow), the typeface, the letter-spacing, whether headings are
+   uppercase, how a press behaves, and which full-screen texture sits on top.
+
+   Everything downstream reads these names and nothing else, so a new theme is
+   a new block and never a new rule anywhere else.
+   ========================================================================== */
+
+:root {
+  /* Motion is written by JS from the theme table; these are the fallbacks. */
+  --motion-scale: 1;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  --gutter: clamp(16px, 4.4vw, 28px);
+  --nav-height: 68px;
+  --header-height: 60px;
+}
+
+/* --- AURORA: deep space glass -------------------------------------------- */
+[data-theme='aurora'] {
+  --ink: #eaeefb;
+  --ink-dim: #93a0c4;
+  --ink-faint: #5d6a8c;
+
+  --surface: rgba(255, 255, 255, 0.055);
+  --surface-2: rgba(255, 255, 255, 0.085);
+  --surface-solid: #10142a;
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+
+  --accent: #7dd3fc;
+  --accent-2: #a78bfa;
+  --accent-ink: #05070f;
+  --positive: #6ee7b7;
+  --negative: #fda4af;
+  --warning: #fcd34d;
+
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 26px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 18px 40px -24px rgba(0, 0, 0, 0.9);
+  --raise-shadow: 0 26px 60px -28px rgba(0, 0, 0, 0.95);
+  --glow: 0 0 28px -6px color-mix(in srgb, var(--accent) 55%, transparent);
+  --blur: blur(18px) saturate(1.25);
+
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font);
+  --display-weight: 800;
+  --display-tracking: -0.028em;
+  --display-transform: none;
+  --label-tracking: 0.07em;
+
+  --press-scale: 0.965;
+  --press-shift: 0px;
+  --texture: none;
+}
+
+/* --- PAPER: printed and pressed ------------------------------------------ */
+[data-theme='paper'] {
+  --ink: #171512;
+  --ink-dim: #5c574c;
+  --ink-faint: #8b8578;
+
+  --surface: #fffdf7;
+  --surface-2: #f7f2e6;
+  --surface-solid: #fffdf7;
+  --line: #171512;
+  --line-strong: #171512;
+
+  --accent: #1f6f5c;
+  --accent-2: #c2410c;
+  --accent-ink: #fffdf7;
+  --positive: #1f6f5c;
+  --negative: #b91c1c;
+  --warning: #b45309;
+
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+  --border: 2px;
+  --border-style: solid;
+
+  /* Print does not blur. Everything is a hard offset block shadow. */
+  --surface-shadow: 4px 4px 0 0 rgba(23, 21, 18, 0.9);
+  --raise-shadow: 7px 7px 0 0 rgba(23, 21, 18, 0.9);
+  --glow: none;
+  --blur: none;
+
+  --font: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, ui-serif, serif;
+  --font-display: var(--font);
+  --display-weight: 700;
+  --display-tracking: -0.012em;
+  --display-transform: none;
+  --label-tracking: 0.12em;
+
+  /* A pressed stamp travels into its own shadow rather than shrinking. */
+  --press-scale: 1;
+  --press-shift: 3px;
+  --texture: none;
+}
+
+/* --- ARCADE: cabinet glow ------------------------------------------------- */
+[data-theme='arcade'] {
+  --ink: #d7fbff;
+  --ink-dim: #6ea9b6;
+  --ink-faint: #3d6673;
+
+  --surface: rgba(10, 22, 34, 0.82);
+  --surface-2: rgba(16, 34, 52, 0.9);
+  --surface-solid: #071120;
+  --line: #22d3ee;
+  --line-strong: #67e8f9;
+
+  --accent: #22d3ee;
+  --accent-2: #f0abfc;
+  --accent-ink: #04121a;
+  --positive: #4ade80;
+  --negative: #fb7185;
+  --warning: #facc15;
+
+  --radius-sm: 0px;
+  --radius: 2px;
+  --radius-lg: 4px;
+  --radius-pill: 2px;
+  --border: 2px;
+  --border-style: solid;
+
+  --surface-shadow: 0 0 0 1px rgba(34, 211, 238, 0.18), 0 0 22px -6px rgba(34, 211, 238, 0.55);
+  --raise-shadow: 0 0 0 1px rgba(34, 211, 238, 0.3), 0 0 34px -4px rgba(34, 211, 238, 0.75);
+  --glow: 0 0 18px -2px var(--accent);
+  --blur: none;
+
+  --font: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --font-display: var(--font);
+  --display-weight: 700;
+  --display-tracking: 0.02em;
+  --display-transform: uppercase;
+  --label-tracking: 0.18em;
+
+  --press-scale: 1;
+  --press-shift: 2px;
+  --texture: scanlines;
+}
+
+/* --- NOIR: one light, one shadow ------------------------------------------ */
+[data-theme='noir'] {
+  --ink: #ece7dd;
+  --ink-dim: #8e8880;
+  --ink-faint: #5b5751;
+
+  --surface: rgba(255, 255, 255, 0.032);
+  --surface-2: rgba(255, 255, 255, 0.06);
+  --surface-solid: #131313;
+  --line: rgba(232, 195, 122, 0.2);
+  --line-strong: rgba(232, 195, 122, 0.45);
+
+  --accent: #e8c37a;
+  --accent-2: #b99a5c;
+  --accent-ink: #0a0a0a;
+  --positive: #cbbb8f;
+  --negative: #c96f6f;
+  --warning: #e8c37a;
+
+  --radius-sm: 1px;
+  --radius: 2px;
+  --radius-lg: 3px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 30px 60px -40px #000;
+  --raise-shadow: 0 40px 80px -40px #000;
+  --glow: 0 0 40px -14px rgba(232, 195, 122, 0.7);
+  --blur: blur(6px);
+
+  --font: 'Iowan Old Style', Georgia, ui-serif, serif;
+  --font-display: 'Didot', 'Bodoni MT', 'Playfair Display', Georgia, ui-serif, serif;
+  --display-weight: 600;
+  --display-tracking: 0.01em;
+  --display-transform: none;
+  --label-tracking: 0.24em;
+
+  --press-scale: 0.985;
+  --press-shift: 0px;
+  --texture: grain;
+}

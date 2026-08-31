@@ -7,10 +7,14 @@ rolled against an eight-tier rarity table with its own visual treatment and its
 own synthesised chime, priced in Buckarooz by how many people actually read the
 article, and saved to a collection you can filter, favourite and sell from.
 
+Four themes, and a theme here is not a palette: each carries its own shapes,
+typeface, pace, texture, live backdrop and musical instrument.
+
 Available in English and French, including the articles themselves.
 
-No backend, no API key, no build-time data. Everything is fetched live from
-Wikipedia's public API and every sound is generated at runtime with the Web
+No backend, no API key, no build-time data, and no UI framework or component
+library. Everything is fetched live from Wikipedia's public API, every control
+is built from scratch, and every sound is synthesised at runtime with the Web
 Audio API.
 
 > The app was called PackyWiki until the rename. Two things deliberately kept
@@ -92,14 +96,107 @@ binary image assets.
 
 ---
 
+## The interface
+
+The app is not a web page with an app-shaped stylesheet on it. Its parts are
+built here rather than borrowed, and none of it is a component library.
+
+**The frame.** A live canvas backdrop, a floating app bar carrying the level
+ring, the screen, the wallet and the gift, five destinations in a floating
+bottom bar, and one sheet that every panel in the app uses. Opening a pack is
+a **takeover**: the frame gets out of the way and the backdrop stops, so the
+whole frame budget goes to the cards.
+
+**The controls**, all in `src/ui/components.js`:
+
+| | |
+|---|---|
+| `press` | takes the press on the way *down*, with the sound |
+| `Odometer` | digits that roll, so a balance change reads before you can |
+| `Ring` | the level badge, sweeping to its value |
+| `Bar` | a fill that animates from wherever it already was |
+| `Segmented` | one indicator that *travels* between segments |
+| `Sheet` | rubber-bands upward, dismisses on distance **or** velocity |
+| `NavBar` | one indicator that travels; the active icon lifts |
+| `Rail` | a depth carousel with a magnetic centre |
+
+The pairing that matters most is the sheet's: dismissing on velocity as well
+as distance is most of what separates a sheet that feels native from a div
+someone animated.
+
+---
+
+## Themes
+
+A theme is not a palette. Each of the four carries its own **shape language,
+typeface, pace, texture, backdrop and instrument**:
+
+| | Aurora | Paper | Arcade | Noir |
+|---|---|---|---|---|
+| Surface | glass, blurred | cream, hard ink border | neon on black | one light on black |
+| Corners | 18px | 8px | 2px | 2px |
+| Type | sans | serif | monospace, uppercase | display serif |
+| Shadow | soft, blurred | hard offset block | outer glow | deep, soft |
+| Press | scales down | sinks into its shadow | shifts and flares | barely moves |
+| Pace | 1.0x | 0.6x, snappy | 0.42x, immediate | 1.5x, cinematic |
+| Backdrop | drifting aurora ribbons | paper fibre and ruled lines | CRT grid horizon | light leak, blinds, grain |
+| Instrument | FM bell | marimba | square and saw | plucked string |
+
+Colour and shape live in `styles/themes.css`, one block per theme; the canvas
+and synth parameters live in `ui/themes.js` under the same ids. Adding a theme
+is a row in one, a block in the other, and a renderer — nothing else in the app
+knows the list.
+
+The picker in Settings gives each option its own `data-theme`, so **the token
+block applies to the option itself**: you are choosing between four miniatures
+of the app rather than four names and a swatch.
+
+---
+
+## Sound
+
+Every sound is synthesised at runtime. The repo ships no audio files, and the
+theme decides the instrument, so switching theme changes what the app *sounds*
+like as much as what it looks like. One chain serves everything:
+
+```
+voice -> [ soft clip ] -> bus -> filter -> compressor -> master -> out
+                           \-> send -> convolver (generated room) -> master
+```
+
+Four voices, written from first principles: an **FM bell** (a modulator at
+3.01x, decaying faster than its carrier), a **marimba** (three inharmonic
+partials plus a mallet knock), a **chiptune** stack (square plus detuned saw,
+gated rather than faded), and a **plucked string** (Karplus-Strong: a noise
+burst through a tuned delay that damps a little each pass).
+
+Twenty-odd sounds cover the whole app rather than just the opening: taps,
+navigation with a sense of direction, toggles that differ on and off, sheets,
+a card turning face up, the shelf snapping, buying, selling, refusal, arming
+something destructive, gifts, level-ups, XP, and a chime when a timed booster
+becomes ready.
+
+---
+
 ## Project layout
 
 ```
-index.html            markup for every screen and modal
+index.html            the app shell: frame, screens, one sheet
 src/
-  main.js             app controller: shelf, rip, opening animation, binder
-  style.css           all styling, including one block per rarity treatment
-  audio.js            Web Audio synthesis (rip, card flip, per-rarity chimes)
+  main.js             app controller: screens, opening flow, wiring
+  style.css           imports the six stylesheets below
+  styles/
+    themes.css        ONE BLOCK PER THEME — the only place colour lives
+    base.css          reset, typography, frame, backdrop, texture
+    components.css    the app's own controls and their per-theme variants
+    booster.css       the foil pack and the rip
+    cards.css         the card, the flip, one block per rarity tier
+    screens.css       layout for each destination
+  ui/
+    themes.js         THEME TABLE — canvas and synth parameters
+    sound.js          the synthesiser: four voices, one signal chain
+    backdrop.js       one live canvas renderer per theme
+    components.js     press, Odometer, Ring, Bar, Segmented, Sheet, NavBar, Rail
   wiki.js             Wikipedia + custom-wiki fetching, filtering, de-duplication
   pricing.js          popularity model and card prices
   economy.js          booster prices, sell rate, the house edge, the stipend
@@ -123,17 +220,18 @@ android/              WebView wrapper that packages the web build as an APK
 .github/workflows/android.yml     builds and publishes the APK
 ```
 
-The two tables in `src/data/` are the extension points. Everything else reads
+The tables in `src/data/` and `src/ui/themes.js` are the extension points. Everything else reads
 from them: the pack picker, the accent colours, the odds modal and the card
 effects are all generated, so neither table has a hard-coded counterpart
 anywhere in the UI code.
 
-### Tabs
+### Destinations
 
-**Boosters** what you own · **Timed** the free trickle · **Custom** build a pack
-from a subject's own wiki · **Shop** buy things · **Collection** the binder ·
-**Profile** level, rank and stats · **Settings** sound, battery, data. The
-daily-gift button lives in the top bar next to the balance.
+Five, in the bottom bar: **Packs** (owned, and the custom builder behind a
+segmented control) · **Timed** · **Shop** · **Binder** · **Profile**. The
+wallet and the daily gift live in the app bar; Settings, the odds and the
+wallet explainer hang off the Profile, because none of them is somewhere you
+go — they are things you look at once.
 
 ---
 
@@ -499,10 +597,27 @@ never stops moving. Four brakes:
   anything inside an inactive screen, which is free.
 - **Audio parks itself.** A running `AudioContext` keeps the audio thread alive
   even in silence, so it is suspended when the app goes to the background.
-- **Battery saver**, in Settings, stops the ambient motion everywhere and
-  flattens the fixed three-gradient page background. Transitions and one-shot
-  animations still run, so the app still feels alive; it just stops repainting
-  when nothing has happened.
+- **The backdrop is governed hard.** It stops when the document is hidden, and
+  it stops during a takeover, so the frame budget while cards are flying goes
+  entirely to the cards. It renders at a capped pixel ratio, and at half
+  resolution on the themes whose look survives it — they are soft, blurred
+  fields, and nobody sees the difference at arm's length.
+- **Battery saver**, in Settings, paints one static backdrop frame and never
+  runs the loop, stops the ambient motion everywhere, and drops the blurs.
+  Transitions and one-shot animations still run, so the app still feels alive;
+  it just stops repainting when nothing has happened.
+
+Two things in the backdrops are deliberately cheap rather than obvious. Noir's
+film grain comes from **one 128px tile**, generated once and blitted at a new
+offset every eighth of a second; scattering grain across the screen per pixel
+per frame is tens of thousands of trigonometric calls a frame, which is exactly
+the sort of thing that warms a handset. Arcade's scanlines are a **CSS overlay**
+rather than a few hundred `fillRect` calls a frame. All four themes hold 60fps
+with the backdrop running.
+
+The rest of the app pulls in the same direction: the theme's `--motion-scale`
+means Arcade's animations are less than half the length of Aurora's, so the
+snappiest theme is also the cheapest.
 
 Playtime is measured between visibility changes rather than by a stopwatch —
 a timer ticking once a second purely to add one to a number is exactly the sort
@@ -538,29 +653,11 @@ rather than how it is built:
 | Battery saver | Stops the glow, shimmer and drift; plainer, cooler, cheaper |
 | On-screen hints | Hides the swipe tips once you no longer need them |
 
+Above them sits the theme picker (see **Themes**).
+
 Below them, the language is shown but locked (see below), and **Erase
 everything** uses the same arm-then-confirm shape as selling a card: the button
 is its own dialog.
-
----
-
-## Sound
-
-Every sound is **synthesised at runtime** with the Web Audio API. The repo
-ships no audio files at all: a rip is filtered noise whose pitch and grit
-follow the drag, a reveal is a pentatonic chord that grows partials, sub-bass
-and shimmer with the tier, and the reverb is a generated impulse response.
-
-Twenty-odd distinct sounds cover the whole app rather than just the opening:
-tearing, card flips and the per-tier reveal chime; taps, tab switches with a
-sense of direction, modals opening and closing, a shelf snapping to a booster;
-buying, selling, a refusal, arming a destructive button; a gift, a level-up, a
-small tick when XP lands, and a chime when a timed booster becomes ready while
-you are watching the tab.
-
-The AudioContext is created on the first tap (browsers require a gesture) and
-suspended whenever the app goes to the background. **Sound** in Settings mutes
-everything.
 
 ---
 

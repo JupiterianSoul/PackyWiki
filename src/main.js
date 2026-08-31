@@ -1,14 +1,25 @@
 /**
- * Wiklodo — app controller.
+ * WIKLODO — application shell.
+ * ============================================================================
+ * This file owns the interface and nothing else. Every rule about what a
+ * booster costs, what a card is worth, when a gift is due or how a level is
+ * earned lives in its own module and is imported here; if you are looking for
+ * a number, it is not in this file.
  *
- * Four tabs: the boosters you own, custom boosters you've built, the shop that
- * sells them, and the collection binder. Opening a booster happens on its own
- * screen which runs through four phases — idle, opening, reveal, summary —
- * without ever swapping screens, so there is no loading gap.
+ * The shape of the app:
+ *
+ *   a live backdrop        one canvas, per theme, behind everything
+ *   a floating app bar     level, screen, wallet, gift
+ *   five destinations      Packs, Timed, Shop, Binder, Profile
+ *   one sheet              every panel in the app is this one component
+ *   one takeover           opening a pack hides the frame entirely
+ *
+ * Themes are not a palette swap: each carries its own shapes, typeface, pace,
+ * texture, backdrop and instrument. See ui/themes.js.
  */
 
-import { THEME_PACKS, themeById, heroTitles } from './data/packs.js';
-import { RARITIES, rarityById, rarityRank, rollRarity, oddsTable } from './data/rarities.js';
+import { THEME_PACKS, themeById as packById, heroTitles } from './data/packs.js';
+import { RARITIES, rarityById, rarityRank, rollRarity, oddsTable, rarityChances } from './data/rarities.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
 import { drawArticles, resolveCustomWiki, fetchPackArt, fetchCustomPackArt } from './wiki.js';
 import { priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS } from './pricing.js';
@@ -25,18 +36,23 @@ import {
   MAX_LEVEL, xpForCard, xpForLevel, rankFor, rewardForLevel, addXp, levelFraction
 } from './progression.js';
 import {
-  BOARD_SIZE, generateBoard, canClaim, claim as claimDaily, nextIndex as nextGiftIndex,
+  generateBoard, canClaim, claim as claimDaily, nextIndex as nextGiftIndex,
   msUntilNextDay, dayNumber
 } from './daily.js';
 import {
   MAX_TIMED_LEVEL, accrue, msToNext, timedLevel, timedSpec, maxHeld, regenMs,
   levelBounds, levelProgress, timedRollOptions
 } from './timed.js';
-import { rarityChances } from './data/rarities.js';
 import { t, tx, getLanguage, setLanguage, languageChosen, LANGUAGES } from './i18n.js';
-import { synth } from './audio.js';
 
-/* --- tuning --------------------------------------------------------------- */
+import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
+import { synth } from './ui/sound.js';
+import { backdrop } from './ui/backdrop.js';
+import {
+  press, trackDrag, dur, Odometer, Ring, Bar, Segmented, Sheet, NavBar, Rail, reveal
+} from './ui/components.js';
+
+/* --- tuning ---------------------------------------------------------------- */
 const RIP_COMMIT = 0.62;
 const RIP_TICK_STEP = 0.055;
 const RIP_LOCK_SLOP = 10;
@@ -44,7 +60,7 @@ const SWIPE_COMMIT = 78;
 const EMERGE_STAGGER = 110;
 const EMERGE_DURATION = 820;
 const PREFETCH_DELAY = 350;
-const TILT_MAX = 16;      // degrees a held card leans by
+const TILT_MAX = 16;
 
 const $ = (sel) => document.querySelector(sel);
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -59,120 +75,15 @@ const shuffle = (arr) => {
   return out;
 };
 
-/**
- * Run a drag from a pointerdown. Move and release are tracked on `window`
- * because a drag almost always ends outside the element it started on.
- */
-function trackDrag(event, { onMove, onEnd }) {
-  const x0 = event.clientX;
-  const y0 = event.clientY;
-  const move = (e) => onMove(e.clientX - x0, e.clientY - y0, e);
-  const end = (e) => {
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', end);
-    window.removeEventListener('pointercancel', end);
-    onEnd(e.clientX - x0, e.clientY - y0, e);
-  };
-  window.addEventListener('pointermove', move);
-  window.addEventListener('pointerup', end);
-  window.addEventListener('pointercancel', end);
-}
-
-const el = {};
-const bind = (map) => Object.assign(el, map);
-bind({
-  screens: {
-    boosters: $('#screen-boosters'), timed: $('#screen-timed'), custom: $('#screen-custom'),
-    shop: $('#screen-shop'), open: $('#screen-open'), collection: $('#screen-collection'),
-    profile: $('#screen-profile'), settings: $('#screen-settings')
-  },
-  brandMark: $('#brand-mark'), brandSub: $('#brand-sub'),
-  tabs: [...document.querySelectorAll('.tab')], tabCount: $('#tab-count'),
-  wallet: $('#wallet'), oddsButton: $('#odds-button'),
-  dailyButton: $('#daily-button'), dailyButtonLabel: $('#daily-button-label'),
-  giftIcon: $('#gift-icon'), giftDot: $('#gift-dot'), timedCount: $('#timed-count'),
-
-  rail: $('#pack-rail'), railPrev: $('#rail-prev'), railNext: $('#rail-next'),
-  railName: $('#rail-name'), railTagline: $('#rail-tagline'), railOwned: $('#rail-owned'),
-  railOpen: $('#rail-open'), railHint: $('#rail-hint'), railCaption: $('#rail-caption'),
-  boostersEmpty: $('#boosters-empty'),
-
-  customRail: $('#custom-rail'), customCaption: $('#custom-caption'),
-  customName: $('#custom-name'), customTagline: $('#custom-tagline'),
-  customOwned: $('#custom-owned'), customOpen: $('#custom-open'), customEmpty: $('#custom-empty'),
-  customForm: $('#custom-form'), customIntro: $('#custom-intro'),
-  customInput: $('#custom-input'), customSubmit: $('#custom-submit'), customStatus: $('#custom-status'),
-
-  shopIntro: $('#shop-intro'), restock: $('#restock'), shopRows: $('#shop-rows'),
-
-  openScreen: $('#screen-open'), openTitle: $('#open-title'), openProgress: $('#open-progress'),
-  boosterSlot: $('#booster-slot'), cardStack: $('#card-stack'), packSummary: $('#pack-summary'),
-  openHint: $('#open-hint'), revealActions: $('#reveal-actions'),
-  backToShelf: $('#back-to-shelf'), backButton: $('#back-button'),
-
-  collectionStats: $('#collection-stats'), collectionGrid: $('#collection-grid'),
-  collectionEmpty: $('#collection-empty'),
-  filterToggle: $('#filter-toggle'), filterIcon: $('#filter-icon'),
-  filterToggleLabel: $('#filter-toggle-label'), filterSummary: $('#filter-summary'),
-  filters: $('#filters'), filterSearch: $('#filter-search'), filterPack: $('#filter-pack'),
-  filterRarity: $('#filter-rarity'), filterBand: $('#filter-band'), filterPrice: $('#filter-price'),
-  filterSort: $('#filter-sort'), filterFav: $('#filter-fav'), filterFavLabel: $('#filter-fav-label'),
-  filterReset: $('#filter-reset'),
-
-  cardModal: $('#card-modal'), cardModalClose: $('#card-modal-close'), cardDetail: $('#card-detail'),
-  detailTitle: $('#detail-title'), detailSub: $('#detail-sub'), detailFacts: $('#detail-facts'),
-  detailExtract: $('#detail-extract'), detailRead: $('#detail-read'), detailSell: $('#detail-sell'),
-
-  walletModal: $('#wallet-modal'), walletClose: $('#wallet-close'), walletTitle: $('#wallet-title'),
-  walletBalance: $('#wallet-balance'), walletWhat: $('#wallet-what'), walletNote: $('#wallet-note'),
-  walletEarnTitle: $('#wallet-earn-title'), walletEarn: $('#wallet-earn'),
-  walletSpendTitle: $('#wallet-spend-title'), walletSpend: $('#wallet-spend'),
-
-  oddsModal: $('#odds-modal'), oddsClose: $('#odds-close'), oddsBody: $('#odds-body'),
-  oddsHeading: $('#odds-heading'), oddsNote: $('#odds-note'), oddsH1: $('#odds-h1'), oddsH2: $('#odds-h2'),
-
-  welcomeModal: $('#welcome-modal'), welcomeTitle: $('#welcome-title'), welcomeBody: $('#welcome-body'),
-  langChoices: $('#lang-choices'), starterPanel: $('#starter-panel'), starterTitle: $('#starter-title'),
-  starterBody: $('#starter-body'), starterLoot: $('#starter-loot'), starterGo: $('#starter-go'),
-
-  timedTitle: $('#timed-title'), timedIntro: $('#timed-intro'),
-  timedBoosterSlot: $('#timed-booster'), timedHeld: $('#timed-held'),
-  timedNext: $('#timed-next'), timedOpen: $('#timed-open'),
-  trackLevel: $('#track-level'), trackRemaining: $('#track-remaining'),
-  trackFill: $('#track-fill'), trackPerks: $('#track-perks'), trackNext: $('#track-next'),
-
-  profileAvatar: $('#profile-avatar'), profileLevel: $('#profile-level'),
-  profileRank: $('#profile-rank'), xpFill: $('#xp-fill'), xpLine: $('#xp-line'),
-  nextRewardTitle: $('#next-reward-title'), nextRewardBody: $('#next-reward-body'),
-  profileStatsTitle: $('#profile-stats-title'), profileStatGrid: $('#profile-stat-grid'),
-  profileRarityTitle: $('#profile-rarity-title'), profileRarity: $('#profile-rarity'),
-
-  settingsTitle: $('#settings-title'), settingsList: $('#settings-list'),
-  settingsDataTitle: $('#settings-data-title'),
-  settingsLanguageTitle: $('#settings-language-title'),
-  settingsLanguageNote: $('#settings-language-note'),
-  settingsLanguageValue: $('#settings-language-value'),
-  settingsResetTitle: $('#settings-reset-title'), settingsResetNote: $('#settings-reset-note'),
-  settingsReset: $('#settings-reset'),
-
-  dailyModal: $('#daily-modal'), dailyTitle: $('#daily-title'), dailyClose: $('#daily-close'),
-  dailyBody: $('#daily-body'), dailyClaim: $('#daily-claim'), dailyStatus: $('#daily-status'),
-  dailyBoardLabel: $('#daily-board-label'), giftBoard: $('#gift-board'),
-
-  levelModal: $('#level-modal'), levelTitle: $('#level-title'), levelBody: $('#level-body'),
-  levelFrom: $('#level-from'), levelTo: $('#level-to'), levelFill: $('#level-fill'),
-  levelReward: $('#level-reward'), levelClaim: $('#level-claim'),
-
-  xpPop: $('#xp-pop'),
-  flash: $('#flash'), toast: $('#toast')
-});
-
+const THEME_KEY = 'packywiki.theme';
 const RIP_DIR_KEY = 'packywiki.ripDirection';
 
+/* --- state ----------------------------------------------------------------- */
+
 const state = {
-  tab: 'boosters',
-  rails: {},                 // per-tab { items, focusIndex }
-  spec: null,                // booster being opened
+  tab: 'packs',
+  packMode: 'owned',           // 'owned' | 'custom'
+  spec: null,
   customPacks: store.loadCustomPacks(),
   collection: store.loadCollection(),
   inventory: store.loadInventory(),
@@ -185,36 +96,85 @@ const state = {
   busy: false,
   pulls: [], cards: [], index: 0, seen: new Set(),
   detail: null,
-  filtersOpen: false,
+  packSlots: [],
   filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false }
 };
 
+const settings = () => state.profile.settings;
 const money = (amount) => `${buckSvg({ size: 12 })}${formatAmount(amount)}`;
 
-function toast(message, kind = 'ok') {
-  el.toast.innerHTML = message;
-  el.toast.className = `toast is-${kind} is-showing`;
-  el.toast.hidden = false;
-  clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { el.toast.classList.remove('is-showing'); }, 2600);
-}
+/* --- elements --------------------------------------------------------------- */
 
-/* --- the one timer -------------------------------------------------------- */
+const el = {};
+const bind = (map) => Object.assign(el, map);
+bind({
+  screens: {
+    packs: $('#screen-packs'), timed: $('#screen-timed'), shop: $('#screen-shop'),
+    binder: $('#screen-binder'), profile: $('#screen-profile'),
+    settings: $('#screen-settings'), open: $('#screen-open')
+  },
+  backdrop: $('#backdrop'), navbar: $('#navbar'),
+  levelBadge: $('#level-badge'), appbarTitle: $('#appbar-title'), appbarSub: $('#appbar-sub'),
+  wallet: $('#wallet'), walletMark: $('#wallet-mark'), walletAmount: $('#wallet-amount'),
+  gift: $('#gift'), giftIcon: $('#gift-icon'), giftDot: $('#gift-dot'),
+
+  packsSeg: $('#packs-seg'), packsRail: $('#packs-rail'), packsCaption: $('#packs-caption'),
+  packsName: $('#packs-name'), packsSub: $('#packs-sub'), packsOwn: $('#packs-own'),
+  packsActions: $('#packs-actions'), packsOpen: $('#packs-open'), packsHint: $('#packs-hint'),
+  packsEmpty: $('#packs-empty'), packsEmptyMark: $('#packs-empty-mark'),
+  packsEmptyText: $('#packs-empty-text'), packsEmptyCta: $('#packs-empty-cta'),
+  creator: $('#creator'), creatorLabel: $('#creator-label'), creatorNote: $('#creator-note'),
+  creatorInput: $('#creator-input'), creatorGo: $('#creator-go'), creatorStatus: $('#creator-status'),
+
+  timedTitle: $('#timed-title'), timedIntro: $('#timed-intro'), timedPack: $('#timed-pack'),
+  timedCount: $('#timed-count'), timedNext: $('#timed-next'), timedOpen: $('#timed-open'),
+  trackLevel: $('#track-level'), trackRemaining: $('#track-remaining'), trackBar: $('#track-bar'),
+  trackPerks: $('#track-perks'), trackNext: $('#track-next'),
+
+  shopTitle: $('#shop-title'), shopIntro: $('#shop-intro'), restock: $('#restock'), shopRows: $('#shop-rows'),
+
+  binderTitle: $('#binder-title'), binderStats: $('#binder-stats'), binderGrid: $('#binder-grid'),
+  binderEmpty: $('#binder-empty'), binderEmptyMark: $('#binder-empty-mark'),
+  binderEmptyText: $('#binder-empty-text'),
+  filterOpen: $('#filter-open'), filterCount: $('#filter-count'),
+
+  profileRing: $('#profile-ring'), profileLevel: $('#profile-level'), profileRank: $('#profile-rank'),
+  xpBar: $('#xp-bar'), xpLine: $('#xp-line'), nextRewardLabel: $('#next-reward-label'),
+  nextReward: $('#next-reward'), statsLabel: $('#stats-label'), statGrid: $('#stat-grid'),
+  rarityLabel: $('#rarity-label'), rarityBars: $('#rarity-bars'),
+  moreLabel: $('#more-label'), profileLinks: $('#profile-links'),
+
+  settingsTitle: $('#settings-title'), themeLabel: $('#theme-label'), themeGrid: $('#theme-grid'),
+  prefsLabel: $('#prefs-label'), settingsList: $('#settings-list'),
+  dataLabel: $('#data-label'), dataList: $('#data-list'),
+
+  openScreen: $('#screen-open'), openBack: $('#open-back'), openTitle: $('#open-title'),
+  openProgress: $('#open-progress'), openStage: $('#open-stage'), boosterSlot: $('#booster-slot'),
+  cardStack: $('#card-stack'), summary: $('#summary'), openHint: $('#open-hint'), openDone: $('#open-done'),
+
+  sheet: $('#sheet'), sheetTitle: $('#sheet-title'), sheetBody: $('#sheet-body'), sheetClose: $('#sheet-close'),
+
+  welcome: $('#welcome'), welcomeMark: $('#welcome-mark'), welcomeTitle: $('#welcome-title'),
+  welcomeBody: $('#welcome-body'), langChoices: $('#lang-choices'), starter: $('#starter'),
+  starterTitle: $('#starter-title'), starterBody: $('#starter-body'),
+  starterLoot: $('#starter-loot'), starterGo: $('#starter-go'),
+
+  flash: $('#flash'), toast: $('#toast'), xpPop: $('#xp-pop')
+});
+
+let nav, sheet, walletOdo, levelRing, profileRing, xpBar, trackBar, packsSeg;
+
+/* --- the one timer ----------------------------------------------------------- */
 
 /**
- * Everything that needs a clock shares a single interval, and that interval
- * only runs when the tab is visible AND something on screen actually wants it.
- *
- * The old code left a 1 Hz interval running for the life of the session the
- * moment the shop rendered once, which kept the phone awake redrawing a
- * countdown nobody was looking at. Waking once a second is cheap; waking once
- * a second forever, in the background, is what warms a handset up.
+ * Everything that needs a clock shares one interval, and it only runs when the
+ * document is visible AND a screen that wants it is on display. A 1 Hz timer
+ * left running in the background is the cheapest way to warm a phone up for
+ * nothing.
  */
 const ticker = { id: null, jobs: new Map() };
 
-function runTicker() {
-  for (const job of ticker.jobs.values()) job();
-}
+const runTicker = () => { for (const job of ticker.jobs.values()) job(); };
 
 function setTickerJob(name, job) {
   if (job) ticker.jobs.set(name, job);
@@ -228,29 +188,8 @@ function syncTicker() {
   if (!wanted && ticker.id != null) { clearInterval(ticker.id); ticker.id = null; }
 }
 
-/* --- settings ------------------------------------------------------------- */
+/* --- playtime ---------------------------------------------------------------- */
 
-const settings = () => state.profile.settings;
-
-/**
- * Push the settings into the document. Everything visual is driven by data
- * attributes on <html> so CSS can switch whole families of animation off at
- * once rather than the app having to know about each one.
- */
-function applySettings() {
-  const s = settings();
-  document.documentElement.dataset.lowpower = s.lowPower ? '1' : '0';
-  document.documentElement.dataset.hints = s.hints ? '1' : '0';
-  synth.setMuted(!s.sound);
-}
-
-/* --- playtime ------------------------------------------------------------- */
-
-/**
- * Counted in chunks. A stopwatch ticking every second purely to add one to a
- * number is exactly the sort of background work this app should not be doing,
- * so time is measured between visibility changes instead.
- */
 let visibleSince = document.visibilityState === 'visible' ? Date.now() : null;
 
 function flushPlaytime() {
@@ -259,44 +198,93 @@ function flushPlaytime() {
   visibleSince = Date.now();
 }
 
-/* --- shell ---------------------------------------------------------------- */
+/* --- toast -------------------------------------------------------------------- */
 
-/** Which screens want the shared clock, and what they want it to do. */
-function screenTicker(name) {
-  setTickerJob('shop', name === 'shop' ? tickRestock : null);
-  setTickerJob('timed', name === 'timed' ? tickTimed : null);
+function toast(markup, kind = 'ok') {
+  el.toast.innerHTML = markup;
+  el.toast.className = `toast is-${kind} is-showing`;
+  el.toast.hidden = false;
+  clearTimeout(toast.timer);
+  toast.timer = setTimeout(() => { el.toast.classList.remove('is-showing'); }, 2600);
 }
+
+/* --- theming -------------------------------------------------------------------- */
+
+function storedTheme() {
+  try { return localStorage.getItem(THEME_KEY) ?? DEFAULT_THEME; } catch { return DEFAULT_THEME; }
+}
+
+/**
+ * Switch theme. The document attribute repaints every token; the backdrop and
+ * the synthesiser are told separately because neither lives in CSS.
+ */
+function useTheme(id, { announce = false } = {}) {
+  const theme = applyTheme(id);
+  try { localStorage.setItem(THEME_KEY, theme.id); } catch { /* session only */ }
+  backdrop.setTheme(theme.id);
+  synth.setTheme(theme.id);
+  document.querySelector('meta[name="theme-color"]')
+    ?.setAttribute('content', theme.swatch[0]);
+  if (announce) { synth.resume(); synth.playTheme(); }
+  return theme;
+}
+
+/* --- app chrome ------------------------------------------------------------------ */
+
+const SCREEN_TITLES = {
+  packs: 'tabBoosters', timed: 'tabTimed', shop: 'tabShop',
+  binder: 'tabCollection', profile: 'tabProfile', settings: 'tabSettings'
+};
 
 function showScreen(name) {
   Object.entries(el.screens).forEach(([key, node]) => node.classList.toggle('is-active', key === name));
-  if (name !== 'open') state.tab = name;
-  el.tabs.forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === state.tab));
-  // Seven tabs do not fit across a phone, so bring the current one into view
-  // rather than leaving it off the end of the strip.
-  const active = el.tabs.find((tab) => tab.dataset.tab === state.tab);
-  active?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior: 'smooth' });
-  screenTicker(name);
+  if (name !== 'open') {
+    state.tab = name;
+    nav?.select(navTabFor(name), { silent: true });
+    el.appbarTitle.textContent = t(SCREEN_TITLES[name] ?? 'tabBoosters');
+  }
+
+  // Opening a pack is a takeover: the frame gets out of the way, and the
+  // backdrop stops so the whole GPU budget goes to the cards.
+  const immersive = name === 'open';
+  document.documentElement.classList.toggle('is-immersive', immersive);
+  backdrop.setPaused(immersive);
+
+  setTickerJob('shop', name === 'shop' ? tickRestock : null);
+  setTickerJob('timed', name === 'timed' ? tickTimed : null);
   window.scrollTo({ top: 0 });
 }
 
-function applyAccent(colours) {
-  document.documentElement.style.setProperty('--accent', colours.accent);
-  document.documentElement.style.setProperty('--accent2', colours.accent2);
-}
+/** Settings has no destination of its own; it lives under Profile. */
+const navTabFor = (screen) => (screen === 'settings' ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
-  el.wallet.innerHTML = money(state.wallet);
+  walletOdo.set(state.wallet);
   el.wallet.setAttribute('aria-label', `${t('walletTitle')}: ${formatAmount(state.wallet)}`);
 }
 
-/* --- booster art ---------------------------------------------------------- */
+function refreshLevelBadge() {
+  const level = state.profile.progress.level ?? 1;
+  levelRing.set(levelFraction(state.profile.progress), String(level));
+  el.levelBadge.setAttribute('aria-label', `${t('profileLevel', { n: level })}`);
+  // The strap line said the same thing on every screen and was too long for
+  // the bar. The rank is short, and it changes as you play.
+  el.appbarSub.textContent = tx(rankFor(level).name);
+}
 
-/**
- * Booster art. A rarity booster keeps its subject's colours and photo and
- * wears the tier as an effect on top; a booster with no subject falls back to
- * the tier's own colour.
- */
+function updateBadges() {
+  const cards = store.allEntries(state.collection).length;
+  nav.setBadge('binder', cards ? String(cards) : '');
+  const timed = state.profile.timed.count ?? 0;
+  nav.setBadge('timed', timed ? String(timed) : '');
+  const ready = canClaim(state.profile.daily);
+  el.giftDot.hidden = !ready;
+  el.gift.classList.toggle('is-hot', ready);
+}
+
+/* --- booster art ------------------------------------------------------------------ */
+
 function buildBooster(spec, { interactive = false, size = '' } = {}) {
   const colours = specColours(spec);
   const booster = document.createElement('div');
@@ -345,7 +333,7 @@ function paintPackPhoto(node, spec) {
   const src = spec.art ?? state.art.get(specHero(spec));
   node.replaceChildren();
   const fallback = () => node.insertAdjacentHTML('afterbegin',
-    `<div class="booster-photo-fallback">${iconSvg(specIcon(spec), { size: 56 })}</div>`);
+    `<div class="booster-photo-fallback">${iconSvg(specIcon(spec), { size: 54 })}</div>`);
   if (!src) return fallback();
 
   const img = document.createElement('img');
@@ -356,34 +344,42 @@ function paintPackPhoto(node, spec) {
   node.appendChild(img);
 }
 
-/* --- shelves (owned boosters + custom) ------------------------------------ */
+/* --- packs ------------------------------------------------------------------------- */
 
-function railFor(tab) {
-  return tab === 'custom'
-    ? { node: el.customRail, name: el.customName, tagline: el.customTagline, owned: el.customOwned,
-        open: el.customOpen, caption: el.customCaption, empty: el.customEmpty }
-    : { node: el.rail, name: el.railName, tagline: el.railTagline, owned: el.railOwned,
-        open: el.railOpen, caption: el.railCaption, empty: el.boostersEmpty };
-}
-
-/** Owned boosters, split into the two shelves. */
-function ownedFor(tab) {
+function ownedFor(mode) {
   return store.ownedBoosters(state.inventory)
-    .filter((slot) => (tab === 'custom') === (slot.spec.kind === 'custom'))
+    .filter((slot) => (mode === 'custom') === (slot.spec.kind === 'custom'))
     .sort((a, b) => specName(a.spec).localeCompare(specName(b.spec)));
 }
 
-function renderRail(tab) {
-  const ui = railFor(tab);
-  const slots = ownedFor(tab);
-  state.rails[tab] = { slots, focusIndex: Math.min(state.rails[tab]?.focusIndex ?? 0, Math.max(0, slots.length - 1)) };
+function renderPacks() {
+  const slots = ownedFor(state.packMode);
+  state.packSlots = slots;
 
-  ui.node.replaceChildren(...slots.map((slot, index) => {
+  el.creator.hidden = state.packMode !== 'custom';
+  const has = slots.length > 0;
+  el.packsRail.hidden = !has;
+  el.packsCaption.hidden = !has;
+  el.packsActions.hidden = !has;
+  el.packsEmpty.hidden = has;
+
+  if (!has) {
+    // Clear it, do not just hide it: leaving the previous shelf's items in the
+    // DOM means switching to an empty shelf still has boosters behind the
+    // empty state, which is exactly the bug the `[hidden]` fix was for.
+    packsRail.setItems([]);
+    el.packsEmptyMark.innerHTML = iconSvg(state.packMode === 'custom' ? 'wand' : 'packs', { size: 46 });
+    el.packsEmptyText.textContent = state.packMode === 'custom' ? t('shelfEmptyCustom') : t('shelfEmpty');
+    el.packsEmptyCta.textContent = t('goShop');
+    el.packsEmptyCta.hidden = state.packMode === 'custom';
+    return;
+  }
+
+  packsRail.setItems(slots.map((slot, index) => {
     const item = document.createElement('button');
     item.type = 'button';
     item.className = 'rail-item';
     item.dataset.index = String(index);
-    item.setAttribute('role', 'option');
     item.setAttribute('aria-label', specName(slot.spec));
     item.appendChild(buildBooster(slot.spec));
 
@@ -393,126 +389,196 @@ function renderRail(tab) {
     item.appendChild(badge);
 
     item.addEventListener('click', () => {
-      if (index === state.rails[tab].focusIndex) openScreenFor(slot.spec);
-      else scrollRailTo(tab, index);
+      if (index === packsRail.index) openScreenFor(slot.spec);
+      else packsRail.scrollTo(index);
     });
     return item;
   }));
-
-  const has = slots.length > 0;
-  ui.caption.hidden = !has;
-  ui.node.parentElement.hidden = !has;
-  ui.empty.hidden = has;
-  ui.empty.textContent = tab === 'custom' ? t('shelfEmptyCustom') : t('shelfEmpty');
-  if (tab === 'boosters') {
-    el.railPrev.hidden = !has;
-    el.railNext.hidden = !has;
-  }
-  if (has) requestAnimationFrame(() => { scrollRailTo(tab, state.rails[tab].focusIndex, 'auto'); updateFocus(tab); });
+  paintPackCaption(Math.min(packsRail.index, slots.length - 1));
 }
 
-function scrollRailTo(tab, index, behavior = 'smooth') {
-  const rail = railFor(tab).node;
-  const item = rail.querySelectorAll('.rail-item')[index];
-  if (!item) return;
-  rail.scrollTo({ left: item.offsetLeft - (rail.clientWidth - item.offsetWidth) / 2, behavior });
-}
-
-function updateFocus(tab) {
-  const ui = railFor(tab);
-  const rail = ui.node;
-  const items = [...rail.querySelectorAll('.rail-item')];
-  const entry = state.rails[tab];
-  if (!items.length || !entry) return;
-
-  const mid = rail.scrollLeft + rail.clientWidth / 2;
-  let best = 0;
-  let bestDist = Infinity;
-  items.forEach((item, i) => {
-    const dist = Math.abs(item.offsetLeft + item.offsetWidth / 2 - mid);
-    if (dist < bestDist) { bestDist = dist; best = i; }
-  });
-  items.forEach((item, i) => item.classList.toggle('is-focused', i === best));
-
-  entry.focusIndex = best;
-  const slot = entry.slots[best];
+function paintPackCaption(index) {
+  const slot = state.packSlots[index];
   if (!slot) return;
-  ui.name.textContent = specName(slot.spec);
-  ui.tagline.textContent = specTagline(slot.spec);
-  ui.owned.innerHTML = `${t('youOwn', { n: slot.count })} · ${slot.spec.cards} ${t('cards')}`;
-  ui.open.textContent = t('openPack');
-  ui.open.onclick = () => openScreenFor(slot.spec);
-  applyAccent(specColours(slot.spec));
-  if (tab === 'boosters') {
-    el.railPrev.disabled = best === 0;
-    el.railNext.disabled = best === items.length - 1;
-  }
+  el.packsName.textContent = specName(slot.spec);
+  el.packsSub.textContent = specTagline(slot.spec);
+  el.packsOwn.innerHTML = `${t('youOwn', { n: slot.count })} · ${slot.spec.cards} ${t('cards')}`;
+  el.packsOpen.textContent = t('openPack');
+  el.packsOpen.onclick = () => openScreenFor(slot.spec);
+  el.packsHint.textContent = t('swipeShelf');
   schedulePrefetch(slot.spec);
 }
 
-function initRail(tab) {
-  const rail = railFor(tab).node;
-  let ticking = false;
-  rail.addEventListener('scroll', () => {
-    if (ticking) return;
-    ticking = true;
-    requestAnimationFrame(() => { updateFocus(tab); ticking = false; });
-  });
+/* --- custom boosters ---------------------------------------------------------------- */
 
-  rail.addEventListener('keydown', (event) => {
-    const entry = state.rails[tab];
-    if (!entry) return;
-    if (event.key === 'ArrowRight') { event.preventDefault(); scrollRailTo(tab, entry.focusIndex + 1); }
-    if (event.key === 'ArrowLeft') { event.preventDefault(); scrollRailTo(tab, entry.focusIndex - 1); }
-    if (event.key === 'Enter' && entry.slots[entry.focusIndex]) {
-      event.preventDefault();
-      openScreenFor(entry.slots[entry.focusIndex].spec);
-    }
-  });
-
-  // Drag-to-scroll for mice; touch scrolls the rail natively.
-  let dragging = false;
-  let left0 = 0;
-  let moved = 0;
-  rail.addEventListener('pointerdown', (event) => {
-    if (event.pointerType === 'touch') return;
-    dragging = true; left0 = rail.scrollLeft; moved = 0;
-    rail.classList.add('is-dragging');
-    trackDrag(event, {
-      onMove: (dx) => { if (!dragging) return; moved = Math.max(moved, Math.abs(dx)); rail.scrollLeft = left0 - dx; },
-      onEnd: () => {
-        dragging = false;
-        rail.classList.remove('is-dragging');
-        scrollRailTo(tab, state.rails[tab]?.focusIndex ?? 0);
-        synth.playSnap();
-      }
-    });
-  });
-  rail.addEventListener('click', (event) => {
-    if (moved > 8) { event.stopPropagation(); event.preventDefault(); }
-  }, true);
+function customPackName(typed, sitename) {
+  const trimmed = (sitename ?? '').replace(/\s*(fandom|wiki|wikia)\s*$/i, '').trim();
+  return trimmed.length >= 2 ? trimmed : typed.replace(/\s+/g, ' ').trim();
 }
 
-/* --- shop ----------------------------------------------------------------- */
+function setCreatorStatus(text, kind) {
+  el.creatorStatus.textContent = text;
+  el.creatorStatus.className = `creator-status is-${kind}`;
+}
+
+async function createCustomPack(event) {
+  event.preventDefault();
+  if (state.busy) return;
+
+  const raw = el.creatorInput.value.trim();
+  if (!raw) { setCreatorStatus(t('typeNameFirst'), 'error'); return; }
+
+  state.busy = true;
+  el.creatorGo.disabled = true;
+  el.creatorInput.disabled = true;
+  setCreatorStatus(t('creating'), 'working');
+
+  try {
+    const wiki = await resolveCustomWiki(raw);
+    const url = new URL(wiki.apiUrl);
+    const host = url.host + url.pathname.replace('/api.php', '');
+    const pack = {
+      id: `custom-${host.replace(/\W+/g, '-')}`,
+      name: customPackName(raw, wiki.sitename),
+      tagline: wiki.sitename,
+      icon: 'wand',
+      accent: '#a78bfa', accent2: '#4c1d95',
+      wiki,
+      art: await fetchCustomPackArt(wiki)
+    };
+    state.customPacks = store.saveCustomPack(pack);
+
+    // Building a pack does NOT hand over a booster: it goes on sale in the
+    // Shop, on its own shelf. It used to be free, which was a free openable
+    // pack out of thin air for anyone who typed a name.
+    renderPacks();
+    renderShop();
+    setCreatorStatus(t('createdGoShop', { name: pack.name }), 'ok');
+    el.creatorInput.value = '';
+    synth.playResolved();
+  } catch {
+    setCreatorStatus(t('createFailed'), 'error');
+    synth.playDenied();
+  } finally {
+    state.busy = false;
+    el.creatorGo.disabled = false;
+    el.creatorInput.disabled = false;
+  }
+}
+
+/* --- timed boosters -------------------------------------------------------------------- */
+
+function syncTimed() {
+  accrue(state.profile.timed);
+  store.saveProfile(state.profile);
+  return state.profile.timed;
+}
+
+const currentTimedSpec = () => timedSpec(timedLevel(state.profile.timed.opened ?? 0));
+
+/**
+ * How much scarcer the top tier is on the timed table. This, not expected
+ * value, is the number worth showing: value barely moves because commons
+ * dominate it, while an Artifact goes from one in 667 to one in 28,000.
+ */
+function timedTopScarcity(level) {
+  const top = (options) => rarityChances(options).at(-1).chance;
+  const timed = top(timedRollOptions(level));
+  return timed > 0 ? top({}) / timed : Infinity;
+}
+
+function renderTimed() {
+  const timed = syncTimed();
+  const level = timedLevel(timed.opened ?? 0);
+  const cap = maxHeld(level);
+
+  el.timedTitle.textContent = t('timedTitle');
+  el.timedIntro.textContent = t('timedIntro', { minutes: Math.round(regenMs(level) / 60000) });
+
+  const pack = buildBooster(currentTimedSpec(), { size: 'is-small' });
+  pack.classList.toggle('is-empty', timed.count <= 0);
+  el.timedPack.replaceChildren(pack);
+
+  el.timedOpen.textContent = t('timedOpen');
+  el.timedOpen.onclick = openTimed;
+
+  const { to } = levelBounds(timed.opened ?? 0);
+  const atMax = level >= MAX_TIMED_LEVEL;
+  el.trackLevel.textContent = atMax ? t('timedTrackMax', { level }) : t('timedTrack', { level });
+  el.trackRemaining.textContent = atMax ? '' : t('timedToNext', { n: to - (timed.opened ?? 0), level: level + 1 });
+  trackBar.set(levelProgress(timed.opened ?? 0));
+
+  const scarcity = timedTopScarcity(level);
+  el.trackPerks.textContent = scarcity <= 1.05
+    ? t('timedPerksMax', { minutes: Math.round(regenMs(level) / 60000), max: cap })
+    : t('timedPerks', {
+        minutes: Math.round(regenMs(level) / 60000), max: cap,
+        factor: scarcity >= 10 ? Math.round(scarcity) : scarcity.toFixed(1)
+      });
+  el.trackNext.textContent = atMax ? '' : t('timedNextPerks', {
+    minutes: Math.round(regenMs(level + 1) / 60000), max: maxHeld(level + 1)
+  });
+  el.trackNext.hidden = atMax;
+
+  tickTimed();
+}
+
+/** The 1 Hz part: counters only, and only while this screen is on display. */
+function tickTimed() {
+  const timed = state.profile.timed;
+  const before = timed.count;
+  accrue(timed);
+  if (timed.count !== before) {
+    store.saveProfile(state.profile);
+    if (timed.count > before) synth.playReady();
+    renderTimed();
+    updateBadges();
+    return;
+  }
+  const level = timedLevel(timed.opened ?? 0);
+  el.timedCount.textContent = t('timedHeld', { n: timed.count, max: maxHeld(level) });
+  const remaining = msToNext(timed);
+  el.timedNext.textContent = remaining == null
+    ? t('timedFull')
+    : t('timedNext', { time: formatCountdown(remaining) });
+  el.timedOpen.disabled = timed.count <= 0;
+}
+
+function openTimed() {
+  const timed = syncTimed();
+  if ((timed.count ?? 0) <= 0) { synth.playDenied(); return; }
+  const spec = currentTimedSpec();
+  // Track progress is credited when the pack produces cards, not here: a
+  // failed draw refunds the booster and must not also count as an opening.
+  store.addBooster(state.inventory, spec, 1);
+  timed.count -= 1;
+  if (!Number.isFinite(timed.last)) timed.last = Date.now();
+  store.saveProfile(state.profile);
+  updateBadges();
+  openScreenFor(spec);
+}
+
+/* --- shop -------------------------------------------------------------------------------- */
+
+const freeNoteText = () =>
+  `${t('freeNote')} ${t('freeAgainIn', { time: formatCountdown(nextFreeAt() - Date.now()) })}`;
 
 function renderShop() {
+  el.shopTitle.textContent = t('tabShop');
   el.shopIntro.textContent = t('shopIntro');
   const rows = generateShop(windowIndexAt(), state.customPacks, freeWindowAt());
 
   el.shopRows.replaceChildren(...rows.map((row) => {
     const section = document.createElement('section');
     section.className = `shop-row${row.free ? ' is-free' : ''}`;
-    section.innerHTML = `<h3 class="shop-row-title"></h3><div class="shop-shelf"></div>`;
-    section.querySelector('.shop-row-title').textContent = row.title;
-    if (row.free) {
-      const note = document.createElement('p');
-      note.className = 'shop-row-note';
-      note.id = 'free-note';
-      note.textContent = freeNoteText();
-      section.insertBefore(note, section.querySelector('.shop-shelf'));
-    }
-    const shelf = section.querySelector('.shop-shelf');
+    section.innerHTML = `
+      <div class="shop-row-head"><h3></h3></div>
+      ${row.free ? '<p class="shop-note"></p>' : ''}
+      <div class="shelf"></div>`;
+    section.querySelector('h3').textContent = row.title;
+    if (row.free) section.querySelector('.shop-note').textContent = freeNoteText();
 
+    const shelf = section.querySelector('.shelf');
     shelf.replaceChildren(...row.specs.map(({ id, spec, price }) => {
       const item = document.createElement('div');
       item.className = 'shop-item';
@@ -521,7 +587,8 @@ function renderShop() {
 
       const buy = document.createElement('button');
       buy.type = 'button';
-      buy.className = row.free ? 'buy-button is-free' : 'buy-button';
+      buy.className = row.free ? 'buy is-free' : 'buy';
+      press(buy, { sound: null });
       if (row.free) paintFreeButton(buy, id, spec);
       else {
         buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
@@ -533,30 +600,14 @@ function renderShop() {
     return section;
   }));
 
+  reveal(el.shopRows.children, { step: 60 });
   tickRestock();
 }
 
-/** The free shelf runs on its own four-hour clock, so it gets its own line. */
-const freeNoteText = () =>
-  `${t('freeNote')} ${t('freeAgainIn', { time: formatCountdown(nextFreeAt() - Date.now()) })}`;
-
-function tickRestock() {
-  const remaining = nextRefreshAt() - Date.now();
-  el.restock.textContent = t('restockIn', { time: formatCountdown(remaining) });
-
-  const note = document.getElementById('free-note');
-  if (note) note.textContent = freeNoteText();
-
-  if (remaining <= 0) {
-    payStipend();
-    renderShop();
-  }
-}
-
 /**
- * The free shelf. Each slot can be taken once per restock, which is what keeps
- * it a safety net rather than an income: come back in two hours and there are
- * two more, but standing in front of it does nothing.
+ * The free shelf. Each slot can be taken once per FOUR-hour window, which is
+ * what keeps it a safety net rather than an income: come back later and there
+ * are two more, but standing in front of it does nothing.
  */
 function paintFreeButton(button, id, spec) {
   const available = store.freeAvailable(state.profile, id);
@@ -575,7 +626,7 @@ function takeFree(id, spec, button) {
   synth.playPurchase();
   toast(`${t('bought')} ${specName(spec)}`, 'ok');
   paintFreeButton(button, id, spec);
-  renderRail('boosters');
+  renderPacks();
 }
 
 function purchase(spec, price, button) {
@@ -591,8 +642,15 @@ function purchase(spec, price, button) {
   button.classList.add('is-bought');
   setTimeout(() => button.classList.remove('is-bought'), 700);
   toast(`${t('bought')} ${specName(spec)}`, 'ok');
-  renderRail('boosters');
-  renderRail('custom');
+  renderPacks();
+}
+
+function tickRestock() {
+  const remaining = nextRefreshAt() - Date.now();
+  el.restock.textContent = t('restockIn', { time: formatCountdown(remaining) });
+  const note = el.shopRows.querySelector('.shop-row.is-free .shop-note');
+  if (note) note.textContent = freeNoteText();
+  if (remaining <= 0) { payStipend(); renderShop(); }
 }
 
 function payStipend() {
@@ -604,131 +662,7 @@ function payStipend() {
   }
 }
 
-/* --- timed boosters ------------------------------------------------------- */
-
-/** Save whatever `accrue` decided, so the timer survives a reload. */
-function syncTimed() {
-  accrue(state.profile.timed);
-  store.saveProfile(state.profile);
-  return state.profile.timed;
-}
-
-function currentTimedSpec() {
-  return timedSpec(timedLevel(state.profile.timed.opened ?? 0));
-}
-
-function renderTimed() {
-  const timed = syncTimed();
-  const level = timedLevel(timed.opened ?? 0);
-  const cap = maxHeld(level);
-  const spec = currentTimedSpec();
-
-  el.timedTitle.textContent = t('timedTitle');
-  el.timedIntro.textContent = t('timedIntro', { minutes: Math.round(regenMs(level) / 60000) });
-
-  const booster = buildBooster(spec, { size: 'is-small' });
-  booster.classList.toggle('is-empty', timed.count <= 0);
-  el.timedBoosterSlot.replaceChildren(booster);
-
-  el.timedOpen.textContent = t('timedOpen');
-  el.timedOpen.disabled = timed.count <= 0;
-  el.timedOpen.onclick = () => openTimed();
-
-  // The track. Levelling it is meant to be a long haul, so the bar shows the
-  // exact number still to go rather than a vague percentage.
-  const { from, to } = levelBounds(timed.opened ?? 0);
-  const atMax = level >= MAX_TIMED_LEVEL;
-  el.trackLevel.textContent = atMax ? t('timedTrackMax', { level }) : t('timedTrack', { level });
-  el.trackRemaining.textContent = atMax ? '' : t('timedToNext', { n: to - (timed.opened ?? 0), level: level + 1 });
-  el.trackFill.style.width = `${(levelProgress(timed.opened ?? 0) * 100).toFixed(1)}%`;
-  const scarcity = timedTopScarcity(level);
-  el.trackPerks.textContent = scarcity <= 1.05
-    ? t('timedPerksMax', { minutes: Math.round(regenMs(level) / 60000), max: cap })
-    : t('timedPerks', {
-        minutes: Math.round(regenMs(level) / 60000),
-        max: cap,
-        factor: scarcity >= 10 ? Math.round(scarcity) : scarcity.toFixed(1)
-      });
-  el.trackNext.textContent = atMax ? '' : t('timedNextPerks', {
-    minutes: Math.round(regenMs(level + 1) / 60000),
-    max: maxHeld(level + 1)
-  });
-  el.trackNext.hidden = atMax;
-
-  tickTimed();
-}
-
-/**
- * How good a timed booster's odds are, as a share of a normal booster's, by
- * expected value. Derived rather than asserted, so it stays true if the rarity
- * table is ever retuned.
- */
-function timedOddsShare(level) {
-  const value = (options) => rarityChances(options)
-    .reduce((sum, { rarity, chance }) => sum + chance * (1 + rarity.bonusPct / 100), 0);
-  return value(timedRollOptions(level)) / value({});
-}
-
-/**
- * How much scarcer the best tier is on the timed table. This, not the value
- * share, is the number worth showing: expected value barely moves because
- * commons dominate it, while an Artifact goes from one in 667 to one in
- * 28,000. The nerf is entirely at the top, which is where it should be.
- */
-function timedTopScarcity(level) {
-  const top = (options) => rarityChances(options).at(-1).chance;
-  const timed = top(timedRollOptions(level));
-  return timed > 0 ? top({}) / timed : Infinity;
-}
-
-/** The 1 Hz part: counters only, and only while this tab is on screen. */
-function tickTimed() {
-  const timed = state.profile.timed;
-  const before = timed.count;
-  accrue(timed);
-  if (timed.count !== before) {
-    store.saveProfile(state.profile);
-    // Only when the player is actually looking at this tab, which is the only
-    // time this branch runs: the clock is parked otherwise.
-    if (timed.count > before) synth.playReady();
-    renderTimed();
-    return;
-  }
-
-  const level = timedLevel(timed.opened ?? 0);
-  const cap = maxHeld(level);
-  el.timedHeld.textContent = t('timedHeld', { n: timed.count, max: cap });
-  const remaining = msToNext(timed);
-  el.timedNext.textContent = remaining == null
-    ? t('timedFull')
-    : t('timedNext', { time: formatCountdown(remaining) });
-  el.timedOpen.disabled = timed.count <= 0;
-  updateTimedBadge();
-}
-
-function updateTimedBadge() {
-  const count = state.profile.timed.count ?? 0;
-  el.timedCount.textContent = String(count);
-  el.timedCount.classList.toggle('is-hot', count > 0);
-}
-
-function openTimed() {
-  const timed = syncTimed();
-  if ((timed.count ?? 0) <= 0) { synth.playDenied(); return; }
-  const spec = currentTimedSpec();
-  // The booster is spent when it is torn, like any other; put one in the
-  // inventory so the whole opening flow works unchanged. Track progress is
-  // credited when the pack actually produces cards, not here — a failed draw
-  // refunds the booster and should not also count as an opening.
-  store.addBooster(state.inventory, spec, 1);
-  timed.count -= 1;
-  timed.last = Number.isFinite(timed.last) ? timed.last : Date.now();
-  store.saveProfile(state.profile);
-  updateTimedBadge();
-  openScreenFor(spec);
-}
-
-/* --- opening: the rip ----------------------------------------------------- */
+/* --- opening: the rip ---------------------------------------------------------------------- */
 
 const rip = { progress: 0, dragging: false, lastTick: 0, done: false, booster: null, zone: null };
 
@@ -830,7 +764,7 @@ function initRip(booster) {
   });
 }
 
-/** The torn-off piece, which tumbles away instead of fading out. */
+/** The torn-off piece, which tumbles away rather than fading out. */
 function dropScrap(booster) {
   const dir = state.ripDir || 1;
   const scrap = document.createElement('div');
@@ -852,7 +786,7 @@ async function completeRip() {
   openPack(booster);
 }
 
-/* --- opening: drawing ----------------------------------------------------- */
+/* --- opening: drawing ------------------------------------------------------------------------ */
 
 function schedulePrefetch(spec) {
   clearTimeout(state.prefetchTimer);
@@ -873,13 +807,11 @@ function drawFor(spec) {
   return drawArticles(toDrawPack(spec)).catch((error) => ({ error }));
 }
 
-/** Where "back" goes from the opening screen, for each kind of booster. */
 const homeTabFor = (spec) =>
-  spec?.kind === 'custom' ? 'custom' : spec?.kind === 'timed' ? 'timed' : 'boosters';
+  spec?.kind === 'timed' ? 'timed' : 'packs';
 
 function openScreenFor(spec) {
   state.spec = spec;
-  applyAccent(specColours(spec));
   synth.resume();
 
   el.openScreen.className = 'screen is-active phase-idle';
@@ -887,14 +819,14 @@ function openScreenFor(spec) {
   el.openProgress.textContent = '';
   el.openHint.textContent = t('slideToRip');
   el.openHint.className = 'open-hint';
-  el.packSummary.replaceChildren();
-  el.revealActions.classList.remove('is-ready');
+  el.summary.replaceChildren();
+  el.openDone.hidden = true;
   el.cardStack.replaceChildren();
-  el.backButton.textContent = `← ${spec.kind === 'timed' ? t('tabTimed') : t('allBoosters')}`;
-  el.backToShelf.textContent = t('back');
   state.pulls = []; state.cards = []; state.index = 0; state.seen = new Set();
 
-  const booster = buildBooster(spec, { interactive: true });
+  if (spec.kind === 'custom') state.packMode = 'custom';
+
+  const booster = buildBooster(spec, { interactive: true, size: 'is-hero' });
   booster.classList.add('is-idle');
   el.boosterSlot.replaceChildren(booster);
   initRip(booster);
@@ -908,17 +840,15 @@ async function openPack(booster) {
   state.busy = true;
   clearTimeout(state.prefetchTimer);
 
-  // Consume the booster the moment it is torn.
   if (!store.takeBooster(state.inventory, specId(state.spec))) {
     state.busy = false;
     return;
   }
-  renderRail('boosters');
-  renderRail('custom');
+  renderPacks();
 
   const drawing = drawFor(state.spec);
 
-  // The animation runs on card BACKS, which need no data — so it starts the
+  // The animation runs on card BACKS, which need no data, so it starts the
   // instant the pack tears and the fetch happens underneath it.
   el.openScreen.classList.replace('phase-idle', 'phase-opening');
   el.openHint.textContent = '';
@@ -949,13 +879,12 @@ async function openPack(booster) {
   if (!articles || articles.error) {
     // Refund: the booster was consumed but produced nothing.
     store.addBooster(state.inventory, state.spec, 1);
-    renderRail('boosters');
-    renderRail('custom');
+    renderPacks();
     el.openScreen.className = 'screen is-active phase-idle';
     el.openHint.textContent = t('openFailed', { error: articles?.error?.message ?? 'Network error' });
     el.openHint.className = 'open-hint is-error';
     el.cardStack.replaceChildren();
-    const fresh = buildBooster(state.spec, { interactive: true });
+    const fresh = buildBooster(state.spec, { interactive: true, size: 'is-hero' });
     fresh.classList.add('is-idle');
     el.boosterSlot.replaceChildren(fresh);
     initRip(fresh);
@@ -979,17 +908,14 @@ async function openPack(booster) {
 
   const recorded = store.recordPulls(state.collection, pulls, state.spec);
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
-  updateTabCount();
 
-  // Stats, the timed track and XP are all credited here — after the draw has
-  // actually produced cards, so a failed pack costs nothing and counts for
-  // nothing.
   store.recordOpening(state.profile, pulls);
   if (state.spec.kind === 'timed') {
     state.profile.timed.opened = (state.profile.timed.opened ?? 0) + 1;
     store.saveProfile(state.profile);
   }
   awardXp(pulls);
+  updateBadges();
 
   state.pulls = pulls;
   bindCards(pulls);
@@ -1000,7 +926,7 @@ async function openPack(booster) {
   state.busy = false;
 }
 
-/* --- cards ---------------------------------------------------------------- */
+/* --- cards --------------------------------------------------------------------------------- */
 
 const CARD_FRONT_MARKUP = `
   <div class="card-art"></div>
@@ -1016,23 +942,22 @@ const CARD_FRONT_MARKUP = `
   <div class="fx fx-b" aria-hidden="true"></div>`;
 
 /**
- * A face-down card. The back takes the booster's colour and icon, so a card
- * looks like it came from the pack it came from — but it carries no rarity,
- * so nothing here can give the pull away.
+ * A face-down card. The back takes the booster's colour and icon so a card
+ * looks like it came from the pack it came from, but it carries no rarity, so
+ * nothing here can give the pull away.
  */
 function buildPlaceholderCard(index, total) {
   const colours = specColours(state.spec);
   const card = document.createElement('div');
   card.className = 'card stack-card';
   card.style.zIndex = String(total - index);
-  card.style.setProperty('--depth', String(Math.min(3, index)));
   card.style.setProperty('--back-accent', colours.accent);
   card.style.setProperty('--back-accent2', colours.accent2);
   card.innerHTML = `
     <div class="card-inner">
       <div class="card-face card-back">
         <div class="back-art"></div>
-        <div class="back-icon">${iconSvg(specIcon(state.spec), { size: 54 })}</div>
+        <div class="back-icon">${iconSvg(specIcon(state.spec), { size: 52 })}</div>
       </div>
       <div class="card-face card-front">${CARD_FRONT_MARKUP}</div>
     </div>`;
@@ -1049,16 +974,14 @@ function fillFront(front, data, rarity) {
   const art = front.querySelector('.card-art');
   art.replaceChildren();
   const fallback = () => art.insertAdjacentHTML('afterbegin',
-    `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 40 })}</div>`);
+    `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 38 })}</div>`);
 
   if (data.thumbnail) {
     const img = document.createElement('img');
     img.src = data.thumbnail;
     img.alt = '';
     img.addEventListener('error', () => { img.remove(); fallback(); });
-    // A picture smaller than the frame would be stretched into a blur by
-    // object-fit: cover, which is what a custom wiki's stray icons looked
-    // like. Fit those inside the frame instead of magnifying them.
+    // Fit a picture smaller than its frame rather than magnifying it.
     img.addEventListener('load', () => {
       if (img.naturalWidth && img.naturalWidth < 220) art.classList.add('is-small-art');
     });
@@ -1082,7 +1005,7 @@ function wireFavButton(button, entryKey) {
     button.classList.toggle('is-on', on);
     button.setAttribute('aria-pressed', String(on));
     button.setAttribute('aria-label', t('favourites'));
-    button.innerHTML = iconSvg(on ? 'starFilled' : 'star', { size: 17 });
+    button.innerHTML = iconSvg(on ? 'starFilled' : 'star', { size: 16 });
   };
   paint();
   button.addEventListener('click', (event) => {
@@ -1090,7 +1013,7 @@ function wireFavButton(button, entryKey) {
     store.toggleFavorite(state.collection, entryKey);
     paint();
     synth.playTap();
-    if (el.screens.collection.classList.contains('is-active')) renderCollection();
+    if (state.tab === 'binder') renderBinder();
   });
 }
 
@@ -1101,32 +1024,28 @@ function bindCards(pulls) {
     if (!pull) return;
     applyRarityVars(card, pull.rarity);
     const front = card.querySelector('.card-front');
-    fillFront(front, { ...pull.article, price: pull.price, packIcon: pull.packIcon }, pull.rarity);
+    const data = { ...pull.article, price: pull.price, packIcon: pull.packIcon };
+    fillFront(front, data, pull.rarity);
     wireFavButton(front.querySelector('.fav-button'), pull.article.key);
     card.addEventListener('click', () => {
       if (!card.classList.contains('is-revealed')) return;
-      openCardDetail(pull.article.key, { ...pull.article, price: pull.price, packIcon: pull.packIcon }, pull.rarity);
+      openCardDetail(pull.article.key, data, pull.rarity);
     });
   });
 }
 
-/* --- reveal: a deck you can page through both ways ------------------------ */
+/* --- reveal ---------------------------------------------------------------------------------- */
 
-/**
- * Position every card from its offset to the current index. A held card only
- * *leans* — tilting on its own axes rather than sliding around the screen.
- */
+/** A held card only leans: it turns on its own axes rather than travelling. */
 function layoutDeck(tiltX = 0, tiltY = 0) {
   state.cards.forEach((card, i) => {
     const offset = i - state.index;
-
     if (offset < 0) {
       card.style.zIndex = String(100 + offset);
       card.style.transform = 'translateX(128%) rotate(13deg) scale(0.94)';
       card.style.opacity = '0';
       return;
     }
-
     const depth = Math.min(3, offset);
     card.style.zIndex = String(50 - offset);
     card.style.opacity = '1';
@@ -1137,18 +1056,14 @@ function layoutDeck(tiltX = 0, tiltY = 0) {
   });
 }
 
-function updateRevealProgress() {
-  el.openProgress.textContent = state.pulls.length
-    ? t('cardOf', { i: Math.min(state.index + 1, state.pulls.length), n: state.pulls.length })
-    : '';
-}
-
 async function revealCurrent() {
   const card = state.cards[state.index];
   const pull = state.pulls[state.index];
   if (!card || !pull) return;
 
-  updateRevealProgress();
+  el.openProgress.textContent = t('cardOf', {
+    i: Math.min(state.index + 1, state.pulls.length), n: state.pulls.length
+  });
   const isNew = !state.seen.has(state.index);
   card.classList.add('is-revealed', 'is-lit');
 
@@ -1177,20 +1092,16 @@ function goTo(index) {
 }
 
 function showSummary() {
-  el.packSummary.replaceChildren(...state.pulls.map((pull, i) => {
+  el.summary.replaceChildren(...state.pulls.map((pull) => {
     const data = { ...pull.article, price: pull.price, packIcon: pull.packIcon };
-    const card = buildStaticCard(data, pull.rarity, pull.article.key);
-    card.classList.add('summary-card');
-    card.style.animationDelay = `${i * 70}ms`;
-    return card;
+    return buildStaticCard(data, pull.rarity, pull.article.key);
   }));
+  reveal(el.summary.children, { step: 70, from: 20 });
   el.openScreen.classList.replace('phase-reveal', 'phase-summary');
   el.openProgress.textContent = t('packSummary', { n: state.pulls.length });
   el.openHint.textContent = t('packDone');
-  el.revealActions.classList.add('is-ready');
-
-  // Levels earned by this pack are celebrated now the cards have all been
-  // seen, rather than interrupting the reveal.
+  el.openDone.textContent = t('back');
+  el.openDone.hidden = false;
   setTimeout(drainLevelUps, 700);
 }
 
@@ -1202,7 +1113,6 @@ function initSwipe() {
     synth.resume();
 
     trackDrag(event, {
-      // Lean, don't travel: the card turns on its axes and stays put.
       onMove: (dx, dy) => layoutDeck(
         clamp(dx * 0.14, -TILT_MAX, TILT_MAX),
         clamp(-dy * 0.14, -TILT_MAX, TILT_MAX)
@@ -1231,21 +1141,15 @@ function fireFlash(intensity) {
   el.flash.classList.add('is-firing');
 }
 
-/* --- experience and levels ------------------------------------------------ */
+/* --- experience and levels ---------------------------------------------------------------------- */
 
-/**
- * XP comes from the cards themselves, so opening is the only way to level.
- * The gain is shown as a small rising number rather than a dialog, and the
- * level-up itself waits for a quiet moment — walking a player through a
- * level-up while cards are still flipping would step on the reveal.
- */
 function awardXp(pulls) {
   const gained = pulls.reduce((sum, pull) => sum + xpForCard(pull.rarity.id), 0);
   const levels = addXp(state.profile.progress, gained);
   if (levels.length) state.profile.pendingLevels.push(...levels);
   store.saveProfile(state.profile);
   showXpPop(gained);
-  return { gained, levels };
+  refreshLevelBadge();
 }
 
 let xpPopTimer = null;
@@ -1264,7 +1168,7 @@ function showXpPop(amount) {
   }, 1500);
 }
 
-/** Show the next queued level-up, if any. Called once the pack is done. */
+/** Show the next queued level-up, if any. Called once the pack is finished. */
 function drainLevelUps() {
   const level = state.profile.pendingLevels[0];
   if (level == null) return false;
@@ -1272,40 +1176,14 @@ function drainLevelUps() {
   return true;
 }
 
-function showLevelUp(level) {
-  const reward = rewardForLevel(level);
-  const rank = rankFor(level);
-
-  el.levelTitle.textContent = t('levelUpTitle');
-  el.levelBody.textContent = t('levelUpBody', { level, rank: tx(rank.name) });
-  el.levelFrom.textContent = String(level - 1);
-  el.levelTo.textContent = String(level);
-  el.levelReward.replaceChildren(rewardCard(reward));
-  el.levelClaim.textContent = t('claimReward');
-  el.levelClaim.onclick = () => claimLevel(level, reward);
-
-  el.levelFill.style.transition = 'none';
-  el.levelFill.style.width = '0%';
-  el.levelModal.hidden = false;
-  requestAnimationFrame(() => {
-    el.levelFill.style.transition = '';
-    el.levelFill.style.width = '100%';
-  });
-  synth.playLevelUp();
-}
-
-/** A little panel describing a reward, used by both levels and daily gifts. */
 function rewardCard(reward) {
   const wrap = document.createElement('div');
   wrap.className = 'reward-card';
-
   if (reward.spec) {
     const art = document.createElement('div');
-    art.className = 'reward-art';
     art.appendChild(buildBooster(reward.spec, { size: 'is-tiny' }));
     wrap.appendChild(art);
   }
-
   const label = document.createElement('p');
   label.className = 'reward-label';
   if (reward.type === 'both') label.innerHTML = t('rewardBoth', { amount: money(reward.coins) });
@@ -1315,6 +1193,39 @@ function rewardCard(reward) {
   return wrap;
 }
 
+function showLevelUp(level) {
+  const reward = rewardForLevel(level);
+  const rank = rankFor(level);
+
+  openSheet(t('levelUpTitle'), (body) => {
+    body.innerHTML = `
+      <div class="level-jump">
+        <span class="level-node"></span>
+        <span class="level-bar"></span>
+        <span class="level-node is-new"></span>
+      </div>
+      <p style="text-align:center"></p>
+      <div class="level-reward" style="margin:16px 0 18px"></div>
+      <button class="btn btn-primary btn-block" type="button"></button>`;
+
+    body.querySelector('.level-node').textContent = String(level - 1);
+    body.querySelector('.level-node.is-new').textContent = String(level);
+    body.querySelector('p').textContent = t('levelUpBody', { level, rank: tx(rank.name) });
+    body.querySelector('.level-reward').appendChild(rewardCard(reward));
+
+    const bar = new Bar(body.querySelector('.level-bar'));
+    bar.set(0, { animate: false });
+    requestAnimationFrame(() => bar.set(1));
+
+    const claim = body.querySelector('button');
+    claim.textContent = t('claimReward');
+    press(claim, { sound: null });
+    claim.addEventListener('click', () => claimLevel(level, reward));
+  }, { dismissible: false });
+
+  synth.playLevelUp();
+}
+
 function claimLevel(level, reward) {
   if (reward.coins) store.saveWallet(store.loadWallet() + reward.coins);
   if (reward.spec) store.addBooster(state.inventory, reward.spec, 1);
@@ -1322,99 +1233,40 @@ function claimLevel(level, reward) {
   state.profile.pendingLevels = state.profile.pendingLevels.filter((l) => l !== level);
   store.saveProfile(state.profile);
   refreshWallet();
-  renderRail('boosters');
+  refreshLevelBadge();
+  renderPacks();
   synth.playCoins();
-  el.levelModal.hidden = true;
+  sheet.hide({ silent: true, force: true });
 
   // More than one level at once is possible on a very good pack.
-  if (!drainLevelUps() && state.tab === 'profile') renderProfile();
+  setTimeout(() => {
+    if (!drainLevelUps() && state.tab === 'profile') renderProfile();
+  }, dur(360));
 }
 
-/* --- profile -------------------------------------------------------------- */
+/* --- the sheet ------------------------------------------------------------------------------------ */
 
-function formatDuration(ms) {
-  const minutes = Math.floor(ms / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-  if (days > 0) return `${days}d ${hours % 24}h`;
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  return `${minutes}m`;
+/**
+ * Every panel in the app is this one component: the wallet, the odds, the
+ * card, the filters, the daily board, a level-up. One sheet means one set of
+ * gestures, one entrance, one dismissal, and no dialog anywhere that behaves
+ * unlike the others.
+ */
+function openSheet(title, build, { dismissible = true, onClose = null } = {}) {
+  el.sheetTitle.textContent = title;
+  el.sheetClose.hidden = !dismissible;
+  el.sheetBody.replaceChildren();
+  build(el.sheetBody);
+  sheet.show(onClose, { locked: !dismissible });
+  el.sheet.classList.toggle('is-locked', !dismissible);
 }
 
-function renderProfile() {
-  const { progress, rarityCounts } = state.profile;
-  const level = progress.level ?? 1;
-  const rank = rankFor(level);
-  const atMax = level >= MAX_LEVEL;
+/* --- card detail ---------------------------------------------------------------------------------- */
 
-  el.profileAvatar.innerHTML = iconSvg('profile', { size: 26 });
-  el.profileLevel.textContent = atMax ? t('profileMax') : t('profileLevel', { n: level });
-  el.profileRank.textContent = tx(rank.name);
-  el.xpFill.style.width = `${(levelFraction(progress) * 100).toFixed(1)}%`;
-  el.xpLine.textContent = atMax
-    ? t('profileMax')
-    : t('profileXpLine', {
-        have: (progress.xp ?? 0).toLocaleString(),
-        need: xpForLevel(level).toLocaleString()
-      });
-
-  el.nextRewardTitle.textContent = t('profileNextReward');
-  el.nextRewardBody.replaceChildren(
-    atMax ? document.createTextNode(t('profileMax')) : rewardCard(rewardForLevel(level + 1))
-  );
-
-  el.profileStatsTitle.textContent = t('profileStats');
-  const entries = store.allEntries(state.collection);
-  const pulled = Object.values(rarityCounts).reduce((sum, n) => sum + n, 0);
-  const best = RARITIES.filter((r) => (rarityCounts[r.id] ?? 0) > 0).pop();
-
-  const stats = [
-    [t('statPlaytime'), formatDuration(state.profile.playMs ?? 0)],
-    [t('statAccountAge'), new Date(state.profile.createdAt ?? Date.now())
-      .toLocaleDateString(getLanguage(), { year: 'numeric', month: 'long', day: 'numeric' })],
-    [t('statBoosters'), (state.profile.boostersOpened ?? 0).toLocaleString()],
-    [t('statCards'), pulled.toLocaleString()],
-    [t('statValue'), formatAmount(entries.reduce((sum, e) => sum + e.price * e.count, 0))],
-    [t('statBest'), best ? tx(best.name) : t('none')]
-  ];
-  el.profileStatGrid.replaceChildren(...stats.map(([label, value]) => {
-    const cell = document.createElement('div');
-    cell.className = 'stat-cell';
-    cell.innerHTML = '<b></b><span></span>';
-    cell.querySelector('b').textContent = value;
-    cell.querySelector('span').textContent = label;
-    return cell;
-  }));
-
-  // Rarity breakdown: bars against the commonest tier, so the shape of a
-  // collection reads at a glance rather than as eight numbers.
-  el.profileRarityTitle.textContent = t('statRarity');
-  const peak = Math.max(1, ...RARITIES.map((r) => rarityCounts[r.id] ?? 0));
-  el.profileRarity.replaceChildren(...RARITIES.map((rarity) => {
-    const count = rarityCounts[rarity.id] ?? 0;
-    const row = document.createElement('div');
-    row.className = 'rarity-row';
-    row.innerHTML = `
-      <span class="rarity-name"></span>
-      <span class="rarity-track"><span class="rarity-fill"></span></span>
-      <span class="rarity-count"></span>`;
-    const name = row.querySelector('.rarity-name');
-    name.textContent = tx(rarity.name);
-    name.style.color = rarity.color;
-    const fill = row.querySelector('.rarity-fill');
-    fill.style.width = `${((count / peak) * 100).toFixed(1)}%`;
-    fill.style.background = rarity.color;
-    row.querySelector('.rarity-count').textContent = count.toLocaleString();
-    return row;
-  }));
-}
-
-/* --- card detail ---------------------------------------------------------- */
-
-/** A face-up card with no back and no flip — summary, binder and detail. */
+/** A face-up card with no back and no flip: summary, binder and detail. */
 function buildStaticCard(data, rarity, entryKey = null, { fav = true } = {}) {
   const card = document.createElement('article');
-  card.className = 'card collection-card is-revealed is-lit';
+  card.className = 'card is-revealed is-lit';
   applyRarityVars(card, rarity);
   card.innerHTML = `<div class="card-inner"><div class="card-face card-front">${CARD_FRONT_MARKUP}</div></div>`;
   const front = card.querySelector('.card-front');
@@ -1426,42 +1278,74 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true } = {}) {
   return card;
 }
 
+/**
+ * The fullscreen card. There is exactly one of these, reached three ways: off
+ * the reveal stack, off the pack summary, and out of the binder. They must
+ * stay the same view, so they all come through here.
+ */
 function openCardDetail(entryKey, data, rarity) {
   const entry = state.collection.entries[entryKey] ?? null;
   state.detail = { key: entryKey, data, rarity, sellArmed: false };
 
-  const card = buildStaticCard(data, rarity, null, { fav: false });
-  card.classList.add('detail-card');
-  el.cardDetail.replaceChildren(card);
-  attachTilt(card);
+  openSheet(data.title, (body) => {
+    body.innerHTML = `
+      <div class="detail-body">
+        <div class="detail-card-wrap"></div>
+        <div class="detail-side">
+          <p class="detail-sub"></p>
+          <div class="detail-facts"></div>
+          <p class="detail-text"></p>
+          <div class="detail-actions">
+            <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer"></a>
+            <button class="btn btn-ghost btn-sm sell" type="button" hidden></button>
+          </div>
+        </div>
+      </div>`;
 
-  el.detailTitle.textContent = data.title;
-  el.detailSub.textContent = data.description || data.sourceName || '';
-  el.detailFacts.innerHTML = [
-    `<span class="fact rarity-badge">${tx(rarity.name)}</span>`,
-    `<span class="fact">${money(data.price)}</span>`,
-    data.views ? `<span class="fact">${t('viewsPerMonth', { views: formatViews(data.views) })}</span>` : '',
-    entry && entry.count > 1 ? `<span class="fact">${t('copiesOwned', { n: entry.count })}</span>` : ''
-  ].filter(Boolean).join('');
-  el.detailExtract.textContent = data.extract;
-  el.detailRead.href = data.url;
-  el.detailRead.textContent = t('read');
+    const card = buildStaticCard(data, rarity, null, { fav: false });
+    card.classList.add('detail-card');
+    body.querySelector('.detail-card-wrap').appendChild(card);
+    attachTilt(card);
+    card.style.setProperty('--rarity', rarity.color);
 
-  // Selling only makes sense for a card that is actually in the binder.
-  el.detailSell.hidden = !entry;
-  if (entry) paintSellButton();
+    body.querySelector('.detail-sub').textContent = data.description || data.sourceName || '';
+    body.querySelector('.detail-side').style.setProperty('--rarity', rarity.color);
+    body.querySelector('.detail-facts').innerHTML = [
+      `<span class="chip" style="color:${rarity.color};border-color:${rarity.color}">${tx(rarity.name)}</span>`,
+      `<span class="chip">${money(data.price)}</span>`,
+      data.views ? `<span class="chip">${t('viewsPerMonth', { views: formatViews(data.views) })}</span>` : '',
+      entry && entry.count > 1 ? `<span class="chip">${t('copiesOwned', { n: entry.count })}</span>` : ''
+    ].filter(Boolean).join('');
+    body.querySelector('.detail-text').textContent = data.extract;
 
-  el.cardModal.hidden = false;
+    const read = body.querySelector('a');
+    read.href = data.url;
+    read.textContent = t('read');
+    press(read, { sound: null });
+
+    // Selling only makes sense for a card actually in the binder.
+    const sell = body.querySelector('.sell');
+    sell.hidden = !entry;
+    if (entry) {
+      state.detail.sellButton = sell;
+      paintSellButton();
+      press(sell, { sound: null });
+      sell.addEventListener('click', handleSell);
+    }
+  }, { onClose: () => { state.detail = null; } });
+
   synth.playCardOpen();
 }
 
 function paintSellButton() {
-  const { key, sellArmed } = state.detail;
-  const entry = state.collection.entries[key];
-  if (!entry) { el.detailSell.hidden = true; return; }
+  const detail = state.detail;
+  if (!detail?.sellButton) return;
+  const entry = state.collection.entries[detail.key];
+  if (!entry) { detail.sellButton.hidden = true; return; }
   const amount = sellPriceFor(entry.price);
-  el.detailSell.classList.toggle('is-armed', sellArmed);
-  el.detailSell.innerHTML = sellArmed ? t('sellConfirm') : t('sell', { amount: money(amount) });
+  detail.sellButton.classList.toggle('btn-danger', detail.sellArmed);
+  detail.sellButton.classList.toggle('is-armed', detail.sellArmed);
+  detail.sellButton.innerHTML = detail.sellArmed ? t('sellConfirm') : t('sell', { amount: money(amount) });
 }
 
 function handleSell() {
@@ -1470,7 +1354,7 @@ function handleSell() {
   const entry = state.collection.entries[detail.key];
   if (!entry) return;
 
-  // First tap arms, second confirms — the button becomes its own dialog.
+  // First tap arms, second confirms: the button is its own dialog.
   if (!detail.sellArmed) {
     detail.sellArmed = true;
     paintSellButton();
@@ -1488,23 +1372,18 @@ function handleSell() {
   store.sellCopy(state.collection, detail.key);
   store.saveWallet(store.loadWallet() + amount);
   refreshWallet();
-  updateTabCount();
+  updateBadges();
   synth.playCoins();
   toast(t('sold', { amount: money(amount) }), 'ok');
-  closeCardDetail();
-  renderCollection();
+  sheet.hide();
+  renderBinder();
 }
 
-function closeCardDetail() {
-  el.cardModal.hidden = true;
-  state.detail = null;
-  synth.playModal(false);
-}
-
-/** Hold and move to lean the card — it turns on its axes, it doesn't travel. */
+/** Hold and move to lean the card: it turns on its axes, it does not travel. */
 function attachTilt(card) {
   card.addEventListener('pointerdown', (event) => {
     event.preventDefault();
+    event.stopPropagation();
     card.classList.add('is-tilting');
     trackDrag(event, {
       onMove: (dx, dy) => {
@@ -1520,7 +1399,7 @@ function attachTilt(card) {
   });
 }
 
-/* --- collection ----------------------------------------------------------- */
+/* --- binder ------------------------------------------------------------------------------------------ */
 
 const option = (value, label) => {
   const opt = document.createElement('option');
@@ -1529,66 +1408,35 @@ const option = (value, label) => {
   return opt;
 };
 
-function renderFilterControls() {
-  const entries = store.allEntries(state.collection);
-  const packs = [...new Map(entries.map((e) => [e.packId, e.packName])).entries()]
-    .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
-
-  el.filterSearch.placeholder = t('searchTitles');
-  el.filterPack.replaceChildren(option('', t('allPacks')), ...packs.map(([id, name]) => option(id, name ?? id)));
-  el.filterPack.value = state.filters.pack;
-  el.filterRarity.replaceChildren(option('', t('allRarities')), ...RARITIES.map((r) => option(r.id, tx(r.name))));
-  el.filterRarity.value = state.filters.rarity;
-  el.filterBand.replaceChildren(option('', t('anyPopularity')), ...POPULARITY_BANDS.map((b) => option(b.id, b.name)));
-  el.filterBand.value = state.filters.band;
-  el.filterPrice.replaceChildren(option('', t('anyPrice')),
-    ...[100, 500, 1500, 5000, 12000].map((p) => option(String(p), t('priceOver', { amount: formatAmount(p) }))));
-  el.filterPrice.value = state.filters.minPrice;
-  el.filterSort.replaceChildren(...store.SORTS.map((s) => option(s.id, store.sortLabel(s))));
-  el.filterSort.value = state.filters.sort;
-
-  el.filterFav.classList.toggle('is-on', state.filters.favoritesOnly);
-  el.filterFav.setAttribute('aria-pressed', String(state.filters.favoritesOnly));
-  el.filterFavLabel.textContent = t('favourites');
-  el.filterFav.querySelector('.chip-star').innerHTML =
-    iconSvg(state.filters.favoritesOnly ? 'starFilled' : 'star', { size: 15 });
-  el.filterReset.textContent = t('reset');
-}
-
 function activeFilterCount() {
   const f = state.filters;
   return [f.search, f.pack, f.rarity, f.band, f.minPrice].filter(Boolean).length
     + (f.favoritesOnly ? 1 : 0) + (f.sort !== 'recent' ? 1 : 0);
 }
 
-function renderCollection() {
+function renderBinder() {
+  el.binderTitle.textContent = t('tabCollection');
   const entries = store.allEntries(state.collection);
   const stats = store.collectionStats(entries);
 
-  el.collectionStats.innerHTML = `
-    <span class="stat"><b>${stats.copies}</b> ${t('copies')}</span>
-    <span class="stat"><b>${money(stats.value)}</b> ${t('total')}</span>
-    <span class="stat"><b>${stats.favorites}</b> ${t('favourites')}</span>`;
+  el.binderStats.innerHTML = `
+    <span class="stat-pill"><b>${stats.copies}</b> ${t('copies')}</span>
+    <span class="stat-pill"><b>${money(stats.value)}</b> ${t('total')}</span>
+    <span class="stat-pill"><b>${stats.favorites}</b> ${t('favourites')}</span>`;
 
-  renderFilterControls();
-  el.filterToggleLabel.textContent = state.filtersOpen ? t('hideFilters') : t('filters');
-  el.filterIcon.innerHTML = iconSvg('filter', { size: 15 });
+  el.filterOpen.textContent = t('filters');
   const active = activeFilterCount();
-  el.filterSummary.textContent = active ? `${active}` : '';
-  el.filterSummary.hidden = !active;
+  el.filterCount.textContent = String(active);
+  el.filterCount.hidden = !active;
 
   const visible = store.filterEntries(entries, state.filters);
-  if (!entries.length) {
-    el.collectionEmpty.hidden = false;
-    el.collectionEmpty.textContent = t('emptyCollection');
-  } else if (!visible.length) {
-    el.collectionEmpty.hidden = false;
-    el.collectionEmpty.textContent = t('noMatches');
-  } else {
-    el.collectionEmpty.hidden = true;
+  el.binderEmpty.hidden = visible.length > 0;
+  if (!visible.length) {
+    el.binderEmptyMark.innerHTML = iconSvg('collection', { size: 46 });
+    el.binderEmptyText.textContent = entries.length ? t('noMatches') : t('emptyCollection');
   }
 
-  el.collectionGrid.replaceChildren(...visible.map((entry) => {
+  el.binderGrid.replaceChildren(...visible.map((entry) => {
     const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
     if (entry.count > 1) {
       const badge = document.createElement('span');
@@ -1598,97 +1446,306 @@ function renderCollection() {
     }
     return card;
   }));
+  reveal(el.binderGrid.children, { step: 26, from: 10 });
 }
 
-const updateTabCount = () => {
-  el.tabCount.textContent = String(store.allEntries(state.collection).length);
-};
+function openFilters() {
+  openSheet(t('filters'), (body) => {
+    const entries = store.allEntries(state.collection);
+    const packs = [...new Map(entries.map((e) => [e.packId, e.packName])).entries()]
+      .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
 
-function initFilters() {
-  const update = (key) => (event) => { state.filters[key] = event.target.value; renderCollection(); };
-  el.filterPack.addEventListener('change', update('pack'));
-  el.filterRarity.addEventListener('change', update('rarity'));
-  el.filterBand.addEventListener('change', update('band'));
-  el.filterPrice.addEventListener('change', update('minPrice'));
-  el.filterSort.addEventListener('change', update('sort'));
-  el.filterSearch.addEventListener('input', (e) => { state.filters.search = e.target.value; renderCollection(); });
-  el.filterFav.addEventListener('click', () => {
-    state.filters.favoritesOnly = !state.filters.favoritesOnly;
-    synth.playTap();
-    renderCollection();
-  });
-  el.filterReset.addEventListener('click', () => {
-    state.filters = { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false };
-    el.filterSearch.value = '';
-    renderCollection();
-  });
-  el.filterToggle.addEventListener('click', () => {
-    state.filtersOpen = !state.filtersOpen;
-    el.filters.hidden = !state.filtersOpen;
-    el.filterToggle.setAttribute('aria-expanded', String(state.filtersOpen));
-    synth.playModal(state.filtersOpen);
-    renderCollection();
-  });
-}
+    const wrap = document.createElement('div');
+    wrap.className = 'filters';
+    wrap.innerHTML = `
+      <input class="filter-input" type="search" data-key="search" />
+      <div class="filter-row">
+        <select class="filter-select" data-key="pack"></select>
+        <select class="filter-select" data-key="rarity"></select>
+      </div>
+      <div class="filter-row">
+        <select class="filter-select" data-key="band"></select>
+        <select class="filter-select" data-key="minPrice"></select>
+      </div>
+      <select class="filter-select" data-key="sort"></select>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;padding-top:4px">
+        <button class="chip" type="button" data-fav></button>
+        <button class="btn btn-ghost btn-sm" type="button" data-reset></button>
+      </div>`;
 
-/* --- custom boosters ------------------------------------------------------ */
+    const search = wrap.querySelector('[data-key="search"]');
+    search.placeholder = t('searchTitles');
+    search.value = state.filters.search;
 
-function customPackName(typed, sitename) {
-  const trimmed = (sitename ?? '').replace(/\s*(fandom|wiki|wikia)\s*$/i, '').trim();
-  return trimmed.length >= 2 ? trimmed : typed.replace(/\s+/g, ' ').trim();
-}
+    const sel = (key) => wrap.querySelector(`[data-key="${key}"]`);
+    sel('pack').replaceChildren(option('', t('allPacks')), ...packs.map(([id, name]) => option(id, name ?? id)));
+    sel('rarity').replaceChildren(option('', t('allRarities')), ...RARITIES.map((r) => option(r.id, tx(r.name))));
+    sel('band').replaceChildren(option('', t('anyPopularity')), ...POPULARITY_BANDS.map((b) => option(b.id, b.name)));
+    sel('minPrice').replaceChildren(option('', t('anyPrice')),
+      ...[100, 500, 1500, 5000, 12000].map((p) => option(String(p), t('priceOver', { amount: formatAmount(p) }))));
+    sel('sort').replaceChildren(...store.SORTS.map((s) => option(s.id, store.sortLabel(s))));
+    ['pack', 'rarity', 'band', 'minPrice', 'sort'].forEach((key) => { sel(key).value = state.filters[key]; });
 
-function setCustomStatus(text, kind) {
-  el.customStatus.textContent = text;
-  el.customStatus.className = `custom-status is-${kind}`;
-}
+    const apply = () => { renderBinder(); paintFav(); };
+    wrap.querySelectorAll('select').forEach((node) => {
+      node.addEventListener('change', (e) => { state.filters[e.target.dataset.key] = e.target.value; apply(); });
+    });
+    search.addEventListener('input', (e) => { state.filters.search = e.target.value; apply(); });
 
-async function createCustomPack(event) {
-  event.preventDefault();
-  if (state.busy) return;
-
-  const raw = el.customInput.value.trim();
-  if (!raw) { setCustomStatus(t('typeNameFirst'), 'error'); return; }
-
-  state.busy = true;
-  el.customSubmit.disabled = true;
-  el.customInput.disabled = true;
-  setCustomStatus(t('creating'), 'working');
-
-  try {
-    const wiki = await resolveCustomWiki(raw);
-    const host = new URL(wiki.apiUrl).host + new URL(wiki.apiUrl).pathname.replace('/api.php', '');
-    const pack = {
-      id: `custom-${host.replace(/\W+/g, '-')}`,
-      name: customPackName(raw, wiki.sitename),
-      tagline: wiki.sitename,
-      icon: 'wand',
-      accent: '#a78bfa', accent2: '#4c1d95',
-      wiki,
-      art: await fetchCustomPackArt(wiki)
+    const fav = wrap.querySelector('[data-fav]');
+    const paintFav = () => {
+      fav.classList.toggle('is-on', state.filters.favoritesOnly);
+      fav.innerHTML = `${iconSvg(state.filters.favoritesOnly ? 'starFilled' : 'star', { size: 14 })}<span>${t('favourites')}</span>`;
+      el.filterCount.textContent = String(activeFilterCount());
+      el.filterCount.hidden = !activeFilterCount();
     };
-    state.customPacks = store.saveCustomPack(pack);
+    paintFav();
+    fav.addEventListener('click', () => {
+      state.filters.favoritesOnly = !state.filters.favoritesOnly;
+      synth.playTap();
+      apply();
+    });
 
-    // Building a pack does NOT hand over a booster. It used to, which meant a
-    // free openable pack out of thin air for anyone who typed a name — and
-    // the cards inside could be sold. Creating a pack now puts it on sale in
-    // the Shop, on its own shelf, where it is bought like anything else.
-    renderRail('custom');
-    renderShop();
-    setCustomStatus(t('createdGoShop', { name: pack.name }), 'ok');
-    el.customInput.value = '';
-    synth.playResolved();
-  } catch (err) {
-    setCustomStatus(t('createFailed'), 'error');
-    synth.playDenied();
-  } finally {
-    state.busy = false;
-    el.customSubmit.disabled = false;
-    el.customInput.disabled = false;
-  }
+    const resetBtn = wrap.querySelector('[data-reset]');
+    resetBtn.textContent = t('reset');
+    press(resetBtn, { sound: null });
+    resetBtn.addEventListener('click', () => {
+      state.filters = { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false };
+      sheet.hide();
+      renderBinder();
+    });
+
+    body.appendChild(wrap);
+  });
 }
 
-/* --- daily gift ----------------------------------------------------------- */
+/* --- profile ------------------------------------------------------------------------------------------- */
+
+function formatDuration(ms) {
+  const minutes = Math.floor(ms / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  if (days > 0) return `${days}d ${hours % 24}h`;
+  if (hours > 0) return `${hours}h ${minutes % 60}m`;
+  return `${minutes}m`;
+}
+
+function renderProfile() {
+  const { progress, rarityCounts } = state.profile;
+  const level = progress.level ?? 1;
+  const rank = rankFor(level);
+  const atMax = level >= MAX_LEVEL;
+
+  profileRing.set(levelFraction(progress), String(level));
+  el.profileLevel.textContent = atMax ? t('profileMax') : t('profileLevel', { n: level });
+  el.profileRank.textContent = tx(rank.name);
+  xpBar.set(levelFraction(progress));
+  el.xpLine.textContent = atMax ? t('profileMax') : t('profileXpLine', {
+    have: (progress.xp ?? 0).toLocaleString(), need: xpForLevel(level).toLocaleString()
+  });
+
+  el.nextRewardLabel.textContent = t('profileNextReward');
+  el.nextReward.replaceChildren(
+    atMax ? document.createTextNode(t('profileMax')) : rewardCard(rewardForLevel(level + 1))
+  );
+
+  el.statsLabel.textContent = t('profileStats');
+  const entries = store.allEntries(state.collection);
+  const pulled = Object.values(rarityCounts).reduce((sum, n) => sum + n, 0);
+  const best = RARITIES.filter((r) => (rarityCounts[r.id] ?? 0) > 0).pop();
+
+  const stats = [
+    [t('statPlaytime'), formatDuration(state.profile.playMs ?? 0)],
+    [t('statAccountAge'), new Date(state.profile.createdAt ?? Date.now())
+      .toLocaleDateString(getLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })],
+    [t('statBoosters'), (state.profile.boostersOpened ?? 0).toLocaleString()],
+    [t('statCards'), pulled.toLocaleString()],
+    [t('statValue'), formatAmount(entries.reduce((sum, e) => sum + e.price * e.count, 0))],
+    [t('statBest'), best ? tx(best.name) : t('none')]
+  ];
+  el.statGrid.replaceChildren(...stats.map(([label, value]) => {
+    const cell = document.createElement('div');
+    cell.className = 'stat-cell';
+    cell.innerHTML = '<b></b><span></span>';
+    cell.querySelector('b').textContent = value;
+    cell.querySelector('span').textContent = label;
+    return cell;
+  }));
+
+  el.rarityLabel.textContent = t('statRarity');
+  const peak = Math.max(1, ...RARITIES.map((r) => rarityCounts[r.id] ?? 0));
+  el.rarityBars.replaceChildren(...RARITIES.map((rarity) => {
+    const count = rarityCounts[rarity.id] ?? 0;
+    const row = document.createElement('div');
+    row.className = 'rarity-row';
+    row.innerHTML = `<span class="rarity-name"></span><span class="rarity-track"></span><span class="rarity-count"></span>`;
+    const name = row.querySelector('.rarity-name');
+    name.textContent = tx(rarity.name);
+    name.style.color = rarity.color;
+    const bar = new Bar(row.querySelector('.rarity-track'));
+    bar.set(count / peak, { animate: false });
+    bar.fill.style.background = rarity.color;
+    row.querySelector('.rarity-count').textContent = count.toLocaleString();
+    return row;
+  }));
+
+  // Everything that is not a destination of its own hangs off the profile.
+  el.moreLabel.textContent = t('moreTitle');
+  const links = [
+    ['settings', 'tabSettings', () => { renderSettings(); showScreen('settings'); }],
+    ['gift', 'dailyTitle', () => openDaily()],
+    ['gem', 'pullRates', () => openOdds()],
+    ['spark', 'walletTitle', () => openWallet()]
+  ];
+  el.profileLinks.replaceChildren(...links.map(([icon, key, go]) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'row';
+    row.style.alignItems = 'center';
+    row.innerHTML = `<span style="display:flex;align-items:center;gap:12px">
+      <span style="color:var(--accent)">${iconSvg(icon, { size: 20 })}</span>
+      <span style="font-weight:700">${t(key)}</span></span>
+      <span class="muted">${iconSvg('chevron', { size: 18 })}</span>`;
+    press(row, { sound: null });
+    row.addEventListener('click', () => { synth.playTap(); go(); });
+    return row;
+  }));
+}
+
+/* --- settings ------------------------------------------------------------------------------------------- */
+
+function settingRow(key, titleKey, noteKey) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="switch row-action" type="button" role="switch"><span class="switch-knob"></span></button>`;
+  row.querySelector('h4').textContent = t(titleKey);
+  row.querySelector('p').textContent = t(noteKey);
+
+  const button = row.querySelector('.switch');
+  const paint = () => {
+    const on = Boolean(settings()[key]);
+    button.classList.toggle('is-on', on);
+    button.setAttribute('aria-checked', String(on));
+    button.setAttribute('aria-label', `${t(titleKey)}: ${on ? t('on') : t('off')}`);
+  };
+  paint();
+  button.addEventListener('click', () => {
+    settings()[key] = !settings()[key];
+    store.saveProfile(state.profile);
+    applySettings();
+    paint();
+    // Fires after the setting is applied, so turning sound on is audible and
+    // turning it off is the last thing you hear.
+    if (settings()[key] || key !== 'sound') { synth.resume(); synth.playToggle(Boolean(settings()[key])); }
+  });
+  return row;
+}
+
+function renderSettings() {
+  el.settingsTitle.textContent = t('tabSettings');
+  el.themeLabel.textContent = t('themeTitle');
+  el.prefsLabel.textContent = t('prefsTitle');
+  el.dataLabel.textContent = t('settingsData');
+
+  // The theme picker previews each theme rather than naming it.
+  const current = storedTheme();
+  el.themeGrid.replaceChildren(...THEMES.map((theme) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `theme-card${theme.id === current ? ' is-on' : ''}`;
+    card.dataset.theme = theme.id;
+    card.innerHTML = `
+      <span class="theme-swatch">${theme.swatch.map((c) => `<span style="background:${c}"></span>`).join('')}</span>
+      <h4></h4><p></p>
+      <span class="theme-check">${iconSvg('check', { size: 14 })}</span>`;
+    card.querySelector('h4').textContent = tx(theme.name);
+    card.querySelector('p').textContent = tx(theme.blurb);
+    press(card, { sound: null });
+    card.addEventListener('click', () => {
+      if (theme.id === storedTheme()) return;
+      useTheme(theme.id, { announce: true });
+      renderSettings();
+      // Everything already on screen has to be rebuilt in the new shape.
+      renderPacks();
+      renderShop();
+      renderBinder();
+    });
+    return card;
+  }));
+
+  el.settingsList.replaceChildren(
+    settingRow('sound', 'settingsSound', 'settingsSoundNote'),
+    settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
+    settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
+    settingRow('hints', 'settingsHints', 'settingsHintsNote')
+  );
+
+  const language = document.createElement('div');
+  language.className = 'row';
+  language.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <span class="chip row-action"></span>`;
+  language.querySelector('h4').textContent = t('settingsLanguage');
+  language.querySelector('p').textContent = t('settingsLanguageNote');
+  language.querySelector('.chip').innerHTML =
+    `${iconSvg('lock', { size: 13 })}<span>${LANGUAGES.find((l) => l.id === getLanguage())?.label ?? ''}</span>`;
+
+  const resetRow = document.createElement('div');
+  resetRow.className = 'row';
+  resetRow.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="btn btn-sm btn-danger row-action" type="button"></button>`;
+  resetRow.querySelector('h4').textContent = t('settingsReset');
+  resetRow.querySelector('p').textContent = t('settingsResetNote');
+  const resetBtn = resetRow.querySelector('button');
+  press(resetBtn, { sound: null });
+  paintResetButton(resetBtn);
+  resetBtn.addEventListener('click', () => handleReset(resetBtn));
+
+  el.dataList.replaceChildren(language, resetRow);
+}
+
+let resetArmed = false;
+let resetTimer = null;
+
+function paintResetButton(button) {
+  button.textContent = resetArmed ? t('settingsResetConfirm') : t('settingsReset');
+  button.classList.toggle('is-armed', resetArmed);
+}
+
+/** Same arm-then-confirm shape as selling a card: the button is the dialog. */
+function handleReset(button) {
+  if (!resetArmed) {
+    resetArmed = true;
+    paintResetButton(button);
+    synth.playArm();
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => { resetArmed = false; paintResetButton(button); }, 5000);
+    return;
+  }
+  wipeEverything();
+}
+
+function wipeEverything() {
+  ['packywiki.collection.v3', 'packywiki.wallet.v1', 'packywiki.inventory.v1',
+   'packywiki.profile.v1', 'packywiki.customPacks.v2', 'packywiki.language',
+   'packywiki.ripDirection', THEME_KEY].forEach((key) => {
+    try { localStorage.removeItem(key); } catch { /* nothing to remove */ }
+  });
+  location.reload();
+}
+
+function applySettings() {
+  const s = settings();
+  document.documentElement.dataset.lowpower = s.lowPower ? '1' : '0';
+  document.documentElement.dataset.hints = s.hints ? '1' : '0';
+  synth.setMuted(!s.sound);
+  backdrop.setLowPower(s.lowPower);
+}
+
+/* --- daily gift -------------------------------------------------------------------------------------------- */
 
 /**
  * A gift's one-line description. Returns MARKUP, not text: the coins case
@@ -1710,40 +1767,57 @@ function giftTile(slot, status) {
     <span class="gift-label"></span>
     <span class="gift-check"></span>`;
   tile.querySelector('.gift-day').textContent = String(slot.day);
-  // The coins label carries the Buckarooz glyph, which is drawn SVG from
-  // icons.js — our own markup, never anything remote.
   tile.querySelector('.gift-label').innerHTML = giftLabel(gift);
-
   const art = tile.querySelector('.gift-art');
-  if (gift.kind === 'coins') art.innerHTML = buckSvg({ size: 22 });
-  else if (gift.kind === 'card') art.innerHTML = iconSvg('collection', { size: 22 });
-  else art.innerHTML = iconSvg('packs', { size: 22 });
-
-  // A claimed day is replaced by its tick: the board is a record as well as
-  // a preview, so you can see at a glance how far in you are.
+  if (gift.kind === 'coins') art.innerHTML = buckSvg({ size: 20 });
+  else if (gift.kind === 'card') art.innerHTML = iconSvg('collection', { size: 20 });
+  else art.innerHTML = iconSvg('packs', { size: 20 });
   if (status === 'claimed') tile.querySelector('.gift-check').innerHTML = iconSvg('check', { size: 18 });
   return tile;
 }
 
-function renderDaily() {
+function openDaily({ auto = false } = {}) {
+  // Auto-opening happens once a day. Dismissing without claiming leaves the
+  // gift waiting and the badge lit, without the dialog reappearing every time
+  // the app is reopened.
+  if (auto) {
+    const today = dayNumber();
+    if (state.profile.daily.shownDay === today) return;
+    state.profile.daily.shownDay = today;
+    store.saveProfile(state.profile);
+  }
+  openSheet(t('dailyTitle'), buildDailyBody);
+}
+
+function buildDailyBody(body) {
   const daily = state.profile.daily;
   const board = generateBoard(daily.board ?? 0);
   const next = nextGiftIndex(daily);
   const ready = canClaim(daily);
 
-  el.dailyTitle.textContent = t('dailyTitle');
-  el.dailyClose.textContent = t('close');
-  el.dailyBody.textContent = t('dailyBody');
-  el.dailyBoardLabel.textContent = t('dailyBoard', { n: (daily.board ?? 0) + 1 });
+  body.innerHTML = `
+    <p style="margin-bottom:16px"></p>
+    <div style="display:grid;gap:10px;margin-bottom:18px">
+      <button class="btn btn-primary btn-block" type="button" data-claim></button>
+      <p class="muted tabular" style="font-size:.82rem;text-align:center" data-status></p>
+    </div>
+    <p class="label" style="margin-bottom:10px" data-board></p>
+    <div class="gift-board"></div>`;
 
-  el.dailyClaim.textContent = t('dailyClaim');
-  el.dailyClaim.disabled = !ready;
-  el.dailyClaim.hidden = !ready;
-  el.dailyStatus.textContent = ready
-    ? ''
-    : `${t('dailyClaimed')} ${t('dailyNextIn', { time: formatCountdown(msUntilNextDay()) })}`;
+  body.querySelector('p').textContent = t('dailyBody');
+  body.querySelector('[data-board]').textContent = t('dailyBoard', { n: (daily.board ?? 0) + 1 });
 
-  el.giftBoard.replaceChildren(...board.map((slot) => giftTile(
+  const claim = body.querySelector('[data-claim]');
+  claim.textContent = t('dailyClaim');
+  claim.hidden = !ready;
+  press(claim, { sound: null });
+  claim.addEventListener('click', () => { synth.resume(); claimGift(body); });
+
+  const status = body.querySelector('[data-status]');
+  status.textContent = ready ? '' :
+    `${t('dailyClaimed')} ${t('dailyNextIn', { time: formatCountdown(msUntilNextDay()) })}`;
+
+  body.querySelector('.gift-board').replaceChildren(...board.map((slot) => giftTile(
     slot,
     slot.index < next ? 'claimed' : slot.index === next ? (ready ? 'ready' : 'next') : 'locked'
   )));
@@ -1753,194 +1827,102 @@ function grantGift(gift) {
   if (gift.kind === 'coins') {
     store.saveWallet(store.loadWallet() + gift.coins);
     refreshWallet();
-    synth.playGift();
   } else {
     store.addBooster(state.inventory, gift.spec, 1);
-    renderRail('boosters');
-    synth.playGift();
+    renderPacks();
   }
+  synth.playGift();
 }
 
-function claimGift() {
+function claimGift(body) {
   const slot = claimDaily(state.profile.daily);
   if (!slot) return;
   store.saveProfile(state.profile);
   grantGift(slot.gift);
   toast(t('dailyGot', { reward: giftLabel(slot.gift) }), 'ok');
-  renderDaily();
-  updateDailyBadge();
+  buildDailyBody(body);
+  updateBadges();
 }
 
-function updateDailyBadge() {
-  const ready = canClaim(state.profile.daily);
-  el.giftDot.hidden = !ready;
-  el.dailyButton.classList.toggle('is-ready', ready);
-}
+/* --- wallet and odds ------------------------------------------------------------------------------------------ */
 
-function openDaily({ auto = false } = {}) {
-  // Auto-opening happens once a day. Dismissing without claiming leaves the
-  // gift waiting and the badge lit, but the dialog does not keep reappearing
-  // every time the app is reopened.
-  if (auto) {
-    const today = dayNumber();
-    if (state.profile.daily.shownDay === today) return;
-    state.profile.daily.shownDay = today;
-    store.saveProfile(state.profile);
-  }
-  renderDaily();
-  el.dailyModal.hidden = false;
-  synth.playModal(true);
-}
-
-/* --- settings ------------------------------------------------------------- */
-
-/** One switch. The label says what it is; the note says why you'd touch it. */
-function settingRow(key, titleKey, noteKey) {
-  const row = document.createElement('div');
-  row.className = 'setting-row';
-  row.innerHTML = `
-    <div class="setting-copy"><h4></h4><p></p></div>
-    <button class="switch" type="button" role="switch"><span class="switch-knob"></span></button>`;
-  row.querySelector('h4').textContent = t(titleKey);
-  row.querySelector('p').textContent = t(noteKey);
-
-  const button = row.querySelector('.switch');
-  const paint = () => {
-    const on = Boolean(settings()[key]);
-    button.classList.toggle('is-on', on);
-    button.setAttribute('aria-checked', String(on));
-    button.setAttribute('aria-label', `${t(titleKey)}: ${on ? t('on') : t('off')}`);
-  };
-  paint();
-  button.addEventListener('click', () => {
-    settings()[key] = !settings()[key];
-    store.saveProfile(state.profile);
-    applySettings();
-    paint();
-    // Fires after the setting is applied, so turning sound ON is audible and
-    // turning it off is the last thing you hear.
-    if (settings()[key] || key !== 'sound') synth.playToggle(Boolean(settings()[key]));
+function openWallet() {
+  openSheet(t('walletTitle'), (body) => {
+    body.innerHTML = `
+      <p style="font-size:2rem;font-weight:800;color:var(--positive);display:flex;align-items:baseline;gap:3px;margin-bottom:8px" data-balance></p>
+      <p style="margin-bottom:16px" data-what></p>
+      <div class="row"><div class="row-copy"><h4 data-earn-t></h4><p data-earn></p></div></div>
+      <div class="row"><div class="row-copy"><h4 data-spend-t></h4><p data-spend></p></div></div>
+      <p class="muted" style="font-size:.78rem;line-height:1.55;margin-top:16px" data-note></p>`;
+    body.querySelector('[data-balance]').innerHTML = money(state.wallet);
+    body.querySelector('[data-what]').textContent = t('walletWhat');
+    body.querySelector('[data-earn-t]').textContent = t('walletEarnTitle');
+    body.querySelector('[data-earn]').textContent = t('walletEarn');
+    body.querySelector('[data-spend-t]').textContent = t('walletSpendTitle');
+    body.querySelector('[data-spend]').textContent = t('walletSpend');
+    body.querySelector('[data-note]').textContent = t('walletNote');
   });
-  return row;
 }
 
-function renderSettings() {
-  el.settingsTitle.textContent = t('settingsTitle');
-  el.settingsList.replaceChildren(
-    settingRow('sound', 'settingsSound', 'settingsSoundNote'),
-    settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
-    settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
-    settingRow('hints', 'settingsHints', 'settingsHintsNote')
-  );
-
-  el.settingsDataTitle.textContent = t('settingsData');
-  el.settingsLanguageTitle.textContent = t('settingsLanguage');
-  el.settingsLanguageNote.textContent = t('settingsLanguageNote');
-  el.settingsLanguageValue.innerHTML =
-    `${iconSvg('lock', { size: 14 })}<span>${LANGUAGES.find((l) => l.id === getLanguage())?.label ?? ''}</span>`;
-  el.settingsResetTitle.textContent = t('settingsReset');
-  el.settingsResetNote.textContent = t('settingsResetNote');
-  paintResetButton();
-}
-
-let resetArmed = false;
-let resetTimer = null;
-
-function paintResetButton() {
-  el.settingsReset.textContent = resetArmed ? t('settingsResetConfirm') : t('settingsReset');
-  el.settingsReset.classList.toggle('is-armed', resetArmed);
-}
-
-/** Same arm-then-confirm shape as selling a card: the button is the dialog. */
-function handleReset() {
-  if (!resetArmed) {
-    resetArmed = true;
-    paintResetButton();
-    synth.playArm();
-    clearTimeout(resetTimer);
-    resetTimer = setTimeout(() => { resetArmed = false; paintResetButton(); }, 5000);
-    return;
-  }
-  wipeEverything();
-}
-
-function wipeEverything() {
-  ['packywiki.collection.v3', 'packywiki.wallet.v1', 'packywiki.inventory.v1',
-   'packywiki.profile.v1', 'packywiki.customPacks.v2', 'packywiki.language',
-   'packywiki.ripDirection'].forEach((key) => {
-    try { localStorage.removeItem(key); } catch { /* nothing to remove */ }
+function openOdds() {
+  openSheet(t('pullRates'), (body) => {
+    const pct = (n) => (n >= 1 ? `${n.toFixed(1)}%` : `${n.toFixed(2)}%`);
+    body.innerHTML = `
+      <p style="margin-bottom:16px" data-note></p>
+      <table class="odds-table">
+        <thead><tr><th></th><th></th></tr></thead>
+        <tbody></tbody>
+      </table>`;
+    body.querySelector('[data-note]').textContent = t('oddsNote');
+    const [h1, h2] = body.querySelectorAll('th');
+    h1.textContent = t('rarity');
+    h2.textContent = t('chance');
+    body.querySelector('tbody').replaceChildren(...oddsTable().map(({ rarity, percent }) => {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span></span></span></td><td class="odds-pct"></td>`;
+      const swatch = row.querySelector('.odds-swatch');
+      swatch.style.color = rarity.color;
+      swatch.style.background = rarity.color;
+      const label = row.querySelector('.odds-name span:last-child');
+      label.textContent = tx(rarity.name);
+      label.style.color = rarity.color;
+      row.querySelector('.odds-pct').textContent = pct(percent);
+      return row;
+    }));
   });
-  location.reload();
 }
 
-/* --- odds ----------------------------------------------------------------- */
-
-function renderOdds() {
-  el.oddsHeading.textContent = t('pullRates');
-  el.oddsNote.textContent = t('oddsNote');
-  el.oddsH1.textContent = t('rarity');
-  el.oddsH2.textContent = t('chance');
-  el.oddsClose.textContent = t('close');
-
-  const pct = (n) => (n >= 1 ? `${n.toFixed(1)}%` : `${n.toFixed(2)}%`);
-  el.oddsBody.replaceChildren(...oddsTable().map(({ rarity, percent }) => {
-    const row = document.createElement('tr');
-    row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span class="odds-label"></span></span></td><td class="odds-pct"></td>`;
-    const swatch = row.querySelector('.odds-swatch');
-    swatch.style.color = rarity.color;
-    swatch.style.background = rarity.color;
-    const label = row.querySelector('.odds-label');
-    label.textContent = tx(rarity.name);
-    label.style.color = rarity.color;
-    row.querySelector('.odds-pct').textContent = pct(percent);
-    return row;
-  }));
-}
-
-/** What the currency is, where it comes from and what it buys. */
-function showWalletInfo() {
-  el.walletTitle.textContent = t('walletTitle');
-  el.walletClose.textContent = t('close');
-  el.walletBalance.innerHTML = money(state.wallet);
-  el.walletWhat.textContent = t('walletWhat');
-  el.walletEarnTitle.textContent = t('walletEarnTitle');
-  el.walletEarn.textContent = t('walletEarn');
-  el.walletSpendTitle.textContent = t('walletSpendTitle');
-  el.walletSpend.textContent = t('walletSpend');
-  el.walletNote.textContent = t('walletNote');
-  el.walletModal.hidden = false;
-  synth.playModal(true);
-}
-
-/* --- first run ------------------------------------------------------------ */
+/* --- first run --------------------------------------------------------------------------------------------------- */
 
 function showWelcome() {
+  el.welcomeMark.innerHTML = logoSvg({ size: 62 });
   el.welcomeTitle.textContent = t('welcomeTitle');
   el.welcomeBody.textContent = t('welcomeBody');
   el.langChoices.replaceChildren(...LANGUAGES.map((lang) => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.className = `lang-choice${lang.id === getLanguage() ? ' is-active' : ''}`;
+    button.className = `choice lang-choice${lang.id === getLanguage() ? ' is-on' : ''}`;
     button.dataset.lang = lang.id;
-    button.textContent = lang.label;
+    button.innerHTML = `<span>${lang.label}</span><span>${iconSvg('chevron', { size: 16 })}</span>`;
+    press(button, { sound: null });
     button.addEventListener('click', () => {
       setLanguage(lang.id);
+      synth.resume();
       synth.playTap();
       showStarter();
     });
     return button;
   }));
-  el.starterPanel.hidden = true;
-  el.welcomeModal.hidden = false;
+  el.starter.hidden = true;
+  el.welcome.hidden = false;
 }
 
 function showStarter() {
-  // Re-label everything now that a language is set.
   applyStrings();
   el.welcomeTitle.textContent = t('welcomeTitle');
   el.welcomeBody.textContent = t('welcomeBody');
   el.langChoices.querySelectorAll('.lang-choice').forEach((b) =>
-    b.classList.toggle('is-active', b.dataset.lang === getLanguage()));
+    b.classList.toggle('is-on', b.dataset.lang === getLanguage()));
 
   store.grantStarter(state.profile);
   const starters = shuffle(THEME_PACKS).slice(0, STARTER_PACKS).map((theme) => ({
@@ -1951,54 +1933,41 @@ function showStarter() {
 
   el.starterTitle.textContent = t('starterTitle');
   el.starterBody.innerHTML = t('starterBody', { coins: money(STARTER_COINS), packs: STARTER_PACKS });
-  el.starterLoot.replaceChildren(
-    ...starters.map((spec) => {
-      const wrap = document.createElement('div');
-      wrap.className = 'loot-item';
-      wrap.appendChild(buildBooster(spec, { size: 'is-tiny' }));
-      return wrap;
-    })
-  );
+  el.starterLoot.replaceChildren(...starters.map((spec) => buildBooster(spec, { size: 'is-tiny' })));
   el.starterGo.textContent = t('letsGo');
-  el.starterPanel.hidden = false;
+  el.starter.hidden = false;
   synth.playFanfare();
 
-  renderRail('boosters');
-  renderRail('custom');
+  renderPacks();
   renderShop();
-  updateTimedBadge();
-  updateDailyBadge();
+  renderBinder();
+  updateBadges();
   loadPackArt();
 }
 
-/* --- strings -------------------------------------------------------------- */
+/* --- strings --------------------------------------------------------------------------------------------------------- */
 
 function applyStrings() {
   document.documentElement.lang = getLanguage();
-  el.brandSub.textContent = t('tagline');
-  el.oddsButton.textContent = t('odds');
-  el.dailyButtonLabel.textContent = t('dailyOpen');
-  el.giftIcon.innerHTML = iconSvg('gift', { size: 15 });
-  const TAB_KEYS = {
-    boosters: 'tabBoosters', timed: 'tabTimed', custom: 'tabCustom', shop: 'tabShop',
-    collection: 'tabCollection', profile: 'tabProfile', settings: 'tabSettings'
-  };
-  el.tabs.forEach((tab) => {
-    tab.querySelector('.tab-label').textContent = t(TAB_KEYS[tab.dataset.tab]);
+  el.appbarTitle.textContent = t(SCREEN_TITLES[state.tab] ?? 'tabBoosters');
+  el.giftIcon.innerHTML = iconSvg('gift', { size: 18 });
+  el.walletMark.innerHTML = buckSvg({ size: 12 });
+  el.sheetClose.innerHTML = iconSvg('close', { size: 17 });
+  el.openBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  el.creatorLabel.textContent = t('tabCustom');
+  el.creatorNote.textContent = `${t('customIntro')} ${t('customOwnNote')}`;
+  el.creatorInput.placeholder = t('customPlaceholder');
+  el.creatorGo.textContent = t('create');
+  el.packsEmptyCta.textContent = t('goShop');
+
+  nav?.setLabels({
+    packs: t('tabBoosters'), timed: t('tabTimed'), shop: t('tabShop'),
+    binder: t('tabCollection'), profile: t('tabProfile')
   });
-  el.railHint.textContent = t('swipeShelf');
-  el.customIntro.textContent = `${t('customIntro')} ${t('customOwnNote')}`;
-  el.customInput.placeholder = t('customPlaceholder');
-  el.customSubmit.textContent = t('create');
-  el.customOpen.textContent = t('openPack');
-  el.backButton.textContent = `← ${t('allBoosters')}`;
-  el.backToShelf.textContent = t('back');
-  el.cardModalClose.innerHTML = iconSvg('close', { size: 18 });
-  el.shopIntro.textContent = t('shopIntro');
-  renderOdds();
+  packsSeg?.relabel([{ label: t('owned') }, { label: t('tabCustom') }]);
 }
 
-/* --- wiring --------------------------------------------------------------- */
+/* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
 async function loadPackArt() {
   try {
@@ -2014,10 +1983,10 @@ async function loadPackArt() {
   }
 }
 
-/** Rebuild a minimal spec from an id, for repainting art after a late load. */
+/** Rebuild a minimal spec from an id, to repaint art after a late load. */
 function specFromId(id) {
   const [kind, theme, rarity, cards] = String(id).split('|');
-  if (kind === 'custom') return null;
+  if (kind === 'custom' || kind === 'timed') return null;
   return {
     kind, themeId: theme === 'any' ? null : theme,
     rarityId: rarity === 'std' ? null : rarity, cards: Number(cards) || 5
@@ -2025,112 +1994,119 @@ function specFromId(id) {
 }
 
 function init() {
-  el.brandMark.innerHTML = logoSvg({ size: 30 });
+  useTheme(storedTheme());
+  backdrop.mount(el.backdrop).setTheme(storedTheme());
+
+  walletOdo = new Odometer(el.walletAmount);
+  levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
+  profileRing = new Ring(el.profileRing, { size: 62, width: 4 });
+  xpBar = new Bar(el.xpBar);
+  trackBar = new Bar(el.trackBar);
+
+  packsRail = new Rail(el.packsRail, { onFocus: paintPackCaption });
+  sheet = new Sheet(el.sheet);
+
+  packsSeg = new Segmented(el.packsSeg, [
+    { id: 'owned', label: t('owned') },
+    { id: 'custom', label: t('tabCustom') }
+  ], (mode) => { state.packMode = mode; renderPacks(); });
+
+  nav = new NavBar(el.navbar, [
+    { id: 'packs', icon: iconSvg('packs', { size: 21 }) },
+    { id: 'timed', icon: iconSvg('clock', { size: 21 }) },
+    { id: 'shop', icon: iconSvg('gem', { size: 21 }) },
+    { id: 'binder', icon: iconSvg('collection', { size: 21 }) },
+    { id: 'profile', icon: iconSvg('profile', { size: 21 }) }
+  ], (id) => {
+    // Every destination repaints on arrival: the shelf, the wallet and the
+    // counters can all have changed while the player was somewhere else.
+    if (id === 'packs') renderPacks();
+    if (id === 'binder') renderBinder();
+    if (id === 'shop') { payStipend(); renderShop(); }
+    if (id === 'timed') renderTimed();
+    if (id === 'profile') renderProfile();
+    showScreen(id);
+  });
+
   applySettings();
   applyStrings();
   refreshWallet();
-  updateTabCount();
-  updateTimedBadge();
-  updateDailyBadge();
-  initRail('boosters');
-  initRail('custom');
+  refreshLevelBadge();
+  updateBadges();
   initSwipe();
-  initFilters();
-  renderRail('boosters');
-  renderRail('custom');
-  renderCollection();
+
+  renderPacks();
   renderShop();
-  // Pack art is language-specific, so it waits until a language exists —
-  // otherwise the first run fetches English images and keeps them.
+  renderBinder();
+  // Pack art is language-specific, so it waits until a language exists.
   if (languageChosen()) loadPackArt();
 
-  el.railPrev.addEventListener('click', () => scrollRailTo('boosters', (state.rails.boosters?.focusIndex ?? 0) - 1));
-  el.railNext.addEventListener('click', () => scrollRailTo('boosters', (state.rails.boosters?.focusIndex ?? 0) + 1));
-  el.customForm.addEventListener('submit', createCustomPack);
-  const leaveOpenScreen = () => {
+  [el.wallet, el.gift, el.levelBadge, el.packsOpen, el.timedOpen,
+   el.filterOpen, el.openBack, el.openDone, el.sheetClose, el.starterGo,
+   el.packsEmptyCta, el.creatorGo].forEach((node) => press(node, { sound: null }));
+
+  el.wallet.addEventListener('click', openWallet);
+  el.gift.addEventListener('click', () => openDaily());
+  el.levelBadge.addEventListener('click', () => { renderProfile(); showScreen('profile'); });
+  el.filterOpen.addEventListener('click', openFilters);
+  el.packsEmptyCta.addEventListener('click', () => { payStipend(); renderShop(); showScreen('shop'); });
+  el.creator.addEventListener('submit', createCustomPack);
+
+  const leaveOpen = () => {
     const home = homeTabFor(state.spec);
     if (home === 'timed') renderTimed();
+    else renderPacks();
     showScreen(home);
   };
-  el.backButton.addEventListener('click', leaveOpenScreen);
-  el.backToShelf.addEventListener('click', leaveOpenScreen);
+  el.openBack.addEventListener('click', leaveOpen);
+  el.openDone.addEventListener('click', leaveOpen);
 
-  const TAB_ORDER = el.tabs.map((tab) => tab.dataset.tab);
-  el.tabs.forEach((tab) => tab.addEventListener('click', () => {
-    const name = tab.dataset.tab;
-    synth.resume();
-    synth.playSwitch(TAB_ORDER.indexOf(name) >= TAB_ORDER.indexOf(state.tab));
-    if (name === 'collection') renderCollection();
-    if (name === 'shop') { payStipend(); renderShop(); }
-    if (name === 'timed') renderTimed();
-    if (name === 'profile') renderProfile();
-    if (name === 'settings') renderSettings();
-    showScreen(name);
-  }));
-
-  el.wallet.addEventListener('click', showWalletInfo);
-  el.walletClose.addEventListener('click', () => { el.walletModal.hidden = true; synth.playModal(false); });
-  el.walletModal.addEventListener('click', (e) => { if (e.target === el.walletModal) el.walletModal.hidden = true; });
-
-  el.oddsButton.addEventListener('click', () => { el.oddsModal.hidden = false; synth.resume(); synth.playModal(true); });
-  el.oddsClose.addEventListener('click', () => { el.oddsModal.hidden = true; synth.playModal(false); });
-  el.oddsModal.addEventListener('click', (e) => { if (e.target === el.oddsModal) el.oddsModal.hidden = true; });
-
-  el.cardModalClose.addEventListener('click', closeCardDetail);
-  el.cardModal.addEventListener('click', (e) => { if (e.target === el.cardModal) closeCardDetail(); });
-  el.detailSell.addEventListener('click', handleSell);
-
+  el.sheetClose.addEventListener('click', () => sheet.hide());
   document.addEventListener('keydown', (e) => {
-    if (e.key !== 'Escape') return;
-    el.oddsModal.hidden = true;
-    el.walletModal.hidden = true;
-    el.dailyModal.hidden = true;
-    if (!el.cardModal.hidden) closeCardDetail();
+    if (e.key === 'Escape' && sheet.open) sheet.hide();
   });
 
-  el.dailyButton.addEventListener('click', openDaily);
-  el.dailyClose.addEventListener('click', () => { el.dailyModal.hidden = true; synth.playModal(false); });
-  el.dailyModal.addEventListener('click', (e) => { if (e.target === el.dailyModal) el.dailyModal.hidden = true; });
-  el.dailyClaim.addEventListener('click', () => { synth.resume(); claimGift(); });
-  el.settingsReset.addEventListener('click', handleReset);
+  el.starterGo.addEventListener('click', () => {
+    el.welcome.hidden = true;
+    synth.playTap();
+    showScreen('packs');
+    if (canClaim(state.profile.daily)) openDaily({ auto: true });
+  });
 
-  // Playtime is measured between visibility changes, and the shared clock is
-  // parked entirely while the app is in the background.
+  // Playtime is measured between visibility changes, and both the clock and
+  // the backdrop are parked entirely while the app is in the background.
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
+    const visible = document.visibilityState === 'visible';
+    if (visible) {
       visibleSince = Date.now();
       syncTimed();
-      updateTimedBadge();
-      updateDailyBadge();
+      updateBadges();
     } else {
       flushPlaytime();
       visibleSince = null;
-      // Nothing is playing in the background, so let the audio hardware go.
       synth.suspend();
     }
+    backdrop.setPaused(!visible || document.documentElement.classList.contains('is-immersive'));
     syncTicker();
   });
   window.addEventListener('pagehide', flushPlaytime);
 
-  el.starterGo.addEventListener('click', () => {
-    el.welcomeModal.hidden = true;
-    synth.playTap();
-    showScreen('boosters');
-    if (canClaim(state.profile.daily)) openDaily({ auto: true });
-  });
+  backdrop.start();
 
   if (!languageChosen() || !state.profile.started) showWelcome();
   else {
     payStipend();
-    // A gift waiting is the first thing a returning player should see.
     if (canClaim(state.profile.daily)) openDaily({ auto: true });
   }
 }
 
+let packsRail;
 init();
 
 window.__packywiki = {
-  state, store, RARITIES, synth, draw: drawArticles, generateShop,
+  state, store, RARITIES, synth, backdrop, THEMES,
+  draw: drawArticles, generateShop,
+  setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderSettings(); },
   debugRarity(id) {
     const forced = rarityById(id);
     document.querySelectorAll('.card').forEach((card) => {
@@ -2141,20 +2117,16 @@ window.__packywiki = {
     return forced;
   },
   grant(amount = 10000) { store.saveWallet(store.loadWallet() + amount); refreshWallet(); },
-  giveBooster(spec) { store.addBooster(state.inventory, spec, 1); renderRail('boosters'); renderRail('custom'); },
-  resetAll: wipeEverything,
+  giveBooster(spec) { store.addBooster(state.inventory, spec, 1); renderPacks(); },
+  giveTimed(n = 5) { state.profile.timed.count += n; store.saveProfile(state.profile); renderTimed(); updateBadges(); },
   addXp(amount = 5000) {
     const levels = addXp(state.profile.progress, amount);
     if (levels.length) state.profile.pendingLevels.push(...levels);
     store.saveProfile(state.profile);
+    refreshLevelBadge();
     drainLevelUps();
     return state.profile.progress;
   },
-  timedShare: timedOddsShare,
   timedScarcity: timedTopScarcity,
-  giveTimed(n = 5) {
-    state.profile.timed.count += n;
-    store.saveProfile(state.profile);
-    renderTimed();
-  }
+  resetAll: wipeEverything
 };

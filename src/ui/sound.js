@@ -1,0 +1,543 @@
+/**
+ * THE SYNTHESISER
+ * ============================================================================
+ * Every sound in the app is built here at runtime. The repo ships no audio
+ * files, and no two themes sound alike: a theme picks the voice (FM bell,
+ * marimba, chiptune, plucked string), the tuning, the amount of room and the
+ * amount of grit, so switching theme changes what the app SOUNDS like as much
+ * as what it looks like.
+ *
+ * The chain, once, for everything:
+ *
+ *   voice -> [ drive ] -> bus -> filter -> compressor -> master -> out
+ *                          \-> reverb send -> convolver -> master
+ *
+ * The compressor is what stops a Legendary chord landing on top of a coin
+ * spill and clipping; the soft-clip waveshaper is what gives Arcade its bite
+ * without letting anything actually distort into mud.
+ */
+import { themeById, DEFAULT_THEME } from './themes.js';
+
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+/** Equal temperament from a root, in semitones. */
+const step = (root, semitones) => root * Math.pow(2, semitones / 12);
+
+class Synth {
+  constructor() {
+    this.ctx = null;
+    this.muted = false;
+    this.theme = themeById(DEFAULT_THEME);
+    this.nodes = null;
+  }
+
+  /* --- graph ------------------------------------------------------------- */
+
+  ensure() {
+    if (this.ctx) return this.ctx;
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return null;
+
+    this.ctx = new Ctx();
+    const ctx = this.ctx;
+
+    const master = ctx.createGain();
+    master.gain.value = this.muted ? 0 : 0.85;
+
+    const comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -18;
+    comp.knee.value = 22;
+    comp.ratio.value = 4;
+    comp.attack.value = 0.004;
+    comp.release.value = 0.18;
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 5200;
+    filter.Q.value = 0.5;
+
+    const bus = ctx.createGain();
+    bus.gain.value = 1;
+
+    const send = ctx.createGain();
+    send.gain.value = 0.3;
+
+    const reverb = ctx.createConvolver();
+
+    bus.connect(filter);
+    filter.connect(comp);
+    comp.connect(master);
+    bus.connect(send);
+    send.connect(reverb);
+    reverb.connect(master);
+    master.connect(ctx.destination);
+
+    this.nodes = { master, comp, filter, bus, send, reverb };
+    this.#applyThemeToGraph();
+    return ctx;
+  }
+
+  resume() {
+    const ctx = this.ensure();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+  }
+
+  /** Park the audio hardware while the app is backgrounded. Never creates one. */
+  suspend() {
+    if (this.ctx && this.ctx.state === 'running') this.ctx.suspend();
+  }
+
+  setMuted(muted) {
+    this.muted = muted;
+    if (this.nodes) {
+      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.85, this.ctx.currentTime, 0.02);
+    }
+  }
+
+  /** Retune the whole instrument. Called when the player changes theme. */
+  setTheme(id) {
+    this.theme = themeById(id);
+    if (this.nodes) this.#applyThemeToGraph();
+  }
+
+  #applyThemeToGraph() {
+    const { filter, send, reverb } = this.nodes;
+    const s = this.theme.sound;
+    const t = this.ctx.currentTime;
+    filter.frequency.setTargetAtTime(s.filter, t, 0.05);
+    send.gain.setTargetAtTime(s.reverb.mix, t, 0.05);
+    reverb.buffer = this.#impulse(s.reverb.seconds, s.reverb.decay);
+  }
+
+  /** A generated room. Cheaper and smaller than shipping an impulse file. */
+  #impulse(seconds, decay) {
+    const rate = this.ctx.sampleRate;
+    const length = Math.max(1, Math.floor(rate * seconds));
+    const buffer = this.ctx.createBuffer(2, length, rate);
+    for (let ch = 0; ch < 2; ch++) {
+      const data = buffer.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, decay);
+      }
+    }
+    return buffer;
+  }
+
+  #noiseBuffer(seconds) {
+    const rate = this.ctx.sampleRate;
+    const buffer = this.ctx.createBuffer(1, Math.max(1, Math.floor(rate * seconds)), rate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    return buffer;
+  }
+
+  /** Soft clip. `amount` 0 is transparent, 1 is Arcade. */
+  #shaper(amount) {
+    const curve = new Float32Array(1024);
+    const k = amount * 60;
+    for (let i = 0; i < 1024; i++) {
+      const x = (i / 511.5) - 1;
+      curve[i] = ((1 + k) * x) / (1 + k * Math.abs(x));
+    }
+    const shaper = this.ctx.createWaveShaper();
+    shaper.curve = curve;
+    shaper.oversample = '2x';
+    return shaper;
+  }
+
+  /* --- voices ------------------------------------------------------------ */
+
+  /**
+   * One note, in whatever voice the current theme speaks. Everything musical
+   * in the app goes through here, which is why a chord sounds like a bell in
+   * Aurora and a plucked string in Noir without any caller knowing.
+   */
+  #note({ freq, at = 0, dur = 0.5, gain = 0.2, voice = null, bend = 0 }) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime + at;
+    const kind = voice ?? this.theme.sound.voice;
+    const out = ctx.createGain();
+    out.gain.value = 1;
+
+    const drive = this.theme.sound.drive;
+    if (drive > 0.02) {
+      const shaper = this.#shaper(drive);
+      out.connect(shaper);
+      shaper.connect(this.nodes.bus);
+    } else {
+      out.connect(this.nodes.bus);
+    }
+
+    if (kind === 'pluck') return this.#pluck({ freq, t, dur, gain, out });
+    if (kind === 'chip') return this.#chip({ freq, t, dur, gain, out, bend });
+    if (kind === 'marimba') return this.#marimba({ freq, t, dur, gain, out });
+    return this.#fm({ freq, t, dur, gain, out });
+  }
+
+  /** FM bell: a modulator an octave-and-a-fifth up, decaying faster than the carrier. */
+  #fm({ freq, t, dur, gain, out }) {
+    const ctx = this.ctx;
+    const carrier = ctx.createOscillator();
+    carrier.type = 'sine';
+    carrier.frequency.value = freq;
+
+    const mod = ctx.createOscillator();
+    mod.type = 'sine';
+    mod.frequency.value = freq * 3.01;   // slightly detuned for shimmer
+
+    const modGain = ctx.createGain();
+    modGain.gain.setValueAtTime(freq * 2.2, t);
+    modGain.gain.exponentialRampToValueAtTime(freq * 0.02, t + dur * 0.6);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(gain, t + 0.008);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    mod.connect(modGain);
+    modGain.connect(carrier.frequency);
+    carrier.connect(env);
+    env.connect(out);
+
+    mod.start(t); carrier.start(t);
+    mod.stop(t + dur + 0.05); carrier.stop(t + dur + 0.05);
+  }
+
+  /** Marimba: sine body with a hard wooden transient and a fast decay. */
+  #marimba({ freq, t, dur, gain, out }) {
+    const ctx = this.ctx;
+    const short = Math.min(dur, 0.42);
+
+    [1, 4.02, 9.1].forEach((ratio, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = 'sine';
+      osc.frequency.value = freq * ratio;
+      const env = ctx.createGain();
+      const level = gain / (i * 2.4 + 1);
+      env.gain.setValueAtTime(0.0001, t);
+      env.gain.exponentialRampToValueAtTime(level, t + 0.004);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + short / (i + 1));
+      osc.connect(env); env.connect(out);
+      osc.start(t); osc.stop(t + short + 0.05);
+    });
+
+    // The mallet hitting the bar.
+    const knock = ctx.createBufferSource();
+    knock.buffer = this.#noiseBuffer(0.03);
+    const kf = ctx.createBiquadFilter();
+    kf.type = 'bandpass'; kf.frequency.value = freq * 5; kf.Q.value = 1.6;
+    const kg = ctx.createGain();
+    kg.gain.setValueAtTime(gain * 0.5, t);
+    kg.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
+    knock.connect(kf); kf.connect(kg); kg.connect(out);
+    knock.start(t); knock.stop(t + 0.05);
+  }
+
+  /** Chiptune: square plus detuned saw, with an optional pitch bend. */
+  #chip({ freq, t, dur, gain, out, bend }) {
+    const ctx = this.ctx;
+    const short = Math.min(dur, 0.5);
+
+    [['square', 1, 1], ['sawtooth', 1.005, 0.4]].forEach(([type, detune, level]) => {
+      const osc = ctx.createOscillator();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq * detune, t);
+      if (bend) osc.frequency.exponentialRampToValueAtTime(freq * detune * (1 + bend), t + short);
+      const env = ctx.createGain();
+      // Hard gate rather than a curve: chip voices do not fade, they stop.
+      env.gain.setValueAtTime(gain * level, t);
+      env.gain.setValueAtTime(gain * level * 0.6, t + short * 0.5);
+      env.gain.exponentialRampToValueAtTime(0.0001, t + short);
+      osc.connect(env); env.connect(out);
+      osc.start(t); osc.stop(t + short + 0.02);
+    });
+  }
+
+  /**
+   * Karplus-Strong: a burst of noise fed through a tuned delay that low-passes
+   * a little on each pass. It is a plucked string, from first principles.
+   */
+  #pluck({ freq, t, dur, gain, out }) {
+    const ctx = this.ctx;
+    const burst = ctx.createBufferSource();
+    burst.buffer = this.#noiseBuffer(0.02);
+
+    const delay = ctx.createDelay(0.05);
+    delay.delayTime.value = 1 / freq;
+
+    const damp = ctx.createBiquadFilter();
+    damp.type = 'lowpass';
+    damp.frequency.value = clamp(freq * 8, 800, 7000);
+
+    const feedback = ctx.createGain();
+    feedback.gain.value = 0.965;
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(gain, t);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    burst.connect(delay);
+    delay.connect(damp);
+    damp.connect(feedback);
+    feedback.connect(delay);
+    damp.connect(env);
+    env.connect(out);
+
+    burst.start(t);
+    burst.stop(t + 0.03);
+    // The loop keeps ringing on its own; cut the feedback so it cannot run on.
+    feedback.gain.setValueAtTime(0.965, t);
+    feedback.gain.setTargetAtTime(0, t + dur * 0.8, 0.05);
+  }
+
+  /** Filtered noise. Rips, whooshes, transients, texture. */
+  #noise({ at = 0, dur = 0.3, gain = 0.2, type = 'bandpass', from = 1400, to = 400, q = 1 }) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime + at;
+    const src = ctx.createBufferSource();
+    src.buffer = this.#noiseBuffer(dur + 0.1);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.Q.value = q;
+    filter.frequency.setValueAtTime(Math.max(40, from), t);
+    filter.frequency.exponentialRampToValueAtTime(Math.max(40, to), t + dur);
+
+    const env = ctx.createGain();
+    env.gain.setValueAtTime(0.0001, t);
+    env.gain.exponentialRampToValueAtTime(gain, t + 0.012);
+    env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    src.connect(filter); filter.connect(env); env.connect(this.nodes.bus);
+    src.start(t); src.stop(t + dur + 0.1);
+  }
+
+  /** The theme's own click: air, wood, bit-crush or brush. */
+  #transient(gain = 0.08) {
+    const kind = this.theme.sound.transient;
+    if (kind === 'knock') this.#noise({ dur: 0.035, gain, type: 'bandpass', from: 2200, to: 900, q: 2.4 });
+    else if (kind === 'bit') this.#noise({ dur: 0.03, gain: gain * 1.1, type: 'highpass', from: 3000, to: 6000, q: 0.6 });
+    else if (kind === 'brush') this.#noise({ dur: 0.09, gain: gain * 0.7, type: 'bandpass', from: 1200, to: 300, q: 0.8 });
+    else this.#noise({ dur: 0.05, gain: gain * 0.8, type: 'highpass', from: 3600, to: 7200, q: 0.7 });
+  }
+
+  /** A note of the theme's scale, `degree` steps up from its root. */
+  #degree(degree, octave = 0) {
+    const { root, scale } = this.theme.sound;
+    const size = scale.length;
+    const index = ((degree % size) + size) % size;
+    const octaves = Math.floor(degree / size) + octave;
+    return step(root, scale[index] + octaves * 12);
+  }
+
+  #ready() {
+    if (!this.ensure() || this.muted) return false;
+    return true;
+  }
+
+  /* --- the app's vocabulary ---------------------------------------------- */
+
+  /** Any press. The smallest sound in the app, and the most frequent. */
+  playTap() {
+    if (!this.#ready()) return;
+    this.#transient(0.07);
+    this.#note({ freq: this.#degree(2, 1), dur: 0.08, gain: 0.05 });
+  }
+
+  /** Moving between destinations. Direction is audible. */
+  playNav(forward = true) {
+    if (!this.#ready()) return;
+    this.#transient(0.05);
+    this.#note({ freq: this.#degree(forward ? 1 : 3, 1), dur: 0.12, gain: 0.06, bend: forward ? 0.04 : -0.03 });
+    this.#note({ freq: this.#degree(forward ? 3 : 1, 1), at: 0.045, dur: 0.16, gain: 0.05 });
+  }
+
+  /** A switch. On and off are different sounds, not the same one twice. */
+  playToggle(on) {
+    if (!this.#ready()) return;
+    this.#transient(0.06);
+    this.#note({ freq: this.#degree(on ? 4 : 0, on ? 1 : 0), dur: 0.12, gain: 0.07 });
+  }
+
+  /** A sheet or dialog arriving or leaving. */
+  playSheet(open = true) {
+    if (!this.#ready()) return;
+    this.#noise({
+      dur: 0.3, gain: 0.06, type: 'bandpass',
+      from: open ? 400 : 2200, to: open ? 2200 : 400, q: 0.8
+    });
+    this.#note({ freq: this.#degree(open ? 0 : 2, 1), dur: 0.24, gain: 0.05 });
+  }
+
+  /** The shelf settling onto a booster. */
+  playSnap() {
+    if (!this.#ready()) return;
+    this.#transient(0.05);
+    this.#note({ freq: this.#degree(4, 1), dur: 0.06, gain: 0.04 });
+  }
+
+  /** One notch of tearing. Driven by the drag, so it has to be granular. */
+  playRipTick(progress = 0) {
+    if (!this.#ready()) return;
+    const p = clamp(progress, 0, 1);
+    this.#noise({
+      dur: 0.05 + p * 0.02, gain: 0.07 + p * 0.09, type: 'bandpass',
+      from: 900 + p * 2600, to: 500 + p * 900, q: 1.1 + p * 2
+    });
+  }
+
+  /** The foil giving way. */
+  playRip() {
+    if (!this.#ready()) return;
+    this.resume();
+    this.#noise({ dur: 0.42, gain: 0.3, type: 'bandpass', from: 3200, to: 260, q: 0.8 });
+    this.#noise({ at: 0.03, dur: 0.3, gain: 0.16, type: 'highpass', from: 2000, to: 6000 });
+    this.#note({ freq: this.#degree(0, -1), dur: 0.5, gain: 0.12 });
+  }
+
+  /** A card turning over. */
+  playFlip() {
+    if (!this.#ready()) return;
+    this.#noise({ dur: 0.15, gain: 0.12, type: 'bandpass', from: 2400, to: 700, q: 1.3 });
+  }
+
+  /** A card opening to full size. */
+  playCardOpen() {
+    if (!this.#ready()) return;
+    this.#noise({ dur: 0.13, gain: 0.09, type: 'bandpass', from: 1700, to: 900, q: 1.4 });
+    this.#note({ freq: this.#degree(3, 1), at: 0.02, dur: 0.26, gain: 0.06 });
+  }
+
+  /** Money arriving. */
+  playCoins() {
+    if (!this.#ready()) return;
+    this.resume();
+    [4, 5, 7].forEach((deg, i) => {
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.05, dur: 0.3, gain: 0.1 });
+    });
+    for (let i = 0; i < 4; i++) {
+      this.#noise({
+        at: 0.02 + Math.random() * 0.18, dur: 0.045, gain: 0.045,
+        type: 'bandpass', from: 4200 + Math.random() * 3000, to: 6500, q: 4
+      });
+    }
+  }
+
+  /** Money leaving, and something arriving in its place. */
+  playPurchase() {
+    if (!this.#ready()) return;
+    this.resume();
+    this.#note({ freq: this.#degree(0), dur: 0.3, gain: 0.13 });
+    this.#note({ freq: this.#degree(2), at: 0.08, dur: 0.32, gain: 0.12 });
+    this.#note({ freq: this.#degree(4, 1), at: 0.16, dur: 0.46, gain: 0.11 });
+    this.#transient(0.07);
+  }
+
+  /** Refused. */
+  playDenied() {
+    if (!this.#ready()) return;
+    this.#note({ freq: this.#degree(0, -1), dur: 0.14, gain: 0.1, bend: -0.12 });
+    this.#note({ freq: this.#degree(0, -1) * 0.94, at: 0.1, dur: 0.22, gain: 0.09 });
+  }
+
+  /** Arming something destructive. Unsettled on purpose. */
+  playArm() {
+    if (!this.#ready()) return;
+    this.#note({ freq: this.#degree(1), dur: 0.1, gain: 0.08, bend: 0.06 });
+    this.#note({ freq: this.#degree(2, 1), at: 0.06, dur: 0.14, gain: 0.05 });
+  }
+
+  /** A gift being taken. */
+  playGift() {
+    if (!this.#ready()) return;
+    this.resume();
+    [2, 4, 6].forEach((deg, i) => {
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.07, dur: 0.44, gain: 0.11 });
+    });
+    this.#noise({ at: 0.08, dur: 0.4, gain: 0.04, type: 'highpass', from: 5000, to: 10000 });
+  }
+
+  /** Crossing a level. */
+  playLevelUp() {
+    if (!this.#ready()) return;
+    this.resume();
+    [0, 2, 4, 6, 8].forEach((deg, i) => {
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.085, dur: 0.8, gain: 0.12 });
+    });
+    this.#note({ freq: this.#degree(0, -1), dur: 1.2, gain: 0.12 });
+    this.#noise({ at: 0.3, dur: 0.9, gain: 0.045, type: 'highpass', from: 4000, to: 12000 });
+  }
+
+  /** XP landing. Tiny: it fires on every pack. */
+  playXp() {
+    if (!this.#ready()) return;
+    this.#note({ freq: this.#degree(5, 1), dur: 0.13, gain: 0.05, bend: 0.08 });
+  }
+
+  /** A timed booster becoming available. */
+  playReady() {
+    if (!this.#ready()) return;
+    this.#note({ freq: this.#degree(4, 1), dur: 0.2, gain: 0.07 });
+    this.#note({ freq: this.#degree(6, 1), at: 0.09, dur: 0.3, gain: 0.06 });
+  }
+
+  /** A custom wiki resolved. */
+  playResolved() {
+    if (!this.#ready()) return;
+    this.#note({ freq: this.#degree(0, 1), dur: 0.26, gain: 0.09 });
+    this.#note({ freq: this.#degree(4, 1), at: 0.09, dur: 0.36, gain: 0.09 });
+  }
+
+  /** The starter kit and the restock bonus. */
+  playFanfare() {
+    if (!this.#ready()) return;
+    this.resume();
+    [0, 2, 4, 7].forEach((deg, i) => {
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.1, dur: 0.75, gain: 0.12 });
+    });
+    this.#note({ freq: this.#degree(0, -1), dur: 1.1, gain: 0.11 });
+  }
+
+  /** Switching theme: a short signature in the theme you just switched TO. */
+  playTheme() {
+    if (!this.#ready()) return;
+    this.resume();
+    [0, 2, 4].forEach((deg, i) => {
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.075, dur: 0.6, gain: 0.11 });
+    });
+    this.#transient(0.06);
+  }
+
+  /**
+   * The reveal. `rank` is the tier's index: higher tiers get more voices, a
+   * longer tail, sub-bass and a shimmer, so the sound scales with the pull.
+   */
+  playReveal(rank = 0) {
+    if (!this.#ready()) return;
+    this.resume();
+    const tier = clamp(rank, 0, 7);
+    const voices = 2 + Math.floor(tier * 0.7);
+    const spacing = 0.08 - tier * 0.005;
+    const tail = 0.5 + tier * 0.24;
+
+    for (let i = 0; i < voices; i++) {
+      this.#note({
+        freq: this.#degree(tier + i, 1),
+        at: i * spacing,
+        dur: tail,
+        gain: 0.2 / Math.sqrt(i + 1)
+      });
+    }
+    if (tier >= 4) this.#note({ freq: this.#degree(tier, -1), dur: tail * 1.2, gain: 0.16 });
+    if (tier >= 6) {
+      for (let i = 0; i < 4; i++) {
+        this.#noise({
+          at: 0.15 + i * 0.12, dur: 0.5, gain: 0.035,
+          type: 'bandpass', from: 6000 + i * 1200, to: 9000, q: 5
+        });
+      }
+    }
+  }
+}
+
+export const synth = new Synth();

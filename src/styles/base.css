@@ -1,0 +1,204 @@
+/* ==========================================================================
+   BASE
+   The shell: reset, typography, the app frame, the header and the backdrop.
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+
+/* An explicit `display` beats the `hidden` attribute, so anything toggled in
+   JS relies on this being here. */
+[hidden] { display: none !important; }
+
+h1, h2, h3, h4, h5, h6, p, figure, ul, ol { margin: 0; padding: 0; }
+ul, ol { list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+input, select, textarea { font: inherit; color: inherit; }
+img { display: block; max-width: 100%; }
+
+html {
+  height: 100%;
+  background: #06070d;
+  overscroll-behavior: none;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100%;
+  overflow-x: hidden;
+  overscroll-behavior-x: none;
+  font-family: var(--font);
+  color: var(--ink);
+  background: transparent;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Nothing selects: this is an app, not a document. */
+body { user-select: none; -webkit-user-select: none; }
+.selectable, .sheet-body p, .detail-text { user-select: text; -webkit-user-select: text; }
+
+h1, h2, h3, h4 {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-transform);
+  line-height: 1.15;
+}
+
+.label {
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+
+.muted { color: var(--ink-dim); }
+.tabular { font-variant-numeric: tabular-nums; }
+
+/* --- the backdrop and its texture ---------------------------------------- */
+
+#backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* One overlay element, whose treatment is chosen by the theme. */
+#texture {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0;
+}
+[data-theme='arcade'] #texture {
+  opacity: 1;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.28) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 80% at 50% 50%, transparent 45%, rgba(0, 0, 0, 0.5) 100%);
+  mix-blend-mode: multiply;
+}
+[data-theme='noir'] #texture {
+  opacity: 1;
+  background-image:
+    radial-gradient(circle at 30% 20%, rgba(232, 195, 122, 0.05), transparent 40%);
+}
+
+/* --- the app frame -------------------------------------------------------- */
+
+#app {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+
+/*
+ * The header is a floating island, not a browser toolbar bolted to the top
+ * edge: it sits inside the safe area with air around it, and it is the same
+ * object on every screen.
+ */
+.appbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: calc(var(--safe-top) + 10px) var(--gutter) 10px;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--surface-solid) 92%, transparent) 62%,
+      transparent);
+  backdrop-filter: var(--blur);
+}
+[data-theme='paper'] .appbar {
+  background: linear-gradient(180deg, rgba(246, 242, 233, 0.96) 62%, transparent);
+}
+
+.appbar-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 1.02rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.appbar-sub {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.appbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* --- screens -------------------------------------------------------------- */
+
+main {
+  flex: 1;
+  position: relative;
+  padding-bottom: calc(var(--nav-height) + var(--safe-bottom) + 26px);
+}
+
+.screen { display: none; }
+.screen.is-active { display: block; animation: screen-in calc(360ms * var(--motion-scale)) var(--ease) both; }
+@keyframes screen-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.995); }
+  to { opacity: 1; transform: none; }
+}
+
+.pad { padding-inline: var(--gutter); }
+.stack { display: grid; gap: 14px; }
+
+/* A full-screen takeover hides the frame entirely. */
+html.is-immersive .appbar,
+html.is-immersive .navbar { opacity: 0; pointer-events: none; transform: translateY(12px); }
+html.is-immersive .appbar,
+html.is-immersive .navbar { transition: opacity calc(260ms * var(--motion-scale)) var(--ease), transform calc(260ms * var(--motion-scale)) var(--ease); }
+html.is-immersive main { padding-bottom: 0; }
+
+/* --- entrance ------------------------------------------------------------- */
+
+.entering { animation: enter calc(420ms * var(--motion-scale)) var(--ease) both; }
+@keyframes enter {
+  from { opacity: 0; transform: translateY(var(--enter-from, 14px)); }
+  to { opacity: 1; transform: none; }
+}
+
+/* --- reduced motion and battery saver ------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001s !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.05s !important;
+  }
+}
+
+/* Battery saver: kill everything that repaints on its own, keep everything
+   that only repaints when the player did something. */
+html[data-lowpower='1'] .fx,
+html[data-lowpower='1'] .sheen,
+html[data-lowpower='1'] .card-front::before,
+html[data-lowpower='1'] .card-front::after,
+html[data-lowpower='1'] .booster-body::before,
+html[data-lowpower='1'] .booster-body::after { animation: none !important; }
+html[data-lowpower='1'] .appbar,
+html[data-lowpower='1'] .navbar,
+html[data-lowpower='1'] .sheet-scrim { backdrop-filter: none; }
+
+/* A screen that is not on display animates nothing. */
+.screen:not(.is-active) *,
+.screen:not(.is-active)::before,
+.screen:not(.is-active)::after { animation-play-state: paused !important; }

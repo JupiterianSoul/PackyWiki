@@ -1,0 +1,407 @@
+/* ==========================================================================
+   CARDS
+   The card shell, the flip, the stack, and one visual treatment per rarity.
+
+   Two rules hold for every treatment:
+     - the effect lives inside .card-front, which .card-face clips, so nothing
+       can bleed outside the card;
+     - it is gated on .is-lit and sits on the back-face-hidden front, so a
+       face-down card gives away nothing about what it is.
+   ========================================================================== */
+
+:root { --card-w: min(72vw, 264px); --card-radius: 18px; }
+[data-theme='paper'] { --card-radius: 8px; }
+[data-theme='arcade'] { --card-radius: 2px; }
+[data-theme='noir'] { --card-radius: 2px; }
+
+.card {
+  position: relative;
+  width: var(--card-w);
+  aspect-ratio: 5 / 7;
+  isolation: isolate;
+  /* Perspective per card, NOT preserve-3d on the stack: a shared 3D context
+     retires z-index, and the face-down cards behind the top one paint through
+     it the moment it leans. */
+  perspective: 1000px;
+}
+
+.card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform calc(560ms * var(--motion-scale)) var(--ease);
+}
+.card.is-revealed .card-inner { transform: rotateY(180deg); }
+
+.card-face {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--card-radius);
+  overflow: hidden;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border: var(--border) var(--border-style) var(--line);
+  box-shadow: var(--surface-shadow);
+}
+
+/* --- the back ------------------------------------------------------------- */
+
+.card-back {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--back-accent, #334155), transparent 60%),
+    linear-gradient(160deg, var(--back-accent2, #1e293b), #0a0d16);
+}
+.back-art {
+  position: absolute;
+  inset: 0;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.05) 0 8px, transparent 8px 16px);
+  opacity: 0.75;
+}
+.back-icon { position: relative; color: rgba(255, 255, 255, 0.62); }
+/* Hidden once turned: a leaning card must not show its own back through itself. */
+.card.is-revealed .card-back { visibility: hidden; transition: visibility 0s linear calc(280ms * var(--motion-scale)); }
+
+/* --- the front ------------------------------------------------------------ */
+
+.card-front {
+  transform: rotateY(180deg);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-solid);
+}
+
+.card-art {
+  position: relative;
+  flex: none;
+  height: 44%;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+}
+.card-art img { width: 100%; height: 100%; object-fit: cover; }
+/* A picture smaller than its frame is fitted, not magnified into a blur. */
+.card-art.is-small-art img { object-fit: contain; padding: 12%; background: rgba(0, 0, 0, 0.3); }
+.card-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 45%, var(--surface-solid));
+}
+.card-art-fallback {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: color-mix(in srgb, var(--ink) 30%, transparent);
+}
+
+.fav-button {
+  position: absolute;
+  top: 8px; right: 8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(4px);
+}
+.fav-button.is-on { color: var(--warning); }
+
+.card-body {
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 13px;
+  margin-top: -14px;
+}
+.card-title {
+  flex: none;
+  font-size: 0.98rem;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.card-desc {
+  flex: none;
+  font-size: 0.64rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rarity, var(--ink-dim));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card-extract {
+  /* flex: 0 1 auto, never flex: 1 — stretching a -webkit-box makes the
+     ellipsis land on the clamp line while the next line keeps painting. */
+  flex: 0 1 auto;
+  min-height: 0;
+  font-size: 0.7rem;
+  line-height: 1.42;
+  color: var(--ink-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  mask-image: linear-gradient(180deg, #000 62%, transparent);
+}
+
+.card-stats {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 13px 6px;
+}
+.card-price { font-size: 1rem; font-weight: 800; color: var(--positive); display: inline-flex; align-items: baseline; gap: 2px; }
+.card-views { font-size: 0.66rem; font-weight: 700; color: var(--ink-faint); }
+
+.card-footer {
+  position: relative;
+  z-index: 2;
+  padding: 0 13px 11px;
+}
+.rarity-badge {
+  display: inline-flex;
+  padding: 4px 11px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--rarity, var(--line));
+  color: var(--rarity, var(--ink));
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+[data-theme='arcade'] .rarity-badge { border-radius: 0; }
+
+/* The effect layers. Both are clipped by .card-face. */
+.fx { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+
+/* --- the stack ------------------------------------------------------------ */
+
+.card-stack {
+  position: relative;
+  z-index: 2;
+  width: var(--card-w);
+  margin: 0 auto;
+  aspect-ratio: 5 / 7;
+  perspective: 1400px;
+  touch-action: none;
+}
+.stack-card {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  transition: transform calc(420ms * var(--motion-scale)) var(--ease),
+              opacity calc(300ms * var(--motion-scale)) var(--ease);
+  cursor: grab;
+}
+.stack-card.is-dragging { transition: none; cursor: grabbing; }
+
+/* Cards fly up out of the pack's mouth. `backwards`, never `both`: a forwards
+   fill would freeze them at transform:none and the stack offsets would never
+   apply afterwards. */
+.stack-card.is-emerging { animation: card-emerge calc(820ms * var(--motion-scale)) var(--ease) backwards; }
+@keyframes card-emerge {
+  0% { opacity: 0; transform: translateY(62%) scale(0.6) rotate(var(--spin, 0deg)); }
+  55% { opacity: 1; }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ==========================================================================
+   RARITY TREATMENTS
+   ========================================================================== */
+
+/* --- 1. Common — matte stock, no motion --------------------------------- */
+[data-rarity="common"] .card-front { background: linear-gradient(175deg, #191d29, #0c0e14); }
+[data-rarity="common"] .fx-a {
+  background: repeating-linear-gradient(58deg,
+    rgba(255, 255, 255, 0.018) 0 3px, transparent 3px 6px);
+}
+
+/* --- 2. Uncommon — one clean sheen sweep -------------------------------- */
+[data-rarity="uncommon"] .fx-a {
+  background: linear-gradient(108deg, transparent 38%,
+    rgba(255, 255, 255, 0.3) 48%, transparent 60%);
+  mix-blend-mode: screen;
+}
+.is-lit[data-rarity="uncommon"] .fx-a { animation: sheen-sweep 3.6s ease-in-out infinite; }
+@keyframes sheen-sweep {
+  0% { transform: translateX(-115%); }
+  55%, 100% { transform: translateX(115%); }
+}
+
+/* --- 3. Rare — breathing border + a slow scan bar ------------------------ */
+[data-rarity="rare"] .fx-a {
+  box-shadow:
+    inset 0 0 0 2px color-mix(in srgb, var(--rarity) 75%, transparent),
+    inset 0 0 30px color-mix(in srgb, var(--rarity) 40%, transparent);
+}
+.is-lit[data-rarity="rare"] .fx-a { animation: edge-breathe 2.6s ease-in-out infinite; }
+@keyframes edge-breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+[data-rarity="rare"] .fx-b {
+  background: linear-gradient(180deg, transparent 42%,
+    color-mix(in srgb, var(--rarity) 55%, transparent) 50%, transparent 58%);
+  mix-blend-mode: screen;
+}
+.is-lit[data-rarity="rare"] .fx-b { animation: scan-down 3.8s linear infinite; }
+@keyframes scan-down {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(100%); }
+}
+
+/* --- 4. Epic — drifting colour blobs ------------------------------------ */
+[data-rarity="epic"] .fx-a {
+  background:
+    radial-gradient(36% 28% at 24% 26%, color-mix(in srgb, var(--rarity) 70%, transparent), transparent 70%),
+    radial-gradient(40% 32% at 76% 68%, rgba(56, 189, 248, 0.55), transparent 72%);
+  mix-blend-mode: color-dodge;
+  filter: blur(9px);
+}
+.is-lit[data-rarity="epic"] .fx-a { animation: blob-drift 6s ease-in-out infinite alternate; }
+@keyframes blob-drift {
+  0% { transform: translate(-6%, 4%) scale(1.05); opacity: 0.55; }
+  100% { transform: translate(6%, -4%) scale(1.2); opacity: 1; }
+}
+[data-rarity="epic"] .fx-b {
+  box-shadow: inset 0 0 34px color-mix(in srgb, var(--rarity) 45%, transparent);
+}
+.is-lit[data-rarity="epic"] .fx-b { animation: edge-breathe 2.1s ease-in-out infinite; }
+
+/* --- 5. Legendary — rotating light rays ---------------------------------- */
+[data-rarity="legendary"] .fx-a {
+  background: repeating-conic-gradient(from 0deg at 50% 40%,
+    color-mix(in srgb, var(--rarity) 80%, transparent) 0deg 7deg,
+    transparent 7deg 22deg);
+  mix-blend-mode: color-dodge;
+  filter: blur(2px);
+}
+.is-lit[data-rarity="legendary"] .fx-a {
+  animation: rays-spin 15s linear infinite, rays-breathe 3.2s ease-in-out infinite;
+}
+@keyframes rays-spin { to { transform: rotate(360deg) scale(2.2); } }
+@keyframes rays-breathe {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.5; }
+}
+[data-rarity="legendary"] .fx-b {
+  background: radial-gradient(58% 44% at 50% 38%, rgba(255, 240, 190, 0.4), transparent 72%);
+  mix-blend-mode: screen;
+}
+.is-lit[data-rarity="legendary"] .fx-b { animation: edge-breathe 2.4s ease-in-out infinite; }
+
+/* --- 6. Mythic — the card is on fire ------------------------------------ */
+/* Flames climb the inside of the card. fx-b rides above the text so the fire
+   reads across the whole card, but stays soft enough to read through. */
+[data-rarity="mythic"] .fx-a {
+  background:
+    radial-gradient(46% 30% at 22% 104%, rgba(255, 214, 96, 0.95), transparent 66%),
+    radial-gradient(50% 40% at 52% 108%, rgba(255, 116, 40, 0.95), transparent 68%),
+    radial-gradient(44% 30% at 80% 103%, rgba(224, 33, 52, 0.95), transparent 66%),
+    radial-gradient(92% 44% at 50% 116%, rgba(150, 14, 20, 0.85), transparent 72%);
+  mix-blend-mode: color-dodge;
+  filter: blur(6px);
+  transform-origin: 50% 100%;
+}
+.is-lit[data-rarity="mythic"] .fx-a { animation: flame-lick 0.46s ease-in-out infinite alternate; }
+@keyframes flame-lick {
+  0% { transform: translateY(0) scaleY(1) scaleX(1); opacity: 0.78; }
+  100% { transform: translateY(-10px) scaleY(1.2) scaleX(0.94); opacity: 1; }
+}
+[data-rarity="mythic"] .fx-b {
+  z-index: 5;
+  background-image:
+    radial-gradient(circle, rgba(255, 190, 90, 0.95) 1px, transparent 2px),
+    radial-gradient(circle, rgba(255, 96, 48, 0.85) 0.9px, transparent 1.9px);
+  background-size: 41px 120px, 67px 150px;
+  mix-blend-mode: screen;
+}
+.is-lit[data-rarity="mythic"] .fx-b {
+  animation: ember-rise 3.2s linear infinite, twinkle 0.9s ease-in-out infinite;
+}
+@keyframes ember-rise {
+  from { background-position: 0 110%, 28px 110%; }
+  to { background-position: 0 -20%, 28px -40%; }
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+/* --- 7. Exotic — holographic prismatic banding -------------------------- */
+[data-rarity="exotic"] .fx-a {
+  background: repeating-linear-gradient(68deg,
+    rgba(255, 0, 122, 0.5) 0px, rgba(255, 214, 0, 0.5) 14px,
+    rgba(0, 255, 162, 0.5) 28px, rgba(0, 174, 255, 0.5) 42px,
+    rgba(178, 0, 255, 0.5) 56px, rgba(255, 0, 122, 0.5) 70px);
+  background-size: 200% 200%;
+  mix-blend-mode: color-dodge;
+  filter: blur(3px) saturate(1.7);
+}
+.is-lit[data-rarity="exotic"] .fx-a { animation: holo-shift 3.4s linear infinite; }
+@keyframes holo-shift {
+  0% { background-position: 0% 0%; filter: blur(3px) saturate(1.7) hue-rotate(0deg); }
+  100% { background-position: 200% 200%; filter: blur(3px) saturate(1.7) hue-rotate(360deg); }
+}
+[data-rarity="exotic"] .fx-b {
+  background: linear-gradient(100deg, transparent 32%, rgba(255, 255, 255, 0.8) 46%, transparent 60%);
+  mix-blend-mode: screen;
+}
+.is-lit[data-rarity="exotic"] .fx-b { animation: sheen-sweep 2.2s ease-in-out infinite; }
+
+/* --- 8. Artifact — full iridescent burst -------------------------------- */
+[data-rarity="artifact"] .card-front {
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.6),
+    inset 0 0 42px rgba(255, 240, 170, 0.3);
+}
+[data-rarity="artifact"] .fx-a {
+  background:
+    repeating-conic-gradient(from 0deg at 50% 45%,
+      rgba(255, 255, 255, 0.4) 0deg 4deg, transparent 4deg 16deg),
+    conic-gradient(from 0deg, #fef08a, #fb7185, #a78bfa, #22d3ee, #4ade80, #fef08a);
+  mix-blend-mode: color-dodge;
+  filter: blur(4px) saturate(1.6);
+  opacity: 0.7;
+}
+.is-lit[data-rarity="artifact"] .fx-a {
+  animation: artifact-burst 8s linear infinite, rays-breathe 2s ease-in-out infinite;
+}
+@keyframes artifact-burst {
+  0% { transform: rotate(0deg) scale(2.1); filter: blur(4px) saturate(1.6) hue-rotate(0deg); }
+  100% { transform: rotate(360deg) scale(2.1); filter: blur(4px) saturate(1.6) hue-rotate(360deg); }
+}
+[data-rarity="artifact"] .fx-b {
+  z-index: 5;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.95) 0.9px, transparent 1.8px),
+    radial-gradient(circle, rgba(254, 240, 138, 0.9) 0.8px, transparent 1.7px);
+  background-size: 44px 58px, 73px 51px;
+  mix-blend-mode: screen;
+}
+.is-lit[data-rarity="artifact"] .fx-b {
+  animation: sparkle-drift 3.6s linear infinite, twinkle 0.7s ease-in-out infinite;
+}
+@keyframes sparkle-drift {
+  from { background-position: 0 0, 22px 16px; }
+  to { background-position: 0 -58px, 22px -35px; }
+}
+

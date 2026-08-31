@@ -1,327 +1,214 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="aurora">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#06070d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Wiklodo</title>
     <meta name="description" content="Open booster packs of real Wikipedia articles as collectible trading cards." />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='12' y='6' width='33' height='52' rx='7' fill='%230f1220' stroke='%23c7d2fe' stroke-width='3'/><path d='M12 17h33' stroke='%23c7d2fe' stroke-width='3'/><path d='M19.5 27 24.5 46 28.5 35.5 32.5 46 37.5 27' fill='none' stroke='%23fbbf24' stroke-width='3.8' stroke-linejoin='round' stroke-linecap='round'/><circle cx='54' cy='12' r='3' fill='%23fbbf24'/></svg>" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <div id="flash" class="flash" aria-hidden="true"></div>
+    <!-- The live, per-theme backdrop, and the texture that sits over it. -->
+    <canvas id="backdrop" aria-hidden="true"></canvas>
+    <div id="texture" aria-hidden="true"></div>
+    <div id="flash" aria-hidden="true"></div>
 
-    <header class="topbar">
-      <div class="brand">
-        <span class="brand-mark" id="brand-mark"></span>
-        <div class="brand-text">
-          <h1>Wiklodo</h1>
-          <p class="brand-sub" id="brand-sub"></p>
+    <div id="app">
+      <header class="appbar">
+        <button id="level-badge" class="ring" type="button" aria-label="Profile"></button>
+        <div class="appbar-title">
+          <span class="appbar-sub" id="appbar-sub"></span>
+          <span id="appbar-title"></span>
         </div>
-      </div>
-
-      <nav class="tabs" id="tabs" aria-label="Sections">
-        <button class="tab is-active" data-tab="boosters" type="button"><span class="tab-label"></span></button>
-        <button class="tab" data-tab="timed" type="button">
-          <span class="tab-label"></span><span class="tab-count" id="timed-count">0</span>
-        </button>
-        <button class="tab" data-tab="custom" type="button"><span class="tab-label"></span></button>
-        <button class="tab" data-tab="shop" type="button"><span class="tab-label"></span></button>
-        <button class="tab" data-tab="collection" type="button">
-          <span class="tab-label"></span><span class="tab-count" id="tab-count">0</span>
-        </button>
-        <button class="tab" data-tab="profile" type="button"><span class="tab-label"></span></button>
-        <button class="tab" data-tab="settings" type="button"><span class="tab-label"></span></button>
-      </nav>
-
-      <div class="topbar-actions">
-        <button class="wallet" id="wallet" type="button" aria-haspopup="dialog"></button>
-        <button id="odds-button" class="ghost-button" type="button"></button>
-        <button id="daily-button" class="ghost-button gift-button" type="button" aria-haspopup="dialog">
-          <span class="gift-icon" id="gift-icon"></span><span id="daily-button-label"></span>
-          <span class="gift-dot" id="gift-dot" hidden></span>
-        </button>
-      </div>
-    </header>
-
-    <main>
-      <!-- SCREEN: owned boosters ------------------------------------------->
-      <section id="screen-boosters" class="screen is-active">
-        <div class="rail-wrap">
-          <button class="rail-arrow is-prev" id="rail-prev" type="button" aria-label="Previous">‹</button>
-          <div class="pack-rail" id="pack-rail" role="listbox" tabindex="0"></div>
-          <button class="rail-arrow is-next" id="rail-next" type="button" aria-label="Next">›</button>
-        </div>
-        <div class="rail-caption" id="rail-caption">
-          <h2 class="rail-name" id="rail-name"></h2>
-          <p class="rail-tagline" id="rail-tagline"></p>
-          <p class="rail-owned" id="rail-owned"></p>
-          <button id="rail-open" class="primary-button" type="button"></button>
-          <p class="rail-hint" id="rail-hint"></p>
-        </div>
-        <p class="empty-note" id="boosters-empty" hidden></p>
-      </section>
-
-      <!-- SCREEN: timed boosters -------------------------------------------->
-      <section id="screen-timed" class="screen">
-        <div class="timed-head">
-          <h2 class="timed-title" id="timed-title"></h2>
-          <p class="section-note" id="timed-intro"></p>
-        </div>
-
-        <div class="timed-stage">
-          <div class="timed-booster" id="timed-booster"></div>
-          <div class="timed-panel">
-            <p class="timed-held" id="timed-held"></p>
-            <p class="timed-next" id="timed-next"></p>
-            <button id="timed-open" class="primary-button" type="button"></button>
-          </div>
-        </div>
-
-        <div class="track">
-          <div class="track-head">
-            <span class="track-level" id="track-level"></span>
-            <span class="track-remaining" id="track-remaining"></span>
-          </div>
-          <div class="track-bar"><span class="track-fill" id="track-fill"></span></div>
-          <p class="track-perks" id="track-perks"></p>
-          <p class="track-next" id="track-next"></p>
-        </div>
-      </section>
-
-      <!-- SCREEN: custom boosters ------------------------------------------>
-      <section id="screen-custom" class="screen">
-        <div class="rail-wrap">
-          <div class="pack-rail" id="custom-rail" role="listbox" tabindex="0"></div>
-        </div>
-        <div class="rail-caption" id="custom-caption">
-          <h2 class="rail-name" id="custom-name"></h2>
-          <p class="rail-tagline" id="custom-tagline"></p>
-          <p class="rail-owned" id="custom-owned"></p>
-          <button id="custom-open" class="primary-button" type="button"></button>
-        </div>
-        <p class="empty-note" id="custom-empty" hidden></p>
-
-        <form id="custom-form" class="custom-form" autocomplete="off">
-          <p class="section-note" id="custom-intro"></p>
-          <div class="custom-row">
-            <input id="custom-input" class="custom-input" type="text" maxlength="60" aria-label="Subject" />
-            <button id="custom-submit" class="primary-button small" type="submit"></button>
-          </div>
-          <p id="custom-status" class="custom-status" role="status" aria-live="polite"></p>
-        </form>
-      </section>
-
-      <!-- SCREEN: shop ----------------------------------------------------->
-      <section id="screen-shop" class="screen">
-        <div class="shop-head">
-          <p class="section-note" id="shop-intro"></p>
-          <span class="restock" id="restock"></span>
-        </div>
-        <div id="shop-rows" class="shop-rows"></div>
-      </section>
-
-      <!-- SCREEN: open + reveal (one screen, four phases) ------------------->
-      <section id="screen-open" class="screen phase-idle">
-        <button id="back-button" class="ghost-button back-button" type="button"></button>
-        <div class="open-head">
-          <h2 class="open-title" id="open-title"></h2>
-          <p class="open-progress" id="open-progress"></p>
-        </div>
-        <div class="open-stage" id="open-stage">
-          <div class="booster-slot" id="booster-slot"></div>
-          <div class="card-stack" id="card-stack"></div>
-        </div>
-        <div id="pack-summary" class="pack-summary"></div>
-        <p id="open-hint" class="open-hint"></p>
-        <div id="reveal-actions" class="reveal-actions">
-          <button id="back-to-shelf" class="primary-button" type="button"></button>
-        </div>
-      </section>
-
-      <!-- SCREEN: collection ----------------------------------------------->
-      <section id="screen-collection" class="screen">
-        <div class="collection-stats" id="collection-stats"></div>
-
-        <div class="filter-bar">
-          <button id="filter-toggle" class="ghost-button filter-toggle" type="button" aria-expanded="false">
-            <span class="filter-icon" id="filter-icon"></span>
-            <span id="filter-toggle-label"></span>
+        <div class="appbar-actions">
+          <button id="wallet" class="wallet-chip" type="button" aria-haspopup="dialog">
+            <span id="wallet-mark" aria-hidden="true"></span>
+            <span id="wallet-amount"></span>
           </button>
-          <span class="filter-summary" id="filter-summary"></span>
-        </div>
-
-        <div class="filters" id="filters" hidden>
-          <input id="filter-search" class="filter-input" type="search" />
-          <select id="filter-pack" class="filter-select"></select>
-          <select id="filter-rarity" class="filter-select"></select>
-          <select id="filter-band" class="filter-select"></select>
-          <select id="filter-price" class="filter-select"></select>
-          <select id="filter-sort" class="filter-select"></select>
-          <button id="filter-fav" class="chip-toggle" type="button" aria-pressed="false">
-            <span class="chip-star"></span><span id="filter-fav-label"></span>
+          <button id="gift" class="icon-btn" type="button" aria-haspopup="dialog" aria-label="Daily gift">
+            <span id="gift-icon" aria-hidden="true"></span>
+            <span class="dot" id="gift-dot" hidden></span>
           </button>
-          <button id="filter-reset" class="ghost-button" type="button"></button>
         </div>
+      </header>
 
-        <p id="collection-empty" class="empty-note" hidden></p>
-        <div id="collection-grid" class="collection-grid"></div>
-      </section>
+      <main>
+        <!-- PACKS: what you own, and the custom builder ------------------- -->
+        <section id="screen-packs" class="screen is-active">
+          <div class="seg-wrap"><div id="packs-seg"></div></div>
+          <div id="packs-rail" class="rail"></div>
+          <div class="hero-caption" id="packs-caption">
+            <h3 id="packs-name"></h3>
+            <p class="sub" id="packs-sub"></p>
+            <p class="own" id="packs-own"></p>
+          </div>
+          <div class="hero-actions" id="packs-actions">
+            <button id="packs-open" class="btn btn-primary" type="button"></button>
+            <p class="hint" id="packs-hint"></p>
+          </div>
+          <div class="empty" id="packs-empty" hidden>
+            <span class="empty-mark" id="packs-empty-mark"></span>
+            <p id="packs-empty-text"></p>
+            <button id="packs-empty-cta" class="btn btn-ghost btn-sm" type="button"></button>
+          </div>
 
-      <!-- SCREEN: profile --------------------------------------------------->
-      <section id="screen-profile" class="screen">
-        <div class="profile-card">
-          <div class="profile-id">
-            <span class="profile-avatar" id="profile-avatar"></span>
+          <form id="creator" class="creator panel" hidden autocomplete="off">
+            <p class="label" id="creator-label"></p>
+            <p class="muted" id="creator-note" style="font-size:.82rem;line-height:1.55"></p>
+            <div class="creator-field">
+              <input id="creator-input" class="creator-input" type="text" maxlength="60" aria-label="Subject" />
+              <button id="creator-go" class="btn btn-primary btn-sm" type="submit"></button>
+            </div>
+            <p id="creator-status" class="creator-status" role="status" aria-live="polite"></p>
+          </form>
+        </section>
+
+        <!-- TIMED ---------------------------------------------------------- -->
+        <section id="screen-timed" class="screen">
+          <div class="screen-head">
+            <h2 id="timed-title"></h2>
+            <p id="timed-intro"></p>
+          </div>
+          <div class="timed-stage panel">
+            <div id="timed-pack"></div>
             <div>
-              <h2 class="profile-level" id="profile-level"></h2>
-              <p class="profile-rank" id="profile-rank"></p>
+              <p class="timed-count" id="timed-count"></p>
+              <p class="timed-next" id="timed-next"></p>
+            </div>
+            <button id="timed-open" class="btn btn-primary" type="button"></button>
+          </div>
+          <div class="track panel">
+            <div class="track-head">
+              <h3 id="track-level"></h3>
+              <span class="track-note tabular" id="track-remaining"></span>
+            </div>
+            <div id="track-bar"></div>
+            <p class="track-note" id="track-perks"></p>
+            <p class="track-note" id="track-next"></p>
+          </div>
+        </section>
+
+        <!-- SHOP ------------------------------------------------------------ -->
+        <section id="screen-shop" class="screen">
+          <div class="screen-head">
+            <h2 id="shop-title"></h2>
+            <p id="shop-intro"></p>
+            <span class="restock" id="restock"></span>
+          </div>
+          <div id="shop-rows" class="shop-rows"></div>
+        </section>
+
+        <!-- BINDER ---------------------------------------------------------- -->
+        <section id="screen-binder" class="screen">
+          <div class="screen-head"><h2 id="binder-title"></h2></div>
+          <div class="binder-stats" id="binder-stats"></div>
+          <div class="binder-bar">
+            <button id="filter-open" class="btn btn-ghost btn-sm" type="button"></button>
+            <span class="chip" id="filter-count" hidden></span>
+          </div>
+          <div class="empty" id="binder-empty" hidden>
+            <span class="empty-mark" id="binder-empty-mark"></span>
+            <p id="binder-empty-text"></p>
+          </div>
+          <div id="binder-grid" class="binder-grid"></div>
+        </section>
+
+        <!-- PROFILE ---------------------------------------------------------- -->
+        <section id="screen-profile" class="screen">
+          <div class="hero-card panel">
+            <div class="hero-id">
+              <span id="profile-ring"></span>
+              <div>
+                <h2 id="profile-level"></h2>
+                <p class="hero-rank" id="profile-rank"></p>
+              </div>
+            </div>
+            <div>
+              <div id="xp-bar"></div>
+              <p class="xp-line" id="xp-line" style="margin-top:8px"></p>
+            </div>
+            <div>
+              <p class="label" id="next-reward-label"></p>
+              <div id="next-reward" style="margin-top:8px"></div>
             </div>
           </div>
 
-          <div class="xp-row">
-            <div class="xp-bar"><span class="xp-fill" id="xp-fill"></span></div>
-            <p class="xp-line" id="xp-line"></p>
-          </div>
+          <div class="section-head"><h3 class="label" id="stats-label"></h3></div>
+          <div class="stat-grid" id="stat-grid"></div>
 
-          <div class="next-reward">
-            <h3 id="next-reward-title"></h3>
-            <div class="next-reward-body" id="next-reward-body"></div>
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="rarity-label"></h3></div>
+          <div class="rarity-bars" id="rarity-bars"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="more-label"></h3></div>
+          <div class="settings-list" id="profile-links"></div>
+        </section>
+
+        <!-- SETTINGS ---------------------------------------------------------- -->
+        <section id="screen-settings" class="screen">
+          <div class="screen-head"><h2 id="settings-title"></h2></div>
+
+          <div class="section-head"><h3 class="label" id="theme-label"></h3></div>
+          <div class="theme-grid" id="theme-grid"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="prefs-label"></h3></div>
+          <div class="settings-list" id="settings-list"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="data-label"></h3></div>
+          <div class="settings-list" id="data-list"></div>
+        </section>
+
+        <!-- OPENING: full-screen takeover -------------------------------------- -->
+        <section id="screen-open" class="screen phase-idle">
+          <div class="open-top">
+            <button id="open-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 class="open-title" id="open-title"></h2>
+            <span style="width:42px"></span>
           </div>
+          <p class="open-progress" id="open-progress"></p>
+          <div class="open-stage" id="open-stage">
+            <div class="booster-slot" id="booster-slot"></div>
+            <div class="card-stack" id="card-stack"></div>
+          </div>
+          <div class="summary" id="summary"></div>
+          <div class="open-foot">
+            <p class="open-hint" id="open-hint"></p>
+            <button id="open-done" class="btn btn-primary" type="button" hidden></button>
+          </div>
+        </section>
+      </main>
+
+      <nav id="navbar" aria-label="Sections"></nav>
+    </div>
+
+    <!-- One sheet component, reused for every panel in the app. ------------- -->
+    <div id="sheet" class="sheet" hidden>
+      <div class="sheet-scrim"></div>
+      <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <h2 id="sheet-title"></h2>
+          <button id="sheet-close" class="icon-btn" type="button" aria-label="Close"></button>
         </div>
-
-        <h3 class="section-heading" id="profile-stats-title"></h3>
-        <div class="stat-grid" id="profile-stat-grid"></div>
-
-        <h3 class="section-heading" id="profile-rarity-title"></h3>
-        <div class="rarity-bars" id="profile-rarity"></div>
-      </section>
-
-      <!-- SCREEN: settings -------------------------------------------------->
-      <section id="screen-settings" class="screen">
-        <h2 class="section-heading" id="settings-title"></h2>
-        <div class="settings-list" id="settings-list"></div>
-
-        <h3 class="section-heading" id="settings-data-title"></h3>
-        <div class="settings-list">
-          <div class="setting-row">
-            <div class="setting-copy">
-              <h4 id="settings-language-title"></h4>
-              <p id="settings-language-note"></p>
-            </div>
-            <span class="setting-value" id="settings-language-value"></span>
-          </div>
-          <div class="setting-row">
-            <div class="setting-copy">
-              <h4 id="settings-reset-title"></h4>
-              <p id="settings-reset-note"></p>
-            </div>
-            <button id="settings-reset" class="danger-button" type="button"></button>
-          </div>
-        </div>
-      </section>
-    </main>
-
-    <!-- Card detail ------------------------------------------------------->
-    <div id="card-modal" class="modal card-modal" hidden>
-      <div class="card-modal-inner" role="dialog" aria-modal="true" aria-label="Card">
-        <button id="card-modal-close" class="modal-x" type="button" aria-label="Close"></button>
-        <div class="card-detail" id="card-detail"></div>
-        <div class="card-detail-side">
-          <h2 class="detail-title" id="detail-title"></h2>
-          <p class="detail-sub" id="detail-sub"></p>
-          <div class="detail-facts" id="detail-facts"></div>
-          <div class="detail-scroll" id="detail-extract"></div>
-          <div class="detail-actions">
-            <a id="detail-read" class="ghost-button" target="_blank" rel="noopener noreferrer"></a>
-            <button id="detail-sell" class="sell-button" type="button" hidden></button>
-          </div>
-        </div>
+        <div class="sheet-body" id="sheet-body"></div>
       </div>
     </div>
 
-    <!-- Odds -------------------------------------------------------------->
-    <div id="odds-modal" class="modal" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="odds-heading">
-        <div class="modal-head">
-          <h2 id="odds-heading"></h2>
-          <button id="odds-close" class="ghost-button" type="button"></button>
-        </div>
-        <p class="modal-note top" id="odds-note"></p>
-        <table class="odds-table">
-          <thead><tr><th id="odds-h1"></th><th id="odds-h2"></th></tr></thead>
-          <tbody id="odds-body"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- What the currency is ---------------------------------------------->
-    <div id="wallet-modal" class="modal" hidden>
-      <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="wallet-title">
-        <div class="modal-head">
-          <h2 id="wallet-title"></h2>
-          <button id="wallet-close" class="ghost-button" type="button"></button>
-        </div>
-        <p class="wallet-balance" id="wallet-balance"></p>
-        <p class="modal-note top" id="wallet-what"></p>
-        <div class="wallet-rows">
-          <div class="wallet-row">
-            <h3 id="wallet-earn-title"></h3>
-            <p id="wallet-earn"></p>
-          </div>
-          <div class="wallet-row">
-            <h3 id="wallet-spend-title"></h3>
-            <p id="wallet-spend"></p>
-          </div>
-        </div>
-        <p class="modal-note" id="wallet-note"></p>
-      </div>
-    </div>
-
-    <!-- First run --------------------------------------------------------->
-    <div id="welcome-modal" class="modal" hidden>
-      <div class="modal-card welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title">
-        <h2 id="welcome-title"></h2>
-        <p class="modal-note top" id="welcome-body"></p>
-        <div class="lang-choices" id="lang-choices"></div>
-        <div class="starter-panel" id="starter-panel" hidden>
-          <h3 id="starter-title"></h3>
-          <p class="modal-note top" id="starter-body"></p>
+    <!-- First run ----------------------------------------------------------- -->
+    <div id="welcome" class="welcome" hidden>
+      <div class="welcome-card panel">
+        <div class="welcome-mark" id="welcome-mark"></div>
+        <h1 id="welcome-title"></h1>
+        <p id="welcome-body"></p>
+        <div class="choices" id="lang-choices"></div>
+        <div id="starter" hidden style="display:grid;gap:14px">
+          <h2 id="starter-title" style="text-align:center;font-size:1.2rem"></h2>
+          <p id="starter-body"></p>
           <div class="starter-loot" id="starter-loot"></div>
-          <button id="starter-go" class="primary-button" type="button"></button>
+          <button id="starter-go" class="btn btn-primary btn-block" type="button"></button>
         </div>
-      </div>
-    </div>
-
-    <!-- Daily gift -------------------------------------------------------->
-    <div id="daily-modal" class="modal" hidden>
-      <div class="modal-card daily-card" role="dialog" aria-modal="true" aria-labelledby="daily-title">
-        <div class="modal-head">
-          <h2 id="daily-title"></h2>
-          <button id="daily-close" class="ghost-button" type="button"></button>
-        </div>
-        <p class="modal-note top" id="daily-body"></p>
-        <div class="daily-action">
-          <button id="daily-claim" class="primary-button" type="button"></button>
-          <p class="daily-status" id="daily-status"></p>
-        </div>
-        <p class="daily-board-label" id="daily-board-label"></p>
-        <div class="gift-board" id="gift-board"></div>
-      </div>
-    </div>
-
-    <!-- Level up ------------------------------------------------------------>
-    <div id="level-modal" class="modal" hidden>
-      <div class="modal-card level-card" role="dialog" aria-modal="true" aria-labelledby="level-title">
-        <h2 id="level-title"></h2>
-        <div class="level-jump">
-          <span class="level-from" id="level-from"></span>
-          <div class="level-bar"><span class="level-fill" id="level-fill"></span></div>
-          <span class="level-to" id="level-to"></span>
-        </div>
-        <p class="modal-note top" id="level-body"></p>
-        <div class="level-reward" id="level-reward"></div>
-        <button id="level-claim" class="primary-button" type="button"></button>
       </div>
     </div>
 
