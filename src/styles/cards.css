@@ -389,15 +389,18 @@
 }
 .stack-card.is-dragging { transition: none; cursor: grabbing; }
 
-/* Cards fly up out of the pack's mouth, each with a little scatter of its
-   own. `backwards`, never `both`: a forwards fill would freeze them at
+/* The fountain: each card is flung out of the pack's mouth, arcs to its own
+   apex off to one side, hangs for a beat, then flocks back into the stack.
+   `backwards`, never `both`: a forwards fill would freeze the card at
    transform:none and the stack offsets would never apply afterwards. */
 .stack-card.is-emerging {
-  animation: card-emerge calc(860ms * var(--motion-scale)) cubic-bezier(0.2, 0.9, 0.3, 1.08) backwards;
+  animation: card-emerge calc(1060ms * var(--motion-scale)) cubic-bezier(0.3, 0.75, 0.3, 1.04) backwards;
 }
 @keyframes card-emerge {
-  0%   { opacity: 0; transform: translate(calc(var(--sway, 0px) * 0.4), 66%) scale(0.55) rotate(var(--spin, 0deg)); }
-  45%  { opacity: 1; transform: translate(var(--sway, 0px), -4%) scale(0.92) rotate(calc(var(--spin, 0deg) * 0.4)); }
+  0%   { opacity: 0; transform: translate(0, 64%) scale(0.46) rotate(0deg); }
+  14%  { opacity: 1; }
+  40%  { transform: translate(var(--sway, 0px), var(--apex, -32%)) scale(0.8) rotate(var(--spin, 0deg)); }
+  66%  { transform: translate(calc(var(--sway, 0px) * 0.4), calc(var(--apex, -32%) * 0.25)) scale(0.93) rotate(calc(var(--spin, 0deg) * 0.35)); }
   100% { opacity: 1; transform: none; }
 }
 

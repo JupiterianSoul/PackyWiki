@@ -91,12 +91,53 @@ export const THEMES = [
     backdrop: { renderer: 'noir', grain: 0.09, leak: true },
     motion: { scale: 1.5, ease: 'cubic-bezier(0.16, 1, 0.3, 1)', pop: 'cubic-bezier(0.25, 1.2, 0.4, 1)' },
     sound: {
-      voice: 'pluck',         // Karplus-Strong string
-      root: 196,              // G3
+      voice: 'keys',          // felt piano: warm, round, never harsh
+      root: 174.61,           // F3
       scale: [0, 3, 7, 10, 14],
-      reverb: { seconds: 4.2, decay: 2.1, mix: 0.4 },
-      filter: 2600,
-      drive: 0.1,
+      reverb: { seconds: 2.6, decay: 3.2, mix: 0.24 },
+      filter: 2400,
+      drive: 0,
+      transient: 'brush'
+    }
+  }
+,
+  {
+    id: 'sunset',
+    name: { en: "Sunset '84", fr: "Sunset '84" },
+    blurb: {
+      en: 'Neon horizon. A grid to the sun, pink chrome, fat analogue saws.',
+      fr: 'Horizon néon. Une grille vers le soleil, chrome rose, synthés analogiques.'
+    },
+    swatch: ['#160a2e', '#f472b6', '#22d3ee'],
+    backdrop: { renderer: 'sunset', speed: 0.00016 },
+    motion: { scale: 0.85, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.3, 1.7, 0.5, 1)' },
+    sound: {
+      voice: 'synthwave',     // detuned saw stack with a sub
+      root: 233.08,           // Bb3
+      scale: [0, 3, 5, 7, 10],
+      reverb: { seconds: 2.2, decay: 2.2, mix: 0.3 },
+      filter: 4600,
+      drive: 0.12,
+      transient: 'air'
+    }
+  },
+  {
+    id: 'meadow',
+    name: { en: 'Meadow', fr: 'Prairie' },
+    blurb: {
+      en: 'Late afternoon outside. Warm greens, drifting seeds, soft keys.',
+      fr: 'Fin d’après-midi dehors. Verts chauds, graines au vent, notes douces.'
+    },
+    swatch: ['#17230f', '#a3e635', '#fbbf24'],
+    backdrop: { renderer: 'meadow', motes: 40, speed: 0.00008 },
+    motion: { scale: 1.15, ease: 'cubic-bezier(0.25, 1, 0.5, 1)', pop: 'cubic-bezier(0.3, 1.4, 0.6, 1)' },
+    sound: {
+      voice: 'keys',          // the felt piano again, tuned brighter
+      root: 293.66,           // D4
+      scale: [0, 2, 4, 7, 9],
+      reverb: { seconds: 1.8, decay: 2.8, mix: 0.22 },
+      filter: 3800,
+      drive: 0,
       transient: 'brush'
     }
   }

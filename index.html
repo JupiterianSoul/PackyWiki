@@ -164,15 +164,37 @@
             <button class="help-btn" data-help="binder" type="button" aria-label="What is this?">?</button>
           </div>
           <div class="binder-stats" id="binder-stats"></div>
-          <div class="binder-bar">
-            <button id="filter-open" class="btn btn-ghost btn-sm" type="button"></button>
-            <span class="chip" id="filter-count" hidden></span>
-          </div>
+          <div id="album-shelf" class="album-shelf"></div>
           <div class="empty" id="binder-empty" hidden>
             <span class="empty-mark" id="binder-empty-mark"></span>
             <p id="binder-empty-text"></p>
           </div>
-          <div id="binder-grid" class="binder-grid"></div>
+
+          <div id="album-view" hidden>
+            <div class="album-head pad">
+              <button id="album-back" class="icon-btn" type="button" aria-label="Back"></button>
+              <div class="album-title-wrap">
+                <h2 id="album-name"></h2>
+                <p class="album-progress" id="album-progress"></p>
+              </div>
+              <button id="filter-open" class="btn btn-ghost btn-sm" type="button"></button>
+              <span class="chip" id="filter-count" hidden></span>
+            </div>
+            <div class="album-book-wrap">
+              <div id="album-book" class="album-book">
+                <div class="album-page is-left">
+                  <div class="album-slots" id="page-left"></div>
+                  <span class="album-pageno" id="pageno-left"></span>
+                </div>
+                <div class="album-page is-right">
+                  <div class="album-slots" id="page-right"></div>
+                  <span class="album-pageno" id="pageno-right"></span>
+                </div>
+              </div>
+            </div>
+            <div class="album-dots" id="album-dots" aria-hidden="true"></div>
+            <p class="album-hint" id="album-hint"></p>
+          </div>
         </section>
 
         <!-- PROFILE ---------------------------------------------------------- -->
@@ -272,6 +294,14 @@
         </section>
 
         <!-- SETTINGS ---------------------------------------------------------- -->
+        <section id="screen-ach" class="screen">
+          <div class="screen-head">
+            <h2 id="ach-title"></h2>
+          </div>
+          <p class="pad muted" id="ach-sub" style="padding-bottom:14px;font-size:.86rem"></p>
+          <div class="ach-list pad" id="ach-list"></div>
+        </section>
+
         <section id="screen-settings" class="screen">
           <div class="screen-head"><h2 id="settings-title"></h2></div>
 

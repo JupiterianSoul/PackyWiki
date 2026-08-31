@@ -36,7 +36,7 @@ import {
   MAX_LEVEL, xpForCard, xpForLevel, rankFor, rewardForLevel, addXp, levelFraction
 } from './progression.js';
 import {
-  generateBoard, canClaim, claim as claimDaily, nextIndex as nextGiftIndex,
+  generateBoard, canClaim, claim as claimDaily, nextIndex as nextGiftIndex, BOARD_SIZE,
   msUntilNextDay, dayNumber
 } from './daily.js';
 import {
@@ -51,6 +51,9 @@ import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
+import { buildAlbums, albumsCompleted, CARDS_PER_PAGE, CARDS_PER_SPREAD } from './albums.js';
+import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
+import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { styleForSpec, rarityBurst } from './packstyle.js';
 import { synth } from './ui/sound.js';
 import { backdrop } from './ui/backdrop.js';
@@ -63,8 +66,8 @@ const RIP_COMMIT = 0.62;
 const RIP_TICK_STEP = 0.055;
 const RIP_LOCK_SLOP = 10;
 const SWIPE_COMMIT = 78;
-const EMERGE_STAGGER = 110;
-const EMERGE_DURATION = 820;
+const EMERGE_STAGGER = 130;
+const EMERGE_DURATION = 1060;
 const PREFETCH_DELAY = 350;
 /** How long the last card stays up before the summary takes over. */
 const LAST_CARD_HOLD = 2000;
@@ -105,8 +108,9 @@ const state = {
   busy: false,
   pulls: [], cards: [], index: 0, seen: new Set(),
   detail: null,
+  album: null, albumTurning: false,
   packSlots: [],
-  filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false },
+  filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'rarity', favoritesOnly: false },
 
   // Who is signed in, and what the server last told us about them.
   account: { session: null, profile: null, mode: 'signin', syncing: false, syncedAt: null, failed: false },
@@ -133,7 +137,7 @@ bind({
     packs: $('#screen-packs'), timed: $('#screen-timed'), shop: $('#screen-shop'),
     binder: $('#screen-binder'), profile: $('#screen-profile'),
     settings: $('#screen-settings'), friends: $('#screen-friends'),
-    friend: $('#screen-friend'), open: $('#screen-open')
+    friend: $('#screen-friend'), ach: $('#screen-ach'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
@@ -172,7 +176,13 @@ bind({
 
   oddsBtn: $('#odds-btn'), oddsIcon: $('#odds-icon'), oddsLabel: $('#odds-label'),
 
-  binderTitle: $('#binder-title'), binderStats: $('#binder-stats'), binderGrid: $('#binder-grid'),
+  binderTitle: $('#binder-title'), binderStats: $('#binder-stats'),
+  albumShelf: $('#album-shelf'), albumView: $('#album-view'), albumBack: $('#album-back'),
+  albumName: $('#album-name'), albumProgress: $('#album-progress'),
+  albumBook: $('#album-book'), pageLeft: $('#page-left'), pageRight: $('#page-right'),
+  pagenoLeft: $('#pageno-left'), pagenoRight: $('#pageno-right'),
+  albumDots: $('#album-dots'), albumHint: $('#album-hint'),
+  achTitle: $('#ach-title'), achSub: $('#ach-sub'), achList: $('#ach-list'),
   binderEmpty: $('#binder-empty'), binderEmptyMark: $('#binder-empty-mark'),
   binderEmptyText: $('#binder-empty-text'),
   filterOpen: $('#filter-open'), filterCount: $('#filter-count'),
@@ -320,7 +330,7 @@ function showScreen(name) {
  * Profile, so the bottom bar stays at five.
  */
 const navTabFor = (screen) =>
-  (screen === 'settings' || screen === 'friends' || screen === 'friend' ? 'profile' : screen);
+  (['settings', 'friends', 'friend', 'ach'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -362,6 +372,9 @@ function drawerItems() {
     { id: 'binder', icon: 'collection', key: 'tabCollection',  run: go('binder', renderBinder) },
     { id: 'daily',  icon: 'gift',       key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
       run: () => openDaily() },
+    { id: 'ach',    icon: 'trophy',     key: 'achTitle',
+      badge: () => achRedeemableCount(),
+      run: go('ach', renderAchievements) },
     { sep: true },
     ...(account.configured
       ? [{ id: 'friends', icon: 'friends', key: 'tabFriends',
@@ -1525,8 +1538,12 @@ async function runOpen(booster) {
   state.cards = Array.from({ length: count }, (_, i) => buildPlaceholderCard(i, count));
   el.cardStack.replaceChildren(...state.cards);
   state.cards.forEach((card, i) => {
-    card.style.setProperty('--spin', `${(Math.random() * 34 - 17).toFixed(1)}deg`);
-    card.style.setProperty('--sway', `${(Math.random() * 52 - 26).toFixed(0)}px`);
+    // The fountain fans out: cards alternate left and right of the mouth,
+    // each with its own throw and twist, then flock back into the stack.
+    const side = i % 2 ? 1 : -1;
+    card.style.setProperty('--spin', `${(side * (10 + Math.random() * 16)).toFixed(1)}deg`);
+    card.style.setProperty('--sway', `${(side * (30 + Math.random() * 46)).toFixed(0)}px`);
+    card.style.setProperty('--apex', `${-(30 + Math.random() * 14).toFixed(0)}%`);
     card.style.animationDelay = `${i * EMERGE_STAGGER}ms`;
     card.classList.add('is-emerging');
     card.addEventListener('animationend', function done(event) {
@@ -1823,9 +1840,10 @@ function initSwipe() {
   });
 }
 
-function fireFlash(intensity) {
+function fireFlash(intensity, tint = null) {
   if (!settings().flash) return;
   el.flash.style.setProperty('--flash-peak', String(intensity));
+  if (tint) el.flash.style.setProperty('--flash-tint', tint);
   el.flash.classList.remove('is-firing');
   void el.flash.offsetWidth;
   el.flash.classList.add('is-firing');
@@ -1956,9 +1974,12 @@ function openSheet(title, build, { dismissible = true, onClose = null } = {}) {
 /* --- card detail ---------------------------------------------------------------------------------- */
 
 /** A face-up card with no back and no flip: summary, binder and detail. */
-function buildStaticCard(data, rarity, entryKey = null, { fav = true } = {}) {
+function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = false } = {}) {
+  // `lit` runs the tier's animations. Only the one card you are actually
+  // looking at (reveal, detail) earns it — a binder page of forty lit cards
+  // is forty looping animations and a hot phone.
   const card = document.createElement('article');
-  card.className = 'card is-revealed is-lit';
+  card.className = `card is-revealed${lit ? ' is-lit' : ''}`;
   applyRarityVars(card, rarity);
   card.innerHTML = `<div class="card-inner"><div class="card-face card-front">${CARD_FRONT_MARKUP}</div></div>`;
   const front = card.querySelector('.card-front');
@@ -1994,7 +2015,7 @@ function openCardDetail(entryKey, data, rarity) {
         </div>
       </div>`;
 
-    const card = buildStaticCard(data, rarity, null, { fav: false });
+    const card = buildStaticCard(data, rarity, null, { fav: false, lit: true });
     card.classList.add('detail-card');
     body.querySelector('.detail-card-wrap').appendChild(card);
     attachTilt(card);
@@ -2106,39 +2127,169 @@ function activeFilterCount() {
     + (f.favoritesOnly ? 1 : 0) + (f.sort !== 'recent' ? 1 : 0);
 }
 
+/*
+ * The collection is a shelf of albums. renderBinder paints whichever of the
+ * two views is live: the shelf, or one open book.
+ */
 function renderBinder() {
+  if (state.album) return renderAlbum();
+
   el.binderTitle.textContent = t('tabCollection');
+  el.albumView.hidden = true;
+  el.albumShelf.hidden = false;
+  el.binderStats.hidden = false;
+
   const entries = store.allEntries(state.collection);
   const stats = store.collectionStats(entries);
+  const albums = buildAlbums(entries, state.customPacks);
+  const done = albums.filter((a) => a.complete).length;
 
   el.binderStats.innerHTML = `
     <span class="stat-pill"><b>${stats.copies}</b> ${t('copies')}</span>
     <span class="stat-pill"><b>${money(stats.value)}</b> ${t('total')}</span>
-    <span class="stat-pill"><b>${stats.favorites}</b> ${t('favourites')}</span>`;
+    <span class="stat-pill"><b>${done}</b> ${t('albumsDone')}</span>`;
 
+  el.binderEmpty.hidden = entries.length > 0;
+  if (!entries.length) {
+    el.binderEmptyMark.innerHTML = iconSvg('collection', { size: 46 });
+    el.binderEmptyText.textContent = t('emptyCollection');
+  }
+
+  el.albumShelf.replaceChildren(...albums.map(buildAlbumCover));
+  reveal(el.albumShelf.children, { step: 22, from: 10 });
+}
+
+function buildAlbumCover(album) {
+  const cover = document.createElement('button');
+  cover.type = 'button';
+  cover.className = `album-cover${album.unlocked ? '' : ' is-locked'}${album.complete ? ' is-complete' : ''}`;
+  cover.dataset.family = album.style.family ?? 'roundel';
+  cover.style.setProperty('--accent', album.style.accent);
+  cover.style.setProperty('--accent2', album.style.accent2);
+  const emblem = album.style.emblem?.kind === 'monogram'
+    ? monogramSvg(album.style.emblem.letter, album.style.emblem.spin, { size: 54 })
+    : emblemSvg(album.style.emblem?.id ?? 'open', { size: 54 });
+  cover.innerHTML = `
+    <span class="album-spine" aria-hidden="true"></span>
+    <span class="album-cover-emblem" aria-hidden="true">${emblem}</span>
+    <b class="album-cover-name"></b>
+    <span class="album-cover-count tabular"></span>
+    <span class="album-cover-bar"><i></i></span>
+    ${album.complete ? `<span class="album-cover-done">${iconSvg('spark', { size: 13 })}</span>` : ''}`;
+  cover.querySelector('.album-cover-name').textContent = album.name;
+  cover.querySelector('.album-cover-count').textContent =
+    album.unlocked ? `${Math.min(album.owned, album.total)}/${album.total}` : t('albumLocked');
+  cover.querySelector('.album-cover-bar i').style.width =
+    `${Math.min(100, (album.owned / album.total) * 100)}%`;
+  press(cover, { sound: null });
+  cover.addEventListener('click', () => {
+    if (!album.unlocked) { toast(t('albumLockedHint', { name: album.name }), 'error'); return; }
+    synth.playSheet(true);
+    state.album = { key: album.key, spread: 0 };
+    renderBinder();
+  });
+  return cover;
+}
+
+/* --- one open album ------------------------------------------------------- */
+
+function currentAlbum() {
+  const entries = store.allEntries(state.collection);
+  return buildAlbums(entries, state.customPacks).find((a) => a.key === state.album?.key) ?? null;
+}
+
+function renderAlbum() {
+  const album = currentAlbum();
+  if (!album) { state.album = null; return renderBinder(); }
+
+  el.albumShelf.hidden = true;
+  el.binderStats.hidden = true;
+  el.binderEmpty.hidden = true;
+  el.albumView.hidden = false;
+  el.binderTitle.textContent = t('tabCollection');
+
+  el.albumBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  el.albumName.textContent = album.name;
+  el.albumProgress.textContent = `${Math.min(album.owned, album.total)}/${album.total}`
+    + (album.complete ? ` · ${t('albumComplete')}` : '');
   el.filterOpen.textContent = t('filters');
   const active = activeFilterCount();
   el.filterCount.textContent = String(active);
   el.filterCount.hidden = !active;
 
-  const visible = store.filterEntries(entries, state.filters);
-  el.binderEmpty.hidden = visible.length > 0;
-  if (!visible.length) {
-    el.binderEmptyMark.innerHTML = iconSvg('collection', { size: 46 });
-    el.binderEmptyText.textContent = entries.length ? t('noMatches') : t('emptyCollection');
-  }
+  // The book takes the album's palette so every album reads as its own book.
+  el.albumBook.style.setProperty('--accent', album.style.accent);
+  el.albumBook.style.setProperty('--accent2', album.style.accent2);
 
-  el.binderGrid.replaceChildren(...visible.map((entry) => {
-    const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
-    if (entry.count > 1) {
-      const badge = document.createElement('span');
-      badge.className = 'copy-badge';
-      badge.textContent = `×${entry.count}`;
-      card.appendChild(badge);
-    }
-    return card;
+  const visible = store.filterEntries(album.entries, { ...state.filters, pack: '' });
+  const spreads = Math.max(album.spreads, 1);
+  const spread = Math.min(state.album.spread, spreads - 1);
+  state.album.spread = spread;
+
+  fillAlbumPage(el.pageLeft, visible, spread * CARDS_PER_SPREAD, album);
+  fillAlbumPage(el.pageRight, visible, spread * CARDS_PER_SPREAD + CARDS_PER_PAGE, album);
+  el.pagenoLeft.textContent = String(spread * 2 + 1);
+  el.pagenoRight.textContent = String(spread * 2 + 2);
+
+  el.albumDots.replaceChildren(...Array.from({ length: spreads }, (_, i) => {
+    const dot = document.createElement('span');
+    dot.className = `album-dot${i === spread ? ' is-on' : ''}`;
+    return dot;
   }));
-  reveal(el.binderGrid.children, { step: 26, from: 10 });
+  el.albumHint.textContent = t('albumSwipeHint');
+}
+
+function fillAlbumPage(node, entries, offset, album) {
+  const slots = [];
+  for (let i = 0; i < CARDS_PER_PAGE; i++) {
+    const entry = entries[offset + i];
+    if (entry) {
+      const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
+      if (entry.count > 1) {
+        const badge = document.createElement('span');
+        badge.className = 'copy-badge';
+        badge.textContent = `×${entry.count}`;
+        card.appendChild(badge);
+      }
+      slots.push(card);
+    } else {
+      const empty = document.createElement('div');
+      empty.className = 'album-slot-empty';
+      empty.innerHTML = `<span class="tabular">${offset + i + 1}</span>`;
+      slots.push(empty);
+    }
+  }
+  node.replaceChildren(...slots);
+}
+
+/** Turn the page: the book folds at the spine, then opens on the new spread. */
+function turnAlbumPage(dir) {
+  const album = currentAlbum();
+  if (!album || state.albumTurning) return;
+  const spreads = Math.max(album.spreads, 1);
+  const next = state.album.spread + dir;
+  if (next < 0 || next >= spreads) {
+    // The cover thuds: there is nothing further.
+    el.albumBook.classList.remove('turn-bump-l', 'turn-bump-r');
+    void el.albumBook.offsetWidth;
+    el.albumBook.classList.add(dir > 0 ? 'turn-bump-r' : 'turn-bump-l');
+    return;
+  }
+  state.albumTurning = true;
+  synth.playPageTurn();
+  const folding = dir > 0 ? el.albumBook.querySelector('.album-page.is-right')
+                          : el.albumBook.querySelector('.album-page.is-left');
+  folding.classList.add(dir > 0 ? 'is-folding-r' : 'is-folding-l');
+  setTimeout(() => {
+    state.album.spread = next;
+    renderAlbum();
+    folding.classList.remove('is-folding-r', 'is-folding-l');
+    folding.classList.add(dir > 0 ? 'is-unfolding-r' : 'is-unfolding-l');
+    setTimeout(() => {
+      folding.classList.remove('is-unfolding-r', 'is-unfolding-l');
+      state.albumTurning = false;
+    }, 240);
+  }, 230);
 }
 
 function openFilters() {
@@ -2202,7 +2353,7 @@ function openFilters() {
     resetBtn.textContent = t('reset');
     press(resetBtn, { sound: null });
     resetBtn.addEventListener('click', () => {
-      state.filters = { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'recent', favoritesOnly: false };
+      state.filters = { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'rarity', favoritesOnly: false };
       sheet.hide();
       renderBinder();
     });
@@ -2245,7 +2396,6 @@ function renderProfile() {
   el.statsLabel.textContent = t('profileStats');
   const entries = store.allEntries(state.collection);
   const pulled = Object.values(rarityCounts).reduce((sum, n) => sum + n, 0);
-  const best = RARITIES.filter((r) => (rarityCounts[r.id] ?? 0) > 0).pop();
 
   const stats = [
     [t('statPlaytime'), formatDuration(state.profile.playMs ?? 0)],
@@ -2254,7 +2404,10 @@ function renderProfile() {
     [t('statBoosters'), (state.profile.boostersOpened ?? 0).toLocaleString()],
     [t('statCards'), pulled.toLocaleString()],
     [t('statValue'), formatAmount(entries.reduce((sum, e) => sum + e.price * e.count, 0))],
-    [t('statBest'), best ? tx(best.name) : t('none')]
+    [t('statAlbums'), String(albumsCompleted(entries, state.customPacks))],
+    [t('statAchievements'), String(evaluateAchievements(achFacts(),
+      state.profile.achievements?.redeemed ?? []).filter((a) => a.unlocked).length)],
+    ...(account.configured ? [[t('statFriends'), String(state.social.friends.length)]] : [])
   ];
   el.statGrid.replaceChildren(...stats.map(([label, value]) => {
     const cell = document.createElement('div');
@@ -2282,6 +2435,97 @@ function renderProfile() {
     return row;
   }));
 
+}
+
+/* --- achievements ------------------------------------------------------------------------ */
+
+function achFacts() {
+  return measureAchievements({
+    profile: state.profile,
+    entries: store.allEntries(state.collection),
+    albumsDone: albumsCompleted(store.allEntries(state.collection), state.customPacks),
+    customPacks: state.customPacks ?? [],
+    friends: state.social.friends.length
+  });
+}
+
+function achRedeemableCount() {
+  return redeemableCount(achFacts(), state.profile.achievements?.redeemed ?? []);
+}
+
+function renderAchievements() {
+  el.achTitle.textContent = t('achTitle');
+  const list = evaluateAchievements(achFacts(), state.profile.achievements?.redeemed ?? []);
+  const done = list.filter((a) => a.unlocked).length;
+  el.achSub.textContent = t('achSub', { done, total: list.length });
+
+  // Redeemable first, then in-progress by closeness, then redeemed.
+  const order = (a) => (a.redeemable ? 0 : !a.unlocked ? 1 : 2);
+  list.sort((a, b) => order(a) - order(b)
+    || (b.have / b.need) - (a.have / a.need));
+
+  el.achList.replaceChildren(...list.map((a) => {
+    const row = document.createElement('div');
+    row.className = `ach${a.redeemable ? ' is-ready' : ''}${a.redeemed ? ' is-done' : ''}`;
+    row.innerHTML = `
+      <span class="ach-icon">${iconSvg(a.icon, { size: 20 })}</span>
+      <span class="ach-copy">
+        <b></b><span class="ach-desc"></span>
+        <span class="ach-track"><i></i></span>
+      </span>
+      <span class="ach-side"></span>`;
+    row.querySelector('b').textContent = a.name;
+    row.querySelector('.ach-desc').textContent = a.desc;
+    row.querySelector('.ach-track i').style.width = `${Math.round((a.have / a.need) * 100)}%`;
+
+    const side = row.querySelector('.ach-side');
+    if (a.redeemed) {
+      side.innerHTML = `<span class="ach-claimed">${iconSvg('check', { size: 16 })}</span>`;
+    } else if (a.redeemable) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-primary btn-sm';
+      btn.innerHTML = t('achRedeem');
+      press(btn, { sound: null });
+      btn.addEventListener('click', () => redeemAchievement(a, btn));
+      side.appendChild(btn);
+    } else {
+      side.innerHTML = `<span class="ach-progress tabular">${
+        a.stat === 'value' ? money(a.have) : Math.floor(a.have)
+      }/<b>${a.stat === 'value' ? money(a.need) : a.need}</b></span>`;
+    }
+
+    const label = document.createElement('span');
+    label.className = 'ach-reward';
+    label.innerHTML = a.reward.kind === 'coins'
+      ? t('achRewardCoins', { amount: money(a.reward.coins) })
+      : t('achRewardPack', { name: specName(a.reward.spec) });
+    row.querySelector('.ach-copy').appendChild(label);
+    return row;
+  }));
+  reveal(el.achList.children, { step: 18, from: 8 });
+}
+
+function redeemAchievement(a, btn) {
+  const redeemed = state.profile.achievements.redeemed;
+  if (redeemed.includes(a.id)) return;
+  redeemed.push(a.id);
+  if (a.reward.kind === 'coins') {
+    store.saveWallet(store.loadWallet() + a.reward.coins);
+    refreshWallet();
+  } else {
+    store.addBooster(state.inventory, a.reward.spec, 1);
+    renderPacks();
+  }
+  store.saveProfile(state.profile);
+  synth.playAchievement();
+  const rect = btn.getBoundingClientRect();
+  spawnBurst({ shapes: ['star4', 'orb'], colors: ['#fbbf24', '#ffffff'],
+    count: 14, spread: 1.1, gravity: 0.3 },
+    { x: rect.left + rect.width / 2, y: rect.top }, { scale: 0.6 });
+  toast(t('achRedeemed', { name: a.name }), 'ok');
+  renderAchievements();
+  paintDrawerLinks();
 }
 
 /* --- the account gate -------------------------------------------------------------------------------------- */
@@ -3321,23 +3565,22 @@ function giftLabel(gift) {
   return t('giftBooster');
 }
 
-function giftTile(slot, status) {
+/** One stop on the month's trail. */
+function giftStop(slot, status) {
   const { gift } = slot;
-  const tile = document.createElement('div');
-  tile.className = `gift-tile is-${status} is-${gift.kind}`;
-  tile.innerHTML = `
-    <span class="gift-day"></span>
-    <span class="gift-art"></span>
-    <span class="gift-label"></span>
-    <span class="gift-check"></span>`;
-  tile.querySelector('.gift-day').textContent = String(slot.day);
-  tile.querySelector('.gift-label').innerHTML = giftLabel(gift);
-  const art = tile.querySelector('.gift-art');
-  if (gift.kind === 'coins') art.innerHTML = buckSvg({ size: 20 });
-  else if (gift.kind === 'card') art.innerHTML = iconSvg('collection', { size: 20 });
-  else art.innerHTML = iconSvg('packs', { size: 20 });
-  if (status === 'claimed') tile.querySelector('.gift-check').innerHTML = iconSvg('check', { size: 18 });
-  return tile;
+  const milestone = slot.day % 7 === 0 || slot.day === BOARD_SIZE;
+  const stop = document.createElement('div');
+  stop.className = `gift-stop is-${status} is-${gift.kind}${milestone ? ' is-milestone' : ''}`;
+  stop.innerHTML = `
+    <span class="gift-stop-node"><span class="gift-stop-art"></span></span>
+    <span class="gift-stop-day tabular"></span>`;
+  stop.querySelector('.gift-stop-day').textContent = String(slot.day);
+  const art = stop.querySelector('.gift-stop-art');
+  if (status === 'claimed') art.innerHTML = iconSvg('check', { size: milestone ? 18 : 14 });
+  else if (gift.kind === 'coins') art.innerHTML = buckSvg({ size: milestone ? 18 : 13 });
+  else if (gift.kind === 'card') art.innerHTML = iconSvg('collection', { size: milestone ? 19 : 14 });
+  else art.innerHTML = iconSvg('packs', { size: milestone ? 19 : 14 });
+  return stop;
 }
 
 function openDaily({ auto = false } = {}) {
@@ -3358,33 +3601,62 @@ function buildDailyBody(body) {
   const board = generateBoard(daily.board ?? 0);
   const next = nextGiftIndex(daily);
   const ready = canClaim(daily);
+  const today = board[next];
 
   body.innerHTML = `
-    <p style="margin-bottom:16px"></p>
-    <div style="display:grid;gap:10px;margin-bottom:18px">
-      <button class="btn btn-primary btn-block" type="button" data-claim></button>
-      <p class="muted tabular" style="font-size:.82rem;text-align:center" data-status></p>
+    <div class="daily-hero${ready ? ' is-ready' : ''}">
+      <button class="present" type="button" data-claim aria-label="">
+        <span class="present-glow" aria-hidden="true"></span>
+        <span class="present-lid" aria-hidden="true"></span>
+        <span class="present-box" aria-hidden="true">
+          <span class="present-ribbon-v"></span>
+        </span>
+      </button>
+      <div class="daily-copy">
+        <b data-headline></b>
+        <span data-status class="tabular"></span>
+      </div>
     </div>
-    <p class="label" style="margin-bottom:10px" data-board></p>
-    <div class="gift-board"></div>`;
+    <div class="gift-trail-wrap">
+      <p class="label" data-board style="margin-bottom:8px"></p>
+      <div class="gift-trail"></div>
+    </div>`;
 
-  body.querySelector('p').textContent = t('dailyBody');
   body.querySelector('[data-board]').textContent = t('dailyBoard', { n: (daily.board ?? 0) + 1 });
 
-  const claim = body.querySelector('[data-claim]');
-  claim.textContent = t('dailyClaim');
-  claim.hidden = !ready;
-  press(claim, { sound: null });
-  claim.addEventListener('click', () => { synth.resume(); claimGift(body); });
-
+  const headline = body.querySelector('[data-headline]');
   const status = body.querySelector('[data-status]');
-  status.textContent = ready ? '' :
-    `${t('dailyClaimed')} ${t('dailyNextIn', { time: formatCountdown(msUntilNextDay()) })}`;
+  const present = body.querySelector('.present');
+  if (ready) {
+    headline.innerHTML = t('dailyTapToOpen');
+    status.innerHTML = `${t('dailyDayN', { n: today.day })} · ${giftLabel(today.gift)}`;
+    present.setAttribute('aria-label', t('dailyClaim'));
+    press(present, { sound: null });
+    present.addEventListener('click', () => {
+      if (present.classList.contains('is-opening')) return;
+      synth.resume();
+      present.classList.add('is-opening');
+      // The lid pops, the reward bursts out, then the sheet repaints claimed.
+      const rect = present.getBoundingClientRect();
+      spawnBurst({ shapes: ['star4', 'orb'], colors: ['#fbbf24', '#f8fafc', '#f472b6'],
+        count: 22, spread: 1.15, gravity: 0.3 },
+        { x: rect.left + rect.width / 2, y: rect.top + rect.height * 0.35 }, { scale: 0.9 });
+      fireFlash(0.25, '#fbbf24');
+      setTimeout(() => claimGift(body), 420);
+    }, { once: true });
+  } else {
+    headline.textContent = t('dailyClaimed');
+    status.textContent = t('dailyNextIn', { time: formatCountdown(msUntilNextDay()) });
+  }
 
-  body.querySelector('.gift-board').replaceChildren(...board.map((slot) => giftTile(
+  const trail = body.querySelector('.gift-trail');
+  trail.replaceChildren(...board.map((slot) => giftStop(
     slot,
     slot.index < next ? 'claimed' : slot.index === next ? (ready ? 'ready' : 'next') : 'locked'
   )));
+  // Bring the current stop into view, roughly centred.
+  const current = trail.children[next];
+  if (current) trail.scrollLeft = Math.max(0, current.offsetLeft - trail.clientWidth / 2 + 20);
 }
 
 function grantGift(gift) {
@@ -3605,6 +3877,19 @@ function init() {
     button.addEventListener('click', () => { synth.playTap(); openHelp(button.dataset.help); });
   });
   el.filterOpen.addEventListener('click', openFilters);
+  el.albumBack.addEventListener('click', () => {
+    synth.playSheet(false);
+    state.album = null;
+    renderBinder();
+  });
+  // Turning pages is a swipe across the open book.
+  el.albumBook.addEventListener('pointerdown', (event) => {
+    if (event.target.closest('.card')) { /* a tap on a card still opens it */ }
+    trackDrag(event, {
+      onMove: () => {},
+      onEnd: (dx) => { if (Math.abs(dx) > 42) turnAlbumPage(dx < 0 ? 1 : -1); }
+    });
+  });
   el.packsEmptyCta.addEventListener('click', () => { payStipend(); renderShop(); showScreen('shop'); });
   el.creator.addEventListener('submit', createCustomPack);
 

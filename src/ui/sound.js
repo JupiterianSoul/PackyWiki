@@ -56,6 +56,13 @@ class Synth {
     filter.frequency.value = 5200;
     filter.Q.value = 0.5;
 
+    // A gentle high-shelf dip: the single biggest de-harsher. Every voice in
+    // every theme passes through it, so nothing can ever be shrill.
+    const tilt = ctx.createBiquadFilter();
+    tilt.type = 'highshelf';
+    tilt.frequency.value = 4800;
+    tilt.gain.value = -4.5;
+
     const bus = ctx.createGain();
     bus.gain.value = 1;
 
@@ -65,7 +72,8 @@ class Synth {
     const reverb = ctx.createConvolver();
 
     bus.connect(filter);
-    filter.connect(comp);
+    filter.connect(tilt);
+    tilt.connect(comp);
     comp.connect(master);
     bus.connect(send);
     send.connect(reverb);
@@ -171,6 +179,8 @@ class Synth {
     if (kind === 'pluck') return this.#pluck({ freq, t, dur, gain, out });
     if (kind === 'chip') return this.#chip({ freq, t, dur, gain, out, bend });
     if (kind === 'marimba') return this.#marimba({ freq, t, dur, gain, out });
+    if (kind === 'synthwave') return this.#synthwave({ freq, t, dur, gain, out, bend });
+    if (kind === 'keys') return this.#keys({ freq, t, dur, gain, out });
     return this.#fm({ freq, t, dur, gain, out });
   }
 
@@ -290,6 +300,88 @@ class Synth {
     feedback.gain.setTargetAtTime(0, t + dur * 0.8, 0.05);
   }
 
+  /**
+   * Synthwave: two saws detuned against each other, a sine sub an octave
+   * down, and a slow filter sweep — the fat analogue stack under every
+   * 1984 sunset. The vibrato arrives late, like a hand reaching for the
+   * mod wheel.
+   */
+  #synthwave({ freq, t, dur, gain, out, bend = 0 }) {
+    const ctx = this.ctx;
+
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 1.1;
+    lp.frequency.setValueAtTime(freq * 3, t);
+    lp.frequency.exponentialRampToValueAtTime(Math.max(300, freq * 9), t + Math.min(0.14, dur * 0.4));
+    lp.frequency.exponentialRampToValueAtTime(Math.max(260, freq * 2.2), t + dur);
+    lp.connect(out);
+
+    const vibrato = ctx.createOscillator();
+    vibrato.frequency.value = 5.4;
+    const vibDepth = ctx.createGain();
+    vibDepth.gain.setValueAtTime(0, t);
+    vibDepth.gain.linearRampToValueAtTime(freq * 0.006, t + Math.min(0.35, dur * 0.7));
+    vibrato.connect(vibDepth);
+
+    [[-7, 0.5, 'sawtooth', -12], [4, 0.5, 'sawtooth', 0], [-4, 0.45, 'sawtooth', 0], [0, 0.55, 'sine', -12]]
+      .forEach(([cents, level, type, semis]) => {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        const f = freq * Math.pow(2, semis / 12);
+        osc.frequency.setValueAtTime(f, t);
+        if (bend) osc.frequency.exponentialRampToValueAtTime(f * (1 + bend), t + dur);
+        osc.detune.value = cents;
+        vibDepth.connect(osc.frequency);
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.exponentialRampToValueAtTime(gain * level, t + 0.014);
+        env.gain.setTargetAtTime(gain * level * 0.55, t + 0.1, 0.12);
+        env.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        osc.connect(env); env.connect(lp);
+        osc.start(t); osc.stop(t + dur + 0.05);
+      });
+    vibrato.start(t); vibrato.stop(t + dur + 0.05);
+  }
+
+  /**
+   * Keys: a felt piano — triangle body, a sine an octave up fading faster,
+   * a soft thump underneath, everything through its own gentle lowpass.
+   * Warm, round, incapable of harshness. Noir speaks in this now.
+   */
+  #keys({ freq, t, dur, gain, out }) {
+    const ctx = this.ctx;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = Math.min(3400, freq * 7);
+    lp.Q.value = 0.4;
+    lp.connect(out);
+
+    [[1, 'triangle', 1, 1], [2.001, 'sine', 0.35, 0.5], [0.5, 'sine', 0.28, 1.2]]
+      .forEach(([ratio, type, level, durScale]) => {
+        const osc = ctx.createOscillator();
+        osc.type = type;
+        osc.frequency.value = freq * ratio;
+        const env = ctx.createGain();
+        env.gain.setValueAtTime(0.0001, t);
+        env.gain.exponentialRampToValueAtTime(gain * level, t + 0.012);
+        env.gain.exponentialRampToValueAtTime(0.0001, t + dur * durScale);
+        osc.connect(env); env.connect(lp);
+        osc.start(t); osc.stop(t + dur * durScale + 0.05);
+      });
+
+    // The felt: a tiny dark thump as the hammer lands.
+    const thump = ctx.createBufferSource();
+    thump.buffer = this.#noiseBuffer(0.02);
+    const tf = ctx.createBiquadFilter();
+    tf.type = 'lowpass'; tf.frequency.value = 420;
+    const tg = ctx.createGain();
+    tg.gain.setValueAtTime(gain * 0.5, t);
+    tg.gain.exponentialRampToValueAtTime(0.0001, t + 0.05);
+    thump.connect(tf); tf.connect(tg); tg.connect(out);
+    thump.start(t); thump.stop(t + 0.06);
+  }
+
   /** Filtered noise. Rips, whooshes, transients, texture. */
   #noise({ at = 0, dur = 0.3, gain = 0.2, type = 'bandpass', from = 1400, to = 400, q = 1 }) {
     const ctx = this.ctx;
@@ -337,11 +429,50 @@ class Synth {
 
   /* --- the app's vocabulary ---------------------------------------------- */
 
-  /** Any press. The smallest sound in the app, and the most frequent. */
+  /** Any press. The smallest sound in the app, and the most frequent —
+   *  so it is never exactly the same twice: the degree wanders between
+   *  three chord tones and the gain breathes a little. */
   playTap() {
     if (!this.#ready()) return;
-    this.#transient(0.07);
-    this.#note({ freq: this.#degree(2, 1), dur: 0.08, gain: 0.05 });
+    this.#transient(0.06 + Math.random() * 0.02);
+    const deg = [1, 2, 4][Math.floor(Math.random() * 3)];
+    this.#note({ freq: this.#degree(deg, 1), dur: 0.08, gain: 0.042 + Math.random() * 0.016 });
+  }
+
+  /** An album page turning: paper, then the soft landing of the spread. */
+  playPageTurn() {
+    if (!this.#ready()) return;
+    this.#noise({ dur: 0.16, gain: 0.1, type: 'bandpass', from: 1600, to: 3400, q: 0.7 });
+    this.#noise({ at: 0.1, dur: 0.1, gain: 0.08, type: 'bandpass', from: 2800, to: 600, q: 1 });
+    this.#note({ freq: this.#degree(2, 0), at: 0.16, dur: 0.12, gain: 0.035 });
+  }
+
+  /** An achievement redeemed: a proud little rise with sparkle on top. */
+  playAchievement() {
+    if (!this.#ready()) return;
+    this.resume();
+    [0, 4, 7, 9].forEach((deg, i) => {
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.09, dur: 0.55, gain: 0.11 });
+    });
+    this.#note({ freq: this.#degree(0, 0), dur: 0.9, gain: 0.09 });
+    this.#noise({ at: 0.25, dur: 0.5, gain: 0.03, type: 'highpass', from: 5000, to: 9000 });
+  }
+
+  /** A message arriving in a chat. Small, bright, unmistakable. */
+  playMessage() {
+    if (!this.#ready()) return;
+    this.#note({ freq: this.#degree(4, 1), dur: 0.12, gain: 0.07 });
+    this.#note({ freq: this.#degree(6, 1), at: 0.07, dur: 0.18, gain: 0.06 });
+  }
+
+  /** A trade or gift going through: two hands meeting. */
+  playTrade() {
+    if (!this.#ready()) return;
+    this.resume();
+    this.#note({ freq: this.#degree(0, 1), dur: 0.2, gain: 0.09 });
+    this.#note({ freq: this.#degree(3, 1), at: 0.09, dur: 0.24, gain: 0.09 });
+    this.#note({ freq: this.#degree(5, 1), at: 0.18, dur: 0.4, gain: 0.1 });
+    this.#transient(0.06);
   }
 
   /** Moving between destinations. Direction is audible. */

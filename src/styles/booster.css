@@ -696,3 +696,12 @@ html[data-lowpower='1'] .rip-front::after,
 .booster.is-tiny { --pack-w: 76px; --pack-h: 136px; }
 .booster.is-hero { --pack-w: clamp(200px, 62vw, 250px); --pack-h: calc(var(--pack-w) * 1.79); }
 .booster.is-empty { opacity: 0.32; filter: grayscale(0.75); }
+
+/* Only the pack in your hand shimmers. A shelf or a shop full of tiny packs
+   each running its own holo drift and gloss sweep keeps the GPU hot for
+   nothing — at that size the animation is invisible anyway. */
+.booster.is-small .booster-holo,
+.booster.is-tiny .booster-holo,
+.booster.is-small .booster-shine::after,
+.booster.is-tiny .booster-shine::after { animation: none; }
+

@@ -239,6 +239,9 @@ export function loadProfile() {
   profile.daily ??= emptyDaily();
   profile.timed ??= emptyTimed();
   profile.freeTaken ??= { window: null, ids: [] };
+  profile.achievements ??= { redeemed: [] };
+  profile.achievements.redeemed ??= [];
+  profile.cardsSold ??= 0;
   profile.settings ??= {};
   profile.settings.sound ??= true;
   profile.settings.lowPower ??= false;

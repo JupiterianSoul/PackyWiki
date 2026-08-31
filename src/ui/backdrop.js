@@ -73,10 +73,16 @@ class Backdrop {
   start() {
     if (this.running || this.lowPower || this.paused || !this.ctx) return;
     this.running = true;
+    // 30fps, not display rate: these are slow ambient fields, and painting a
+    // full-screen canvas at 60/120Hz is the single biggest battery drain in
+    // the app. Nobody can see the difference; the thermal camera can.
+    let last = 0;
     const loop = (now) => {
       if (!this.running) return;
-      this.#frame(now);
       this.raf = requestAnimationFrame(loop);
+      if (now - last < 31) return;
+      last = now;
+      this.#frame(now);
     };
     this.raf = requestAnimationFrame(loop);
   }
@@ -117,6 +123,8 @@ class Backdrop {
       case 'paper': this.#paper(ctx, w, h, t); break;
       case 'arcade': this.#arcade(ctx, w, h, t); break;
       case 'noir': this.#noir(ctx, w, h, t); break;
+      case 'sunset': this.#sunset(ctx, w, h, t); break;
+      case 'meadow': this.#meadow(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -369,6 +377,143 @@ class Backdrop {
     this.grainCanvas = canvas;
     return canvas;
   }
-}
 
+  /**
+   * SUNSET '84 — a neon horizon: banded sun sinking behind a perspective
+   * grid that rolls slowly toward the viewer, purple sky above.
+   */
+  #sunset(ctx, w, h, t) {
+    const speed = this.theme.backdrop.speed ?? 0.00016;
+    const horizon = h * 0.56;
+
+    const sky = ctx.createLinearGradient(0, 0, 0, horizon);
+    sky.addColorStop(0, '#160a2e');
+    sky.addColorStop(0.6, '#31164f');
+    sky.addColorStop(1, '#6b2158');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, horizon);
+
+    // The sun: banded, half set.
+    const r = Math.min(w, h) * 0.2;
+    const cx = w / 2;
+    const cy = horizon - r * 0.18;
+    const sun = ctx.createLinearGradient(0, cy - r, 0, cy + r);
+    sun.addColorStop(0, '#fcd34d');
+    sun.addColorStop(0.55, '#fb7185');
+    sun.addColorStop(1, '#f472b6');
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, w, horizon);
+    ctx.clip();
+    ctx.fillStyle = sun;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+    // The slats cut out of the sun.
+    ctx.fillStyle = '#31164f';
+    for (let i = 0; i < 5; i++) {
+      const y = cy - r * 0.1 + i * r * 0.24;
+      ctx.fillRect(cx - r, y, r * 2, r * (0.035 + i * 0.02));
+    }
+    ctx.restore();
+
+    // The ground and its grid, rolling forward.
+    const ground = ctx.createLinearGradient(0, horizon, 0, h);
+    ground.addColorStop(0, '#2b1048');
+    ground.addColorStop(1, '#0d0620');
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, horizon, w, h - horizon);
+
+    ctx.strokeStyle = 'rgba(244, 114, 182, 0.4)';
+    ctx.lineWidth = 1;
+    // Verticals converge on the sun.
+    for (let i = -9; i <= 9; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * w * 0.011, horizon);
+      ctx.lineTo(cx + i * w * 0.22, h);
+      ctx.stroke();
+    }
+    // Horizontals accelerate toward the viewer, looping with time.
+    const phase = (t * speed) % 1;
+    for (let i = 0; i < 9; i++) {
+      const p = ((i + phase) / 9) ** 2.2;
+      const y = horizon + p * (h - horizon);
+      ctx.globalAlpha = 0.15 + p * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(w, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // A thin cyan horizon line, glowing.
+    ctx.strokeStyle = 'rgba(34, 211, 238, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, horizon);
+    ctx.lineTo(w, horizon);
+    ctx.stroke();
+  }
+
+  /**
+   * MEADOW — dusk over soft hills: layered green ridges, a warm sky, and
+   * seeds/fireflies drifting up on their own slow sines.
+   */
+  #meadow(ctx, w, h, t) {
+    const speed = this.theme.backdrop.speed ?? 0.00008;
+
+    const sky = ctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#243318');
+    sky.addColorStop(0.45, '#1d2914');
+    sky.addColorStop(1, '#131c0c');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, h);
+
+    // A low warm glow, as if the sun just left.
+    const glow = ctx.createRadialGradient(w * 0.3, h * 0.32, 0, w * 0.3, h * 0.32, w * 0.5);
+    glow.addColorStop(0, 'rgba(251, 191, 36, 0.12)');
+    glow.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, w, h);
+
+    // Three ridges, each swaying imperceptibly.
+    const ridges = [
+      { base: 0.62, amp: 26, tone: 'rgba(74, 222, 128, 0.10)', k: 1.3 },
+      { base: 0.74, amp: 34, tone: 'rgba(54, 83, 20, 0.55)', k: 0.9 },
+      { base: 0.86, amp: 40, tone: 'rgba(20, 33, 10, 0.9)', k: 0.6 }
+    ];
+    for (const ridge of ridges) {
+      ctx.fillStyle = ridge.tone;
+      ctx.beginPath();
+      ctx.moveTo(0, h);
+      for (let x = 0; x <= w; x += 16) {
+        const y = h * ridge.base
+          + Math.sin(x * 0.008 * ridge.k + t * speed * 900) * ridge.amp * 0.2
+          + Math.sin(x * 0.002 * ridge.k + 2) * ridge.amp;
+        ctx.lineTo(x, y);
+      }
+      ctx.lineTo(w, h);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    // The motes: seeds low, fireflies high, all on individual loops.
+    const count = this.theme.backdrop.motes ?? 40;
+    for (let i = 0; i < count; i++) {
+      const seed = i * 127.3;
+      const p = ((t * speed * (0.5 + (i % 5) * 0.22)) + seed / 97) % 1;
+      const x = ((seed * 7.13) % w) + Math.sin(t * speed * 600 + seed) * 30;
+      const y = h - p * h * 0.9;
+      const firefly = i % 4 === 0;
+      const flicker = firefly ? (0.5 + 0.5 * Math.sin(t * 0.004 + seed)) : 1;
+      ctx.globalAlpha = (1 - p) * 0.5 * flicker;
+      ctx.fillStyle = firefly ? '#fde68a' : '#e5f9c9';
+      ctx.beginPath();
+      ctx.arc(((x % w) + w) % w, y, firefly ? 1.8 : 1.1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+}
 export const backdrop = new Backdrop();

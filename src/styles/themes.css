@@ -197,3 +197,89 @@
   --press-shift: 0px;
   --texture: grain;
 }
+
+/* --- SUNSET '84: neon horizon ---------------------------------------------- */
+[data-theme='sunset'] {
+  --ink: #fbeaf6;
+  --ink-dim: #c093c0;
+  --ink-faint: #7d5f92;
+
+  --surface: rgba(244, 114, 182, 0.07);
+  --surface-2: rgba(244, 114, 182, 0.12);
+  --surface-solid: #1b0f35;
+  --line: rgba(244, 114, 182, 0.28);
+  --line-strong: rgba(244, 114, 182, 0.55);
+
+  --accent: #f472b6;
+  --accent-2: #22d3ee;
+  --accent-ink: #1b0724;
+  --positive: #5eead4;
+  --negative: #fb7185;
+  --warning: #fcd34d;
+
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 0 0 1px rgba(244, 114, 182, 0.14), 0 18px 42px -22px rgba(244, 114, 182, 0.35);
+  --raise-shadow: 0 0 0 1px rgba(244, 114, 182, 0.24), 0 26px 60px -24px rgba(34, 211, 238, 0.4);
+  --glow: 0 0 30px -6px color-mix(in srgb, var(--accent) 65%, transparent);
+  --blur: blur(14px) saturate(1.4);
+
+  --font: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-display: var(--font);
+  --display-weight: 800;
+  --display-tracking: 0.06em;
+  --display-transform: uppercase;
+  --label-tracking: 0.16em;
+
+  --press-scale: 0.96;
+  --press-shift: 0px;
+  --texture: none;
+}
+
+/* --- MEADOW: late afternoon outside ---------------------------------------- */
+[data-theme='meadow'] {
+  --ink: #f2f7e8;
+  --ink-dim: #a9bb95;
+  --ink-faint: #6d7f5c;
+
+  --surface: rgba(226, 250, 200, 0.06);
+  --surface-2: rgba(226, 250, 200, 0.1);
+  --surface-solid: #1d2914;
+  --line: rgba(206, 236, 170, 0.16);
+  --line-strong: rgba(206, 236, 170, 0.32);
+
+  --accent: #a3e635;
+  --accent-2: #fbbf24;
+  --accent-ink: #14200b;
+  --positive: #86efac;
+  --negative: #fca5a5;
+  --warning: #fcd34d;
+
+  --radius-sm: 14px;
+  --radius: 20px;
+  --radius-lg: 30px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 16px 36px -22px rgba(0, 0, 0, 0.8);
+  --raise-shadow: 0 24px 54px -26px rgba(0, 0, 0, 0.85);
+  --glow: 0 0 26px -8px color-mix(in srgb, var(--accent) 55%, transparent);
+  --blur: blur(14px) saturate(1.15);
+
+  --font: ui-rounded, 'SF Pro Rounded', ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font);
+  --display-weight: 800;
+  --display-tracking: -0.015em;
+  --display-transform: none;
+  --label-tracking: 0.09em;
+
+  --press-scale: 0.955;
+  --press-shift: 0px;
+  --texture: none;
+}
