@@ -114,7 +114,32 @@ const P = {
   facets: (s = 1, a = 0.14) => `
     repeating-linear-gradient(60deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${21 * s}px),
     repeating-linear-gradient(-60deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${21 * s}px),
-    repeating-linear-gradient(0deg, rgba(0,0,0,${a}) 0 1px, transparent 1px ${21 * s}px)`
+    repeating-linear-gradient(0deg, rgba(0,0,0,${a}) 0 1px, transparent 1px ${21 * s}px)`,
+
+  /** Vinyl grooves ringing out from a centre. Music. */
+  grooves: (s = 1, a = 0.14) => `
+    repeating-radial-gradient(circle at 50% 42%,
+      transparent 0 ${9 * s}px, rgba(255,255,255,${a}) ${9 * s}px ${10 * s}px)`,
+
+  /** Traces and solder points. Technology. */
+  circuit: (s = 1, a = 0.12) => `
+    repeating-linear-gradient(0deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${17 * s}px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,${a * 0.8}) 0 1px, transparent 1px ${23 * s}px),
+    radial-gradient(circle 2px at 30% 24%, rgba(255,255,255,${a * 2.2}) 97%, transparent),
+    radial-gradient(circle 2px at 72% 58%, rgba(255,255,255,${a * 2.2}) 97%, transparent),
+    radial-gradient(circle 2px at 18% 78%, rgba(255,255,255,${a * 2.2}) 97%, transparent)`,
+
+  /** Topographic contour lines. Geography. */
+  contours: (s = 1, a = 0.12) => `
+    repeating-radial-gradient(ellipse ${52 * s}px ${34 * s}px at 28% 30%,
+      transparent 0 ${9 * s}px, rgba(255,255,255,${a}) ${9 * s}px ${10 * s}px),
+    repeating-radial-gradient(ellipse ${44 * s}px ${30 * s}px at 78% 74%,
+      transparent 0 ${11 * s}px, rgba(255,255,255,${a * 0.7}) ${11 * s}px ${12 * s}px)`,
+
+  /** A slow hypnotic spiral of spokes. Weird. */
+  swirl: (s = 1, a = 0.1) => `
+    repeating-conic-gradient(from 8deg at 50% 46%,
+      rgba(255,255,255,${a}) 0deg ${9 * s}deg, transparent ${9 * s}deg ${30 * s}deg)`
 };
 
 /* --- the holographic interference bands -------------------------------------
@@ -175,7 +200,23 @@ const THEME_STYLES = {
   cactus:      { family: 'arch', foil: P.petals(0.7, 0.1),      holoAngle: 76,
                  particles: burst(['spike', 'orb'], ['#4ade80', '#fbbf24', '#dcfce7'], { spread: 1.4, gravity: 0.4 }) },
   sport:       { family: 'sash', foil: P.stripes(1.4, 0.11),    holoAngle: 58,
-                 particles: burst(['square-alt', 'orb'], ['#fbbf24', '#f8fafc', '#38bdf8'], { count: 30, gravity: 0.5 }) }
+                 particles: burst(['square-alt', 'orb'], ['#fbbf24', '#f8fafc', '#38bdf8'], { count: 30, gravity: 0.5 }) },
+  music:       { family: 'marquee', foil: P.grooves(1, 0.13),   holoAngle: 96,
+                 particles: burst(['ring', 'orb', 'star4'], ['#ff4fa3', '#ffd6ec', '#ffffff'], { count: 28, gravity: 0.25 }) },
+  records:     { family: 'plate', foil: P.rays(1.2, 0.12),      holoAngle: 108,
+                 particles: burst(['star5', 'star4'], ['#ffe9a3', '#e6edf7', '#ffffff'], { count: 30, gravity: 0.3 }) },
+  food:        { family: 'arch', foil: P.petals(0.9, 0.11),     holoAngle: 88,
+                 particles: burst(['blob', 'orb'], ['#ff6b57', '#ffd8a8', '#fff7ed'], { count: 26, gravity: 0.6 }) },
+  geography:   { family: 'roundel', foil: P.contours(1, 0.13),  holoAngle: 124,
+                 particles: burst(['orb', 'shard'], ['#0ea5e9', '#bae6fd', '#ffffff'], { gravity: 0.35 }) },
+  technology:  { family: 'panel', foil: P.circuit(1, 0.12),     holoAngle: 90,
+                 particles: burst(['square', 'streak'], ['#4cc9f0', '#a5f3fc', '#ffffff'], { count: 30, gravity: 0.2 }) },
+  weapons:     { family: 'sash', foil: P.facets(0.9, 0.12),     holoAngle: 70,
+                 particles: burst(['shard', 'streak'], ['#cbd5e1', '#ffffff', '#ffb86b'], { spread: 1.3, gravity: 0.3 }) },
+  weird:       { family: 'panel', foil: P.swirl(1, 0.1),        holoAngle: 134,
+                 particles: burst(['ring', 'star4', 'orb'], ['#a3e635', '#d8b4fe', '#ffffff'], { count: 30, spread: 1.3, gravity: 0.05 }) },
+  memes:       { family: 'marquee', foil: P.pixels(1.5, 0.12),  holoAngle: 82,
+                 particles: burst(['square', 'star5'], ['#ffd60a', '#38bdf8', '#ffffff'], { count: 34, gravity: 0.5 }) }
 };
 
 /* Non-subject packs. */

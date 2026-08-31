@@ -273,6 +273,118 @@ export const THEME_PACKS = [
       fr: ['incategory:"Sport"', 'incategory:"Football"', 'incategory:"Sport olympique"',
            'sportif français', 'championnat sportif', 'discipline sportive']
     }
+  },
+  {
+    id: 'music', icon: 'music',
+    name: { en: 'Music', fr: 'Musique' },
+    tagline: { en: 'Bands, albums, composers and the songs that stuck.',
+               fr: 'Groupes, albums, compositeurs et les chansons qui restent.' },
+    hero: { en: 'The Beatles', fr: 'The Beatles' },
+    accent: '#ff4fa3', accent2: '#57002f',
+    queries: {
+      en: ['rock band', 'studio album', 'music genre', 'jazz musician',
+           'classical composer', 'hip hop musician'],
+      fr: ['groupe de rock', 'album studio', 'genre musical',
+           'compositeur', 'chanteuse', 'rappeur']
+    }
+  },
+  {
+    id: 'records', icon: 'records',
+    name: { en: 'World Records', fr: 'Records du monde' },
+    tagline: { en: 'The tallest, the fastest, the oldest, the strangest.',
+               fr: 'Les plus hauts, les plus rapides, les plus anciens, les plus étranges.' },
+    hero: { en: 'Guinness World Records', fr: 'Livre Guinness des records' },
+    accent: '#e6edf7', accent2: '#12335e',
+    queries: {
+      en: ['world record', 'Guinness World Records', 'largest structure',
+           'fastest vehicle', 'longest river', 'tallest building'],
+      fr: ['record du monde', 'records Guinness', 'plus grand édifice',
+           'véhicule le plus rapide', 'plus long fleuve', 'plus haut gratte-ciel']
+    }
+  },
+  {
+    id: 'food', icon: 'food',
+    name: { en: 'Food', fr: 'Cuisine' },
+    tagline: { en: 'Dishes, ingredients and cuisines of the world.',
+               fr: 'Plats, ingrédients et cuisines du monde.' },
+    hero: { en: 'Pizza', fr: 'Pizza' },
+    accent: '#ff6b57', accent2: '#571405',
+    queries: {
+      en: ['national dish', 'traditional cuisine', 'dessert', 'street food',
+           'cheese', 'incategory:"Fast food"'],
+      fr: ['plat traditionnel', 'cuisine régionale', 'dessert', 'fromage',
+           'spécialité culinaire', 'boisson traditionnelle']
+    }
+  },
+  {
+    id: 'geography', icon: 'geography',
+    name: { en: 'Geography', fr: 'Géographie' },
+    tagline: { en: 'Countries, capitals, rivers and mountain ranges.',
+               fr: 'Pays, capitales, fleuves et chaînes de montagnes.' },
+    hero: { en: 'Mount Everest', fr: 'Everest' },
+    accent: '#0ea5e9', accent2: '#0b3a5c',
+    queries: {
+      en: ['incategory:"Member states of the United Nations"', 'mountain range',
+           'longest river', 'capital city', 'island nation', 'desert region'],
+      fr: ['chaîne de montagnes', 'fleuve', 'capitale', 'île',
+           'désert', 'pays européen']
+    }
+  },
+  {
+    id: 'technology', icon: 'technology',
+    name: { en: 'Technology', fr: 'Technologie' },
+    tagline: { en: 'Machines, gadgets, code and the ideas inside them.',
+               fr: 'Machines, gadgets et les idées qui les animent.' },
+    hero: { en: 'Robot', fr: 'Robot' },
+    accent: '#4cc9f0', accent2: '#10243e',
+    queries: {
+      en: ['incategory:"Consumer electronics"', 'smartphone', 'operating system',
+           'microprocessor', 'robotics', 'artificial intelligence'],
+      fr: ['ordinateur', 'téléphone mobile', "système d'exploitation",
+           'microprocesseur', 'robotique', 'intelligence artificielle']
+    }
+  },
+  {
+    id: 'weapons', icon: 'weapons',
+    name: { en: 'Weapons', fr: 'Armes' },
+    tagline: { en: 'Blades, bows and firearms across the ages.',
+               fr: 'Lames, arcs et armes à feu à travers les âges.' },
+    hero: { en: 'Katana', fr: 'Katana' },
+    accent: '#aab4c4', accent2: '#1b1f27',
+    queries: {
+      en: ['incategory:"Swords"', 'medieval weapon', 'firearm', 'artillery',
+           'siege weapon', 'military rifle'],
+      fr: ['épée', 'arme médiévale', 'arme à feu', 'artillerie',
+           'arme de siège', 'fusil militaire']
+    }
+  },
+  {
+    id: 'weird', icon: 'weird',
+    name: { en: 'Weird', fr: 'Insolite' },
+    tagline: { en: 'Cryptids, legends and the unexplained.',
+               fr: 'Cryptides, légendes et phénomènes inexpliqués.' },
+    hero: { en: 'Loch Ness Monster', fr: 'Monstre du loch Ness' },
+    accent: '#a3e635', accent2: '#2e1065',
+    queries: {
+      en: ['cryptid', 'urban legend', 'unexplained phenomenon', 'paranormal',
+           'mysterious disappearance', 'hoax'],
+      fr: ['cryptide', 'légende urbaine', 'phénomène inexpliqué', 'paranormal',
+           'disparition mystérieuse', 'canular']
+    }
+  },
+  {
+    id: 'memes', icon: 'memes',
+    name: { en: 'Memes', fr: 'Mèmes' },
+    tagline: { en: 'Internet culture and the jokes that went too far.',
+               fr: 'La culture Internet et les blagues devenues cultes.' },
+    hero: { en: 'Grumpy Cat', fr: 'Grumpy Cat' },
+    accent: '#ffd60a', accent2: '#003566',
+    queries: {
+      en: ['incategory:"Internet memes"', 'Internet meme', 'viral video',
+           'Internet phenomenon', 'YouTube personality', 'image macro'],
+      fr: ['incategory:"Mème Internet"', 'mème Internet', 'vidéo virale',
+           'phénomène Internet', 'vidéaste web', 'culture Internet']
+    }
   }
 ].map((pack) => ({ ...pack, group: 'theme', source: 'wikipedia' }));
 

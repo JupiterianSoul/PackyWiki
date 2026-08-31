@@ -69,23 +69,18 @@
 
           <!-- CUSTOM BUILDER: name a subject, get a pack made of its own wiki -->
           <div id="creator-wrap" class="creator-wrap" hidden>
-            <form id="creator" class="creator panel" autocomplete="off">
-              <div class="creator-head">
-                <span class="creator-mark" id="creator-mark" aria-hidden="true"></span>
-                <div>
-                  <h3 id="creator-label"></h3>
-                  <p id="creator-note"></p>
-                </div>
-              </div>
-              <div class="creator-field">
-                <input id="creator-input" class="creator-input" type="text" maxlength="60"
-                       aria-label="Subject" />
-                <button id="creator-go" class="btn btn-primary" type="submit"></button>
-              </div>
-              <p id="creator-status" class="creator-status" role="status" aria-live="polite"></p>
+            <form id="creator" class="forge panel" autocomplete="off">
+              <div class="forge-seal" id="forge-seal" aria-hidden="true"></div>
+              <h3 id="forge-title"></h3>
+              <p id="forge-note"></p>
+              <input id="creator-input" class="forge-input" type="text" maxlength="60"
+                     aria-label="Subject" enterkeyhint="go" />
+              <div class="forge-ideas" id="forge-ideas"></div>
+              <button id="creator-go" class="btn btn-primary forge-go" type="submit"></button>
+              <p id="creator-status" class="forge-status" role="status" aria-live="polite" hidden></p>
             </form>
             <div class="section-head"><h3 class="label" id="creator-mine-label"></h3></div>
-            <div class="creator-mine" id="creator-mine"></div>
+            <div class="forge-mine" id="creator-mine"></div>
             <div class="empty" id="creator-empty" hidden>
               <span class="empty-mark" id="creator-empty-mark"></span>
               <p id="creator-empty-text"></p>

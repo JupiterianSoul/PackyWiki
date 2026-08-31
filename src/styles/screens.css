@@ -51,98 +51,118 @@
 
 .seg-wrap { display: flex; justify-content: center; padding: 0 var(--gutter) 14px; }
 
-/* --- the custom builder --------------------------------------------------------
-   Rebuilt as a workbench rather than a lone text field: it says what it makes,
-   offers examples so nobody has to guess what counts as a subject, and lists
-   what you have already built underneath instead of sending you to the Shop to
-   find out whether it worked. */
+/* --- the forge ------------------------------------------------------------------
+   The custom tab, built for a thumb: one centred column inside the screen,
+   nothing beside anything, nothing past the edge. The seal is a live preview
+   running the same procedural identity a finished pack gets. */
 
 .creator-wrap { display: grid; gap: 0; }
-.creator {
+.forge {
   display: grid;
-  gap: 14px;
-  margin: 0 var(--gutter) 26px;
-  padding: 20px;
+  gap: 12px;
+  justify-items: center;
+  margin: 0 var(--gutter) 24px;
+  padding: 22px 16px 16px;
+  text-align: center;
 }
-.creator-head { display: flex; align-items: flex-start; gap: 13px; }
-.creator-mark {
-  flex: none;
-  width: 42px;
-  height: 42px;
+.forge-seal {
+  width: 106px;
+  height: 106px;
   display: grid;
   place-items: center;
-  border-radius: var(--radius);
-  border: var(--border) var(--border-style) color-mix(in srgb, var(--accent) 45%, transparent);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  border-radius: 26px;
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--accent, #a78bfa) 45%, var(--line));
+  background:
+    radial-gradient(120% 120% at 28% 18%, color-mix(in srgb, var(--accent, #a78bfa) 30%, transparent), transparent 68%),
+    linear-gradient(150deg,
+      color-mix(in srgb, var(--accent, #a78bfa) 18%, var(--surface-solid)),
+      color-mix(in srgb, var(--accent2, #4c1d95) 50%, var(--surface-solid)));
+  --e1: color-mix(in srgb, var(--accent, #a78bfa) 55%, #ffffff);
+  --e2: var(--accent, #a78bfa);
+  --e3: color-mix(in srgb, var(--accent2, #4c1d95) 70%, #05060c);
+  transition: transform calc(320ms * var(--motion-scale)) var(--ease);
 }
-.creator-head h3 { font-size: 1.02rem; margin-bottom: 4px; }
-.creator-head p { font-size: 0.82rem; line-height: 1.55; color: var(--ink-dim); }
+.forge-seal.is-live { transform: scale(1.05) rotate(-2deg); }
+[data-theme='arcade'] .forge-seal { border-radius: var(--radius); }
+.forge h3 { font-size: 1.08rem; }
+.forge > p { font-size: 0.82rem; line-height: 1.55; color: var(--ink-dim); max-width: 36ch; }
 
-.creator-field { display: flex; gap: 10px; }
-.creator-input {
-  flex: 1;
-  min-width: 0;
+.forge-input {
+  width: 100%;
   padding: 13px 16px;
   border-radius: var(--radius-pill);
   border: var(--border) var(--border-style) var(--line);
   background: color-mix(in srgb, var(--ink) 6%, transparent);
   color: var(--ink);
-  font-size: 0.92rem;
+  font-size: 1rem;
+  text-align: center;
 }
-[data-theme='arcade'] .creator-input { border-radius: var(--radius); }
-[data-theme='paper'] .creator-input { background: transparent; }
-.creator-input::placeholder { color: var(--ink-faint); }
-.creator-input:focus { outline: none; border-color: var(--accent); }
+[data-theme='arcade'] .forge-input { border-radius: var(--radius); }
+[data-theme='paper'] .forge-input { background: transparent; }
+.forge-input::placeholder { color: var(--ink-faint); }
+.forge-input:focus { outline: none; border-color: var(--accent); }
 
-.creator-status { font-size: 0.82rem; font-weight: 700; min-height: 1.2em; }
-.creator-status.is-working { color: var(--warning); }
-.creator-status.is-ok { color: var(--positive); }
-.creator-status.is-error { color: var(--negative); }
-
-.creator-mine { display: grid; gap: 8px; padding: 0 var(--gutter); }
-.made {
-  display: flex;
-  align-items: stretch;
-  gap: 0;
-  border-radius: var(--radius);
+.forge-ideas { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.forge-idea {
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
   border: var(--border) var(--border-style) var(--line);
   background: var(--surface);
-  width: 100%;
-  overflow: clip;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-dim);
 }
-.made-main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
-  text-align: left;
-}
-.made-delete {
-  flex: none;
+[data-theme='arcade'] .forge-idea { border-radius: var(--radius); }
+.forge-go { width: 100%; }
+
+.forge-status { font-size: 0.82rem; font-weight: 700; }
+.forge-status.is-working { color: var(--warning); }
+.forge-status.is-ok { color: var(--positive); }
+.forge-status.is-error { color: var(--negative); }
+
+/* What you have built, as tiles. */
+.forge-mine {
   display: grid;
-  place-items: center;
-  width: 46px;
-  color: var(--ink-faint);
-  border-left: var(--border) var(--border-style) var(--line);
-  transition: background calc(180ms * var(--motion-scale)), color calc(180ms * var(--motion-scale));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 var(--gutter);
 }
-.made-delete.is-armed {
-  color: #fff;
-  background: var(--negative);
+.forge-made { position: relative; min-width: 0; }
+.forge-made-main {
+  width: 100%;
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 14px 10px 12px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
 }
-.made-art { flex: none; display: grid; place-items: center; }
-.made-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
-.made-copy b {
-  font-size: 0.92rem;
+.forge-made-main b {
+  max-width: 100%;
+  font-size: 0.84rem;
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.made-copy span { font-size: 0.73rem; color: var(--ink-faint); }
+.forge-made-sub { font-size: 0.7rem; color: var(--ink-faint); }
+.forge-made-art { display: grid; place-items: center; padding-bottom: 4px; }
+.forge-made-delete {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  color: var(--ink-faint);
+  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+  transition: background calc(180ms * var(--motion-scale)), color calc(180ms * var(--motion-scale));
+}
+.forge-made-delete.is-armed { color: #fff; background: var(--negative); border-color: var(--negative); }
 
 .packs-tools {
   display: flex;

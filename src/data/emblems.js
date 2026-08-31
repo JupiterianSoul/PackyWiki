@@ -280,6 +280,118 @@ export const EMBLEMS = {
     <circle cx="60" cy="44" r="9" fill="${E3}" opacity="0.55"/>
     <path d="M60 38 l2.2 4.4 4.8 0.7 -3.5 3.4 0.8 4.8 -4.3 -2.3 -4.3 2.3 0.8 -4.8 -3.5 -3.4 4.8 -0.7Z" fill="${HI}"/>`,
 
+  /* A spinning record, tonearm glint, two notes off the groove. */
+  music: `
+    <circle cx="50" cy="68" r="40" fill="${E3}"/>
+    <circle cx="50" cy="68" r="40" fill="none" stroke="${E1}" stroke-width="2.4" opacity="0.55"/>
+    <circle cx="50" cy="68" r="32" fill="none" stroke="${E1}" stroke-width="1.4" opacity="0.35"/>
+    <circle cx="50" cy="68" r="24" fill="none" stroke="${E1}" stroke-width="1.4" opacity="0.28"/>
+    <circle cx="50" cy="68" r="13" fill="${E2}"/>
+    <circle cx="50" cy="68" r="3.6" fill="${INK}"/>
+    <path d="M50 28 a40 40 0 0 1 27 11" stroke="${HI}" stroke-width="3.4" fill="none" opacity="0.75" stroke-linecap="round"/>
+    <path d="M78 60 L78 26 L104 20 L104 52" stroke="${E1}" stroke-width="4.6" fill="none" stroke-linejoin="round"/>
+    <ellipse cx="72.5" cy="60" rx="7.4" ry="5.4" fill="${E1}"/>
+    <ellipse cx="98.5" cy="52" rx="7.4" ry="5.4" fill="${E1}"/>
+    <path d="M78 34 L104 28" stroke="${E1}" stroke-width="4" opacity="0.7"/>`,
+
+  /* A podium under a gold-star medal on its ribbon. */
+  records: `
+    <path d="M60 14 l5 10 11 1.6 -8 7.8 1.9 11 -9.9 -5.2 -9.9 5.2 1.9 -11 -8 -7.8 11 -1.6Z" fill="${E1}"/>
+    <path d="M60 21 l3 6 6.6 1 -4.8 4.6 1.1 6.6 -5.9 -3.1 -5.9 3.1 1.1 -6.6 -4.8 -4.6 6.6 -1Z" fill="${HI}" opacity="0.85"/>
+    <rect x="44" y="60" width="32" height="46" rx="3" fill="${E2}"/>
+    <rect x="12" y="74" width="30" height="32" rx="3" fill="${E2}" opacity="0.82"/>
+    <rect x="78" y="82" width="30" height="24" rx="3" fill="${E2}" opacity="0.72"/>
+    <path d="M56 70 h8 v26 h-8Z" fill="${E3}" opacity="0.65"/>
+    <path d="M23 82 h8 M25 82 l-4 18 M23 100 h10" stroke="${E3}" stroke-width="4.6" stroke-linecap="round" fill="none" opacity="0.7"/>
+    <path d="M88 88 q8 -4 8 3 q0 4 -8 9 h10" stroke="${E3}" stroke-width="4" stroke-linecap="round" fill="none" opacity="0.65"/>
+    <path d="M44 60 h32 v6 h-32Z" fill="${E1}" opacity="0.55"/>`,
+
+  /* A stacked burger, seeds, cheese drip and all. */
+  food: `
+    <ellipse cx="60" cy="102" rx="42" ry="6" fill="${INK}" opacity="0.35"/>
+    <path d="M20 54 Q20 24 60 24 Q100 24 100 54 L100 58 L20 58Z" fill="${E2}"/>
+    <path d="M28 40 Q40 28 60 27 L58 40Z" fill="${E1}" opacity="0.6"/>
+    <circle cx="42" cy="38" r="2.6" fill="${HI}"/>
+    <circle cx="58" cy="32" r="2.6" fill="${HI}"/>
+    <circle cx="74" cy="37" r="2.6" fill="${HI}"/>
+    <circle cx="86" cy="46" r="2.6" fill="${HI}" opacity="0.8"/>
+    <path d="M20 58 h80 l0 4 q-8 10 -16 2 q-8 10 -16 1 q-8 10 -16 1 q-8 9 -16 1 q-8 8 -16 -2Z" fill="${E1}"/>
+    <rect x="16" y="68" width="88" height="12" rx="6" fill="${E3}"/>
+    <path d="M22 84 q10 -7 19 0 q10 -7 19 0 q10 -7 19 0 q10 -7 19 0 l0 4 h-76Z" fill="${E2}" opacity="0.75"/>
+    <path d="M22 90 h76 q0 16 -15 16 h-46 q-15 0 -15 -16Z" fill="${E2}"/>
+    <path d="M26 92 q16 -4 34 0 l-2 6 q-15 -3 -30 0Z" fill="${E1}" opacity="0.35"/>`,
+
+  /* A folded map, a route, and the pin that marks the spot. */
+  geography: `
+    <path d="M16 34 L45 24 L75 34 L104 24 L104 88 L75 98 L45 88 L16 98Z" fill="${E1}"/>
+    <path d="M45 24 L45 88 L16 98 L16 34Z" fill="${E2}" opacity="0.5"/>
+    <path d="M75 34 L104 24 L104 88 L75 98Z" fill="${E2}" opacity="0.5"/>
+    <path d="M45 24 L45 88 M75 34 L75 98" stroke="${E3}" stroke-width="2" opacity="0.5"/>
+    <path d="M24 78 Q40 66 52 70 Q70 76 82 58 Q88 49 96 46" stroke="${E3}" stroke-width="3.4"
+      stroke-dasharray="7 6" fill="none" stroke-linecap="round" opacity="0.8"/>
+    <circle cx="24" cy="78" r="4.4" fill="${E3}"/>
+    <path d="M96 22 Q110 22 110 36 Q110 46 96 58 Q82 46 82 36 Q82 22 96 22Z" fill="${E2}"/>
+    <circle cx="96" cy="37" r="6.4" fill="${HI}"/>`,
+
+  /* A microchip: die, pins and traces. */
+  technology: `
+    <path d="M42 20 v-10 M60 20 v-10 M78 20 v-10 M42 110 v-10 M60 110 v-10 M78 110 v-10
+             M20 42 h-10 M20 60 h-10 M20 78 h-10 M110 42 h-10 M110 60 h-10 M110 78 h-10"
+      stroke="${E1}" stroke-width="5.4" stroke-linecap="round"/>
+    <rect x="22" y="22" width="76" height="76" rx="10" fill="${E2}"/>
+    <rect x="22" y="22" width="76" height="76" rx="10" fill="none" stroke="${E1}" stroke-width="2.6" opacity="0.6"/>
+    <rect x="40" y="40" width="40" height="40" rx="5" fill="${E3}"/>
+    <path d="M40 52 h-12 M40 68 h-12 M80 52 h12 M80 68 h12 M52 40 v-12 M68 40 v-12 M52 80 v12 M68 80 v12"
+      stroke="${HI}" stroke-width="2.2" opacity="0.65"/>
+    <circle cx="28" cy="52" r="2.4" fill="${HI}" opacity="0.8"/>
+    <circle cx="92" cy="68" r="2.4" fill="${HI}" opacity="0.8"/>
+    <path d="M48 60 h10 M58 60 v-8 M58 52 h14" stroke="${E1}" stroke-width="2.6" fill="none"/>
+    <circle cx="72" cy="52" r="2.6" fill="${E1}"/>
+    <path d="M52 70 h16" stroke="${E1}" stroke-width="2.6"/>
+    <circle cx="48" cy="70" r="2.6" fill="${E1}"/>`,
+
+  /* Two swords crossed behind a studded shield. */
+  weapons: `
+    <path d="M30 18 L38 18 L88 84 L80 92Z" fill="${E1}"/>
+    <path d="M30 18 L38 18 L60 47 L54 55Z" fill="${HI}" opacity="0.45"/>
+    <path d="M90 18 L82 18 L32 84 L40 92Z" fill="${E1}"/>
+    <path d="M90 18 L82 18 L60 47 L66 55Z" fill="${HI}" opacity="0.35"/>
+    <path d="M72 78 l14 -10 M34 68 l14 10" stroke="${E3}" stroke-width="7" stroke-linecap="round"/>
+    <path d="M84 96 l8 8 M36 96 l-8 8" stroke="${INK}" stroke-width="8" stroke-linecap="round"/>
+    <path d="M60 50 Q76 58 88 56 Q88 86 60 100 Q32 86 32 56 Q44 58 60 50Z" fill="${E2}"/>
+    <path d="M60 50 Q76 58 88 56 Q88 86 60 100Z" fill="${E3}" opacity="0.4"/>
+    <path d="M60 58 Q70 62 80 62 Q79 82 60 92 Q41 82 40 62 Q50 62 60 58Z" fill="none" stroke="${E1}" stroke-width="2.6" opacity="0.7"/>
+    <circle cx="60" cy="74" r="6" fill="${E1}"/>`,
+
+  /* A saucer, beam down, one baffled star caught in it. */
+  weird: `
+    <circle cx="20" cy="20" r="1.8" fill="${HI}"/>
+    <circle cx="100" cy="16" r="1.4" fill="${HI}" opacity="0.7"/>
+    <circle cx="16" cy="56" r="1.4" fill="${HI}" opacity="0.6"/>
+    <path d="M46 60 L74 60 L94 106 L26 106Z" fill="${HI}" opacity="0.16"/>
+    <path d="M60 78 l3.4 7.4 8 1.1 -5.8 5.6 1.4 8 -7 -3.8 -7 3.8 1.4 -8 -5.8 -5.6 8 -1.1Z" fill="${E1}"/>
+    <ellipse cx="60" cy="52" rx="40" ry="14" fill="${E2}"/>
+    <ellipse cx="60" cy="48" rx="40" ry="12" fill="${E3}" opacity="0.45"/>
+    <path d="M40 46 Q40 26 60 26 Q80 26 80 46 Q70 52 60 52 Q50 52 40 46Z" fill="${E1}" opacity="0.9"/>
+    <path d="M46 34 Q52 28 60 28 L58 40Z" fill="${HI}" opacity="0.55"/>
+    <circle cx="30" cy="56" r="3.2" fill="${INK}"/>
+    <circle cx="46" cy="61" r="3.2" fill="${INK}"/>
+    <circle cx="60" cy="63" r="3.2" fill="${INK}"/>
+    <circle cx="74" cy="61" r="3.2" fill="${INK}"/>
+    <circle cx="90" cy="56" r="3.2" fill="${INK}"/>`,
+
+  /* The grin with the shades: a face that has seen the timeline. */
+  memes: `
+    <circle cx="60" cy="62" r="42" fill="${E2}"/>
+    <path d="M30 40 Q42 24 60 22 L58 34 Q46 36 38 46Z" fill="${E1}" opacity="0.55"/>
+    <path d="M20 48 h80 v6 h-6 v4 q0 8 -9 8 h-14 q-9 0 -9 -8 v-4 h-4 v4 q0 8 -9 8 h-14 q-9 0 -9 -8 v-4 h-6Z" fill="${INK}"/>
+    <path d="M26 54 h18 v3 q0 5 -6 5 h-6 q-6 0 -6 -5Z" fill="${E1}" opacity="0.25"/>
+    <path d="M68 54 h18 v3 q0 5 -6 5 h-6 q-6 0 -6 -5Z" fill="${E1}" opacity="0.25"/>
+    <path d="M38 82 Q60 98 82 82" stroke="${INK}" stroke-width="6" fill="none" stroke-linecap="round"/>
+    <path d="M42 85 Q60 96 78 85 L76 89 Q60 98 44 89Z" fill="${HI}" opacity="0.9"/>
+    <path d="M96 30 l2.4 5.2 5.2 2.4 -5.2 2.4 -2.4 5.2 -2.4 -5.2 -5.2 -2.4 5.2 -2.4Z" fill="${HI}"/>
+    <path d="M22 88 q-2 8 4 10" stroke="${E1}" stroke-width="4" fill="none" stroke-linecap="round" opacity="0.8"/>`,
+
   /* Non-subject packs ----------------------------------------------------- */
 
   /* Free/timed: an hourglass mid-pour. */

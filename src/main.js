@@ -57,6 +57,7 @@ import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsCompleted, fetchAlbumTotal, CARDS_PER_PAGE, CARDS_PER_SPREAD } from './albums.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
+import { proceduralStyle } from './packstyle.js';
 import { styleForSpec, rarityBurst } from './packstyle.js';
 import { synth } from './ui/sound.js';
 import { backdrop } from './ui/backdrop.js';
@@ -157,8 +158,8 @@ bind({
   packsActions: $('#packs-actions'), packsOpen: $('#packs-open'), packsHint: $('#packs-hint'),
   packsEmpty: $('#packs-empty'), packsEmptyMark: $('#packs-empty-mark'),
   packsEmptyText: $('#packs-empty-text'), packsEmptyCta: $('#packs-empty-cta'),
-  creatorWrap: $('#creator-wrap'), creator: $('#creator'), creatorMark: $('#creator-mark'),
-  creatorLabel: $('#creator-label'), creatorNote: $('#creator-note'),
+  creatorWrap: $('#creator-wrap'), creator: $('#creator'), forgeSeal: $('#forge-seal'),
+  forgeTitle: $('#forge-title'), forgeNote: $('#forge-note'), forgeIdeas: $('#forge-ideas'),
   creatorInput: $('#creator-input'), creatorGo: $('#creator-go'), creatorStatus: $('#creator-status'),
   creatorMineLabel: $('#creator-mine-label'),
   creatorMine: $('#creator-mine'), creatorEmpty: $('#creator-empty'),
@@ -707,20 +708,49 @@ function paintPackCaption(index) {
 /* --- custom boosters ---------------------------------------------------------------- */
 
 /*
- * Rebuilt as a workbench rather than a bare text field.
- *
- * The old version was a label, an input and a button, and gave no clue what
- * counted as a subject or whether anything you had built still existed — you
- * had to go and look in the Shop. It now says what it makes, offers real
- * examples to tap, and lists what you have already built underneath.
+ * THE FORGE
+ * ----------------------------------------------------------------------------
+ * The custom tab, rebuilt from nothing for a phone. One centred column,
+ * everything full width, nothing beside anything: a seal that LIVE-PREVIEWS
+ * the pack being typed (it runs the same procedural identity a finished pack
+ * gets, so the letter, palette and spin on screen are the ones you will own),
+ * a big input, tappable ideas for anyone unsure what counts as a subject, one
+ * big button, and the packs already built as tiles underneath.
  */
+const FORGE_IDEAS = ['Minecraft', 'Naruto', 'Pokémon', 'Star Wars', 'Zelda', 'One Piece'];
+
+function paintForgeSeal(text) {
+  const subject = text.trim();
+  const style = proceduralStyle((subject || 'wiklodo').toLowerCase());
+  el.forgeSeal.style.setProperty('--accent', style.accent);
+  el.forgeSeal.style.setProperty('--accent2', style.accent2);
+  const letter = (subject.charAt(0) || 'W').toUpperCase();
+  el.forgeSeal.innerHTML = monogramSvg(letter, subject.length * 3, { size: 86 });
+  el.forgeSeal.classList.toggle('is-live', subject.length > 0);
+}
+
 function renderCreator() {
-  el.creatorMark.innerHTML = iconSvg('wand', { size: 22 });
-  el.creatorLabel.textContent = t('creatorTitle');
-  el.creatorNote.textContent = t('creatorNote');
+  el.forgeTitle.textContent = t('creatorTitle');
+  el.forgeNote.textContent = t('creatorNote');
   el.creatorInput.placeholder = t('customPlaceholder');
   el.creatorGo.textContent = t('create');
   el.creatorMineLabel.textContent = t('creatorMine');
+  el.creatorStatus.hidden = !el.creatorStatus.textContent;
+  paintForgeSeal(el.creatorInput.value);
+
+  el.forgeIdeas.replaceChildren(...FORGE_IDEAS.map((idea) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'forge-idea';
+    chip.textContent = idea;
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => {
+      el.creatorInput.value = idea;
+      paintForgeSeal(idea);
+      synth.playTap();
+    });
+    return chip;
+  }));
 
   const made = state.customPacks ?? [];
   el.creatorEmpty.hidden = made.length > 0;
@@ -730,22 +760,26 @@ function renderCreator() {
   }
 
   el.creatorMine.replaceChildren(...made.map((pack) => {
-    const spec = { kind: 'custom', themeId: pack.id, rarityId: null, cards: 5 };
-    const row = document.createElement('div');
-    row.className = 'made';
-    row.innerHTML = `
-      <button type="button" class="made-main">
-        <span class="made-art"></span>
-        <span class="made-copy"><b></b><span></span></span>
+    const spec = {
+      kind: 'custom', themeId: null, rarityId: null, cards: 5,
+      customName: pack.name, customId: pack.id, wiki: pack.wiki,
+      icon: pack.icon, accent: pack.accent, accent2: pack.accent2
+    };
+    const tile = document.createElement('div');
+    tile.className = 'forge-made';
+    tile.innerHTML = `
+      <button type="button" class="forge-made-main">
+        <span class="forge-made-art"></span>
+        <b></b><span class="forge-made-sub"></span>
       </button>
-      <button type="button" class="made-delete" aria-label="${t('deleteBooster')}">
-        ${iconSvg('trash', { size: 17 })}
+      <button type="button" class="forge-made-delete" aria-label="${t('deleteBooster')}">
+        ${iconSvg('trash', { size: 16 })}
       </button>`;
-    row.querySelector('.made-art').appendChild(buildBooster(spec, { size: 'is-tiny' }));
-    row.querySelector('b').textContent = pack.name;
-    row.querySelector('.made-copy span').textContent = t('creatorInShop');
+    tile.querySelector('.forge-made-art').appendChild(buildBooster(spec, { size: 'is-tiny' }));
+    tile.querySelector('b').textContent = pack.name;
+    tile.querySelector('.forge-made-sub').textContent = t('creatorInShop');
 
-    const main = row.querySelector('.made-main');
+    const main = tile.querySelector('.forge-made-main');
     press(main, { sound: null });
     main.addEventListener('click', () => {
       synth.playTap();
@@ -756,7 +790,7 @@ function renderCreator() {
 
     // Deleting is two taps: the first arms the button, the second commits.
     // Walking away (or tapping anything else) disarms it.
-    const del = row.querySelector('.made-delete');
+    const del = tile.querySelector('.forge-made-delete');
     let armTimer = 0;
     del.addEventListener('click', (event) => {
       event.stopPropagation();
@@ -775,7 +809,7 @@ function renderCreator() {
       renderPacks();
       renderShop();
     });
-    return row;
+    return tile;
   }));
 }
 
@@ -787,7 +821,8 @@ function customPackName(typed, sitename) {
 
 function setCreatorStatus(text, kind) {
   el.creatorStatus.textContent = text;
-  el.creatorStatus.className = `creator-status is-${kind}`;
+  el.creatorStatus.className = `forge-status is-${kind}`;
+  el.creatorStatus.hidden = !text;
 }
 
 async function createCustomPack(event) {
@@ -4874,6 +4909,7 @@ function init() {
   });
   el.packsEmptyCta.addEventListener('click', () => { payStipend(); renderShop(); showScreen('shop'); });
   el.creator.addEventListener('submit', createCustomPack);
+  el.creatorInput.addEventListener('input', () => paintForgeSeal(el.creatorInput.value));
 
   const leaveOpen = () => {
     const home = homeTabFor(state.spec);
