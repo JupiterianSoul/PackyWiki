@@ -18,13 +18,16 @@
 -- of another's data. Nothing below trusts the client.
 -- ============================================================================
 
-create extension if not exists citext;
-
 -- --- profiles ---------------------------------------------------------------
+--
+-- Usernames are plain text with a unique index on lower(username), rather than
+-- the citext extension. Same effect — one person may hold "Ada" and nobody
+-- else may hold "ada" — with nothing to install, so this script cannot fail on
+-- an extension the project will not grant.
 
 create table if not exists public.profiles (
   id                uuid primary key references auth.users on delete cascade,
-  username          citext not null unique
+  username          text not null
                       check (username ~ '^[a-zA-Z0-9_]{3,20}$'),
   created_at        timestamptz not null default now(),
   updated_at        timestamptz not null default now(),
@@ -39,6 +42,9 @@ create table if not exists public.profiles (
   best_rarity       text,
   play_ms           bigint  not null default 0
 );
+
+create unique index if not exists profiles_username_lower_idx
+  on public.profiles (lower(username));
 
 alter table public.profiles enable row level security;
 
@@ -212,7 +218,9 @@ stable
 security definer
 set search_path = public, pg_temp
 as $$
-  select not exists (select 1 from public.profiles p where p.username = name::citext);
+  select not exists (
+    select 1 from public.profiles p where lower(p.username) = lower(name)
+  );
 $$;
 
 revoke all on function public.username_available(text) from public;
@@ -237,3 +245,12 @@ create trigger profiles_touch before update on public.profiles
 drop trigger if exists saves_touch on public.saves;
 create trigger saves_touch before update on public.saves
   for each row execute function public.touch_updated_at();
+
+-- --- tell PostgREST about all of the above ------------------------------------------
+--
+-- The API keeps a cached picture of the schema and does not always notice DDL
+-- straight away. Without this, everything above can be present and correct and
+-- the app still gets "Could not find the table 'public.profiles' in the schema
+-- cache" until the cache happens to refresh.
+
+notify pgrst, 'reload schema';

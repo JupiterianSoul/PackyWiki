@@ -289,7 +289,10 @@ To point a build at a **different** project:
 
 1. Create one at supabase.com (the free tier is plenty).
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
-   and run it. That creates the tables, the policies and the three functions.
+   and run it. That creates the tables, the policies and the three functions,
+   and ends by telling PostgREST to reload its schema cache — without that
+   last step the API can answer "Could not find the table" for a while even
+   though everything exists.
 3. Take the **Project URL** and the **publishable** key (`sb_publishable_...`)
    from **Project Settings → API** and put them in `.env.production`, which is
    what this repo does. To override it for one machine without committing, use
