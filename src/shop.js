@@ -1,23 +1,25 @@
 /**
- * The shop.
+ * The shop: a small market of fixed stalls rather than a pile of random
+ * shelves. Every restock (two hours) re-seeds what each stall carries:
  *
- * Stock is generated from the current two-hour window index, so it is stable
- * across reloads and restocks on its own without any server. Rows are shelves
- * of boosters: some grouped by tier, some by subject, some just cheap.
+ *   featured  one spotlight booster at a real discount
+ *   free      the free shelf, on its own slower four-hour clock
+ *   subjects  six subject boosters, plain stock
+ *   vault     tier boosters; the higher the tier, the rarer the stall stocks it
+ *   customs   every pack the player has built
  *
- * Availability is the other half of the economy. Pricing already guarantees
- * that selling a booster's contents returns less than it cost (see
- * economy.js), but that alone would let a lucky player buy Artifact boosters
- * back to back forever. High tiers are therefore also *rare on the shelves* —
- * an Artifact booster shows up in roughly one window in twelve.
+ * Stock is deterministic per window index, so it is stable across reloads and
+ * identical on every device with no server. Pricing comes from economy.js and
+ * already guarantees that opening and selling loses money on average; the
+ * vault's availability odds are the second brake on the top of the game: an
+ * Artifact booster you cannot buy is one you cannot farm.
  */
 import { THEME_PACKS } from './data/packs.js';
-import { RARITIES, rarityRank } from './data/rarities.js';
+import { RARITIES, rarityRank, tierBand, viewsAtPopularity } from './data/rarities.js';
 import {
   CARD_COUNT_RANGE, windowIndexAt, boosterPrice, FREE_SLOTS, FREE_CARDS, freeWindowAt
 } from './economy.js';
 import { specId } from './booster.js';
-import { t, tx } from './i18n.js';
 
 /** Deterministic PRNG — same window, same shop, on every device and reload. */
 function seeded(seed) {
@@ -33,96 +35,34 @@ const pick = (rng, arr) => arr[Math.floor(rng() * arr.length)];
 const between = (rng, lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
 
 /**
- * How often each tier is offered at all. This is the main brake on the top of
- * the game: an Artifact booster you cannot buy is one you cannot farm.
+ * How often each tier is in the vault at all. Uncommon and Rare are always
+ * stocked; from Epic up, a window simply may not carry the tier, and the top
+ * of the table is on the shelves one window in sixteen.
  */
-const TIER_STOCK_WEIGHT = {
-  common: 0, uncommon: 26, rare: 20, epic: 12,
-  legendary: 6, mythic: 3.4, exotic: 1.8, artifact: 0.8
+const VAULT_ODDS = {
+  uncommon: 1, rare: 1, epic: 0.7, legendary: 0.45,
+  mythic: 0.22, exotic: 0.12, artifact: 0.06
 };
 
-function weightedTier(rng, { max = 'artifact' } = {}) {
-  const ceiling = rarityRank(max);
-  const pool = RARITIES.filter((r) => TIER_STOCK_WEIGHT[r.id] > 0 && rarityRank(r.id) <= ceiling);
-  const total = pool.reduce((sum, r) => sum + TIER_STOCK_WEIGHT[r.id], 0);
+/** A random tier for the featured slot, weighted towards the affordable end. */
+const FEATURE_TIER_WEIGHT = { uncommon: 10, rare: 7, epic: 4, legendary: 2, mythic: 1 };
+function featureTier(rng) {
+  const pool = RARITIES.filter((r) => FEATURE_TIER_WEIGHT[r.id]);
+  const total = pool.reduce((sum, r) => sum + FEATURE_TIER_WEIGHT[r.id], 0);
   let ticket = rng() * total;
   for (const rarity of pool) {
-    ticket -= TIER_STOCK_WEIGHT[rarity.id];
+    ticket -= FEATURE_TIER_WEIGHT[rarity.id];
     if (ticket <= 0) return rarity.id;
   }
   return pool[0].id;
 }
 
-const cardCount = (rng) => between(rng, CARD_COUNT_RANGE[0], CARD_COUNT_RANGE[1]);
-
-/* --- shelves -------------------------------------------------------------- */
-
-function rarityShelf(rng, customPacks) {
-  const rarityId = weightedTier(rng);
-  const rarity = RARITIES.find((r) => r.id === rarityId);
-  const specs = [];
-  const count = between(rng, 3, 5);
-
-  for (let i = 0; i < count; i++) {
-    // Mostly subject-tied (which costs more), occasionally a pure tier booster.
-    const pure = rng() < 0.3;
-    specs.push(pure
-      ? { kind: 'open', themeId: null, rarityId, cards: cardCount(rng) }
-      : { kind: 'theme', themeId: pick(rng, THEME_PACKS).id, rarityId, cards: cardCount(rng) });
-  }
-  // A custom booster can turn up on any shelf.
-  if (customPacks.length && rng() < 0.25) {
-    specs.push({ ...customSpec(rng, customPacks), rarityId });
-  }
-  return { id: `rarity-${rarityId}`, title: t('shopRarityRow', { rarity: tx(rarity.name) }), specs };
-}
-
-function themeShelf(rng, customPacks) {
-  const theme = pick(rng, THEME_PACKS);
-  const specs = [];
-  const count = between(rng, 3, 5);
-  for (let i = 0; i < count; i++) {
-    // Most of a subject shelf is plain stock; a minority is upgraded.
-    const rarityId = rng() < 0.35 ? weightedTier(rng, { max: 'legendary' }) : null;
-    specs.push({ kind: 'theme', themeId: theme.id, rarityId, cards: cardCount(rng) });
-  }
-  if (customPacks.length && rng() < 0.15) specs.push(customSpec(rng, customPacks));
-  return { id: `theme-${theme.id}`, title: t('shopThemeRow', { theme: tx(theme.name) }), specs };
-}
-
-function mixedShelf(rng, customPacks) {
-  const specs = [];
-  const count = between(rng, 4, 6);
-  for (let i = 0; i < count; i++) {
-    const roll = rng();
-    if (roll < 0.2) specs.push({ kind: 'open', themeId: null, rarityId: null, cards: cardCount(rng) });
-    else if (roll < 0.75) specs.push({ kind: 'theme', themeId: pick(rng, THEME_PACKS).id, rarityId: null, cards: cardCount(rng) });
-    else specs.push({ kind: 'theme', themeId: pick(rng, THEME_PACKS).id, rarityId: weightedTier(rng, { max: 'epic' }), cards: cardCount(rng) });
-  }
-  if (customPacks.length && rng() < 0.4) specs.push(customSpec(rng, customPacks));
-  return { id: 'mixed', title: t('shopMixedRow'), specs };
-}
-
-function valueShelf(rng) {
-  const specs = [];
-  for (let i = 0; i < between(rng, 3, 5); i++) {
-    specs.push({
-      kind: rng() < 0.35 ? 'open' : 'theme',
-      themeId: rng() < 0.35 ? null : pick(rng, THEME_PACKS).id,
-      rarityId: null,
-      cards: between(rng, CARD_COUNT_RANGE[0], 4)
-    });
-  }
-  return { id: 'value', title: t('shopValueRow'), specs };
-}
-
-function customSpec(rng, customPacks) {
-  const pack = pick(rng, customPacks);
+function customSpec(rng, pack) {
   return {
     kind: 'custom',
     themeId: null,
     rarityId: null,
-    cards: cardCount(rng),
+    cards: between(rng, CARD_COUNT_RANGE[0], CARD_COUNT_RANGE[1]),
     wiki: pack.wiki,
     customName: pack.name,
     customTagline: pack.tagline,
@@ -134,158 +74,101 @@ function customSpec(rng, customPacks) {
   };
 }
 
-/* --- more shelves --------------------------------------------------------- */
-
-/** Only the biggest boosters. Expensive, but the best cards-per-tear ratio. */
-function jumboShelf(rng) {
-  const specs = [];
-  for (let i = 0; i < between(rng, 3, 4); i++) {
-    specs.push({
-      kind: 'theme',
-      themeId: pick(rng, THEME_PACKS).id,
-      rarityId: rng() < 0.45 ? weightedTier(rng, { max: 'mythic' }) : null,
-      cards: between(rng, 6, CARD_COUNT_RANGE[1])
-    });
-  }
-  return { id: 'jumbo', title: t('shopJumboRow'), specs };
-}
-
-/** Two subjects, side by side, so the row reads as a matchup. */
-function duoShelf(rng) {
-  const a = pick(rng, THEME_PACKS);
-  const b = pick(rng, THEME_PACKS.filter((theme) => theme.id !== a.id));
-  const specs = [a, b, a, b].map((theme, i) => ({
-    kind: 'theme',
-    themeId: theme.id,
-    rarityId: i < 2 ? null : weightedTier(rng, { max: 'legendary' }),
-    cards: cardCount(rng)
-  }));
-  return { id: `duo-${a.id}-${b.id}`, title: t('shopDuoRow', { a: tx(a.name), b: tx(b.name) }), specs };
-}
-
-/** One subject, climbing the tiers, so you can see what the ladder costs. */
-function ladderShelf(rng) {
-  const theme = pick(rng, THEME_PACKS);
-  const cards = cardCount(rng);
-  const top = rarityRank(weightedTier(rng, { max: 'exotic' }));
-  const specs = [{ kind: 'theme', themeId: theme.id, rarityId: null, cards }];
-  for (let rank = 1; rank <= top; rank++) {
-    specs.push({ kind: 'theme', themeId: theme.id, rarityId: RARITIES[rank].id, cards });
-  }
-  return { id: `ladder-${theme.id}`, title: t('shopLadderRow', { theme: tx(theme.name) }), specs };
-}
-
-/** No subject at all: the whole of Wikipedia, at every size. */
-function wildShelf(rng) {
-  const specs = [];
-  for (let i = 0; i < between(rng, 3, 5); i++) {
-    specs.push({
-      kind: 'open', themeId: null,
-      rarityId: rng() < 0.4 ? weightedTier(rng, { max: 'legendary' }) : null,
-      cards: cardCount(rng)
-    });
-  }
-  return { id: 'wild', title: t('shopWildRow'), specs };
-}
-
-/** Everything in the row is the same size, at a slight discount for buying blind. */
-function bundleShelf(rng) {
-  const cards = between(rng, 4, 6);
-  const specs = [];
-  for (let i = 0; i < between(rng, 4, 5); i++) {
-    specs.push({ kind: 'theme', themeId: pick(rng, THEME_PACKS).id, rarityId: null, cards });
-  }
-  return { id: `bundle-${cards}`, title: t('shopBundleRow', { n: cards }), specs };
-}
-
-/**
- * Everything the player has built. Custom boosters were free once, which was
- * an obvious hole — build a pack, open it, sell the cards, repeat. They are
- * bought here like anything else now, and this shelf guarantees a pack you
- * just made is immediately available rather than waiting on a lucky roll.
- */
-function customShelf(rng, customPacks) {
-  if (!customPacks.length) return null;
-  const specs = customPacks.slice(0, 8).map((pack, i) => ({
-    ...customSpec(rng, [pack]),
-    cards: i === 0 ? 5 : cardCount(rng)
-  }));
-  return { id: 'custom-built', title: t('shopCustomRow'), specs, pinned: true };
-}
-
-/**
- * The free shelf, which is always here. Small boosters, no tier most of the
- * time, one per window each. This is the anti-lockout guarantee: whatever
- * happens to your wallet, there is always something to open.
- */
-/**
- * Seeded from the FOUR-hour free window rather than the shop's two-hour one,
- * so the free boosters stay put through a restock and only change on their own
- * cadence. Using the shop's rng here would reshuffle them every two hours and
- * quietly halve the cooldown.
- */
-function freeShelf(_rng, _customPacks, freeWindow) {
-  const rng = seeded(freeWindow * 104729 + 7);
-  const specs = [];
-  for (let i = 0; i < FREE_SLOTS; i++) {
-    specs.push({
-      kind: 'theme',
-      themeId: pick(rng, THEME_PACKS).id,
-      // A tenth of the time the free pack is a low-tier upgrade, which is the
-      // whole reason to come back and look at it.
-      rarityId: rng() < 0.1 ? RARITIES[1].id : null,
-      cards: FREE_CARDS,
-      free: true
-    });
-  }
-  return { id: 'free', title: t('shopFreeRow'), specs, free: true, pinned: true };
-}
-
-/* --- assembly ------------------------------------------------------------- */
-
-/**
- * The shelves for a window. Rows are deduped by spec so the same booster never
- * appears twice, and each entry carries its price so the UI doesn't recompute.
- */
-const ROTATING = [
-  rarityShelf, themeShelf, mixedShelf, valueShelf,
-  jumboShelf, duoShelf, ladderShelf, wildShelf, bundleShelf
-];
+/* --- the market ----------------------------------------------------------- */
 
 export function generateShop(windowIndex = windowIndexAt(), customPacks = [], freeWindow = freeWindowAt()) {
   const rng = seeded(windowIndex);
-
-  // The free shelf and the player's own custom boosters are always here; the
-  // rest of the shop is a rotating draw from the pool, so no two windows look
-  // quite alike.
-  const pool = [...ROTATING];
-  const rotating = [];
-  const wanted = between(rng, 5, 7);
-  while (rotating.length < wanted && pool.length) {
-    rotating.push(pool.splice(Math.floor(rng() * pool.length), 1)[0]);
-  }
-  // A rarity shelf always earns its place: it is where the top of the game is.
-  if (!rotating.includes(rarityShelf)) rotating.unshift(rarityShelf);
-
-  const builders = [freeShelf, customShelf, ...rotating];
   const seen = new Set();
-  const rows = [];
+  const claim = (spec) => {
+    spec.cards = Math.min(CARD_COUNT_RANGE[1], Math.max(CARD_COUNT_RANGE[0], spec.cards));
+    const id = specId(spec);
+    if (seen.has(id)) return null;
+    seen.add(id);
+    return id;
+  };
+  const entry = (spec) => {
+    const id = claim(spec);
+    return id ? { id, spec, price: boosterPrice(spec) } : null;
+  };
 
-  for (const build of builders) {
-    const row = build(rng, customPacks, freeWindow);
-    if (!row) continue;
-    const specs = [];
-    for (const spec of row.specs) {
-      // Enforce the card-count range even if a builder drifts.
-      spec.cards = Math.min(CARD_COUNT_RANGE[1], Math.max(CARD_COUNT_RANGE[0], spec.cards));
-      const id = specId(spec);
-      if (seen.has(id)) continue;
-      seen.add(id);
-      specs.push({ id, spec, price: row.free ? 0 : boosterPrice(spec) });
-    }
-    if (specs.length) rows.push({ ...row, specs });
+  // THE SPOTLIGHT: one booster, a real discount. The discount is safe by
+  // construction — even at 25% off, opening and selling still loses money.
+  const featSpec = {
+    kind: 'theme',
+    themeId: pick(rng, THEME_PACKS).id,
+    rarityId: rng() < 0.55 ? featureTier(rng) : null,
+    cards: between(rng, 5, CARD_COUNT_RANGE[1])
+  };
+  claim(featSpec);
+  const fullPrice = boosterPrice(featSpec);
+  const pct = between(rng, 15, 25);
+  const featured = {
+    id: specId(featSpec),
+    spec: featSpec,
+    fullPrice,
+    pct,
+    price: Math.max(5, Math.round((fullPrice * (100 - pct)) / 100 / 5) * 5)
+  };
+
+  // THE FREE SHELF: seeded from the FOUR-hour free window rather than the
+  // shop's two-hour one, so it sits still through one restock. Using the
+  // shop's rng would reshuffle it every restock and quietly halve the
+  // cooldown. This is the anti-lockout guarantee: whatever happens to your
+  // wallet, there is always something to open.
+  const freeRng = seeded(freeWindow * 104729 + 7);
+  const free = [];
+  for (let i = 0; i < FREE_SLOTS; i++) {
+    const spec = {
+      kind: 'theme',
+      themeId: pick(freeRng, THEME_PACKS).id,
+      // A tenth of the time the free pack is an Uncommon upgrade, which is
+      // the whole reason to come back and look at it.
+      rarityId: freeRng() < 0.1 ? RARITIES[1].id : null,
+      cards: FREE_CARDS,
+      free: true
+    };
+    const id = claim(spec);
+    if (id) free.push({ id, spec, price: 0 });
   }
-  return rows;
+
+  // SUBJECTS: six distinct themes a window, plain stock, honest sizes.
+  const themePool = [...THEME_PACKS];
+  const subjects = [];
+  while (subjects.length < 6 && themePool.length) {
+    const theme = themePool.splice(Math.floor(rng() * themePool.length), 1)[0];
+    const item = entry({ kind: 'theme', themeId: theme.id, rarityId: null, cards: between(rng, 4, 6) });
+    if (item) subjects.push(item);
+  }
+
+  // THE VAULT: tier boosters. A tier booster only draws pages famous enough
+  // for its tier (see economy.drawCapsFor), and availability thins fast.
+  const vault = [];
+  for (const rarity of RARITIES) {
+    const odds = VAULT_ODDS[rarity.id] ?? 0;
+    if (odds <= 0 || rng() >= odds) continue;
+    const themed = rng() < 0.5;
+    const item = entry({
+      kind: themed ? 'theme' : 'open',
+      themeId: themed ? pick(rng, THEME_PACKS).id : null,
+      rarityId: rarity.id,
+      cards: between(rng, 4, 6)
+    });
+    if (item) {
+      vault.push({ ...item, rarity, minViews: viewsAtPopularity(tierBand(rarity.id).min) });
+    }
+  }
+  vault.sort((a, b) => rarityRank(a.rarity.id) - rarityRank(b.rarity.id));
+
+  // YOUR PACKS: everything the player has built, always buyable. Custom
+  // boosters were free once, which was an obvious hole — build, open, sell,
+  // repeat. They cost like anything else now.
+  const customs = [];
+  for (const pack of customPacks.slice(0, 8)) {
+    const item = entry(customSpec(rng, pack));
+    if (item) customs.push(item);
+  }
+
+  return { featured, free, subjects, vault, customs };
 }
 
 /** "1h 24m" — how long until the shelves change. */

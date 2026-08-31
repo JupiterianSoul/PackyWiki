@@ -10,14 +10,14 @@
  * A Common and an Artifact of the same article share a base; the Artifact is
  * simply worth 3200% more of it.
  *
- * Popularity affects price ONLY. It has no influence on the rarity roll — see
- * src/data/rarities.js.
+ * Popularity now also DECIDES the rarity (see src/data/rarities.js), so a
+ * card's price is one curve of how read its article is, with tier steps.
  */
 
 /** log10(views) at which an article counts as maximally popular (~2M/month). */
 const VIEWS_LOG_CEILING = 6.3;
 /** log10(words) treated as maximally "big" when pageviews aren't available. */
-const WORDS_LOG_CEILING = Math.log10(9000);
+const WORDS_LOG_CEILING = Math.log10(20000);
 
 const clamp01 = (n) => Math.min(1, Math.max(0, n));
 
@@ -33,7 +33,10 @@ export function popularityFromViews(views) {
  */
 export function popularityFromWordCount(words) {
   if (!Number.isFinite(words) || words <= 0) return 0.25;
-  return clamp01(Math.log10(words + 1) / WORDS_LOG_CEILING);
+  // The gentle power keeps a middling wiki page from reading as famous:
+  // rarity comes straight from this number now, so the size-to-popularity
+  // curve has to hand out the top of the scale as grudgingly as pageviews do.
+  return clamp01(Math.pow(Math.log10(words + 1) / WORDS_LOG_CEILING, 1.15));
 }
 
 /** Base value of the article itself, before any rarity bonus. */

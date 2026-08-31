@@ -19,12 +19,15 @@
  */
 
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
-import { RARITIES, rarityById, rarityRank, rollRarity, oddsTable, rarityChances } from './data/rarities.js';
+import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityThresholds } from './data/rarities.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
 import { drawArticles, resolveCustomWiki } from './wiki.js';
-import { priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS } from './pricing.js';
 import {
-  boosterPrice, rollOptionsFor, sellPriceFor, nextRefreshAt, windowIndexAt,
+  priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS,
+  popularityFromViews, popularityFromWordCount
+} from './pricing.js';
+import {
+  boosterPrice, sellPriceFor, nextRefreshAt, windowIndexAt,
   nextFreeAt, freeWindowAt, STARTER_PACKS, STARTER_PACK_CARDS, STARTER_COINS
 } from './economy.js';
 import { generateShop, formatCountdown } from './shop.js';
@@ -41,7 +44,7 @@ import {
 } from './daily.js';
 import {
   MAX_TIMED_LEVEL, TIMED_CARDS, accrue, msToNext, timedLevel, timedSpec, maxHeld,
-  regenMs, levelBounds, levelProgress, timedRollOptions
+  regenMs, levelBounds, levelProgress, timedTopTier
 } from './timed.js';
 import { t, tx, getLanguage, setLanguage, languageChosen, LANGUAGES } from './i18n.js';
 import {
@@ -51,7 +54,7 @@ import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
-import { buildAlbums, albumsCompleted, CARDS_PER_PAGE, CARDS_PER_SPREAD } from './albums.js';
+import { buildAlbums, albumsCompleted, fetchAlbumTotal, CARDS_PER_PAGE, CARDS_PER_SPREAD } from './albums.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { styleForSpec, rarityBurst } from './packstyle.js';
@@ -94,7 +97,6 @@ const RIP_DIR_KEY = 'packywiki.ripDirection';
 const state = {
   tab: 'packs',
   packMode: 'owned',           // 'owned' | 'custom'
-  shopFilter: 'all',
   spec: null,
   customPacks: store.loadCustomPacks(),
   collection: store.loadCollection(),
@@ -169,10 +171,9 @@ bind({
   trackLevel: $('#track-level'), trackRemaining: $('#track-remaining'), trackBar: $('#track-bar'),
   trackNext: $('#track-next'),
 
-  shopTitle: $('#shop-title'), restock: $('#restock'), shopRows: $('#shop-rows'),
+  shopTitle: $('#shop-title'), restock: $('#restock'), shopMarket: $('#shop-market'),
   shopPurse: $('#shop-purse'), shopPurseLabel: $('#shop-purse-label'),
-  shopRestockLabel: $('#shop-restock-label'), shopFilter: $('#shop-filter'),
-  shopEmpty: $('#shop-empty'), shopEmptyMark: $('#shop-empty-mark'), shopEmptyText: $('#shop-empty-text'),
+  shopRestockLabel: $('#shop-restock-label'),
 
   oddsBtn: $('#odds-btn'), oddsIcon: $('#odds-icon'), oddsLabel: $('#odds-label'),
 
@@ -273,6 +274,15 @@ function flushPlaytime() {
 }
 
 /* --- toast -------------------------------------------------------------------- */
+
+/** 6,912,930 reads as 6.9M: album totals are real category sizes now. */
+function compactCount(n) {
+  if (!Number.isFinite(n)) return '?';
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `${Math.round(n / 1000)}k`;
+  if (n >= 1_000) return `${(n / 1000).toFixed(1)}k`;
+  return String(n);
+}
 
 function toast(markup, kind = 'ok') {
   el.toast.innerHTML = markup;
@@ -834,17 +844,6 @@ function syncTimed() {
 
 const currentTimedSpec = () => timedSpec(timedLevel(state.profile.timed.opened ?? 0));
 
-/**
- * How much scarcer the top tier is on the timed table. This, not expected
- * value, is the number worth showing: value barely moves because commons
- * dominate it, while an Artifact goes from one in 667 to one in 28,000.
- */
-function timedTopScarcity(level) {
-  const top = (options) => rarityChances(options).at(-1).chance;
-  const timed = top(timedRollOptions(level));
-  return timed > 0 ? top({}) / timed : Infinity;
-}
-
 /*
  * FREE PACKS
  * ----------------------------------------------------------------------------
@@ -891,13 +890,12 @@ function renderTimed() {
   trackBar.set(levelProgress(timed.opened ?? 0));
 
   // What this level buys, one line each, rather than one dense sentence.
-  const scarcity = timedTopScarcity(level);
+  const topTier = timedTopTier(level);
+  const atCeiling = topTier.id === RARITIES[RARITIES.length - 1].id;
   const perks = [
     ['clock', t('freePerkSpeed', { minutes: Math.round(regenMs(level) / 60000) })],
     ['packs', t('freePerkCap', { max: cap })],
-    ['gem', scarcity <= 1.05
-      ? t('freePerkOddsMax')
-      : t('freePerkOdds', { factor: scarcity >= 10 ? Math.round(scarcity) : scarcity.toFixed(1) })]
+    ['gem', atCeiling ? t('freePerkTierMax') : t('freePerkTier', { tier: tx(topTier.name) })]
   ];
   el.freePerks.replaceChildren(...perks.map(([icon, text]) => {
     const row = document.createElement('div');
@@ -969,26 +967,14 @@ function openTimed() {
 const freeNoteText = () =>
   `${t('freeShelfNote')} ${t('freeAgainIn', { time: formatCountdown(nextFreeAt() - Date.now()) })}`;
 
-/** Which kinds of shelf the filter chips offer, and what each keeps. */
-const SHOP_FILTERS = [
-  { id: 'all',   key: 'shopAll',   keep: () => true },
-  { id: 'free',  key: 'shopFree',  keep: (row) => Boolean(row.free) },
-  { id: 'cheap', key: 'shopCheap', keep: (row) => row.specs.some((s) => s.price <= state.wallet) },
-  { id: 'big',   key: 'shopBig',   keep: (row) => row.specs.some((s) => s.spec.cards >= 6) }
-];
-
 /*
  * THE SHOP
  * ----------------------------------------------------------------------------
- * Rebuilt so that the two things you need before spending anything — what is
- * in your purse and how long this stock lasts — sit above the stock instead of
- * inside a paragraph, and so a shelf item is a labelled card rather than a
- * strip of art with a price under it. You could not previously tell what you
- * were buying without recognising the picture.
- *
- * Filter chips are a plain client-side pass over the generated shelves: the
- * stock itself is still whatever the two-hour window decided, so filtering
- * cannot conjure anything that was not on sale.
+ * A market of fixed stalls, laid out for a phone: the spotlight deal on top,
+ * then the free shelf, a two-column grid of subject boosters, the tier vault,
+ * and the packs you built. Nothing scrolls sideways and nothing hides off the
+ * edge of the screen; every item is a full tile that says what it is, what is
+ * inside and what it costs.
  */
 function renderShop() {
   el.shopTitle.textContent = t('tabShop');
@@ -996,90 +982,146 @@ function renderShop() {
   el.shopRestockLabel.textContent = t('shopRestockIn');
   el.shopPurse.innerHTML = money(state.wallet);
 
-  const all = generateShop(windowIndexAt(), state.customPacks, freeWindowAt());
-  const filter = SHOP_FILTERS.find((f) => f.id === state.shopFilter) ?? SHOP_FILTERS[0];
-  const rows = all.filter(filter.keep);
-
-  el.shopFilter.replaceChildren(...SHOP_FILTERS.map((f) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = `shop-chip${f.id === filter.id ? ' is-on' : ''}`;
-    chip.textContent = t(f.key);
-    press(chip, { sound: null });
-    chip.addEventListener('click', () => {
-      state.shopFilter = f.id;
-      synth.playTab?.(1);
-      renderShop();
-    });
-    return chip;
-  }));
-
-  el.shopEmpty.hidden = rows.length > 0;
-  if (!rows.length) {
-    el.shopEmptyMark.innerHTML = iconSvg('gem', { size: 46 });
-    el.shopEmptyText.textContent = t('shopNoMatch');
-  }
-
-  el.shopRows.replaceChildren(...rows.map((row) => {
-    const section = document.createElement('section');
-    section.className = `shop-row${row.free ? ' is-free' : ''}`;
-    section.innerHTML = `
-      <div class="shop-row-head"><h3></h3><span class="shop-row-tag"></span></div>
-      ${row.free ? '<p class="shop-note"></p>' : ''}
-      <div class="shelf"></div>`;
-    section.querySelector('h3').textContent = row.title;
-    // The tag says the one thing the row's title does not: what it costs, or
-    // that it is free.
-    const prices = row.specs.map((s) => s.price).filter((p) => p > 0);
-    section.querySelector('.shop-row-tag').textContent = row.free
-      ? t('free')
-      : (prices.length ? t('shopFrom', { amount: formatAmount(Math.min(...prices)) }) : '');
-    if (row.free) section.querySelector('.shop-note').textContent = freeNoteText();
-
-    const shelf = section.querySelector('.shelf');
-    shelf.replaceChildren(...row.specs.map(({ id, spec, price }) => {
-      const item = document.createElement('div');
-      item.className = 'shop-item';
-      item.dataset.spec = id;
-
-      const art = document.createElement('div');
-      art.className = 'shop-item-art';
-      art.appendChild(buildBooster(spec, { size: 'is-tiny' }));
-      item.appendChild(art);
-
-      // Name and size in words, so the shelf can be read rather than decoded.
-      const name = document.createElement('p');
-      name.className = 'shop-item-name';
-      name.textContent = specName(spec);
-      item.appendChild(name);
-
-      const meta = document.createElement('p');
-      meta.className = 'shop-item-meta';
-      const tier = spec.rarityId ? rarityById(spec.rarityId) : null;
-      meta.textContent = tier
-        ? `${t('shopItemMeta', { n: spec.cards })} · ${tx(tier.name)}`
-        : t('shopItemMeta', { n: spec.cards });
-      if (tier) meta.style.color = tier.color;
-      item.appendChild(meta);
-
-      const buy = document.createElement('button');
-      buy.type = 'button';
-      buy.className = row.free ? 'buy is-free' : 'buy';
-      press(buy, { sound: null });
-      if (row.free) paintFreeButton(buy, id, spec);
-      else {
-        buy.classList.toggle('is-poor', price > state.wallet);
-        buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
-        buy.addEventListener('click', () => purchase(spec, price, buy));
-      }
-      item.appendChild(buy);
-      return item;
-    }));
-    return section;
-  }));
-
-  reveal(el.shopRows.children, { step: 60 });
+  const market = generateShop(windowIndexAt(), state.customPacks, freeWindowAt());
+  const sections = [
+    buildFeatured(market.featured),
+    buildShopSection({
+      title: t('shopFreeRow'), note: freeNoteText(), noteAttr: 'data-free-note',
+      body: shopGrid(market.free.map((item) => shopTile(item, { free: true })))
+    }),
+    buildShopSection({
+      title: t('shopSubjects'),
+      body: shopGrid(market.subjects.map((item) => shopTile(item)))
+    }),
+    buildShopSection({ title: t('shopVault'), note: t('shopVaultNote'), body: buildVault(market.vault) }),
+    market.customs.length
+      ? buildShopSection({
+          title: t('shopCustomRow'),
+          body: shopGrid(market.customs.map((item) => shopTile(item)))
+        })
+      : null
+  ];
+  el.shopMarket.replaceChildren(...sections.filter(Boolean));
+  reveal(el.shopMarket.children, { step: 60 });
   tickRestock();
+}
+
+function buildShopSection({ title, note = '', noteAttr = '', body }) {
+  const sec = document.createElement('section');
+  sec.className = 'shop-sec';
+  sec.innerHTML = `<div class="shop-sec-head"><h3></h3></div>${note ? `<p class="shop-sec-note" ${noteAttr}></p>` : ''}`;
+  sec.querySelector('h3').textContent = title;
+  if (note) sec.querySelector('.shop-sec-note').textContent = note;
+  sec.appendChild(body);
+  return sec;
+}
+
+function shopGrid(tiles) {
+  const grid = document.createElement('div');
+  grid.className = 'shop-grid';
+  grid.replaceChildren(...tiles);
+  return grid;
+}
+
+/** The one price control everywhere in the market. */
+function buyButton(spec, price) {
+  const buy = document.createElement('button');
+  buy.type = 'button';
+  buy.className = 'buy';
+  press(buy, { sound: null });
+  buy.classList.toggle('is-poor', price > state.wallet);
+  buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
+  buy.addEventListener('click', () => purchase(spec, price, buy));
+  return buy;
+}
+
+/** What a booster holds, coloured by its tier when it has one. */
+function paintTileMeta(node, spec) {
+  const tier = spec.rarityId ? rarityById(spec.rarityId) : null;
+  node.textContent = tier
+    ? `${t('shopItemMeta', { n: spec.cards })} · ${tx(tier.name)}`
+    : t('shopItemMeta', { n: spec.cards });
+  if (tier) node.style.color = tier.color;
+}
+
+/** One booster as a tile: art, name, contents, then the price. */
+function shopTile({ id, spec, price }, { free = false } = {}) {
+  const tile = document.createElement('div');
+  tile.className = 'shop-tile';
+  tile.dataset.spec = id;
+
+  const art = document.createElement('div');
+  art.className = 'shop-tile-art';
+  art.appendChild(buildBooster(spec, { size: 'is-tiny' }));
+  tile.appendChild(art);
+
+  const name = document.createElement('p');
+  name.className = 'shop-tile-name';
+  name.textContent = specName(spec);
+  tile.appendChild(name);
+
+  const meta = document.createElement('p');
+  meta.className = 'shop-tile-meta';
+  paintTileMeta(meta, spec);
+  tile.appendChild(meta);
+
+  if (free) {
+    const buy = document.createElement('button');
+    buy.type = 'button';
+    buy.className = 'buy is-free';
+    press(buy, { sound: null });
+    paintFreeButton(buy, id, spec);
+    tile.appendChild(buy);
+  } else {
+    tile.appendChild(buyButton(spec, price));
+  }
+  return tile;
+}
+
+/** The spotlight: one discounted booster, presented like a poster. */
+function buildFeatured({ spec, price, fullPrice, pct }) {
+  const colours = specColours(spec);
+  const sec = document.createElement('section');
+  sec.className = 'shop-feature panel';
+  sec.style.setProperty('--accent', colours.accent);
+  sec.style.setProperty('--accent2', colours.accent2);
+  sec.innerHTML = `
+    <span class="shop-feature-tag">-${pct}%</span>
+    <div class="shop-feature-art"></div>
+    <div class="shop-feature-copy">
+      <span class="label"></span>
+      <h3></h3>
+      <p class="shop-feature-meta"></p>
+      <p class="shop-feature-old"></p>
+    </div>`;
+  sec.querySelector('.shop-feature-art').appendChild(buildBooster(spec, { size: 'is-small' }));
+  sec.querySelector('.label').textContent = t('shopDeal');
+  sec.querySelector('h3').textContent = specName(spec);
+  paintTileMeta(sec.querySelector('.shop-feature-meta'), spec);
+  sec.querySelector('.shop-feature-old').innerHTML = `<s>${money(fullPrice)}</s>`;
+  sec.appendChild(buyButton(spec, price));
+  return sec;
+}
+
+/** The vault: one row per tier on offer, its floor spelled out in reads. */
+function buildVault(items) {
+  const list = document.createElement('div');
+  list.className = 'vault';
+  list.replaceChildren(...items.map(({ id, spec, price, rarity, minViews }) => {
+    const row = document.createElement('div');
+    row.className = 'vault-row';
+    row.dataset.spec = id;
+    row.style.setProperty('--tier', rarity.color);
+    row.innerHTML = `
+      <span class="vault-gem">${iconSvg('gem', { size: 19 })}</span>
+      <div class="vault-copy"><b></b><p class="tabular"></p></div>`;
+    row.querySelector('b').textContent = specName(spec);
+    row.querySelector('p').textContent =
+      `${t('shopItemMeta', { n: spec.cards })} · ${t('shopMinFame', { views: formatViews(minViews) })}`;
+    row.appendChild(buyButton(spec, price));
+    return row;
+  }));
+  return list;
 }
 
 /**
@@ -1126,7 +1168,7 @@ function purchase(spec, price, button) {
 function tickRestock() {
   const remaining = nextRefreshAt() - Date.now();
   el.restock.textContent = formatCountdown(remaining);
-  const note = el.shopRows.querySelector('.shop-row.is-free .shop-note');
+  const note = el.shopMarket.querySelector('[data-free-note]');
   if (note) note.textContent = freeNoteText();
   if (remaining <= 0) { payStipend(); renderShop(); }
 }
@@ -1625,11 +1667,12 @@ async function runOpen(booster) {
     return false;
   }
 
-  const options = rollOptionsFor(state.spec);
   const colours = specColours(state.spec);
   // Random order: a Legendary can come first and a Common last.
   const pulls = shuffle(articles.map((article) => {
-    const rarity = rollRarity(options);
+    // The pack chose what it was allowed to draw; the page itself decides
+    // what it is. Same article, same rarity, for everyone.
+    const rarity = rarityFromPopularity(article.popularity);
     return {
       article, rarity,
       price: priceFor(article.popularity, rarity),
@@ -2234,7 +2277,29 @@ function renderBinder() {
 
   el.albumShelf.replaceChildren(...albums.map(buildAlbumCover));
   reveal(el.albumShelf.children, { step: 22, from: 10 });
+  refreshAlbumTotals(albums.filter((a) => a.unlocked));
 }
+
+/**
+ * Real category sizes arrive from the network after the shelf has painted.
+ * Fetch whatever is missing or stale, then repaint once, if the player is
+ * still looking at the collection.
+ */
+function refreshAlbumTotals(albums) {
+  if (!albums.length) return;
+  const before = albums.map((a) => `${a.key}:${a.total}`).join('|');
+  Promise.all(albums.map((album) => fetchAlbumTotal(album))).then(() => {
+    if (state.tab !== 'binder') return;
+    const after = albums.map((a) => `${a.key}:${knownTotalOf(a)}`).join('|');
+    if (after !== before) renderBinder();
+  });
+}
+
+const knownTotalOf = (album) => {
+  const fresh = buildAlbums(store.allEntries(state.collection), state.customPacks)
+    .find((a) => a.key === album.key);
+  return fresh?.total ?? null;
+};
 
 function buildAlbumCover(album) {
   const cover = document.createElement('button');
@@ -2255,9 +2320,9 @@ function buildAlbumCover(album) {
     ${album.complete ? `<span class="album-cover-done">${iconSvg('spark', { size: 13 })}</span>` : ''}`;
   cover.querySelector('.album-cover-name').textContent = album.name;
   cover.querySelector('.album-cover-count').textContent =
-    album.unlocked ? `${Math.min(album.owned, album.total)}/${album.total}` : t('albumLocked');
+    album.unlocked ? `${album.owned}/${album.total == null ? '?' : compactCount(album.total)}` : t('albumLocked');
   cover.querySelector('.album-cover-bar i').style.width =
-    `${Math.min(100, (album.owned / album.total) * 100)}%`;
+    `${album.total ? Math.min(100, (album.owned / album.total) * 100) : 0}%`;
   press(cover, { sound: null });
   cover.addEventListener('click', () => {
     if (!album.unlocked) { toast(t('albumLockedHint', { name: album.name }), 'error'); return; }
@@ -2287,8 +2352,9 @@ function renderAlbum() {
 
   el.albumBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
   el.albumName.textContent = album.name;
-  el.albumProgress.textContent = `${Math.min(album.owned, album.total)}/${album.total}`
+  el.albumProgress.textContent = `${album.owned}/${album.total == null ? '?' : compactCount(album.total)}`
     + (album.complete ? ` · ${t('albumComplete')}` : '');
+  if (album.total == null) refreshAlbumTotals([album]);
   el.filterOpen.textContent = t('filters');
   const active = activeFilterCount();
   el.filterCount.textContent = String(active);
@@ -2308,11 +2374,18 @@ function renderAlbum() {
   el.pagenoLeft.textContent = String(spread * 2 + 1);
   el.pagenoRight.textContent = String(spread * 2 + 2);
 
-  el.albumDots.replaceChildren(...Array.from({ length: spreads }, (_, i) => {
-    const dot = document.createElement('span');
-    dot.className = `album-dot${i === spread ? ' is-on' : ''}`;
-    return dot;
-  }));
+  if (spreads <= 12) {
+    el.albumDots.replaceChildren(...Array.from({ length: spreads }, (_, i) => {
+      const dot = document.createElement('span');
+      dot.className = `album-dot${i === spread ? ' is-on' : ''}`;
+      return dot;
+    }));
+  } else {
+    const counter = document.createElement('span');
+    counter.className = 'album-dot-count tabular';
+    counter.textContent = `${spread + 1} / ${spreads}`;
+    el.albumDots.replaceChildren(counter);
+  }
   el.albumHint.textContent = t('albumSwipeHint');
 }
 
@@ -4560,7 +4633,6 @@ function openWallet() {
 
 function openOdds() {
   openSheet(t('pullRates'), (body) => {
-    const pct = (n) => (n >= 1 ? `${n.toFixed(1)}%` : `${n.toFixed(2)}%`);
     body.innerHTML = `
       <p style="margin-bottom:16px" data-note></p>
       <table class="odds-table">
@@ -4570,8 +4642,8 @@ function openOdds() {
     body.querySelector('[data-note]').textContent = t('oddsNote');
     const [h1, h2] = body.querySelectorAll('th');
     h1.textContent = t('rarity');
-    h2.textContent = t('chance');
-    body.querySelector('tbody').replaceChildren(...oddsTable().map(({ rarity, percent }) => {
+    h2.textContent = t('oddsViews');
+    body.querySelector('tbody').replaceChildren(...rarityThresholds().map(({ rarity, views }) => {
       const row = document.createElement('tr');
       row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span></span></span></td><td class="odds-pct"></td>`;
       const swatch = row.querySelector('.odds-swatch');
@@ -4580,7 +4652,7 @@ function openOdds() {
       const label = row.querySelector('.odds-name span:last-child');
       label.textContent = tx(rarity.name);
       label.style.color = rarity.color;
-      row.querySelector('.odds-pct').textContent = pct(percent);
+      row.querySelector('.odds-pct').textContent = views <= 0 ? t('oddsAny') : `\u2265 ${formatViews(views)}`;
       return row;
     }));
   });
@@ -4664,6 +4736,41 @@ function applyStrings() {
 
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
+/**
+ * One-time re-grade after the rarity rework: rarity is a function of
+ * popularity now, so every stored card is re-derived from what we know of its
+ * article. Cards from wikis without stats fall back to their word count, and
+ * the profile's per-rarity tallies are rebuilt to match what is owned.
+ */
+function regradeCollection() {
+  let changed = 0;
+  for (const entry of Object.values(state.collection.entries ?? {})) {
+    let pop = entry.popularity;
+    if (!Number.isFinite(pop)) {
+      pop = Number.isFinite(entry.views) && entry.views > 0
+        ? popularityFromViews(entry.views)
+        : popularityFromWordCount(entry.wordCount);
+      entry.popularity = pop;
+    }
+    const rarity = rarityFromPopularity(pop);
+    const price = priceFor(pop, rarity);
+    if (entry.rarityId !== rarity.id || entry.price !== price) {
+      entry.rarityId = rarity.id;
+      entry.price = price;
+      changed++;
+    }
+  }
+  if (!changed) return 0;
+  const counts = {};
+  for (const entry of Object.values(state.collection.entries ?? {})) {
+    counts[entry.rarityId] = (counts[entry.rarityId] ?? 0) + Math.max(1, entry.count ?? 1);
+  }
+  state.profile.rarityCounts = counts;
+  store.saveCollection(state.collection);
+  store.saveProfile(state.profile);
+  return changed;
+}
+
 function init() {
   useTheme(storedTheme());
   el.splashMark.innerHTML = logoSvg({ size: 78 });
@@ -4673,6 +4780,11 @@ function init() {
   // already in the collection are swept out once here.
   const pruned = store.pruneImagelessCards(state.collection);
   if (pruned) console.info(`Removed ${pruned} pictureless card(s) from the collection`);
+
+  // Rarity belongs to the article now. Saves from before the rework carry
+  // rolled rarities, so owned cards are re-graded from popularity once here.
+  const regraded = regradeCollection();
+  if (regraded) setTimeout(() => toast(t('regradeToast', { n: regraded })), 2600);
 
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
@@ -4939,6 +5051,6 @@ window.__packywiki = {
     drainLevelUps();
     return state.profile.progress;
   },
-  timedScarcity: timedTopScarcity,
+  timedTopTier,
   resetAll: wipeEverything
 };

@@ -58,13 +58,25 @@ export const regenMs = (level) => Math.round(lerp(10, 3, level) * 60 * 1000);
 export const maxHeld = (level) => Math.round(lerp(7, 20, level));
 
 /**
- * Odds. `tierShift` under 1 multiplies each tier's weight by shift^rank, which
- * pushes the top of the table down hard: at level 1 an Artifact is about
- * seventy times rarer than normal. Level 10 reaches exactly 1, which is the
- * plain table every other booster uses.
+ * What a free pack may pull. Rarity belongs to the article now, so the track
+ * gates FAME instead of odds: at level 1 a free pack only draws pages up to
+ * the Rare band; each level raises the ceiling until level 10 lifts it
+ * entirely and a free pack can hand you anything.
  */
-const MIN_SHIFT = 0.55;
-export const timedRollOptions = (level) => ({ tierShift: lerp(MIN_SHIFT, 1, level) });
+export function timedDrawCaps(level) {
+  const cap = lerp(0.755, 1, level);   // Epic's floor at level 1, open at 10
+  return { minPopularity: null, maxPopularity: cap >= 0.995 ? null : cap };
+}
+
+/** The best tier a free pack can reach at this level, for the track UI. */
+export function timedTopTier(level) {
+  const { maxPopularity } = timedDrawCaps(level);
+  if (maxPopularity === null) return RARITIES[RARITIES.length - 1];
+  for (let i = RARITIES.length - 1; i >= 0; i--) {
+    if (RARITIES[i].minPop < maxPopularity) return RARITIES[i];
+  }
+  return RARITIES[0];
+}
 
 /** The booster a timed slot hands over. */
 export const timedSpec = (level) => ({

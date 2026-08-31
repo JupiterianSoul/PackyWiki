@@ -50,6 +50,19 @@ async function fetchJson(url) {
 const encodeTitle = (title) =>
   encodeURIComponent(title.replace(/ /g, '_')).replace(/%2F/gi, '%252F');
 
+/* --- draw constraints ----------------------------------------------------- */
+
+const fitsBand = (pack, popularity) =>
+  (pack.minPopularity == null || popularity >= pack.minPopularity) &&
+  (pack.maxPopularity == null || popularity <= pack.maxPopularity);
+
+/** How far outside the pack's band a popularity lands; 0 inside it. */
+function bandMiss(pack, popularity) {
+  if (pack.minPopularity != null && popularity < pack.minPopularity) return pack.minPopularity - popularity;
+  if (pack.maxPopularity != null && popularity > pack.maxPopularity) return popularity - pack.maxPopularity;
+  return 0;
+}
+
 /* --- shared filtering ---------------------------------------------------- */
 
 const BAD_TITLE =
@@ -92,13 +105,16 @@ function searchUrl(query, offset) {
 }
 
 /** A random hit for one query, sampled across the whole result set. */
-async function searchOne(query) {
+async function searchOne(query, { preferBig = false } = {}) {
   const cacheKey = `${wikiLang()}|${query}`;
   let offset = 0;
   const known = querySizeCache.get(cacheKey);
+  // Famous pages cluster near the top of the ranking, so a fame hunt samples
+  // only the first few hundred hits; an open draw roams the whole result set.
+  const roam = preferBig ? 400 : MAX_SEARCH_OFFSET;
   if (known && known > SEARCH_PAGE_SIZE) {
-    const ceiling = Math.min(known, MAX_SEARCH_OFFSET) - SEARCH_PAGE_SIZE;
-    offset = Math.max(0, Math.floor(Math.random() * ceiling));
+    const ceiling = Math.min(known, roam) - SEARCH_PAGE_SIZE;
+    if (ceiling > 0) offset = Math.max(0, Math.floor(Math.random() * ceiling));
   }
 
   const data = await fetchJson(searchUrl(query, offset));
@@ -109,6 +125,13 @@ async function searchOne(query) {
   if (!results.length) {
     if (totalHits === 0) deadQueries.add(cacheKey);
     return null;
+  }
+  if (preferBig) {
+    // Within the window, the long articles are the famous ones far more often
+    // than not. Pick among the biggest few rather than the single biggest, so
+    // two draws from one query do not fight over the same page.
+    const biggest = [...results].sort((a, b) => (b.wordcount ?? 0) - (a.wordcount ?? 0));
+    return pick(biggest.slice(0, Math.min(6, biggest.length)));
   }
   return pick(results);
 }
@@ -156,21 +179,28 @@ function summaryToCard(summary, wordCount, views) {
 
 async function drawWikipediaCard(pack, seen) {
   const live = (pack.queries ?? []).filter((q) => !deadQueries.has(`${wikiLang()}|${q}`));
+  const banded = pack.minPopularity != null || pack.maxPopularity != null;
+  const maxAttempts = banded ? MAX_ATTEMPTS_PER_CARD + 4 : MAX_ATTEMPTS_PER_CARD;
+  // A high floor means hunting fame, and uniform sampling would starve it.
+  const preferBig = (pack.minPopularity ?? 0) >= 0.65;
+  let nearest = null;   // best card OUTSIDE the band, if the hunt runs dry
+  let nearestMiss = Infinity;
+  let lastError = null;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_CARD; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
       let summary = null;
       let wordCount = null;
       // The search hit already names the article, so its pageviews can be
-      // fetched alongside the summary — one fewer round trip per card.
+      // fetched alongside the summary: one fewer round trip per card.
       let viewsPromise = null;
 
       // The final two attempts fall back to a fully random article, so a
       // renamed category can never leave a booster unopenable.
-      const useQuery = live.length > 0 && attempt < MAX_ATTEMPTS_PER_CARD - 2;
+      const useQuery = live.length > 0 && attempt < maxAttempts - 2;
 
       if (useQuery) {
-        const hit = await searchOne(pick(live));
+        const hit = await searchOne(pick(live), { preferBig });
         if (!hit || seen.has(hit.title)) continue;
         wordCount = hit.wordcount ?? null;
         viewsPromise = fetchMonthlyViews(hit.title);
@@ -185,15 +215,23 @@ async function drawWikipediaCard(pack, seen) {
       // Every card must carry a picture. Only the very last attempt may
       // hand over a bare one, so a booster can never fail to open at all.
       const hasImage = Boolean(summary.thumbnail?.source ?? summary.originalimage?.source);
-      if (!hasImage && attempt < MAX_ATTEMPTS_PER_CARD - 1) continue;
+      if (!hasImage && attempt < maxAttempts - 1) continue;
       seen.add(title);
 
       const views = viewsPromise ? await viewsPromise : await fetchMonthlyViews(title);
-      return summaryToCard(summary, wordCount, views);
+      const card = summaryToCard(summary, wordCount, views);
+      if (fitsBand(pack, card.popularity)) return card;
+
+      // Outside what this booster may draw. Remember the nearest miss: a
+      // booster must never fail to open, so it ships if nothing qualifies.
+      const miss = bandMiss(pack, card.popularity);
+      if (miss < nearestMiss) { nearest = card; nearestMiss = miss; }
     } catch (err) {
-      if (attempt === MAX_ATTEMPTS_PER_CARD - 1) throw err;
+      lastError = err;
     }
   }
+  if (nearest) return nearest;
+  if (lastError) throw lastError;
   throw new Error(`No usable article found for "${pack.name}"`);
 }
 
@@ -443,17 +481,61 @@ async function wikiForLanguage(wiki) {
   }
 }
 
+/** Article bytes needed before its word count can read as this popular. */
+function bytesForPopularity(minPopularity) {
+  const words = Math.pow(10, Math.log10(20000) * Math.pow(minPopularity, 1 / 1.15)) - 1;
+  return Math.max(0, Math.round(words * 6));
+}
+
+const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+
+/**
+ * Candidates big enough for a tiered custom booster. Random pages on a mid
+ * sized wiki are nearly all stubs, so a fame floor would reject almost all of
+ * them; allpages filters by size server-side, and starting from a random
+ * letter keeps the sample spread across the wiki.
+ */
+async function bigPageCandidates(wiki, minPopularity, seen) {
+  try {
+    const params = new URLSearchParams({
+      action: 'query', list: 'allpages', apnamespace: '0', apfilterredir: 'nonredirects',
+      apminsize: String(bytesForPopularity(minPopularity)),
+      apfrom: pick(AZ), aplimit: '40', format: 'json', origin: '*'
+    });
+    const rows = (await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.allpages ?? [];
+    return rows
+      .filter((r) => r.pageid && !seen.has(r.title))
+      .map((r) => ({ id: r.pageid, title: r.title }));
+  } catch {
+    return [];
+  }
+}
+
 async function drawCustomCard(pack, seen) {
   const wiki = await wikiForLanguage(pack.wiki);
+  const banded = pack.minPopularity != null || pack.maxPopularity != null;
+  const maxAttempts = banded ? MAX_ATTEMPTS_PER_CARD + 4 : MAX_ATTEMPTS_PER_CARD;
+  const floor = pack.minPopularity ?? 0;
+  let nearest = null;
+  let nearestMiss = Infinity;
+  let lastError = null;
 
-  for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_CARD; attempt++) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
     try {
-      const params = new URLSearchParams({
-        action: 'query', list: 'random', rnnamespace: '0', rnlimit: '6',
-        format: 'json', origin: '*'
-      });
-      const candidates = ((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.random ?? [])
-        .filter((r) => !seen.has(r.title));
+      // With a fame floor, random pages are hopeless on most wikis: ask for
+      // pages big enough to qualify instead. Without one, roam freely.
+      let candidates = [];
+      if (floor >= 0.5 && attempt < maxAttempts - 2) {
+        candidates = await bigPageCandidates(wiki, floor, seen);
+      }
+      if (!candidates.length) {
+        const params = new URLSearchParams({
+          action: 'query', list: 'random', rnnamespace: '0', rnlimit: '6',
+          format: 'json', origin: '*'
+        });
+        candidates = ((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.random ?? [])
+          .filter((r) => !seen.has(r.title));
+      }
       if (!candidates.length) continue;
 
       const choice = pick(candidates);
@@ -472,9 +554,9 @@ async function drawCustomCard(pack, seen) {
         ?? (page.original?.source ? upgradeImageUrl(page.original.source, 640) : null)
         ?? await customPageImage(wiki, page.pageid);
       // A pictureless page is not a card. Only the last attempt may pass one.
-      if (!thumbnail && attempt < MAX_ATTEMPTS_PER_CARD - 1) { seen.add(page.title); continue; }
+      if (!thumbnail && attempt < maxAttempts - 1) { seen.add(page.title); continue; }
 
-      return toCard({
+      const card = toCard({
         sourceId: `wiki:${new URL(wiki.apiUrl).host}${new URL(wiki.apiUrl).pathname.replace('/api.php', '')}`,
         sourceName: wiki.sitename,
         pageId: page.pageid,
@@ -487,10 +569,15 @@ async function drawCustomCard(pack, seen) {
         // No pageview API on Fandom, so page size stands in for popularity.
         wordCount: page.length ? Math.round(page.length / 6) : null
       });
+      if (fitsBand(pack, card.popularity)) return card;
+      const miss = bandMiss(pack, card.popularity);
+      if (miss < nearestMiss) { nearest = card; nearestMiss = miss; }
     } catch (err) {
-      if (attempt === MAX_ATTEMPTS_PER_CARD - 1) throw err;
+      lastError = err;
     }
   }
+  if (nearest) return nearest;
+  if (lastError) throw lastError;
   throw new Error(`No usable page found on ${wiki.sitename}`);
 }
 

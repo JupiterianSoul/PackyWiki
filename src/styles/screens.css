@@ -243,94 +243,111 @@
 .shop-banner-cell:first-child b { color: var(--positive); }
 .shop-banner-rule { width: 1px; align-self: stretch; margin: 0 16px; background: var(--line); }
 
-.shop-filter {
-  display: flex;
-  gap: 8px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-  padding: 0 var(--gutter) 18px;
-}
-.shop-filter::-webkit-scrollbar { display: none; }
-.shop-chip {
-  flex: none;
-  padding: 8px 15px;
-  border-radius: var(--radius-pill);
-  border: var(--border) var(--border-style) var(--line);
-  background: var(--surface);
-  font-size: 0.78rem;
-  font-weight: 700;
-  color: var(--ink-dim);
-  white-space: nowrap;
-}
-[data-theme='arcade'] .shop-chip { border-radius: var(--radius); }
-.shop-chip.is-on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+/* The market stacks its stalls vertically; every tile is a full card of
+   information, two columns at most, nothing scrolling sideways. */
+.shop-market { display: grid; gap: 26px; padding: 0 var(--gutter); }
+.shop-sec { min-width: 0; }
+.shop-sec-head { display: flex; align-items: baseline; gap: 10px; padding-bottom: 6px; }
+.shop-sec-head h3 { font-size: 1.02rem; flex: 1; min-width: 0; }
+.shop-sec-note { font-size: 0.74rem; line-height: 1.5; color: var(--ink-faint); padding-bottom: 10px; }
 
-.shop-rows { display: grid; gap: 26px; }
-.shop-row { min-width: 0; }        /* grid items default to min-width:auto and blow the page out */
-.shop-row-head {
-  display: flex;
+/* The spotlight: one discounted booster, presented like a poster. */
+.shop-feature {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 10px;
-  padding: 0 var(--gutter) 8px;
+  gap: 14px 16px;
+  padding: 16px;
+  overflow: hidden;
 }
-.shop-row-head h3 { font-size: 1rem; flex: 1; min-width: 0; }
-.shop-row-tag {
-  flex: none;
-  font-size: 0.64rem;
-  font-weight: 800;
-  letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
+.shop-feature::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(130% 100% at 0% 0%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 62%);
+  pointer-events: none;
+}
+.shop-feature > * { position: relative; }
+.shop-feature-art { display: grid; place-items: center; }
+.shop-feature-copy { display: grid; gap: 4px; min-width: 0; align-content: center; }
+.shop-feature-copy h3 { font-size: 1.12rem; line-height: 1.2; }
+.shop-feature-meta { font-size: 0.72rem; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+.shop-feature-old { font-size: 0.8rem; color: var(--ink-faint); }
+.shop-feature-old s { opacity: 0.8; }
+.shop-feature-tag {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   padding: 4px 9px;
   border-radius: var(--radius-pill);
-  border: var(--border) var(--border-style) var(--line);
-  color: var(--ink-faint);
+  background: var(--negative);
+  color: #fff;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  z-index: 1;
 }
-[data-theme='arcade'] .shop-row-tag { border-radius: var(--radius); }
-.shop-row.is-free .shop-row-tag { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 50%, transparent); }
-.shop-note { font-size: 0.75rem; color: var(--ink-faint); padding: 0 var(--gutter) 10px; }
+[data-theme='arcade'] .shop-feature-tag { border-radius: var(--radius); }
+.shop-feature > .buy { grid-column: 1 / -1; }
 
-.shelf {
-  display: flex;
-  gap: 12px;
-  overflow-x: auto;
-  scrollbar-width: none;
-  overscroll-behavior-x: contain;
-  touch-action: pan-x pan-y;
-  padding: 4px var(--gutter) 8px;
-  scroll-snap-type: x proximity;
-}
-.shelf::-webkit-scrollbar { display: none; }
-
-/* A shop item is now a card: art, name, size, then the price button. */
-.shop-item {
-  flex: none;
-  width: 132px;
+/* Two columns of full tiles. */
+.shop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.shop-tile {
+  min-width: 0;
   display: grid;
   gap: 0;
-  scroll-snap-align: start;
-  padding: 10px 10px 10px;
+  padding: 12px;
   border-radius: var(--radius-lg);
   border: var(--border) var(--border-style) var(--line);
   background: var(--surface);
 }
-.shop-item-art { display: grid; place-items: center; padding-bottom: 8px; }
-.shop-item-name {
-  font-size: 0.82rem;
+.shop-tile-art { display: grid; place-items: center; padding-bottom: 9px; }
+.shop-tile-name {
+  font-size: 0.84rem;
   font-weight: 700;
   line-height: 1.3;
-  min-height: 2.1em;
+  min-height: 2.2em;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.shop-item-meta {
+.shop-tile-meta {
   font-size: 0.68rem;
   color: var(--ink-faint);
   padding: 2px 0 9px;
   font-variant-numeric: tabular-nums;
 }
+
+/* The vault: one row per tier on offer, its colour saying what it is. */
+.vault { display: grid; gap: 10px; }
+.vault-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--tier, var(--accent)) 40%, var(--line));
+  background: linear-gradient(135deg,
+    color-mix(in srgb, var(--tier, var(--accent)) 14%, var(--surface-solid)),
+    var(--surface));
+}
+.vault-gem {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: var(--tier);
+  background: color-mix(in srgb, var(--tier) 18%, transparent);
+}
+.vault-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.vault-copy b { font-size: 0.86rem; color: var(--tier); line-height: 1.25; }
+.vault-copy p { font-size: 0.68rem; color: var(--ink-faint); }
+.vault-row .buy { width: auto; min-width: 92px; flex: none; }
+
 .buy {
   display: grid;
   justify-items: center;
@@ -637,6 +654,7 @@
   background: color-mix(in srgb, var(--ink) 20%, transparent);
 }
 .album-dot.is-on { background: var(--accent); transform: scale(1.25); }
+.album-dot-count { font-size: 0.72rem; font-weight: 700; color: var(--ink-dim); letter-spacing: 0.04em; }
 .album-hint { text-align: center; font-size: 0.72rem; color: var(--ink-faint); padding-bottom: 4px; }
 
 .binder-bar { display: flex; align-items: center; gap: 10px; padding: 0 var(--gutter) 14px; }

@@ -19,6 +19,7 @@
  */
 import { THEME_PACKS, themeById } from './data/packs.js';
 import { rarityById, rarityRank } from './data/rarities.js';
+import { drawCapsFor } from './economy.js';
 import { tx, t, getLanguage } from './i18n.js';
 import { proceduralStyle, customSeed } from './packstyle.js';
 
@@ -129,7 +130,10 @@ export function toDrawPack(spec) {
     cards: spec.cards,
     source: spec.kind === 'custom' ? 'custom' : 'wikipedia',
     queries: specQueries(spec),
-    wiki: spec.wiki ?? null
+    wiki: spec.wiki ?? null,
+    // What the pack is allowed to draw: a tier is a fame floor, the free
+    // track a fame ceiling. The draw layer enforces it per candidate.
+    ...drawCapsFor(spec)
   };
 }
 

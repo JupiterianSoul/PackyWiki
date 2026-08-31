@@ -15,9 +15,9 @@
  * so E[sell everything] = RETURN_RATE × price, for every booster in the game.
  * Progression therefore comes from time (the shop stipend), not from grinding.
  */
-import { expectedMultiplier, rarityRank, rarityById } from './data/rarities.js';
-import { basePrice } from './pricing.js';
-import { timedRollOptions } from './timed.js';
+import { rarityRank, rarityFromPopularity, tierMidPopularity, tierBand } from './data/rarities.js';
+import { basePrice, priceFor } from './pricing.js';
+import { timedDrawCaps } from './timed.js';
 
 /** A card sells for this fraction of its listed price. */
 export const SELL_RATE = 0.3;
@@ -26,11 +26,12 @@ export const SELL_RATE = 0.3;
 export const RETURN_RATE = 0.72;
 
 /**
- * Assumed average article value, used to price boosters before we know which
- * articles they'll contain. Real pulls vary around it — that variance is the
- * gambling texture — but prices stay predictable.
+ * Assumed popularity of a typical draw from an untiered pack, used to price
+ * boosters before we know which articles they'll contain. Real pulls vary
+ * around it — that variance is the gambling texture — but prices stay
+ * predictable.
  */
-const BASE_ESTIMATE = basePrice(0.5);
+const TYPICAL_POP = 0.56;
 
 /** Boosters restricted to one theme cost more than open ones. */
 const THEME_SURCHARGE = 1.25;
@@ -38,25 +39,36 @@ const THEME_SURCHARGE = 1.25;
 /** How many cards a shop booster can hold. */
 export const CARD_COUNT_RANGE = [3, 7];
 
-/* --- rarity boosters ------------------------------------------------------ */
+/* --- what a pack is allowed to draw --------------------------------------- */
 
 /**
- * Roll odds for a booster. A standard booster uses the plain table; a rarity
- * booster tilts it upward and drops the bottom three tiers, so a Legendary
- * booster never yields a Common.
+ * Rarity is the article's own now, so a booster's tier is a POPULARITY
+ * CONSTRAINT on what it may draw: a Legendary booster only pulls pages
+ * famous enough to BE at least Legendary. Timed packs run the other way:
+ * low track levels cap how famous a page they may pull.
+ *
+ * Returns { minPopularity, maxPopularity } for the draw, either side null
+ * when unconstrained.
  */
-export function rollOptionsFor(spec) {
-  // Timed boosters run on their own nerfed table, which only reaches the
-  // normal odds at the top of their track. See src/timed.js.
-  if (spec?.kind === 'timed') return timedRollOptions(spec.timedLevel ?? 1);
-  if (!spec?.rarityId) return {};
-  const rank = rarityRank(spec.rarityId);
-  return { tierShift: 1 + rank * 0.16, floorTier: Math.max(0, rank - 3) };
+export function drawCapsFor(spec) {
+  if (spec?.kind === 'timed') return timedDrawCaps(spec.timedLevel ?? 1);
+  if (!spec?.rarityId) return { minPopularity: null, maxPopularity: null };
+  return { minPopularity: tierBand(spec.rarityId).min, maxPopularity: null };
 }
 
-/** Mean value of a single card out of this booster. */
-export const expectedCardValue = (spec) =>
-  BASE_ESTIMATE * expectedMultiplier(rollOptionsFor(spec));
+/** Mean value of a single card out of this booster, from what it may draw. */
+export function expectedCardValue(spec) {
+  if (spec?.rarityId) {
+    // A tiered pack draws from its tier's band and up; assume the low half
+    // of the band, since fame thins out fast above every threshold.
+    const { min, max } = tierBand(spec.rarityId);
+    const pop = min + (max - min) * 0.35;
+    return priceFor(pop, rarityFromPopularity(pop));
+  }
+  const caps = drawCapsFor(spec);
+  const pop = Math.min(TYPICAL_POP, caps.maxPopularity ?? 1);
+  return priceFor(pop, rarityFromPopularity(pop));
+}
 
 /** What the shop charges. */
 export function boosterPrice(spec) {
