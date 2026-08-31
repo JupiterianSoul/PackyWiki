@@ -362,9 +362,12 @@ const STRINGS = {
 
     // custom builder
     creatorTitle: 'Build your own booster',
-    creatorNote: 'Name a game, book, film or show. Wiklodo finds that subject’s own wiki and builds a pack entirely out of it.',
+    creatorNote: 'Name a subject. Wiklodo finds its wiki and builds a booster entirely out of it.',
+    deleteBooster: 'Delete',
+    deleteArmed: 'Tap again to delete',
+    packDeleted: '{name} deleted',
     creatorMine: 'Boosters you built',
-    creatorNoneYet: 'Nothing built yet. Try one of the examples above.',
+    creatorNoneYet: 'Nothing built yet. Name a subject above to make your first booster.',
     creatorInShop: 'On sale in the Shop',
 
     // help
@@ -730,9 +733,12 @@ const STRINGS = {
     freeShelfNote: 'Un de chaque, gratuitement, toutes les quatre heures.',
 
     creatorTitle: 'Créez votre propre booster',
-    creatorNote: 'Nommez un jeu, un livre, un film ou une série. Wiklodo trouve le wiki dédié à ce sujet et en fait un pack entier.',
+    creatorNote: 'Nommez un sujet. Wiklodo trouve son wiki et en fait un booster entier.',
+    deleteBooster: 'Supprimer',
+    deleteArmed: 'Touchez encore pour supprimer',
+    packDeleted: '{name} supprimé',
     creatorMine: 'Vos boosters créés',
-    creatorNoneYet: 'Rien de créé pour l’instant. Essayez un des exemples ci-dessus.',
+    creatorNoneYet: 'Rien de créé pour l’instant. Nommez un sujet ci-dessus pour créer votre premier booster.',
     creatorInShop: 'En vente dans la Boutique',
 
     help_packs_title: 'Boosters',

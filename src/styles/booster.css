@@ -2,7 +2,8 @@
    THE BOOSTER — PRISM FOIL
    A serrated mylar bag: metallic body in the subject's palette, the subject's
    own pattern embossed into the foil, holographic interference bands drifting
-   over it, a photograph printed on the foil, and a foil-stamped name.
+   over it, the category's drawn emblem in its own mounting, and a
+   foil-stamped name.
 
    The structure is one design language; what changes per pack comes in
    through four custom properties set by buildBooster():
@@ -16,7 +17,7 @@
      .booster-mouth  the dark inside            (under the tear strip)
      .booster-holo   interference bands         (drifts slowly)
      .booster-crimp  pressed seals top & bottom
-     .booster-face   photo, name, count
+     .booster-face   emblem, name, count
      .booster-shine  cylinder shading + travelling gloss
      .booster-tear   the strip above the rip line (a copy of the foil; JS
                      clips it away as the line is dragged)
@@ -129,41 +130,190 @@
   padding: 0 7.5%;
 }
 
-/* The photograph, printed straight onto the foil: no frame box — it fades out
-   into the metal on every side, and the holo bands pass over it. */
-.booster-photo {
+/*
+ * The emblem: the category's own drawn artwork, mounted in one of six
+ * constructions ("families") so each subject's pack is built differently —
+ * a racing sash, a porthole roundel, a library plate, a theatre marquee,
+ * an organic arch, or a hard pixel panel. data-family on .booster picks one.
+ */
+.booster { --e2: var(--accent); --e3: var(--accent2);
+  --e1: color-mix(in srgb, var(--accent) 42%, #ffffff); }
+
+.booster-emblem {
   position: relative;
   width: 100%;
   flex: 1;
   min-height: 0;
-  overflow: hidden;
-  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 84%, transparent 100%);
-  mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 84%, transparent 100%);
-}
-.booster-photo img {
-  width: 100%; height: 100%;
-  object-fit: cover;
-  display: block;
-}
-/* Printed-on-foil: the pack's own colour breathes through the ink. */
-.booster-photo::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(180deg, color-mix(in srgb, var(--accent2) 55%, transparent) 0%,
-      transparent 30% 62%, color-mix(in srgb, var(--accent2) 70%, transparent) 100%),
-    repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 3px);
-  mix-blend-mode: normal;
-}
-.booster-photo-fallback {
-  position: absolute;
-  inset: 0;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.5);
 }
-.booster-photo-fallback svg { width: 34%; height: 34%; }
+.emblem-art {
+  position: relative;
+  z-index: 2;
+  width: 62%;
+  filter: drop-shadow(0 0.03em 0.06em rgba(0, 0, 0, 0.55));
+}
+.emblem-art svg { width: 100%; height: auto; display: block; }
+.emblem-deco { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+
+/* roundel — a porthole: double ring, glass glow, four compass ticks. */
+.booster[data-family='roundel'] .emblem-deco::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 78%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%,
+    color-mix(in srgb, var(--accent) 30%, transparent), transparent 72%);
+  border: 0.016em solid color-mix(in srgb, var(--e1) 75%, transparent);
+  box-shadow: inset 0 0 0 0.008em rgba(0, 0, 0, 0.4),
+    inset 0 0 0.12em rgba(0, 0, 0, 0.45),
+    0 0 0 0.014em color-mix(in srgb, var(--accent2) 80%, transparent);
+}
+.booster[data-family='roundel'] .emblem-deco::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 92%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    conic-gradient(from -2deg,
+      var(--e1) 0deg 4deg, transparent 4deg 86deg,
+      var(--e1) 86deg 94deg, transparent 94deg 176deg,
+      var(--e1) 176deg 184deg, transparent 184deg 266deg,
+      var(--e1) 266deg 274deg, transparent 274deg 356deg, var(--e1) 356deg);
+  -webkit-mask: radial-gradient(circle, transparent 46%, #000 47% 50%, transparent 51%);
+  mask: radial-gradient(circle, transparent 46%, #000 47% 50%, transparent 51%);
+  opacity: 0.85;
+}
+
+/* sash — a racing ribbon crossing behind the art, stitched edges. */
+.booster[data-family='sash'] .emblem-deco::before {
+  content: "";
+  position: absolute;
+  left: -12%; right: -12%;
+  top: 50%;
+  height: 34%;
+  transform: translateY(-50%) rotate(-9deg);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 62%, #0c0f1e),
+    color-mix(in srgb, var(--accent2) 82%, #05070d));
+  border-top: 0.012em solid var(--e1);
+  border-bottom: 0.012em solid color-mix(in srgb, var(--e1) 55%, transparent);
+  box-shadow: 0 0.03em 0.08em rgba(0, 0, 0, 0.5);
+}
+.booster[data-family='sash'] .emblem-deco::after {
+  content: "";
+  position: absolute;
+  left: -12%; right: -12%;
+  top: 50%;
+  height: 34%;
+  transform: translateY(-50%) rotate(-9deg);
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0 0.02em, transparent 0.02em 0.06em)
+      0 12% / 100% 0.012em no-repeat,
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.4) 0 0.02em, transparent 0.02em 0.06em)
+      0 88% / 100% 0.012em no-repeat;
+  opacity: 0.7;
+}
+
+/* plate — a library plaque: double-ruled frame with clipped corners. */
+.booster[data-family='plate'] .emblem-deco::before {
+  content: "";
+  position: absolute;
+  inset: 6% 6%;
+  clip-path: polygon(6% 0, 94% 0, 100% 8%, 100% 92%, 94% 100%, 6% 100%, 0 92%, 0 8%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent2) 62%, #0a0d18),
+    color-mix(in srgb, var(--accent2) 88%, #05070d));
+  box-shadow: inset 0 0 0 0.012em color-mix(in srgb, var(--e1) 80%, transparent),
+    inset 0 0 0 0.036em color-mix(in srgb, var(--accent2) 60%, transparent),
+    inset 0 0 0 0.048em color-mix(in srgb, var(--e1) 45%, transparent);
+}
+.booster[data-family='plate'] .emblem-deco::after {
+  content: "";
+  position: absolute;
+  left: 20%; right: 20%;
+  top: 3.5%;
+  height: 1.5%;
+  background: linear-gradient(90deg, transparent, var(--e1), transparent);
+  box-shadow: 0 0.055em 0 -0.008em color-mix(in srgb, var(--e1) 55%, transparent);
+}
+
+/* marquee — a lit theatre beam behind the art with two bulb columns. */
+.booster[data-family='marquee'] .emblem-deco::before {
+  content: "";
+  position: absolute;
+  left: 50%; top: -2%;
+  width: 58%; height: 104%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, var(--accent) 46%, transparent),
+    color-mix(in srgb, var(--accent) 12%, transparent) 55%,
+    transparent);
+  border-left: 0.012em solid color-mix(in srgb, var(--e1) 65%, transparent);
+  border-right: 0.012em solid color-mix(in srgb, var(--e1) 65%, transparent);
+}
+.booster[data-family='marquee'] .emblem-deco::after {
+  content: "";
+  position: absolute;
+  left: 50%; top: 0;
+  width: 74%; height: 100%;
+  transform: translateX(-50%);
+  background:
+    radial-gradient(circle 0.014em at 0% 50%, var(--e1) 98%, transparent) 0 0 / 100% 9%,
+    radial-gradient(circle 0.014em at 100% 50%, var(--e1) 98%, transparent) 0 0 / 100% 9%;
+  opacity: 0.9;
+}
+
+/* arch — a garden window: round-topped opening with a sun vignette. */
+.booster[data-family='arch'] .emblem-deco::before {
+  content: "";
+  position: absolute;
+  left: 12%; right: 12%;
+  top: 2%; bottom: 4%;
+  border-radius: 50% 50% 8% 8% / 42% 42% 6% 6%;
+  background: radial-gradient(90% 70% at 50% 30%,
+    color-mix(in srgb, var(--accent) 34%, transparent),
+    color-mix(in srgb, var(--accent2) 40%, transparent) 75%, transparent);
+  border: 0.014em solid color-mix(in srgb, var(--e1) 70%, transparent);
+  box-shadow: inset 0 0.03em 0.1em rgba(0, 0, 0, 0.35);
+}
+.booster[data-family='arch'] .emblem-deco::after {
+  content: "";
+  position: absolute;
+  left: 20%; right: 20%;
+  bottom: 3%;
+  height: 4%;
+  border-radius: 50%;
+  background: radial-gradient(50% 100% at 50% 50%, rgba(0, 0, 0, 0.5), transparent 70%);
+}
+
+/* panel — hard game-cartridge geometry: split blocks, pixel corners. */
+.booster[data-family='panel'] .emblem-deco::before {
+  content: "";
+  position: absolute;
+  inset: 4% 8%;
+  background:
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--accent) 55%, #0c0f1e) 0 34%,
+      color-mix(in srgb, var(--accent2) 80%, #05070d) 34% 100%);
+  clip-path: polygon(0 6%, 6% 6%, 6% 0, 94% 0, 94% 6%, 100% 6%,
+    100% 94%, 94% 94%, 94% 100%, 6% 100%, 6% 94%, 0 94%);
+  box-shadow: inset 0 0 0 0.012em color-mix(in srgb, var(--e1) 60%, transparent);
+}
+.booster[data-family='panel'] .emblem-deco::after {
+  content: "";
+  position: absolute;
+  inset: 4% 8%;
+  background:
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 0.024em, transparent 0.024em 0.07em)
+      0 8% / 100% 0.024em no-repeat,
+    repeating-linear-gradient(90deg, rgba(255,255,255,0.16) 0 0.024em, transparent 0.024em 0.07em)
+      0 92% / 100% 0.024em no-repeat;
+}
 
 /* Foil-stamped name: metallic gradient text tinted by the pack itself. */
 .booster-name {
@@ -190,6 +340,38 @@
   background-clip: text;
   color: transparent;
   filter: drop-shadow(0 0.014em 0.02em rgba(0, 0, 0, 0.75));
+}
+
+/*
+ * A tiered pack reads top-to-bottom: the subject up top, the photograph in
+ * the middle, and the tier printed big along the bottom in its own colour.
+ */
+.booster[data-rarity] .booster-name { order: -1; margin-top: 0; margin-bottom: 0.02em; }
+.booster[data-rarity] .booster-tier { order: 1; }
+.booster[data-rarity] .booster-count { order: 2; }
+.booster-tier {
+  flex: none;
+  max-width: 100%;
+  margin-top: 0.02em;
+  text-align: center;
+  font-size: 0.088em;
+  font-weight: 900;
+  line-height: 1.05;
+  letter-spacing: 0.16em;
+  text-indent: 0.16em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--rarity, #fff) 62%, #ffffff) 15%,
+    #ffffff 42%,
+    var(--rarity, #dfe8ff) 60%,
+    color-mix(in srgb, var(--rarity, #fff) 45%, #ffffff) 85%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0.014em 0.02em rgba(0, 0, 0, 0.8))
+          drop-shadow(0 0 0.09em color-mix(in srgb, var(--rarity, transparent) 55%, transparent));
 }
 
 .booster-count {
@@ -307,7 +489,8 @@
     -8px 3px 0 -3px #2c3358, 8px 3px 0 -3px #2c3358;
 }
 
-/* The rip line and its drag zone. The line IS the control. */
+/* The invisible drag zone across the tear seam. The crimped mouth is the
+   invitation; no painted indicator sits on the foil. */
 .rip-zone {
   position: absolute;
   top: 15%;
@@ -318,56 +501,7 @@
   cursor: ew-resize;
   touch-action: none;
 }
-.rip-line {
-  position: absolute;
-  top: 50%;
-  left: 4%; right: 4%;
-  height: 2px;
-  margin-top: -1px;
-  background: repeating-linear-gradient(90deg,
-    rgba(255, 255, 255, 0.8) 0 6px, rgba(255, 255, 255, 0.1) 6px 12px);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
-}
-/* An invitation: a glint runs the line while the pack waits. */
-.booster.is-idle .rip-line::after {
-  content: '';
-  position: absolute;
-  inset: -2px -8px;
-  background: linear-gradient(90deg, transparent 20%, #fff 50%, transparent 80%);
-  background-size: 34% 100%;
-  background-repeat: no-repeat;
-  mix-blend-mode: screen;
-  animation: rip-glint 2.8s ease-in-out infinite;
-}
-@keyframes rip-glint {
-  0%, 20% { background-position: -40% 0; opacity: 0; }
-  35% { opacity: 1; }
-  60%, 100% { background-position: 140% 0; opacity: 0; }
-}
-
-.rip-grip {
-  position: absolute;
-  top: 50%;
-  width: 20px; height: 16px;
-  margin-top: -8px;
-  border-radius: 3px;
-  background: linear-gradient(180deg, #f1f5f9, #94a3b8);
-  box-shadow: 0 3px 10px -3px rgba(0, 0, 0, 0.9);
-  opacity: 0.9;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-}
-.rip-grip.is-left { left: 2px; animation: grip-left 2.6s ease-in-out infinite; }
-.rip-grip.is-right { right: 2px; animation: grip-right 2.6s ease-in-out infinite; }
-@keyframes grip-left {
-  0%, 100% { transform: translateX(0); } 40% { transform: translateX(7px); }
-}
-@keyframes grip-right {
-  0%, 100% { transform: translateX(0); } 40% { transform: translateX(-7px); }
-}
-.booster[data-rip-dir="1"] .rip-grip.is-right,
-.booster[data-rip-dir="-1"] .rip-grip.is-left { opacity: 0; pointer-events: none; }
-.booster.is-tearing .rip-grip { animation: none; }
-.booster.is-open .rip-zone, .booster.is-open .rip-line { opacity: 0; pointer-events: none; }
+.booster.is-open .rip-zone { opacity: 0; pointer-events: none; }
 
 /* The glowing edge where the foil is parting, plus a crinkle bloom around it. */
 .rip-front {
@@ -548,15 +682,14 @@
 }
 
 [data-theme='noir'] .booster { filter: saturate(0.3) contrast(1.12); }
-[data-theme='noir'] .booster-photo img { filter: grayscale(1) contrast(1.15); }
+[data-theme='noir'] .emblem-art { filter: grayscale(0.35) contrast(1.1) drop-shadow(0 0.03em 0.06em rgba(0,0,0,0.55)); }
 [data-theme='noir'] .booster-holo { opacity: 0.4; }
 
 /* Battery saver: the bag holds still. */
 html[data-lowpower='1'] .booster-holo,
 html[data-lowpower='1'] .booster-shine::after,
-html[data-lowpower='1'] .rip-line::after,
 html[data-lowpower='1'] .rip-front::after,
-html[data-lowpower='1'] .rip-grip { animation: none !important; }
+
 
 /* Sizes used around the app. */
 .booster.is-small { --pack-w: 128px; --pack-h: 229px; }

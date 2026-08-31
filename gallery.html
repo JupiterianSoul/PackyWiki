@@ -84,7 +84,7 @@ import { RARITIES as TIERS } from '/src/data/rarities.js';
 import { iconSvg } from '/src/data/icons.js';
 
 const CARD_FRONT = `
-  <div class="fx fx-a"></div><div class="fx-c"></div>
+  <div class="fx fx-a"></div><div class="fx-c"></div><div class="fx-art"></div>
   <div class="card-art"><div class="card-art-fallback">${iconSvg('space', { size: 38 })}</div></div>
   <div class="card-body">
     <h3 class="card-title">Antikythera mechanism</h3>
@@ -96,21 +96,29 @@ const CARD_FRONT = `
   <div class="fx fx-b"></div>
   <div class="fx-ring"></div>`;
 
-const backs = section('card backs · halftone pop, in the pack’s colours');
-for (const [id, a, b] of [['space', '#818cf8', '#312e81'], ['f1', '#ef4444', '#450a0a'],
-  ['plants', '#4ade80', '#14532d'], ['books', '#fbbf24', '#78350f']]) {
+import { buildCardBack } from '/src/packview.js';
+const backs = section('card backs · one per category');
+const backSpecs = [
+  ...THEME_PACKS.map((p) => ({ kind: 'theme', themeId: p.id, rarityId: null, cards: 5 })),
+  { kind: 'custom', customName: 'Terraria', cards: 5,
+    wiki: { apiUrl: 'https://terraria.fandom.com/api.php', sitename: 'terraria' } },
+  { kind: 'custom', customName: 'Zelda', cards: 5,
+    wiki: { apiUrl: 'https://zelda.fandom.com/api.php', sitename: 'zelda' } }
+];
+for (const spec of backSpecs) {
   const slot = document.createElement('div');
   slot.className = 'slot';
-  slot.innerHTML = `<div class="card" style="--back-accent:${a};--back-accent2:${b};width:200px">
-    <div class="card-inner">
-      <div class="card-face card-back">
-        <div class="back-field"><div class="back-rays"></div><div class="back-dots"></div></div>
-        <div class="back-zip"></div>
-        <div class="back-burst">${iconSvg('burst', { size: 120 })}</div>
-        <div class="back-icon">${iconSvg(id, { size: 52 })}</div>
-        <div class="back-word">WIKLODO</div>
-      </div>
-    </div></div><i>${id}</i>`;
+  const card = document.createElement('div');
+  card.className = 'card';
+  card.style.width = '158px';
+  const inner = document.createElement('div');
+  inner.className = 'card-inner';
+  inner.appendChild(buildCardBack(spec));
+  card.appendChild(inner);
+  slot.appendChild(card);
+  const i = document.createElement('i');
+  i.textContent = spec.themeId ?? spec.customName;
+  slot.appendChild(i);
   backs.appendChild(slot);
 }
 

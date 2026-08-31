@@ -724,16 +724,69 @@ html.is-immersive .xp-pop.is-rising { animation-name: xp-rise-down; }
   place-content: center;
   justify-items: center;
   gap: 18px;
-  background: var(--surface-solid);
-  transition: opacity 420ms var(--ease);
+  background: radial-gradient(120% 90% at 50% 30%,
+    color-mix(in srgb, var(--accent) 10%, var(--surface-solid)),
+    var(--surface-solid) 70%);
+  transition: opacity 480ms var(--ease), clip-path 560ms cubic-bezier(0.6, 0, 0.8, 0.4);
+  clip-path: circle(140% at 50% 46%);
 }
-.splash.is-going { opacity: 0; pointer-events: none; }
+/* The exit is an iris: the launch scene closes down around the mark. */
+.splash.is-going {
+  opacity: 0;
+  clip-path: circle(0% at 50% 46%);
+  pointer-events: none;
+}
 .splash[hidden] { display: none !important; }
+
+.splash-stage { position: relative; display: grid; place-items: center; }
+
+/* A halo breathes out behind the mark, twice. */
+.splash-halo {
+  position: absolute;
+  width: 130px; height: 130px;
+  border-radius: 50%;
+  border: 2px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  opacity: 0;
+  animation: splash-halo 1.5s 500ms var(--ease) 2;
+}
+@keyframes splash-halo {
+  0% { opacity: 0; transform: scale(0.55); }
+  25% { opacity: 0.8; }
+  100% { opacity: 0; transform: scale(1.55); }
+}
+
 .splash-mark {
-  color: var(--accent);
+  position: relative;
   display: flex;
   animation: splash-mark 1100ms var(--ease-pop) both;
 }
+
+/* A shine bar crosses the mark once it has landed. */
+.splash-shine {
+  position: absolute;
+  inset: -10%;
+  overflow: hidden;
+  border-radius: 22%;
+  pointer-events: none;
+}
+.splash-shine::before {
+  content: '';
+  position: absolute;
+  top: -30%; bottom: -30%;
+  left: -60%;
+  width: 40%;
+  opacity: 0;
+  transform: rotate(16deg);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: splash-shine 900ms 900ms var(--ease) both;
+}
+@keyframes splash-shine {
+  0%   { transform: rotate(16deg) translateX(0); opacity: 0; }
+  18%  { opacity: 1; }
+  82%  { opacity: 1; }
+  100% { transform: rotate(16deg) translateX(500%); opacity: 0; }
+}
+
 .splash-word {
   font-family: var(--font-display);
   font-weight: var(--display-weight);
@@ -741,14 +794,14 @@ html.is-immersive .xp-pop.is-rising { animation-name: xp-rise-down; }
   text-transform: uppercase;
   font-size: 0.92rem;
   color: var(--ink-faint);
-  animation: splash-word 900ms 260ms var(--ease) both;
+  animation: splash-word 900ms 320ms var(--ease) both;
 }
 @keyframes splash-mark {
-  0%   { opacity: 0; transform: translateY(14px) scale(0.82); }
-  55%  { opacity: 1; transform: translateY(0) scale(1.06); }
+  0%   { opacity: 0; transform: translateY(26px) scale(0.7); }
+  55%  { opacity: 1; transform: translateY(0) scale(1.08); }
   100% { opacity: 1; transform: none; }
 }
 @keyframes splash-word {
-  from { opacity: 0; letter-spacing: 0.42em; }
-  to   { opacity: 1; letter-spacing: 0.16em; }
+  from { opacity: 0; letter-spacing: 0.42em; transform: translateY(6px); }
+  to   { opacity: 1; letter-spacing: 0.16em; transform: none; }
 }

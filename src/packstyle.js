@@ -140,50 +140,52 @@ const burst = (shapes, colors, { count = 26, spread = 1, gravity = 0.35 } = {}) 
  * particles. Every subject must feel like ITS OWN product on the shelf.
  */
 const THEME_STYLES = {
-  cars:        { foil: P.stripes(1, 0.13),      holoAngle: 64,
+  cars:        { family: 'sash', foil: P.stripes(1, 0.13),      holoAngle: 64,
                  particles: burst(['streak', 'shard'], ['#f87171', '#ffe1e1', '#ffffff'], { spread: 1.3, gravity: 0.2 }) },
-  f1:          { foil: P.checker(1, 0.12),      holoAngle: 105,
+  f1:          { family: 'sash', foil: P.checker(1, 0.12),      holoAngle: 105,
                  particles: burst(['square', 'square-alt'], ['#f8fafc', '#111318', '#ef4444'], { count: 30, gravity: 0.5 }) },
-  planes:      { foil: P.contrails(1, 0.2),     holoAngle: 148,
+  planes:      { family: 'roundel', foil: P.contrails(1, 0.2),     holoAngle: 148,
                  particles: burst(['streak', 'orb'], ['#bfdbfe', '#ffffff', '#60a5fa'], { spread: 1.4, gravity: 0.1 }) },
-  'video-games': { foil: P.pixels(1, 0.11),     holoAngle: 90,
+  'video-games': { family: 'panel', foil: P.pixels(1, 0.11),     holoAngle: 90,
                  particles: burst(['square', 'square', 'square-alt'], ['#4ade80', '#facc15', '#38bdf8', '#f472b6'], { count: 34, gravity: 0.45 }) },
-  books:       { foil: P.ruled(1, 0.12),        holoAngle: 100,
+  books:       { family: 'plate', foil: P.ruled(1, 0.12),        holoAngle: 100,
                  particles: burst(['page', 'page'], ['#fde68a', '#fef3c7', '#d6b25e'], { count: 22, gravity: 0.8 }) },
-  movies:      { foil: P.sprockets(1, 0.4),     holoAngle: 120,
+  movies:      { family: 'marquee', foil: P.sprockets(1, 0.4),     holoAngle: 120,
                  particles: burst(['frame', 'star4'], ['#facc15', '#f8fafc', '#171717'], { gravity: 0.5 }) },
-  space:       { foil: P.stars(1, 0.5),         holoAngle: 122,
+  space:       { family: 'roundel', foil: P.stars(1, 0.5),         holoAngle: 122,
                  particles: burst(['star4', 'orb', 'ring'], ['#c4b5fd', '#67e8f9', '#ffffff'], { spread: 1.2, gravity: 0 }) },
-  physics:     { foil: P.orbits(1, 0.15),       holoAngle: 132,
+  physics:     { family: 'roundel', foil: P.orbits(1, 0.15),       holoAngle: 132,
                  particles: burst(['orb', 'ring'], ['#22d3ee', '#a78bfa', '#ffffff'], { gravity: 0.05 }) },
-  nature:      { foil: P.zigzag(1, 0.12),       holoAngle: 118,
+  nature:      { family: 'arch', foil: P.zigzag(1, 0.12),       holoAngle: 118,
                  particles: burst(['petal', 'orb'], ['#86efac', '#fbbf24', '#dcfce7'], { gravity: 0.6 }) },
-  animals:     { foil: P.scales(1, 0.13),       holoAngle: 108,
+  animals:     { family: 'arch', foil: P.scales(1, 0.13),       holoAngle: 108,
                  particles: burst(['orb', 'shard'], ['#fbbf24', '#fb923c', '#fff7ed'], { gravity: 0.45 }) },
-  plants:      { foil: P.petals(1, 0.12),       holoAngle: 96,
+  plants:      { family: 'arch', foil: P.petals(1, 0.12),       holoAngle: 96,
                  particles: burst(['petal', 'petal', 'orb'], ['#86efac', '#4ade80', '#fef9c3'], { count: 30, gravity: 0.55 }) },
-  history:     { foil: P.columns(1, 0.1),       holoAngle: 90,
+  history:     { family: 'plate', foil: P.columns(1, 0.1),       holoAngle: 90,
                  particles: burst(['shard', 'page'], ['#d6b25e', '#a8a29e', '#f5f5f4'], { gravity: 0.7 }) },
-  philosophy:  { foil: P.orbits(1.6, 0.13),     holoAngle: 140,
+  philosophy:  { family: 'roundel', foil: P.orbits(1.6, 0.13),     holoAngle: 140,
                  particles: burst(['ring', 'orb'], ['#e0e7ff', '#a5b4fc', '#ffffff'], { count: 20, gravity: 0.1 }) },
-  celebrities: { foil: P.rays(1, 0.11),         holoAngle: 112,
+  celebrities: { family: 'marquee', foil: P.rays(1, 0.11),         holoAngle: 112,
                  particles: burst(['star5', 'star4'], ['#fde047', '#ffffff', '#f9a8d4'], { count: 30, gravity: 0.3 }) },
-  quotes:      { foil: P.ruled(1.5, 0.1),       holoAngle: 102,
+  quotes:      { family: 'plate', foil: P.ruled(1.5, 0.1),       holoAngle: 102,
                  particles: burst(['comma', 'page'], ['#f8fafc', '#cbd5e1', '#94a3b8'], { count: 22, gravity: 0.6 }) },
-  art:         { foil: P.waves(1, 0.13),        holoAngle: 84,
+  art:         { family: 'marquee', foil: P.waves(1, 0.13),        holoAngle: 84,
                  particles: burst(['blob', 'blob', 'orb'], ['#f472b6', '#fbbf24', '#38bdf8', '#4ade80'], { count: 30, gravity: 0.5 }) },
-  cactus:      { foil: P.petals(0.7, 0.1),      holoAngle: 76,
+  cactus:      { family: 'arch', foil: P.petals(0.7, 0.1),      holoAngle: 76,
                  particles: burst(['spike', 'orb'], ['#4ade80', '#fbbf24', '#dcfce7'], { spread: 1.4, gravity: 0.4 }) },
-  sport:       { foil: P.stripes(1.4, 0.11),    holoAngle: 58,
+  sport:       { family: 'sash', foil: P.stripes(1.4, 0.11),    holoAngle: 58,
                  particles: burst(['square-alt', 'orb'], ['#fbbf24', '#f8fafc', '#38bdf8'], { count: 30, gravity: 0.5 }) }
 };
 
 /* Non-subject packs. */
 const TIMED_STYLE = {
+  family: 'roundel',
   foil: P.orbits(0.8, 0.14), holoAngle: 126,
   particles: burst(['orb', 'ring'], ['#38bdf8', '#bae6fd', '#ffffff'], { count: 20, gravity: 0.15 })
 };
 const OPEN_STYLE = {
+  family: 'roundel',
   foil: P.stars(1.4, 0.3), holoAngle: 116,
   particles: burst(['orb', 'star4'], ['#cbd5e1', '#ffffff'], { count: 22, gravity: 0.3 })
 };
@@ -215,6 +217,7 @@ function mulberry(seed) {
 
 const PROC_PATTERNS = ['stars', 'orbits', 'stripes', 'pixels', 'ruled', 'scales',
   'petals', 'rays', 'waves', 'zigzag', 'checker', 'columns'];
+const PROC_FAMILIES = ['sash', 'roundel', 'plate', 'marquee', 'arch', 'panel'];
 const PROC_SHAPES = [['shard', 'orb'], ['square', 'square-alt'], ['star4', 'orb'],
   ['petal', 'orb'], ['ring', 'orb'], ['blob', 'star4'], ['streak', 'shard'], ['page', 'shard']];
 
@@ -266,30 +269,41 @@ export function customSeed(spec) {
 export function styleForSpec(spec) {
   if (spec.kind === 'custom') {
     const style = proceduralStyle(customSeed(spec));
-    return { ...style, holo: holo(style.holoAngle, style.holoStrength) };
+    const seed = hashSeed(String(customSeed(spec)));
+    const letter = (spec.customName ?? spec.wiki?.sitename ?? 'W').trim().charAt(0) || 'W';
+    return {
+      ...style,
+      holo: holo(style.holoAngle, style.holoStrength),
+      family: PROC_FAMILIES[seed % PROC_FAMILIES.length],
+      emblem: { kind: 'monogram', letter, spin: seed % 14 }
+    };
   }
 
   if (spec.kind === 'timed') {
     return { accent: '#38bdf8', accent2: '#0c4a6e', foil: TIMED_STYLE.foil,
-      holo: holo(TIMED_STYLE.holoAngle), particles: TIMED_STYLE.particles };
+      holo: holo(TIMED_STYLE.holoAngle), particles: TIMED_STYLE.particles,
+      family: TIMED_STYLE.family, emblem: { kind: 'drawn', id: 'timed' } };
   }
 
   const theme = themeById(spec.themeId);
   if (theme) {
     const s = THEME_STYLES[theme.id] ?? OPEN_STYLE;
     return { accent: theme.accent, accent2: theme.accent2, foil: s.foil,
-      holo: holo(s.holoAngle ?? 115), particles: s.particles };
+      holo: holo(s.holoAngle ?? 115), particles: s.particles,
+      family: s.family ?? 'roundel', emblem: { kind: 'drawn', id: theme.id } };
   }
 
   // A pure rarity booster is a cut gem in the tier's colour.
   if (spec.rarityId) {
     const rarity = rarityById(spec.rarityId);
     return { accent: rarity.color, accent2: '#1e2233', foil: P.facets(1, 0.15),
-      holo: holo(118), particles: burst(['shard', 'star4'], [rarity.color, '#ffffff'], { count: 28, gravity: 0.25 }) };
+      holo: holo(118), particles: burst(['shard', 'star4'], [rarity.color, '#ffffff'], { count: 28, gravity: 0.25 }),
+      family: 'roundel', emblem: { kind: 'drawn', id: 'gem' } };
   }
 
   return { accent: '#94a3b8', accent2: '#334155', foil: OPEN_STYLE.foil,
-    holo: holo(OPEN_STYLE.holoAngle), particles: OPEN_STYLE.particles };
+    holo: holo(OPEN_STYLE.holoAngle), particles: OPEN_STYLE.particles,
+    family: OPEN_STYLE.family, emblem: { kind: 'drawn', id: 'open' } };
 }
 
 /** Particles for a rarity reveal (a Legendary flip earns its own burst). */

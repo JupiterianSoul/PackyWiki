@@ -140,6 +140,10 @@ const ICONS = {
   spark: `
     <path d="M12 3.2 13.9 9.3 20 11.2 13.9 13.1 12 19.2 10.1 13.1 4 11.2 10.1 9.3z"/>`,
   chevron: `<path d="M9.5 5.5 16 12l-6.5 6.5"/>`,
+  trash: `
+    <path d="M4.5 6.5h15"/><path d="M9.5 6.5v-2a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v2"/>
+    <path d="M6.5 6.5 7.3 19a1.6 1.6 0 0 0 1.6 1.5h6.2a1.6 1.6 0 0 0 1.6-1.5l.8-12.5"/>
+    <path d="M10 10.5v6.5M14 10.5v6.5"/>`,
   chevronLeft: `<path d="M14.5 5.5 8 12l6.5 6.5"/>`,
 
   /* --- accounts and friends --- */
@@ -182,14 +186,36 @@ const ICONS = {
  * spark beside it. Drawn with `currentColor` so it takes the colour of
  * whatever it sits in, the same as every other icon here.
  */
+/*
+ * The Wiklodo mark: a foil booster torn open, a star bursting out of the
+ * mouth, the W stamped on the face. The same drawing ships as the Android
+ * launcher icon (ic_launcher_foreground.xml) — one identity everywhere.
+ */
 export const LOGO_MARK = `
-  <g fill="none" stroke="currentColor" stroke-linejoin="round" stroke-linecap="round">
-    <rect x="12" y="6" width="33" height="52" rx="7" stroke-width="3"/>
-    <path d="M12 17h33" stroke-width="3"/>
-    <path d="M19.5 27 24.5 46 28.5 35.5 32.5 46 37.5 27" stroke-width="3.8"/>
-  </g>
-  <circle cx="54" cy="12" r="3" fill="currentColor"/>
-  <circle cx="54" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2" opacity="0.45"/>`;
+  <defs>
+    <linearGradient id="lg-bag" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f46e5"/>
+      <stop offset="0.55" stop-color="#312e81"/>
+      <stop offset="1" stop-color="#1e1b4b"/>
+    </linearGradient>
+    <linearGradient id="lg-star" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#lg-bag)"
+    d="M15 21 L18 18 L21 21 L24 18 L27 21 L30 18 L33 21 L36 18 L39 21 L42 18 L45 21 L48 18 L48 51 A6 6 0 0 1 42 57 L21 57 A6 6 0 0 1 15 51 Z"/>
+  <path fill="rgba(165,180,252,0.35)" d="M15 33 L48 23 L48 31 L15 41 Z"/>
+  <path fill="#0b0d1c" d="M17 21.8 L46 21.8 L46 25.4 L17 25.4 Z"/>
+  <path fill="none" stroke="#a5b4fc" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"
+    d="M15 21 L18 18 L21 21 L24 18 L27 21 L30 18 L33 21 L36 18 L39 21 L42 18 L45 21 L48 18"/>
+  <path fill="url(#lg-star)"
+    d="M31.5 2 L34.6 10.4 L43 13.5 L34.6 16.6 L31.5 25 L28.4 16.6 L20 13.5 L28.4 10.4 Z"/>
+  <path fill="#fff7d6" d="M31.5 7.6 L33.3 11.7 L37.4 13.5 L33.3 15.3 L31.5 19.4 L29.7 15.3 L25.6 13.5 L29.7 11.7 Z"/>
+  <path fill="#fde68a" d="M46 4 L47.1 7 L50 8.1 L47.1 9.2 L46 12.2 L44.9 9.2 L42 8.1 L44.9 7 Z"/>
+  <path fill="#fde68a" d="M17 6.5 L17.9 8.9 L20.2 9.8 L17.9 10.7 L17 13.1 L16.1 10.7 L13.8 9.8 L16.1 8.9 Z"/>
+  <path fill="none" stroke="#f8fafc" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"
+    d="M22 36 L26.4 50 L31.5 41 L36.6 50 L41 36"/>`;
 
 /**
  * The Buckarooz mark: a B with two bars running through it, top and bottom,

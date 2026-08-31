@@ -15,8 +15,17 @@ button { font: inherit; color: inherit; background: none; border: 0; cursor: poi
 input, select, textarea { font: inherit; color: inherit; }
 img { display: block; max-width: 100%; }
 
+/*
+ * The document does not scroll and cannot be panned, ever. The page is pinned
+ * to the viewport and #app is the one scroll container. This is what stops
+ * every "the whole screen slides sideways" bug for good: no matter what a
+ * particle, a wide row or a long word does, the document is never wider than
+ * the screen, so the WebView has nothing to pan or zoom out to.
+ */
 html {
-  height: 100%;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   background: #06070d;
   overscroll-behavior: none;
   -webkit-text-size-adjust: 100%;
@@ -24,9 +33,9 @@ html {
 
 body {
   margin: 0;
-  min-height: 100%;
-  overflow-x: hidden;
-  overscroll-behavior-x: none;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
   font-family: var(--font);
   color: var(--ink);
   background: transparent;
@@ -91,11 +100,14 @@ h1, h2, h3, h4 {
 /* --- the app frame -------------------------------------------------------- */
 
 #app {
-  position: relative;
+  position: absolute;
+  inset: 0;
   z-index: 2;
   display: flex;
   flex-direction: column;
-  min-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: clip;
+  overscroll-behavior: none;
 }
 
 /*
@@ -122,29 +134,12 @@ h1, h2, h3, h4 {
 }
 
 /*
- * The app name sits in the middle and is the first thing to go: it is the one
- * item that tells you nothing you did not already know. Below 380px the row is
- * the menu, the purse, the bell and your level, which are all controls.
+ * Two equal wings keep the purse dead centre: menu and bell on the left,
+ * the daily gift and your level on the right. The name lives in the drawer.
  */
-.appbar-brand {
-  flex: 1;
-  min-width: 0;
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  letter-spacing: var(--display-tracking);
-  text-transform: var(--display-transform);
-  font-size: 1.05rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-@media (max-width: 379px) {
-  .appbar-brand { display: none; }
-  .appbar { justify-content: space-between; }
-  .appbar-actions { flex: 1; justify-content: flex-end; }
-}
-
-.appbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.appbar-side { flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; }
+.appbar-side.is-right { justify-content: flex-end; }
+.appbar > .wallet-chip { flex: none; }
 
 /* The unread count on the bell. Sits on the icon rather than beside it, so a
    two-digit count does not push the level badge off the row. */

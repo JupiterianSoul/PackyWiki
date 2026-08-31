@@ -18,20 +18,24 @@
 
     <div id="app">
       <header class="appbar">
-        <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu"
-                aria-haspopup="dialog" aria-expanded="false">
-          <span id="menu-icon" aria-hidden="true"></span>
-          <span class="dot" id="menu-dot" hidden></span>
-        </button>
-        <span class="appbar-brand" id="appbar-brand">Wiklodo</span>
-        <div class="appbar-actions">
-          <button id="wallet" class="wallet-chip" type="button" aria-haspopup="dialog">
-            <span id="wallet-mark" aria-hidden="true"></span>
-            <span id="wallet-amount"></span>
+        <div class="appbar-side is-left">
+          <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu"
+                  aria-haspopup="dialog" aria-expanded="false">
+            <span id="menu-icon" aria-hidden="true"></span>
           </button>
           <button id="bell" class="icon-btn" type="button" aria-haspopup="dialog" aria-label="Notifications">
             <span id="bell-icon" aria-hidden="true"></span>
             <span class="count" id="bell-count" hidden></span>
+          </button>
+        </div>
+        <button id="wallet" class="wallet-chip" type="button" aria-haspopup="dialog">
+          <span id="wallet-mark" aria-hidden="true"></span>
+          <span id="wallet-amount"></span>
+        </button>
+        <div class="appbar-side is-right">
+          <button id="gift-btn" class="icon-btn" type="button" aria-label="Daily gift">
+            <span id="gift-icon" aria-hidden="true"></span>
+            <span class="dot" id="gift-dot" hidden></span>
           </button>
           <button id="level-badge" class="ring" type="button" aria-label="Profile"></button>
         </div>
@@ -78,7 +82,6 @@
                        aria-label="Subject" />
                 <button id="creator-go" class="btn btn-primary" type="submit"></button>
               </div>
-              <div class="creator-examples" id="creator-examples"></div>
               <p id="creator-status" class="creator-status" role="status" aria-live="polite"></p>
             </form>
             <div class="section-head"><h3 class="label" id="creator-mine-label"></h3></div>
@@ -368,7 +371,11 @@
     <!-- Opening animation. Also what the account gate hides behind until the
          stored session has been read, so it cannot flash on every launch. -->
     <div id="splash" class="splash">
-      <div class="splash-mark" id="splash-mark" aria-hidden="true"></div>
+      <div class="splash-stage" aria-hidden="true">
+        <div class="splash-halo"></div>
+        <div class="splash-mark" id="splash-mark"></div>
+        <div class="splash-shine"></div>
+      </div>
       <div class="splash-word" id="splash-word">Wiklodo</div>
     </div>
 

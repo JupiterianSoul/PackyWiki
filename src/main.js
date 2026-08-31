@@ -18,10 +18,10 @@
  * texture, backdrop and instrument. See ui/themes.js.
  */
 
-import { THEME_PACKS, themeById as packById, heroTitles } from './data/packs.js';
+import { THEME_PACKS, themeById as packById } from './data/packs.js';
 import { RARITIES, rarityById, rarityRank, rollRarity, oddsTable, rarityChances } from './data/rarities.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
-import { drawArticles, resolveCustomWiki, fetchPackArt, fetchCustomPackArt } from './wiki.js';
+import { drawArticles, resolveCustomWiki } from './wiki.js';
 import { priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS } from './pricing.js';
 import {
   boosterPrice, rollOptionsFor, sellPriceFor, nextRefreshAt, windowIndexAt,
@@ -29,7 +29,7 @@ import {
 } from './economy.js';
 import { generateShop, formatCountdown } from './shop.js';
 import {
-  specId, specName, specTagline, specColours, specIcon, specHero, toDrawPack
+  specId, specName, specTagline, specColours, specIcon, toDrawPack
 } from './booster.js';
 import * as store from './collection.js';
 import {
@@ -50,7 +50,7 @@ import {
 import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
-import { buildPackElement } from './packview.js';
+import { buildPackElement, buildCardBack } from './packview.js';
 import { styleForSpec, rarityBurst } from './packstyle.js';
 import { synth } from './ui/sound.js';
 import { backdrop } from './ui/backdrop.js';
@@ -98,7 +98,6 @@ const state = {
   inventory: store.loadInventory(),
   profile: store.loadProfile(),
   wallet: store.loadWallet(),
-  art: new Map(),
   ripDir: Number(localStorage.getItem?.(RIP_DIR_KEY)) || 0,
   prefetch: null,
   prefetchTimer: null,
@@ -137,8 +136,8 @@ bind({
     friend: $('#screen-friend'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
-  menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'), menuDot: $('#menu-dot'),
-  appbarBrand: $('#appbar-brand'),
+  menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
+  giftBtn: $('#gift-btn'), giftIcon: $('#gift-icon'), giftDot: $('#gift-dot'),
   levelBadge: $('#level-badge'),
   wallet: $('#wallet'), walletMark: $('#wallet-mark'), walletAmount: $('#wallet-amount'),
   bell: $('#bell'), bellIcon: $('#bell-icon'), bellCount: $('#bell-count'),
@@ -155,7 +154,7 @@ bind({
   creatorWrap: $('#creator-wrap'), creator: $('#creator'), creatorMark: $('#creator-mark'),
   creatorLabel: $('#creator-label'), creatorNote: $('#creator-note'),
   creatorInput: $('#creator-input'), creatorGo: $('#creator-go'), creatorStatus: $('#creator-status'),
-  creatorExamples: $('#creator-examples'), creatorMineLabel: $('#creator-mine-label'),
+  creatorMineLabel: $('#creator-mine-label'),
   creatorMine: $('#creator-mine'), creatorEmpty: $('#creator-empty'),
   creatorEmptyMark: $('#creator-empty-mark'), creatorEmptyText: $('#creator-empty-text'),
 
@@ -312,7 +311,8 @@ function showScreen(name) {
 
   setTickerJob('shop', name === 'shop' ? tickRestock : null);
   setTickerJob('timed', name === 'timed' ? tickTimed : null);
-  window.scrollTo({ top: 0 });
+  // #app is the scroll container now, not the document.
+  document.getElementById('app')?.scrollTo({ top: 0 });
 }
 
 /**
@@ -340,7 +340,7 @@ function updateBadges() {
   const timed = state.profile.timed.count ?? 0;
   nav.setBadge('timed', timed ? String(timed) : '');
   const ready = canClaim(state.profile.daily);
-  el.menuDot.hidden = !ready;
+  el.giftDot.hidden = !ready;
   paintBell();
 }
 
@@ -360,15 +360,15 @@ function drawerItems() {
     { id: 'timed',  icon: 'hourglass',  key: 'tabTimed',       run: go('timed', renderTimed) },
     { id: 'shop',   icon: 'gem',        key: 'tabShop',        run: go('shop', () => { payStipend(); renderShop(); }) },
     { id: 'binder', icon: 'collection', key: 'tabCollection',  run: go('binder', renderBinder) },
-    { id: 'profile', icon: 'profile',   key: 'tabProfile',     run: go('profile', renderProfile) },
+    { id: 'daily',  icon: 'gift',       key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
+      run: () => openDaily() },
     { sep: true },
     ...(account.configured
       ? [{ id: 'friends', icon: 'friends', key: 'tabFriends',
            badge: () => state.social.incoming.length,
            run: go('friends', () => { renderFriends(); loadFriends(); }) }]
       : []),
-    { id: 'daily',    icon: 'gift',     key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
-      run: () => openDaily() },
+    { id: 'profile',  icon: 'profile',  key: 'tabProfile',  run: go('profile', renderProfile) },
     { id: 'settings', icon: 'settings', key: 'tabSettings', run: go('settings', renderSettings) }
   ];
 }
@@ -558,24 +558,8 @@ function openHelp(topic) {
 
 function buildBooster(spec, { interactive = false, size = '' } = {}) {
   const booster = buildPackElement(spec, { interactive, size });
-  paintPackPhoto(booster.querySelector('.booster-photo'), spec);
   if (interactive && state.ripDir) booster.dataset.ripDir = String(state.ripDir);
   return booster;
-}
-
-function paintPackPhoto(node, spec) {
-  const src = spec.art ?? state.art.get(specHero(spec));
-  node.replaceChildren();
-  const fallback = () => node.insertAdjacentHTML('afterbegin',
-    `<div class="booster-photo-fallback">${iconSvg(specIcon(spec), { size: 54 })}</div>`);
-  if (!src) return fallback();
-
-  const img = document.createElement('img');
-  img.src = src;
-  img.alt = '';
-  img.loading = 'lazy';
-  img.addEventListener('error', () => { img.remove(); fallback(); });
-  node.appendChild(img);
 }
 
 /* --- packs ------------------------------------------------------------------------- */
@@ -658,8 +642,6 @@ function paintPackCaption(index) {
  * had to go and look in the Shop. It now says what it makes, offers real
  * examples to tap, and lists what you have already built underneath.
  */
-const CREATOR_EXAMPLES = ['Terraria', 'Stardew Valley', 'Zelda', 'Minecraft', 'One Piece'];
-
 function renderCreator() {
   el.creatorMark.innerHTML = iconSvg('wand', { size: 22 });
   el.creatorLabel.textContent = t('creatorTitle');
@@ -667,19 +649,6 @@ function renderCreator() {
   el.creatorInput.placeholder = t('customPlaceholder');
   el.creatorGo.textContent = t('create');
   el.creatorMineLabel.textContent = t('creatorMine');
-
-  el.creatorExamples.replaceChildren(...CREATOR_EXAMPLES.map((name) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'creator-example';
-    chip.textContent = name;
-    press(chip, { sound: null });
-    chip.addEventListener('click', () => {
-      el.creatorInput.value = name;
-      el.creatorInput.focus();
-    });
-    return chip;
-  }));
 
   const made = state.customPacks ?? [];
   el.creatorEmpty.hidden = made.length > 0;
@@ -690,21 +659,49 @@ function renderCreator() {
 
   el.creatorMine.replaceChildren(...made.map((pack) => {
     const spec = { kind: 'custom', themeId: pack.id, rarityId: null, cards: 5 };
-    const row = document.createElement('button');
-    row.type = 'button';
+    const row = document.createElement('div');
     row.className = 'made';
-    row.innerHTML = `<span class="made-art"></span>
-      <span class="made-copy"><b></b><span></span></span>
-      <span class="muted">${iconSvg('chevron', { size: 17 })}</span>`;
+    row.innerHTML = `
+      <button type="button" class="made-main">
+        <span class="made-art"></span>
+        <span class="made-copy"><b></b><span></span></span>
+      </button>
+      <button type="button" class="made-delete" aria-label="${t('deleteBooster')}">
+        ${iconSvg('trash', { size: 17 })}
+      </button>`;
     row.querySelector('.made-art').appendChild(buildBooster(spec, { size: 'is-tiny' }));
     row.querySelector('b').textContent = pack.name;
     row.querySelector('.made-copy span').textContent = t('creatorInShop');
-    press(row, { sound: null });
-    row.addEventListener('click', () => {
+
+    const main = row.querySelector('.made-main');
+    press(main, { sound: null });
+    main.addEventListener('click', () => {
       synth.playTap();
       payStipend();
       renderShop();
       showScreen('shop');
+    });
+
+    // Deleting is two taps: the first arms the button, the second commits.
+    // Walking away (or tapping anything else) disarms it.
+    const del = row.querySelector('.made-delete');
+    let armTimer = 0;
+    del.addEventListener('click', (event) => {
+      event.stopPropagation();
+      if (!del.classList.contains('is-armed')) {
+        del.classList.add('is-armed');
+        toast(t('deleteArmed'), 'ok');
+        synth.playTap();
+        armTimer = setTimeout(() => del.classList.remove('is-armed'), 3500);
+        return;
+      }
+      clearTimeout(armTimer);
+      state.customPacks = store.deleteCustomPack(pack.id);
+      toast(t('packDeleted', { name: pack.name }), 'ok');
+      synth.playResolved();
+      renderCreator();
+      renderPacks();
+      renderShop();
     });
     return row;
   }));
@@ -743,8 +740,7 @@ async function createCustomPack(event) {
       tagline: wiki.sitename,
       icon: 'wand',
       accent: '#a78bfa', accent2: '#4c1d95',
-      wiki,
-      art: await fetchCustomPackArt(wiki)
+      wiki
     };
     state.customPacks = store.saveCustomPack(pack);
 
@@ -1201,8 +1197,6 @@ function paintRip() {
   if (!tear) return;
   const clip = dir > 0 ? `inset(0 0 0 ${pct}%)` : `inset(0 ${pct}% 0 0)`;
   tear.style.clipPath = clip;
-  const line = rip.booster.querySelector('.rip-line');
-  if (line) line.style.clipPath = clip;
   const front = rip.booster.querySelector('.rip-front');
   if (front) {
     front.style.left = `${dir > 0 ? pct : 100 - pct}%`;
@@ -1604,6 +1598,7 @@ async function runOpen(booster) {
 const CARD_FRONT_MARKUP = `
   <div class="fx fx-a" aria-hidden="true"></div>
   <div class="fx-c" aria-hidden="true"></div>
+  <div class="fx-art" aria-hidden="true"></div>
   <div class="card-art"></div>
   <button class="fav-button" type="button" aria-pressed="false"></button>
   <div class="card-body">
@@ -1622,26 +1617,17 @@ const CARD_FRONT_MARKUP = `
  * nothing here can give the pull away.
  */
 function buildPlaceholderCard(index, total) {
-  const colours = specColours(state.spec);
   const card = document.createElement('div');
   card.className = 'card stack-card';
   card.style.zIndex = String(total - index);
-  card.style.setProperty('--back-accent', colours.accent);
-  card.style.setProperty('--back-accent2', colours.accent2);
-  card.innerHTML = `
-    <div class="card-inner">
-      <div class="card-face card-back">
-        <div class="back-field">
-          <div class="back-rays"></div>
-          <div class="back-dots"></div>
-        </div>
-        <div class="back-zip"></div>
-        <div class="back-burst">${iconSvg('burst', { size: 120 })}</div>
-        <div class="back-icon">${iconSvg(specIcon(state.spec), { size: 52 })}</div>
-        <div class="back-word">WIKLODO</div>
-      </div>
-      <div class="card-face card-front">${CARD_FRONT_MARKUP}</div>
-    </div>`;
+  const inner = document.createElement('div');
+  inner.className = 'card-inner';
+  inner.appendChild(buildCardBack(state.spec));
+  const front = document.createElement('div');
+  front.className = 'card-face card-front';
+  front.innerHTML = CARD_FRONT_MARKUP;
+  inner.appendChild(front);
+  card.appendChild(inner);
   return card;
 }
 
@@ -1880,13 +1866,15 @@ function drainLevelUps() {
   return true;
 }
 
-function rewardCard(reward) {
+function rewardCard(reward, { art = true } = {}) {
   const wrap = document.createElement('div');
   wrap.className = 'reward-card';
-  if (reward.spec) {
-    const art = document.createElement('div');
-    art.appendChild(buildBooster(reward.spec, { size: 'is-tiny' }));
-    wrap.appendChild(art);
+  // The profile's "next reward" line shows the name alone: a thumbnail-sized
+  // pack render reads as clutter there. The level-up sheet keeps the art.
+  if (reward.spec && art) {
+    const artBox = document.createElement('div');
+    artBox.appendChild(buildBooster(reward.spec, { size: 'is-tiny' }));
+    wrap.appendChild(artBox);
   }
   const label = document.createElement('p');
   label.className = 'reward-label';
@@ -2250,7 +2238,8 @@ function renderProfile() {
 
   el.nextRewardLabel.textContent = t('profileNextReward');
   el.nextReward.replaceChildren(
-    atMax ? document.createTextNode(t('profileMax')) : rewardCard(rewardForLevel(level + 1))
+    atMax ? document.createTextNode(t('profileMax'))
+      : rewardCard(rewardForLevel(level + 1), { art: false })
   );
 
   el.statsLabel.textContent = t('profileStats');
@@ -2635,7 +2624,6 @@ function reloadFromStorage() {
   renderShop();
   renderBinder();
   updateBadges();
-  if (languageChosen()) loadPackArt();
 }
 
 /** Sign out, and put the gate back. Local state is left for the next sign-in. */
@@ -3518,7 +3506,6 @@ function showStarter() {
   renderShop();
   renderBinder();
   updateBadges();
-  loadPackArt();
 }
 
 /* --- strings --------------------------------------------------------------------------------------------------------- */
@@ -3527,6 +3514,7 @@ function applyStrings() {
   document.documentElement.lang = getLanguage();
   el.menuIcon.innerHTML = iconSvg('menu', { size: 20 });
   el.bellIcon.innerHTML = iconSvg('bell', { size: 19 });
+  el.giftIcon.innerHTML = iconSvg('gift', { size: 19 });
   el.walletMark.innerHTML = buckSvg({ size: 12 });
   el.sheetClose.innerHTML = iconSvg('close', { size: 17 });
   el.openBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
@@ -3545,30 +3533,6 @@ function applyStrings() {
 }
 
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
-
-async function loadPackArt() {
-  try {
-    state.art = await fetchPackArt(heroTitles(getLanguage()));
-    document.querySelectorAll('.booster').forEach((booster) => {
-      const id = booster.dataset.spec;
-      const slot = state.inventory[id];
-      const spec = slot?.spec ?? specFromId(id);
-      if (spec) paintPackPhoto(booster.querySelector('.booster-photo'), spec);
-    });
-  } catch {
-    /* offline: every booster keeps its drawn fallback */
-  }
-}
-
-/** Rebuild a minimal spec from an id, to repaint art after a late load. */
-function specFromId(id) {
-  const [kind, theme, rarity, cards] = String(id).split('|');
-  if (kind === 'custom' || kind === 'timed') return null;
-  return {
-    kind, themeId: theme === 'any' ? null : theme,
-    rarityId: rarity === 'std' ? null : rarity, cards: Number(cards) || 5
-  };
-}
 
 function init() {
   useTheme(storedTheme());
@@ -3592,9 +3556,9 @@ function init() {
   ], (mode) => { state.packMode = mode; renderPacks(); });
 
   nav = new NavBar(el.navbar, [
-    { id: 'packs', icon: iconSvg('packs', { size: 21 }) },
-    { id: 'timed', icon: iconSvg('clock', { size: 21 }) },
     { id: 'shop', icon: iconSvg('gem', { size: 21 }) },
+    { id: 'timed', icon: iconSvg('clock', { size: 21 }) },
+    { id: 'packs', icon: iconSvg('packs', { size: 21 }) },
     { id: 'binder', icon: iconSvg('collection', { size: 21 }) },
     { id: 'profile', icon: iconSvg('profile', { size: 21 }) }
   ], (id) => {
@@ -3621,15 +3585,15 @@ function init() {
   renderShop();
   renderBinder();
   // Pack art is language-specific, so it waits until a language exists.
-  if (languageChosen()) loadPackArt();
 
-  [el.wallet, el.menuBtn, el.bell, el.levelBadge, el.packsOpen, el.timedOpen,
+  [el.wallet, el.menuBtn, el.bell, el.giftBtn, el.levelBadge, el.packsOpen, el.timedOpen,
    el.filterOpen, el.openBack, el.openDone, el.sheetClose, el.starterGo,
    el.packsEmptyCta, el.creatorGo, el.findGo, el.friendBack,
    el.friendRemove, el.gateAlt, el.oddsBtn].forEach((node) => press(node, { sound: null }));
 
   el.wallet.addEventListener('click', openWallet);
   el.bell.addEventListener('click', openNotifications);
+  el.giftBtn.addEventListener('click', () => openDaily());
   el.menuBtn.addEventListener('click', () => (el.drawer.hidden ? openDrawer() : closeDrawer()));
   el.drawerScrim.addEventListener('click', closeDrawer);
   el.levelBadge.addEventListener('click', () => { renderProfile(); showScreen('profile'); });

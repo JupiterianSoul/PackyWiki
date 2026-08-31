@@ -55,7 +55,11 @@ public class MainActivity extends Activity {
         // stylesheet is measured against the wrong number and the app gets
         // the desktop layout on a phone.
         settings.setUseWideViewPort(true);
-        settings.setLoadWithOverviewMode(true);
+        // NEVER zoom the page out to fit its widest content. With this on,
+        // any element that strayed past the right edge (a particle, a wide
+        // row) made the WebView shrink the whole app into a pannable
+        // "desktop" view. The layout is width=device-width, always.
+        settings.setLoadWithOverviewMode(false);
         // The layout is responsive; pinch-zooming a native-feeling app only
         // ever produces a half-scrolled mess.
         settings.setSupportZoom(false);

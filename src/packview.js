@@ -10,9 +10,9 @@
  * bag itself.
  */
 import { styleForSpec } from './packstyle.js';
-import { specId, specName, specIcon } from './booster.js';
+import { specId, specBaseName, specTierName } from './booster.js';
 import { rarityById } from './data/rarities.js';
-import { iconSvg } from './data/icons.js';
+import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { t } from './i18n.js';
 
 export function buildPackElement(spec, { interactive = false, size = '' } = {}) {
@@ -20,6 +20,7 @@ export function buildPackElement(spec, { interactive = false, size = '' } = {}) 
   const booster = document.createElement('div');
   booster.className = `booster ${size}`.trim();
   booster.dataset.spec = specId(spec);
+  booster.dataset.family = style.family ?? 'roundel';
   booster.style.setProperty('--accent', style.accent);
   booster.style.setProperty('--accent2', style.accent2);
   booster.style.setProperty('--foil', style.foil);
@@ -33,11 +34,20 @@ export function buildPackElement(spec, { interactive = false, size = '' } = {}) 
     booster.style.setProperty('--rarity-glow', rarity.glow);
   }
 
+  // The face artwork is the app's own: the category's drawn emblem, or a
+  // custom pack's faceted monogram. No photographs on packs.
+  const emblem = style.emblem?.kind === 'monogram'
+    ? monogramSvg(style.emblem.letter, style.emblem.spin)
+    : emblemSvg(style.emblem?.id ?? 'open');
+
   booster.innerHTML = `
     <div class="booster-body">
       <div class="booster-foil" aria-hidden="true"></div>
       <div class="booster-face">
-        <div class="booster-photo"></div>
+        <div class="booster-emblem" aria-hidden="true">
+          <div class="emblem-deco"></div>
+          <div class="emblem-art">${emblem}</div>
+        </div>
         <span class="booster-name"></span>
         <span class="booster-count"></span>
       </div>
@@ -49,17 +59,45 @@ export function buildPackElement(spec, { interactive = false, size = '' } = {}) 
       ${interactive ? `
         <div class="booster-tear" aria-hidden="true"></div>
         <div class="rip-front" aria-hidden="true"></div>
-        <div class="rip-zone" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div class="rip-line"></div>
-          <div class="rip-grip is-left"></div>
-          <div class="rip-grip is-right"></div>
-        </div>` : ''}
+        <div class="rip-zone" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"></div>` : ''}
     </div>`;
 
-  booster.querySelector('.booster-name').textContent = specName(spec);
+  booster.querySelector('.booster-name').textContent = specBaseName(spec);
   booster.querySelector('.booster-count').textContent = `${spec.cards} ${t('cards')}`;
-  // The subject icon stands in until (or in case) the photograph arrives.
-  booster.querySelector('.booster-photo').innerHTML =
-    `<div class="booster-photo-fallback">${iconSvg(specIcon(spec), { size: 44 })}</div>`;
+  // A tiered pack wears its subject at the top and its tier at the bottom.
+  const tier = specTierName(spec);
+  if (tier) {
+    const el = document.createElement('span');
+    el.className = 'booster-tier';
+    el.textContent = tier;
+    booster.querySelector('.booster-face').appendChild(el);
+  }
   return booster;
+}
+
+/**
+ * The back of a card from this pack. Every category's cards wear their own
+ * back: the pack's family construction, palette, foil pattern and emblem,
+ * scaled down to card size — so a face-down card already says where it came
+ * from, without giving anything about the pull away.
+ */
+export function buildCardBack(spec) {
+  const style = styleForSpec(spec);
+  const emblem = style.emblem?.kind === 'monogram'
+    ? monogramSvg(style.emblem.letter, style.emblem.spin)
+    : emblemSvg(style.emblem?.id ?? 'open');
+
+  const back = document.createElement('div');
+  back.className = 'card-face card-back';
+  back.dataset.family = style.family ?? 'roundel';
+  back.style.setProperty('--accent', style.accent);
+  back.style.setProperty('--accent2', style.accent2);
+  back.style.setProperty('--foil', style.foil);
+  back.innerHTML = `
+    <div class="cb-foil" aria-hidden="true"></div>
+    <div class="cb-deco" aria-hidden="true"></div>
+    <div class="cb-emblem" aria-hidden="true">${emblem}</div>
+    <div class="cb-word" aria-hidden="true">WIKLODO</div>
+    <div class="cb-frame" aria-hidden="true"></div>`;
+  return back;
 }

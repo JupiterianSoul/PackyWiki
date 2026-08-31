@@ -95,18 +95,6 @@
 .creator-input::placeholder { color: var(--ink-faint); }
 .creator-input:focus { outline: none; border-color: var(--accent); }
 
-.creator-examples { display: flex; flex-wrap: wrap; gap: 7px; }
-.creator-example {
-  padding: 6px 12px;
-  border-radius: var(--radius-pill);
-  border: var(--border) var(--border-style) var(--line);
-  background: transparent;
-  font-size: 0.76rem;
-  font-weight: 600;
-  color: var(--ink-dim);
-}
-[data-theme='arcade'] .creator-example { border-radius: var(--radius); }
-
 .creator-status { font-size: 0.82rem; font-weight: 700; min-height: 1.2em; }
 .creator-status.is-working { color: var(--warning); }
 .creator-status.is-ok { color: var(--positive); }
@@ -115,14 +103,35 @@
 .creator-mine { display: grid; gap: 8px; padding: 0 var(--gutter); }
 .made {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 10px 12px;
+  align-items: stretch;
+  gap: 0;
   border-radius: var(--radius);
   border: var(--border) var(--border-style) var(--line);
   background: var(--surface);
   width: 100%;
+  overflow: clip;
+}
+.made-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
   text-align: left;
+}
+.made-delete {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  color: var(--ink-faint);
+  border-left: var(--border) var(--border-style) var(--line);
+  transition: background calc(180ms * var(--motion-scale)), color calc(180ms * var(--motion-scale));
+}
+.made-delete.is-armed {
+  color: #fff;
+  background: var(--negative);
 }
 .made-art { flex: none; display: grid; place-items: center; }
 .made-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }

@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Wiklodo — emblem proofs (dev)</title>
+<style>
+  body { background: #0b0e1c; margin: 0; padding: 28px; font: 600 11px system-ui; color: #93a; }
+  .grid { display: flex; flex-wrap: wrap; gap: 26px; }
+  .slot { display: grid; gap: 8px; justify-items: center; color: #8b93b8; }
+  .chip { display: grid; place-items: center; width: 150px; height: 150px; border-radius: 20px;
+          background: radial-gradient(120% 120% at 50% 20%, var(--e3), #0a0d1a 90%); }
+  .chip.small { width: 60px; height: 60px; border-radius: 10px; }
+  .chip.small svg { width: 44px; height: 44px; }
+</style>
+</head>
+<body>
+<div class="grid" id="grid"></div>
+<script type="module">
+import { EMBLEMS, emblemSvg, monogramSvg } from '/src/data/emblems.js';
+import { THEME_PACKS } from '/src/data/packs.js';
+
+const grid = document.getElementById('grid');
+const pal = Object.fromEntries(THEME_PACKS.map(p => [p.id, [p.accent, p.accent2]]));
+pal.timed = ['#38bdf8', '#0c4a6e']; pal.open = ['#94a3b8', '#334155']; pal.gem = ['#fbbf24', '#1e2233'];
+
+const mix = (hex, pct) => `color-mix(in srgb, ${hex} ${pct}%, #ffffff)`;
+for (const id of Object.keys(EMBLEMS)) {
+  const [a, d] = pal[id] ?? ['#94a3b8', '#334155'];
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+  slot.innerHTML = `
+    <div class="chip" style="--e1:${mix(a, 45)};--e2:${a};--e3:${d}">${emblemSvg(id, { size: 116 })}</div>
+    <div style="display:flex;gap:8px">
+      <div class="chip small" style="--e1:${mix(a, 45)};--e2:${a};--e3:${d}">${emblemSvg(id)}</div>
+    </div>
+    <i>${id}</i>`;
+  grid.appendChild(slot);
+}
+for (const [ltr, spin, a, d] of [['T', 3, '#fb923c', '#7c2d12'], ['Z', 9, '#4ade80', '#14532d'], ['M', 12, '#60a5fa', '#1e3a8a']]) {
+  const slot = document.createElement('div');
+  slot.className = 'slot';
+  slot.innerHTML = `<div class="chip" style="--e1:${mix(a, 45)};--e2:${a};--e3:${d}">${monogramSvg(ltr, spin, { size: 116 })}</div><i>custom ${ltr}</i>`;
+  grid.appendChild(slot);
+}
+</script>
+</body>
+</html>

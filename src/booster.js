@@ -56,6 +56,21 @@ export function specName(spec) {
   return tier ? t('rarityBooster', { rarity: tier }) : t('wildcard');
 }
 
+/**
+ * The two halves of the name, for surfaces that lay them out separately —
+ * the pack face prints the subject at the top and the tier at the bottom
+ * rather than jamming them into one line.
+ */
+export function specBaseName(spec) {
+  if (spec.kind === 'timed') return t('timedBooster');
+  if (spec.kind === 'custom') return spec.customName ?? spec.wiki?.sitename ?? 'Custom';
+  if (spec.themeId) return tx(themeById(spec.themeId)?.name);
+  return spec.rarityId ? t('wildcard') : t('wildcard');
+}
+
+export const specTierName = (spec) =>
+  spec.rarityId ? tx(rarityById(spec.rarityId).name) : null;
+
 export function specTagline(spec) {
   if (spec.kind === 'timed') return t('timedTagline');
   if (spec.kind === 'custom') return spec.customTagline ?? '';
