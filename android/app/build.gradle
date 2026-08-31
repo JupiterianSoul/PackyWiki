@@ -2,6 +2,9 @@ plugins {
     id 'com.android.application'
 }
 
+/** CI passes the run number; a local build is always 1. */
+def buildNumber = (System.getenv('BUILD_NUMBER') ?: '1').toInteger()
+
 android {
     namespace 'com.packywiki.app'
     compileSdk 35
@@ -43,7 +46,12 @@ android {
         // Rises with every CI build so Android always sees a newer version.
         // Falls back to 1 for a local build, which is fine: a local build is
         // never installed over a released one.
-        versionCode (System.getenv('BUILD_NUMBER') ?: '1') as int
+        //
+        // Computed into a variable first, deliberately. Written inline as
+        // `versionCode (expr) as int`, Groovy reads it as
+        // `versionCode(expr) as int` — the cast lands on the setter's null
+        // return value, and the build dies with "Value is null".
+        versionCode buildNumber
         versionName '0.1.0'
     }
 
