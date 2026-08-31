@@ -1718,10 +1718,9 @@ function buildGateForm() {
   submit.textContent = t(creating ? 'gateSignUp' : 'gateSignIn');
   press(submit, { sound: null });
 
+  // Email and password only. The username is its own step, after the account
+  // exists — see showNameGate().
   el.gateForm.replaceChildren(
-    ...(creating
-      ? [field('username', 'gateUsername', { icon: 'profile', hintKey: 'gateUsernameHint', autocomplete: 'username' })]
-      : []),
     field('email', 'gateEmail', { type: 'email', icon: 'mail', autocomplete: 'email' }),
     field('password', 'gatePassword', {
       type: 'password', icon: 'key',
@@ -1773,10 +1772,8 @@ async function submitGate(event) {
 
   const email = fieldValue('email').trim();
   const password = fieldValue('password');
-  const username = fieldValue('username').trim();
   const creating = state.account.mode === 'signup';
 
-  if (creating && !account.USERNAME_RE.test(username)) return gateStatus('authBadName', 'error');
   if (!email || !password) return gateStatus('authUnknown', 'error');
 
   gateBusy = true;
@@ -1784,13 +1781,14 @@ async function submitGate(event) {
   synth.playTap();
   try {
     if (creating) {
-      const result = await account.signUp(email, password, username);
+      const result = await account.signUp(email, password);
       if (result.needsConfirmation) {
         gateStatus('gateConfirm', 'ok');
         setGateMode('signin');
         return;
       }
       gateStatus('gateSignedUp', 'ok');
+      // onSession finds an account with no profile and asks for a username.
     } else {
       await account.signIn(email, password);
     }
@@ -1819,8 +1817,12 @@ async function gateAltAction() {
 }
 
 /**
- * The one case where a signed-in account still has no profile: the username
- * chosen at sign-up was taken while the email was being confirmed.
+ * Step two of creating an account: take a username.
+ *
+ * Reached whenever a signed-in account has no profile — which is every new
+ * account, and also an older one whose chosen name was taken while its email
+ * was being confirmed. There is no way past it but to pick a name or sign out,
+ * because everything social is keyed on having one.
  */
 function showNameGate() {
   el.gateMark.innerHTML = logoSvg({ size: 56 });
@@ -1848,7 +1850,7 @@ function showNameGate() {
     if (!account.USERNAME_RE.test(name)) return gateStatus('authBadName', 'error');
     gateStatus('gateWorking', 'working');
     try {
-      const profile = await account.ensureProfile(userId(), name);
+      const profile = await account.claimUsername(userId(), name);
       if (!profile) return gateStatus('authNameTaken', 'error');
       state.account.profile = profile;
       synth.playFanfare();

@@ -264,8 +264,8 @@ const STRINGS = {
     gateConfirm: 'Check your inbox to confirm your address, then sign in.',
     gateResetSent: 'If that address has an account, a reset link is on its way.',
     gateResetNeedEmail: 'Enter your email address first.',
-    gateNameTitle: 'Choose a username',
-    gateNameBody: 'This is the name friends will search for. It cannot be changed later.',
+    gateNameTitle: 'Pick a username',
+    gateNameBody: 'Your account is ready. Last thing: choose the name your friends will search for. It cannot be changed later.',
     gateNameSave: 'Claim it',
 
     authBadLogin: 'That email and password do not match an account.',
@@ -563,7 +563,7 @@ const STRINGS = {
     gateResetSent: 'Si un compte existe pour cette adresse, un lien de réinitialisation vient de partir.',
     gateResetNeedEmail: 'Saisissez d’abord votre adresse e-mail.',
     gateNameTitle: 'Choisissez un pseudo',
-    gateNameBody: 'C’est le nom que vos amis rechercheront. Il ne pourra pas être modifié.',
+    gateNameBody: 'Votre compte est prêt. Dernière étape : choisissez le nom que vos amis rechercheront. Il ne pourra pas être modifié.',
     gateNameSave: 'Le prendre',
 
     authBadLogin: 'Cet e-mail et ce mot de passe ne correspondent à aucun compte.',

@@ -101,32 +101,40 @@ export async function signIn(email, password) {
 }
 
 /**
- * Create an account and claim a username in one go.
+ * Create an account. Email and password only.
  *
- * The username is checked first so a taken one fails before an auth user
- * exists, rather than leaving an account with no profile behind it. It is
- * checked again by the unique constraint, which is the check that actually
- * counts — this one is only there to give a better error.
+ * The username is claimed afterwards, as its own step, because the two are
+ * different kinds of question: one is credentials, the other is identity in
+ * the game. It also removes a failure mode — a name taken between typing it
+ * and submitting no longer wastes the whole form.
+ *
+ * An account therefore exists for a moment with no profile. That is the same
+ * state an email-confirmation round trip leaves behind, and the gate already
+ * handles it: no profile means "ask for a username".
  */
-export async function signUp(email, password, username) {
-  const name = username.trim();
+export async function signUp(email, password) {
+  const { data, error } = await supabase.auth.signUp({ email: email.trim(), password });
+  if (error) throw error;
+  return { session: data.session, needsConfirmation: !data.session };
+}
+
+/**
+ * Take a username for an account that has none.
+ *
+ * Returns the profile, or null when the name has just been taken. The unique
+ * index is the check that counts; the availability call before it exists only
+ * to say "taken" rather than "duplicate key value violates..." in the common
+ * case where nobody is racing for it.
+ */
+export async function claimUsername(userId, username) {
+  const name = String(username ?? '').trim();
   if (!USERNAME_RE.test(name)) throw new Error('username invalid');
 
   const { data: free, error: checkError } = await supabase.rpc('username_available', { name });
   if (checkError) throw checkError;
-  if (!free) throw new Error('duplicate key value violates unique constraint on username');
+  if (!free) return null;
 
-  const { data, error } = await supabase.auth.signUp({
-    email: email.trim(),
-    password,
-    // Carried on the auth user so the name survives an email-confirmation
-    // round trip, where there is no session yet to write a profile with.
-    options: { data: { username: name } }
-  });
-  if (error) throw error;
-
-  if (data.session) await ensureProfile(data.session.user.id, name);
-  return { session: data.session, username: name, needsConfirmation: !data.session };
+  return ensureProfile(userId, name);
 }
 
 export async function signOut() {
