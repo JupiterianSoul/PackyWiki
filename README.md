@@ -281,13 +281,28 @@ meant storing passwords, which is not a thing to do casually or at all.
 
 ### Setting it up
 
-1. Create a project at supabase.com (the free tier is plenty).
+This repository is already pointed at a project: `.env.production` carries its
+URL and publishable key, and Vite reads that file at build time, so a clone
+builds an app that can sign in without any further setup.
+
+To point a build at a **different** project:
+
+1. Create one at supabase.com (the free tier is plenty).
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
-   and run it. That creates the tables, the policies and the two functions.
-3. Copy `.env.example` to `.env.local` and fill in the project URL and the
-   **anon public** key from **Project Settings → API**.
-4. For the APK, add the same two values as repository secrets named
-   `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The workflow compiles them in.
+   and run it. That creates the tables, the policies and the three functions.
+3. Take the **Project URL** and the **publishable** key (`sb_publishable_...`)
+   from **Project Settings → API**, and put them either in `.env.production`
+   (committed, what this repo does) or in a local `.env.local` (ignored by git,
+   and it wins over `.env.production`). `.env.example` is the template.
+
+Never use the `sb_secret_...` key anywhere in this app. It bypasses every
+policy below, and the app has no need of it.
+
+Do not also pass these in as CI environment variables: Vite gives `process.env`
+precedence over `.env` files, so a variable set from an unset repository secret
+arrives as an empty string and silently blanks them out — which ships an APK
+whose sign-in screen cannot work. The workflow greps the built bundle for the
+project URL and fails the build rather than publishing one of those.
 
 ### Email links, and why you probably want confirmation off
 
@@ -334,10 +349,13 @@ Both functions pin `search_path` and are revoked from `public` before being
 granted to `authenticated`, so neither can be reached anonymously or hijacked
 by a schema the caller controls.
 
-The anon key ships inside the APK. That is how it is designed to work: it
-identifies the project, not the player, and grants nothing on its own. The
-policies are the security boundary. The `service_role` key, which bypasses
-them, is never used by this app and must never be put in `.env`.
+The publishable key ships inside the APK, and is committed to this repository
+for the same reason: it identifies the project, not the player, and grants
+nothing on its own. Anyone who could read it here could already unzip it out of
+a published APK. The policies are the security boundary. The secret key
+(`sb_secret_...`, formerly `service_role`), which bypasses them, is never used
+by this app and must never be committed, pasted into a chat, or put in `.env`.
+If one is ever exposed, rotate it in **Project Settings → API Keys**.
 
 ### How syncing works
 
