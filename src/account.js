@@ -58,6 +58,11 @@ export function readableError(error) {
   const raw = String(error?.message ?? error ?? '').toLowerCase();
   if (!raw) return 'authUnknown';
 
+  // The project IS set up — it is just running the older schema, which is a
+  // different problem with a different fix (re-run schema.sql), and saying
+  // "not set up yet" about a working database sends the owner nowhere.
+  if (raw.includes(SCHEMA_OUTDATED.toLowerCase())) return 'authSchemaOld';
+
   if (raw.includes('invalid login')) return 'authBadLogin';
   if (raw.includes('already registered') || raw.includes('already been registered')) return 'authEmailTaken';
   if (raw.includes('duplicate key') && raw.includes('username')) return 'authNameTaken';
@@ -259,20 +264,125 @@ export async function syncOnLogin(userId) {
   return 'pushed';
 }
 
+/* --- what this database actually has ---------------------------------------
+ *
+ * The social release (chat, trades, gifts, presence, avatars) added columns
+ * to `profiles` and three new tables. A project running the older schema is
+ * a normal state — the owner has not re-run schema.sql yet — and it must NOT
+ * take the friends list down with it.
+ *
+ * So the shape of the database is DETECTED rather than assumed: the first
+ * query asks for the new columns, and if the server says they are not there,
+ * it is remembered and every later query asks only for what exists. Friends,
+ * search and requests keep working; the newer features report themselves as
+ * unavailable instead of failing at random.
+ */
+
+/** null = not probed yet, true = present, false = this project is pre-social. */
+let socialColumns = null;
+let socialTables = null;
+
+/** What the app may offer right now. */
+export const socialSchemaReady = () => socialColumns !== false;
+export const socialTablesReady = () => socialTables !== false;
+
+/**
+ * Forget what we learned about the database's shape.
+ *
+ * The owner very often runs schema.sql with the app still installed and
+ * open, so coming back to the foreground re-probes rather than staying in
+ * degraded mode until the next restart.
+ */
+export function forgetSchemaProbe() {
+  socialColumns = null;
+  socialTables = null;
+}
+
+/** The marker a v2-only write throws when the tables are not installed. */
+export const SCHEMA_OUTDATED = 'WIKLODO_SCHEMA_OUTDATED';
+
+/**
+ * Is this failure "that column/table isn't there", rather than a real error?
+ * Postgres answers 42703 for an unknown column and 42P01 for an unknown
+ * table; PostgREST answers PGRST204/PGRST205 out of its schema cache.
+ */
+function isSchemaGap(error) {
+  const code = String(error?.code ?? '');
+  if (['42703', '42P01', 'PGRST204', 'PGRST205'].includes(code)) return true;
+  const raw = String(error?.message ?? '').toLowerCase();
+  return raw.includes('does not exist')
+    || raw.includes('schema cache')
+    || raw.includes('could not find');
+}
+
+/** The v2 columns on `profiles`, asked for only where they exist. */
+const SOCIAL_COLS = 'avatar, presence, last_seen_at, visibility';
+
+/**
+ * Run a profiles read that WANTS the social columns. `build` is handed the
+ * column list to use; on a pre-social project it is called again with the
+ * base list alone.
+ */
+async function readProfiles(baseCols, build) {
+  if (socialColumns !== false) {
+    const { data, error } = await build(`${baseCols}, ${SOCIAL_COLS}`);
+    if (!error) {
+      socialColumns = true;
+      return data ?? [];
+    }
+    if (!isSchemaGap(error)) throw error;
+    socialColumns = false;
+  }
+  const { data, error } = await build(baseCols);
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
+ * Run a read against one of the v2 tables. A missing table is not an error
+ * here — it is an answer: this project has nothing to report yet.
+ */
+async function readSocialTable(run, empty) {
+  if (socialTables === false) return empty;
+  try {
+    const value = await run();
+    socialTables = true;
+    return value;
+  } catch (error) {
+    if (!isSchemaGap(error)) throw error;
+    socialTables = false;
+    return empty;
+  }
+}
+
+/** Run a v2 WRITE. Unlike a read, this has to be reported: the player asked
+ *  for something the database cannot do yet. */
+async function writeSocial(run) {
+  try {
+    const value = await run();
+    socialTables = true;
+    return value;
+  } catch (error) {
+    if (isSchemaGap(error)) {
+      socialTables = false;
+      throw new Error(SCHEMA_OUTDATED);
+    }
+    throw error;
+  }
+}
+
 /* --- friends ------------------------------------------------------------------------- */
 
 /** Prefix search, excluding yourself. */
 export async function searchPlayers(term, selfId) {
   const q = term.trim();
   if (q.length < 2) return [];
-  const { data, error } = await supabase
+  return readProfiles('id, username, level, rank, cards', (cols) => supabase
     .from('profiles')
-    .select('id, username, level, rank, cards, avatar, presence, last_seen_at')
+    .select(cols)
     .ilike('username', `${q}%`)
     .neq('id', selfId)
-    .limit(20);
-  if (error) throw error;
-  return data ?? [];
+    .limit(20));
 }
 
 /**
@@ -290,12 +400,11 @@ export async function listFriendships(selfId) {
   const otherIds = [...new Set(rows.map((r) => (r.requester === selfId ? r.addressee : r.requester)))];
   const profiles = new Map();
   if (otherIds.length) {
-    const { data: people, error: peopleError } = await supabase
-      .from('profiles')
-      .select('id, username, level, rank, cards, unique_cards, boosters_opened, collection_value, best_rarity, play_ms, created_at, avatar, presence, last_seen_at, visibility')
-      .in('id', otherIds);
-    if (peopleError) throw peopleError;
-    for (const person of people ?? []) profiles.set(person.id, person);
+    const people = await readProfiles(
+      'id, username, level, rank, cards, unique_cards, boosters_opened,'
+      + ' collection_value, best_rarity, play_ms, created_at',
+      (cols) => supabase.from('profiles').select(cols).in('id', otherIds));
+    for (const person of people) profiles.set(person.id, person);
   }
 
   const friends = [];
@@ -353,9 +462,17 @@ export async function friendCollection(userId) {
 
 /* --- identity and presence -------------------------------------------------- */
 
-/** Whether a friend row counts as online right now, from its profile columns. */
+/** Whether this row carries presence at all (a pre-social project's does not). */
+export const hasPresence = (profile) => Boolean(profile) && 'presence' in profile;
+
+/**
+ * Whether a friend counts as online right now. Returns null when the
+ * database cannot say — which is not the same as "offline", and the UI shows
+ * nothing rather than claiming everyone is away.
+ */
 export function isOnline(profile) {
-  if (!profile || profile.presence !== 'online') return false;
+  if (!hasPresence(profile)) return null;
+  if (profile.presence !== 'online') return false;
   const seen = Date.parse(profile.last_seen_at ?? 0);
   return Number.isFinite(seen) && Date.now() - seen < 2 * 60 * 1000;
 }
@@ -382,110 +499,136 @@ export async function changeUsername(userId, username) {
 
 /** Visibility, presence switch, avatar — the player's own row only. */
 export async function updateProfileFields(userId, fields) {
-  const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
-  if (error) throw error;
+  return writeSocial(async () => {
+    const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
+    if (error) throw error;
+  });
 }
 
 /** A cheap "I am here": refreshes last_seen_at. Fired on resume and on a slow
  *  interval; failures are the caller's to ignore. */
 export async function heartbeat(userId) {
+  if (socialColumns === false) return;         // nothing to write to
   const { error } = await supabase.from('profiles')
     .update({ last_seen_at: new Date().toISOString() }).eq('id', userId);
-  if (error) throw error;
+  if (error) {
+    if (isSchemaGap(error)) { socialColumns = false; return; }
+    throw error;
+  }
 }
 
 /* --- chat -------------------------------------------------------------------- */
 
 export async function listMessages(selfId, otherId, { limit = 60 } = {}) {
-  const { data, error } = await supabase
-    .from('messages')
-    .select('id, sender, recipient, body, created_at, read_at')
-    .or(`and(sender.eq.${selfId},recipient.eq.${otherId}),and(sender.eq.${otherId},recipient.eq.${selfId})`)
-    .order('created_at', { ascending: false })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []).reverse();
+  return readSocialTable(async () => {
+    const { data, error } = await supabase
+      .from('messages')
+      .select('id, sender, recipient, body, created_at, read_at')
+      .or(`and(sender.eq.${selfId},recipient.eq.${otherId}),and(sender.eq.${otherId},recipient.eq.${selfId})`)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).reverse();
+  }, []);
 }
 
 export async function sendChatMessage(selfId, otherId, body) {
   const text = String(body ?? '').trim().slice(0, 500);
   if (!text) return null;
-  const { data, error } = await supabase.from('messages')
-    .insert({ sender: selfId, recipient: otherId, body: text }).select().single();
-  if (error) throw error;
-  return data;
+  return writeSocial(async () => {
+    const { data, error } = await supabase.from('messages')
+      .insert({ sender: selfId, recipient: otherId, body: text }).select().single();
+    if (error) throw error;
+    return data;
+  });
 }
 
 /** Mark everything the other person sent me as read. */
 export async function markConversationRead(selfId, otherId) {
-  const { error } = await supabase.from('messages')
-    .update({ read_at: new Date().toISOString() })
-    .eq('recipient', selfId).eq('sender', otherId).is('read_at', null);
-  if (error) throw error;
+  return readSocialTable(async () => {
+    const { error } = await supabase.from('messages')
+      .update({ read_at: new Date().toISOString() })
+      .eq('recipient', selfId).eq('sender', otherId).is('read_at', null);
+    if (error) throw error;
+  }, undefined);
 }
 
 /** Unread message count per sender, for badges. */
 export async function unreadBySender(selfId) {
-  const { data, error } = await supabase
-    .from('messages').select('sender')
-    .eq('recipient', selfId).is('read_at', null);
-  if (error) throw error;
-  const counts = new Map();
-  for (const row of data ?? []) counts.set(row.sender, (counts.get(row.sender) ?? 0) + 1);
-  return counts;
+  return readSocialTable(async () => {
+    const { data, error } = await supabase
+      .from('messages').select('sender')
+      .eq('recipient', selfId).is('read_at', null);
+    if (error) throw error;
+    const counts = new Map();
+    for (const row of data ?? []) counts.set(row.sender, (counts.get(row.sender) ?? 0) + 1);
+    return counts;
+  }, new Map());
 }
 
 /* --- deliveries (gifts, and the goods side of trades) ------------------------ */
 
 export async function sendDelivery(selfId, otherId, kind, payload, note = null) {
-  const { error } = await supabase.from('deliveries')
-    .insert({ sender: selfId, recipient: otherId, kind, payload, note });
-  if (error) throw error;
+  return writeSocial(async () => {
+    const { error } = await supabase.from('deliveries')
+      .insert({ sender: selfId, recipient: otherId, kind, payload, note });
+    if (error) throw error;
+  });
 }
 
 /** Everything waiting for me, oldest first. */
 export async function pendingDeliveries(selfId) {
-  const { data, error } = await supabase
-    .from('deliveries')
-    .select('id, sender, kind, payload, note, created_at')
-    .eq('recipient', selfId).is('claimed_at', null)
-    .order('created_at', { ascending: true })
-    .limit(50);
-  if (error) throw error;
-  return data ?? [];
+  return readSocialTable(async () => {
+    const { data, error } = await supabase
+      .from('deliveries')
+      .select('id, sender, kind, payload, note, created_at')
+      .eq('recipient', selfId).is('claimed_at', null)
+      .order('created_at', { ascending: true })
+      .limit(50);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
 }
 
 export async function claimDelivery(id) {
-  const { error } = await supabase.from('deliveries')
-    .update({ claimed_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
+  return writeSocial(async () => {
+    const { error } = await supabase.from('deliveries')
+      .update({ claimed_at: new Date().toISOString() }).eq('id', id);
+    if (error) throw error;
+  });
 }
 
 /* --- trades ------------------------------------------------------------------- */
 
 export async function proposeTrade(selfId, otherId, offer, ask) {
-  const { data, error } = await supabase.from('trades')
-    .insert({ proposer: selfId, recipient: otherId, offer, ask }).select().single();
-  if (error) throw error;
-  return data;
+  return writeSocial(async () => {
+    const { data, error } = await supabase.from('trades')
+      .insert({ proposer: selfId, recipient: otherId, offer, ask }).select().single();
+    if (error) throw error;
+    return data;
+  });
 }
 
 /** Trades I am part of that still need something from somebody. */
 export async function openTrades(selfId) {
-  const { data, error } = await supabase
-    .from('trades')
-    .select('id, proposer, recipient, offer, ask, status, created_at, resolved_at')
-    .or(`proposer.eq.${selfId},recipient.eq.${selfId}`)
-    .neq('status', 'closed')
-    .order('created_at', { ascending: false })
-    .limit(30);
-  if (error) throw error;
-  return data ?? [];
+  return readSocialTable(async () => {
+    const { data, error } = await supabase
+      .from('trades')
+      .select('id, proposer, recipient, offer, ask, status, created_at, resolved_at')
+      .or(`proposer.eq.${selfId},recipient.eq.${selfId}`)
+      .neq('status', 'closed')
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    return data ?? [];
+  }, []);
 }
 
 export async function setTradeStatus(id, status) {
-  const patch = { status };
-  if (status !== 'pending') patch.resolved_at = new Date().toISOString();
-  const { error } = await supabase.from('trades').update(patch).eq('id', id);
-  if (error) throw error;
+  return writeSocial(async () => {
+    const patch = { status };
+    if (status !== 'pending') patch.resolved_at = new Date().toISOString();
+    const { error } = await supabase.from('trades').update(patch).eq('id', id);
+    if (error) throw error;
+  });
 }

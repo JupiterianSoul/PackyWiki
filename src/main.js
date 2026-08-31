@@ -185,6 +185,7 @@ bind({
   achTitle: $('#ach-title'), achSub: $('#ach-sub'), achList: $('#ach-list'),
   friendActions: $('#friend-actions'), friendAlbums: $('#friend-albums'),
   tradesHead: $('#trades-head'), tradesLabel: $('#trades-label'), tradesList: $('#trades-list'),
+  friendsStale: $('#friends-stale'),
   chatBack: $('#chat-back'), chatAvatar: $('#chat-avatar'), chatName: $('#chat-name'),
   chatPresence: $('#chat-presence'), chatLog: $('#chat-log'),
   chatForm: $('#chat-form'), chatInput: $('#chat-input'), chatSend: $('#chat-send'),
@@ -2889,6 +2890,8 @@ function stopSocialPoll() {
  */
 async function resumeAccount() {
   if (!signedIn()) return;
+  // The database may have been updated while we were away.
+  account.forgetSchemaProbe();
   const had = Boolean(state.account.profile);
   await fetchAccountProfile();
   // A profile that only just arrived means nothing has ever been pushed on
@@ -3017,9 +3020,10 @@ function personRow(profile, actions, { onOpen = null, note = null } = {}) {
 
   const mark = row.querySelector('.person-mark');
   paintAvatarInto(mark, profile);
-  if ('presence' in profile) {
+  const live = account.isOnline(profile);
+  if (live !== null) {
     const dot = document.createElement('span');
-    dot.className = `presence-dot${account.isOnline(profile) ? ' is-online' : ''}`;
+    dot.className = `presence-dot${live ? ' is-online' : ''}`;
     mark.appendChild(dot);
   }
   row.querySelector('b').textContent = profile.username ?? '';
@@ -3443,7 +3447,8 @@ function renderChatFrame() {
   el.chatName.textContent = person.username ?? '';
   paintAvatarInto(el.chatAvatar, person);
   const online = account.isOnline(person);
-  el.chatPresence.textContent = online ? t('friendOnline') : t('friendOffline');
+  el.chatPresence.textContent = online === null ? ''
+    : (online ? t('friendOnline') : t('friendOffline'));
   el.chatPresence.className = `chat-presence${online ? ' is-online' : ''}`;
   el.chatInput.placeholder = t('chatPlaceholder');
   el.chatSend.textContent = t('chatSend');
@@ -3673,7 +3678,7 @@ function renderFriends() {
   // Favourites first, then whoever is online now, then the alphabet.
   const orderedFriends = [...friends].sort((a, b) =>
     (isFavFriend(b.otherId) - isFavFriend(a.otherId))
-    || (account.isOnline(b.profile) - account.isOnline(a.profile))
+    || ((account.isOnline(b.profile) === true) - (account.isOnline(a.profile) === true))
     || a.profile.username.localeCompare(b.profile.username));
 
   el.friendsList.replaceChildren(...orderedFriends.map((entry) => {
@@ -3744,6 +3749,12 @@ function renderFriends() {
   el.friendsHead.hidden = !friends.length;
   el.outgoingHead.hidden = !outgoing.length;
 
+  // One honest line when chat/trades/gifts cannot work yet.
+  el.friendsStale.hidden = account.socialTablesReady();
+  if (!account.socialTablesReady()) {
+    el.friendsStale.textContent = t('schemaOldNote');
+  }
+
   const nothing = !friends.length && !incoming.length && !outgoing.length && !results.length;
   el.friendsEmpty.hidden = !nothing;
   if (nothing) {
@@ -3773,8 +3784,10 @@ function renderFriend() {
   el.friendName.textContent = person.username ?? '';
   friendRing.set(0, String(level));
   el.friendLevel.textContent = t('profileLevel', { n: level });
-  el.friendRank.innerHTML = `<span class="presence-dot is-inline${online ? ' is-online' : ''}"></span> `
-    + esc(online ? t('friendOnline') : t('friendOffline')) + ' · ' + esc(tx(rankFor(level).name));
+  el.friendRank.innerHTML = (online === null ? ''
+    : `<span class="presence-dot is-inline${online ? ' is-online' : ''}"></span> `
+      + esc(online ? t('friendOnline') : t('friendOffline')) + ' · ')
+    + esc(tx(rankFor(level).name));
   el.friendCardsLabel.textContent = t('friendAlbums');
   el.friendRemove.textContent = t('friendsRemove');
 
@@ -4091,6 +4104,20 @@ function accountRows() {
     } catch (error) { toast(esc(describeError(error)), 'error'); }
     btn.disabled = false;
   });
+
+  // A project still on the older schema cannot store a picture, a visibility
+  // or a presence — so rather than offering controls that fail on tap, say
+  // plainly what is missing and what fixes it. Changing your name works on
+  // every schema, so that row always stays.
+  if (!account.socialSchemaReady()) {
+    const stale = document.createElement('div');
+    stale.className = 'row is-warning';
+    stale.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>
+      <span class="chip row-action">${iconSvg('cloud', { size: 13 })}</span>`;
+    stale.querySelector('h4').textContent = t('schemaOldTitle');
+    stale.querySelector('p').textContent = t('schemaOldNote');
+    return [who, stale, nameRow, out];
+  }
 
   return [who, avatarRow, nameRow, visRow, presRow, out];
 }

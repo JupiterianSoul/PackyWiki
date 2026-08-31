@@ -1392,3 +1392,13 @@
   border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, 0.85);
 }
+
+/* A database that predates a feature: said once, quietly, where it matters. */
+.schema-note {
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--warning);
+  padding-bottom: 14px;
+}
+.row.is-warning { border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
+.row.is-warning h4 { color: var(--warning); }
