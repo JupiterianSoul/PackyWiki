@@ -182,6 +182,10 @@ async function drawWikipediaCard(pack, seen) {
       if (!summary || summary.type !== 'standard') continue;
       const title = summary.titles?.normalized ?? summary.title;
       if (!isUsableText(title, summary.extract) || seen.has(title)) continue;
+      // Every card must carry a picture. Only the very last attempt may
+      // hand over a bare one, so a booster can never fail to open at all.
+      const hasImage = Boolean(summary.thumbnail?.source ?? summary.originalimage?.source);
+      if (!hasImage && attempt < MAX_ATTEMPTS_PER_CARD - 1) continue;
       seen.add(title);
 
       const views = viewsPromise ? await viewsPromise : await fetchMonthlyViews(title);
@@ -191,47 +195,6 @@ async function drawWikipediaCard(pack, seen) {
     }
   }
   throw new Error(`No usable article found for "${pack.name}"`);
-}
-
-/* --- pack art ------------------------------------------------------------ */
-
-/**
- * Lead photographs for the boosters, fetched in ONE request for all of them.
- * Returns a Map of requested title -> image URL; titles with no image are
- * absent and the caller falls back to the booster's drawn icon.
- */
-export async function fetchPackArt(titles) {
-  const art = new Map();
-  if (!titles.length) return art;
-
-  const params = new URLSearchParams({
-    action: 'query', titles: titles.join('|'), redirects: '1',
-    prop: 'pageimages', piprop: 'thumbnail', pithumbsize: '640',
-    format: 'json', origin: '*'
-  });
-  const query = (await fetchJson(`${ACTION()}?${params}`))?.query ?? {};
-
-  // MediaWiki rewrites titles twice on the way in (capitalisation, then
-  // redirects), so follow both chains to get back to what we asked for.
-  const rename = new Map();
-  for (const list of [query.normalized ?? [], query.redirects ?? []]) {
-    for (const { from, to } of list) rename.set(from, to);
-  }
-  const resolve = (title) => {
-    let current = title;
-    for (let hop = 0; hop < 4 && rename.has(current); hop++) current = rename.get(current);
-    return current;
-  };
-
-  const byTitle = new Map();
-  for (const page of Object.values(query.pages ?? {})) {
-    if (page.thumbnail?.source) byTitle.set(page.title, page.thumbnail.source);
-  }
-  for (const title of titles) {
-    const image = byTitle.get(resolve(title));
-    if (image) art.set(title, image);
-  }
-  return art;
 }
 
 /* --- custom wikis -------------------------------------------------------- */
@@ -267,6 +230,7 @@ async function probeWiki(apiUrl) {
   const absolute = (u) => (u?.startsWith('//') ? `https:${u}` : u) || null;
   return {
     apiUrl,
+    lang: (general.lang ?? 'en').split('-')[0],
     sitename: general.sitename,
     server: absolute(general.server),
     articlePath: general.articlepath ?? '/wiki/$1',
@@ -434,44 +398,6 @@ async function customPageImage(wiki, pageId) {
   }
 }
 
-/** A representative image for a custom booster's pack art. */
-export async function fetchCustomPackArt(wiki) {
-  // The main page usually carries the wiki's best hero image.
-  if (wiki.mainPage) {
-    try {
-      const params = new URLSearchParams({
-        action: 'query', titles: wiki.mainPage, prop: 'pageimages',
-        piprop: 'thumbnail|original', pithumbsize: '640', format: 'json', origin: '*'
-      });
-      const page = Object.values((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages ?? {})[0];
-      const art = usableThumb(page, 640) ?? (page?.original?.source
-        ? upgradeImageUrl(page.original.source, 640) : null);
-      if (art) return art;
-    } catch { /* fall through */ }
-  }
-
-  // Otherwise take the first random page that has a picture.
-  try {
-    const params = new URLSearchParams({
-      action: 'query', generator: 'random', grnnamespace: '0', grnlimit: '16',
-      prop: 'pageimages', piprop: 'thumbnail|original', pithumbsize: '640',
-      format: 'json', origin: '*'
-    });
-    const pages = Object.values((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages ?? {});
-    for (const page of pages) {
-      const art = usableThumb(page, 640);
-      if (art) return art;
-    }
-    // Nothing surfaced a thumbnail: go digging on the first couple of pages.
-    for (const page of pages.slice(0, 3)) {
-      const deep = await customPageImage(wiki, page.pageid);
-      if (deep) return deep;
-    }
-  } catch { /* fall through */ }
-
-  return wiki.logo ?? null;
-}
-
 async function customPageDetail(wiki, pageId) {
   const params = new URLSearchParams({
     action: 'query', pageids: String(pageId),
@@ -493,8 +419,32 @@ async function customLeadText(wiki, pageId) {
   return html ? htmlToText(html) : null;
 }
 
+/**
+ * The language-matched twin of a resolved wiki. A pack built while the app
+ * was in English still has to pull French pages when the app is in French:
+ * Fandom keeps localised communities on a language path, so we probe
+ * `<wiki>/<lang>/api.php` once and use it whenever it exists.
+ */
+const langTwinCache = new Map();
+async function wikiForLanguage(wiki) {
+  const lang = getLanguage();
+  if ((wiki.lang ?? 'en') === lang) return wiki;
+  const base = wiki.apiUrl.replace(/\/[a-z]{2}\/api\.php$/, '/api.php');
+  const twinUrl = lang === 'en' ? base : base.replace(/\/api\.php$/, `/${lang}/api.php`);
+  if (twinUrl === wiki.apiUrl) return wiki;
+  if (langTwinCache.has(twinUrl)) return langTwinCache.get(twinUrl) ?? wiki;
+  try {
+    const twin = await probeWiki(twinUrl);
+    langTwinCache.set(twinUrl, twin);
+    return twin ?? wiki;
+  } catch {
+    langTwinCache.set(twinUrl, null);
+    return wiki;
+  }
+}
+
 async function drawCustomCard(pack, seen) {
-  const wiki = pack.wiki;
+  const wiki = await wikiForLanguage(pack.wiki);
 
   for (let attempt = 0; attempt < MAX_ATTEMPTS_PER_CARD; attempt++) {
     try {
@@ -521,6 +471,8 @@ async function drawCustomCard(pack, seen) {
       const thumbnail = usableThumb(page, 640)
         ?? (page.original?.source ? upgradeImageUrl(page.original.source, 640) : null)
         ?? await customPageImage(wiki, page.pageid);
+      // A pictureless page is not a card. Only the last attempt may pass one.
+      if (!thumbnail && attempt < MAX_ATTEMPTS_PER_CARD - 1) { seen.add(page.title); continue; }
 
       return toCard({
         sourceId: `wiki:${new URL(wiki.apiUrl).host}${new URL(wiki.apiUrl).pathname.replace('/api.php', '')}`,

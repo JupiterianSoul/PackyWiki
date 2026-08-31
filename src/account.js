@@ -267,7 +267,7 @@ export async function searchPlayers(term, selfId) {
   if (q.length < 2) return [];
   const { data, error } = await supabase
     .from('profiles')
-    .select('id, username, level, rank, cards')
+    .select('id, username, level, rank, cards, avatar, presence, last_seen_at')
     .ilike('username', `${q}%`)
     .neq('id', selfId)
     .limit(20);
@@ -292,7 +292,7 @@ export async function listFriendships(selfId) {
   if (otherIds.length) {
     const { data: people, error: peopleError } = await supabase
       .from('profiles')
-      .select('id, username, level, rank, cards, unique_cards, boosters_opened, collection_value, best_rarity, play_ms, created_at')
+      .select('id, username, level, rank, cards, unique_cards, boosters_opened, collection_value, best_rarity, play_ms, created_at, avatar, presence, last_seen_at, visibility')
       .in('id', otherIds);
     if (peopleError) throw peopleError;
     for (const person of people ?? []) profiles.set(person.id, person);
@@ -349,4 +349,143 @@ export async function friendCollection(userId) {
   } catch {
     return [];
   }
+}
+
+/* --- identity and presence -------------------------------------------------- */
+
+/** Whether a friend row counts as online right now, from its profile columns. */
+export function isOnline(profile) {
+  if (!profile || profile.presence !== 'online') return false;
+  const seen = Date.parse(profile.last_seen_at ?? 0);
+  return Number.isFinite(seen) && Date.now() - seen < 2 * 60 * 1000;
+}
+
+/**
+ * Change username. The unique index is the real gate; the availability call
+ * exists to say "taken" nicely. Returns the updated profile, or null when the
+ * name is already held.
+ */
+export async function changeUsername(userId, username) {
+  const name = String(username ?? '').trim();
+  if (!USERNAME_RE.test(name)) throw new Error('username invalid');
+  const { data: free, error: checkError } = await supabase.rpc('username_available', { name });
+  if (checkError) throw checkError;
+  if (!free) return null;
+  const { data, error } = await supabase
+    .from('profiles').update({ username: name }).eq('id', userId).select().single();
+  if (error) {
+    if (String(error.message ?? '').toLowerCase().includes('duplicate key')) return null;
+    throw error;
+  }
+  return data;
+}
+
+/** Visibility, presence switch, avatar — the player's own row only. */
+export async function updateProfileFields(userId, fields) {
+  const { error } = await supabase.from('profiles').update(fields).eq('id', userId);
+  if (error) throw error;
+}
+
+/** A cheap "I am here": refreshes last_seen_at. Fired on resume and on a slow
+ *  interval; failures are the caller's to ignore. */
+export async function heartbeat(userId) {
+  const { error } = await supabase.from('profiles')
+    .update({ last_seen_at: new Date().toISOString() }).eq('id', userId);
+  if (error) throw error;
+}
+
+/* --- chat -------------------------------------------------------------------- */
+
+export async function listMessages(selfId, otherId, { limit = 60 } = {}) {
+  const { data, error } = await supabase
+    .from('messages')
+    .select('id, sender, recipient, body, created_at, read_at')
+    .or(`and(sender.eq.${selfId},recipient.eq.${otherId}),and(sender.eq.${otherId},recipient.eq.${selfId})`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).reverse();
+}
+
+export async function sendChatMessage(selfId, otherId, body) {
+  const text = String(body ?? '').trim().slice(0, 500);
+  if (!text) return null;
+  const { data, error } = await supabase.from('messages')
+    .insert({ sender: selfId, recipient: otherId, body: text }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+/** Mark everything the other person sent me as read. */
+export async function markConversationRead(selfId, otherId) {
+  const { error } = await supabase.from('messages')
+    .update({ read_at: new Date().toISOString() })
+    .eq('recipient', selfId).eq('sender', otherId).is('read_at', null);
+  if (error) throw error;
+}
+
+/** Unread message count per sender, for badges. */
+export async function unreadBySender(selfId) {
+  const { data, error } = await supabase
+    .from('messages').select('sender')
+    .eq('recipient', selfId).is('read_at', null);
+  if (error) throw error;
+  const counts = new Map();
+  for (const row of data ?? []) counts.set(row.sender, (counts.get(row.sender) ?? 0) + 1);
+  return counts;
+}
+
+/* --- deliveries (gifts, and the goods side of trades) ------------------------ */
+
+export async function sendDelivery(selfId, otherId, kind, payload, note = null) {
+  const { error } = await supabase.from('deliveries')
+    .insert({ sender: selfId, recipient: otherId, kind, payload, note });
+  if (error) throw error;
+}
+
+/** Everything waiting for me, oldest first. */
+export async function pendingDeliveries(selfId) {
+  const { data, error } = await supabase
+    .from('deliveries')
+    .select('id, sender, kind, payload, note, created_at')
+    .eq('recipient', selfId).is('claimed_at', null)
+    .order('created_at', { ascending: true })
+    .limit(50);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function claimDelivery(id) {
+  const { error } = await supabase.from('deliveries')
+    .update({ claimed_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
+
+/* --- trades ------------------------------------------------------------------- */
+
+export async function proposeTrade(selfId, otherId, offer, ask) {
+  const { data, error } = await supabase.from('trades')
+    .insert({ proposer: selfId, recipient: otherId, offer, ask }).select().single();
+  if (error) throw error;
+  return data;
+}
+
+/** Trades I am part of that still need something from somebody. */
+export async function openTrades(selfId) {
+  const { data, error } = await supabase
+    .from('trades')
+    .select('id, proposer, recipient, offer, ask, status, created_at, resolved_at')
+    .or(`proposer.eq.${selfId},recipient.eq.${selfId}`)
+    .neq('status', 'closed')
+    .order('created_at', { ascending: false })
+    .limit(30);
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function setTradeStatus(id, status) {
+  const patch = { status };
+  if (status !== 'pending') patch.resolved_at = new Date().toISOString();
+  const { error } = await supabase.from('trades').update(patch).eq('id', id);
+  if (error) throw error;
 }

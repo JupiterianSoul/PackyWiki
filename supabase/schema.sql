@@ -254,3 +254,185 @@ create trigger saves_touch before update on public.saves
 -- cache" until the cache happens to refresh.
 
 notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- V2 — social: visibility, presence, avatars, chat, trades, gifts
+-- ============================================================================
+-- Everything below is idempotent; re-run the whole file freely.
+
+-- --- profile additions -------------------------------------------------------
+
+alter table public.profiles
+  add column if not exists visibility text not null default 'public'
+    check (visibility in ('private', 'friends', 'public')),
+  add column if not exists presence text not null default 'online'
+    check (presence in ('online', 'hidden')),
+  add column if not exists last_seen_at timestamptz not null default now(),
+  -- The chosen card artwork and its crop, e.g. {"url": ..., "x": 50, "y": 30}.
+  add column if not exists avatar jsonb;
+
+-- Visibility now decides who can read a profile:
+--   public   anyone signed in (search finds you)
+--   friends  your accepted friends, plus anyone you have a pending row with
+--            (they must see the request to answer it)
+--   private  only you
+drop policy if exists "profiles are readable by signed-in players" on public.profiles;
+create policy "profiles are readable by signed-in players"
+  on public.profiles for select
+  to authenticated
+  using (
+    auth.uid() = id
+    or visibility = 'public'
+    or (visibility = 'friends' and exists (
+      select 1 from public.friendships f
+      where (f.requester = auth.uid() and f.addressee = id)
+         or (f.requester = id and f.addressee = auth.uid())
+    ))
+  );
+
+-- --- messages (friend chat) --------------------------------------------------
+
+create table if not exists public.messages (
+  id          uuid primary key default gen_random_uuid(),
+  sender      uuid not null references auth.users on delete cascade,
+  recipient   uuid not null references auth.users on delete cascade,
+  body        text not null check (char_length(body) between 1 and 500),
+  created_at  timestamptz not null default now(),
+  read_at     timestamptz,
+  check (sender <> recipient)
+);
+
+create index if not exists messages_pair_idx
+  on public.messages (least(sender, recipient), greatest(sender, recipient), created_at);
+create index if not exists messages_recipient_unread_idx
+  on public.messages (recipient) where read_at is null;
+
+alter table public.messages enable row level security;
+
+drop policy if exists "you read conversations you are in" on public.messages;
+create policy "you read conversations you are in"
+  on public.messages for select
+  to authenticated
+  using (auth.uid() = sender or auth.uid() = recipient);
+
+-- You write as yourself, to a friend.
+drop policy if exists "you message friends as yourself" on public.messages;
+create policy "you message friends as yourself"
+  on public.messages for insert
+  to authenticated
+  with check (auth.uid() = sender and public.are_friends(sender, recipient));
+
+-- Only the recipient marks a message read, and that is all they may change.
+drop policy if exists "the recipient marks messages read" on public.messages;
+create policy "the recipient marks messages read"
+  on public.messages for update
+  to authenticated
+  using (auth.uid() = recipient)
+  with check (auth.uid() = recipient);
+
+-- --- deliveries --------------------------------------------------------------
+--
+-- The one-way postbox that makes gifts and trades safe with client-owned
+-- saves: whoever GIVES removes the goods from their own save and posts a
+-- delivery; the recipient's app claims it and adds the goods to its own save.
+-- No client ever writes another player's save.
+
+create table if not exists public.deliveries (
+  id          uuid primary key default gen_random_uuid(),
+  sender      uuid not null references auth.users on delete cascade,
+  recipient   uuid not null references auth.users on delete cascade,
+  kind        text not null check (kind in ('card', 'booster', 'trade-return')),
+  -- card:   the full card entry snapshot
+  -- booster:{spec: {...}}
+  payload     jsonb not null,
+  note        text check (char_length(note) <= 200),
+  created_at  timestamptz not null default now(),
+  claimed_at  timestamptz
+);
+
+create index if not exists deliveries_recipient_idx
+  on public.deliveries (recipient) where claimed_at is null;
+
+alter table public.deliveries enable row level security;
+
+drop policy if exists "you see deliveries you sent or received" on public.deliveries;
+create policy "you see deliveries you sent or received"
+  on public.deliveries for select
+  to authenticated
+  using (auth.uid() = sender or auth.uid() = recipient);
+
+drop policy if exists "you send deliveries as yourself to friends" on public.deliveries;
+create policy "you send deliveries as yourself to friends"
+  on public.deliveries for insert
+  to authenticated
+  with check (auth.uid() = sender
+    and (public.are_friends(sender, recipient) or sender = recipient));
+
+drop policy if exists "the recipient claims a delivery" on public.deliveries;
+create policy "the recipient claims a delivery"
+  on public.deliveries for update
+  to authenticated
+  using (auth.uid() = recipient)
+  with check (auth.uid() = recipient);
+
+-- --- trades ------------------------------------------------------------------
+--
+-- WikiMaster-style: I offer cards, I ask for cards, you accept or decline.
+-- The offered cards leave the proposer's save the moment the trade is posted
+-- (escrow, held in `offer`). On accept, the recipient removes the asked cards
+-- from their own save, takes the offered ones, and posts the asked cards back
+-- as a delivery to the proposer. On decline/cancel the proposer's app
+-- restores the escrowed cards from `offer`.
+
+create table if not exists public.trades (
+  id           uuid primary key default gen_random_uuid(),
+  proposer     uuid not null references auth.users on delete cascade,
+  recipient    uuid not null references auth.users on delete cascade,
+  offer        jsonb not null,     -- [card entry snapshots]
+  ask          jsonb not null,     -- [{key, title, rarityId}]
+  status       text not null default 'pending'
+                 check (status in ('pending', 'accepted', 'declined', 'cancelled', 'closed')),
+  created_at   timestamptz not null default now(),
+  resolved_at  timestamptz,
+  check (proposer <> recipient)
+);
+
+create index if not exists trades_proposer_idx on public.trades (proposer);
+create index if not exists trades_recipient_idx on public.trades (recipient);
+
+alter table public.trades enable row level security;
+
+drop policy if exists "you see trades you are part of" on public.trades;
+create policy "you see trades you are part of"
+  on public.trades for select
+  to authenticated
+  using (auth.uid() = proposer or auth.uid() = recipient);
+
+drop policy if exists "you propose trades as yourself to friends" on public.trades;
+create policy "you propose trades as yourself to friends"
+  on public.trades for insert
+  to authenticated
+  with check (auth.uid() = proposer
+    and status = 'pending'
+    and public.are_friends(proposer, recipient));
+
+-- The recipient answers a pending trade; the proposer cancels a pending one
+-- or closes an answered one after restoring/collecting.
+drop policy if exists "trade parties update their side" on public.trades;
+create policy "trade parties update their side"
+  on public.trades for update
+  to authenticated
+  using (auth.uid() = proposer or auth.uid() = recipient)
+  with check (auth.uid() = proposer or auth.uid() = recipient);
+
+-- Presence: whether a player counts as online right now. Their own presence
+-- switch decides whether anyone may know.
+create or replace function public.is_online(p public.profiles)
+returns boolean
+language sql
+stable
+as $$
+  select p.presence = 'online' and p.last_seen_at > now() - interval '2 minutes';
+$$;
+
+notify pgrst, 'reload schema';

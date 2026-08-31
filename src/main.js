@@ -115,7 +115,7 @@ const state = {
   // Who is signed in, and what the server last told us about them.
   account: { session: null, profile: null, mode: 'signin', syncing: false, syncedAt: null, failed: false },
   // The friends screen, and whichever friend is being looked at.
-  social: { friends: [], incoming: [], outgoing: [], results: [], loaded: false },
+  social: { friends: [], incoming: [], outgoing: [], results: [], loaded: false, unread: new Map(), trades: [] },
   viewing: null
 };
 
@@ -137,7 +137,7 @@ bind({
     packs: $('#screen-packs'), timed: $('#screen-timed'), shop: $('#screen-shop'),
     binder: $('#screen-binder'), profile: $('#screen-profile'),
     settings: $('#screen-settings'), friends: $('#screen-friends'),
-    friend: $('#screen-friend'), ach: $('#screen-ach'), open: $('#screen-open')
+    friend: $('#screen-friend'), chat: $('#screen-chat'), ach: $('#screen-ach'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
@@ -183,6 +183,11 @@ bind({
   pagenoLeft: $('#pageno-left'), pagenoRight: $('#pageno-right'),
   albumDots: $('#album-dots'), albumHint: $('#album-hint'),
   achTitle: $('#ach-title'), achSub: $('#ach-sub'), achList: $('#ach-list'),
+  friendActions: $('#friend-actions'), friendAlbums: $('#friend-albums'),
+  tradesHead: $('#trades-head'), tradesLabel: $('#trades-label'), tradesList: $('#trades-list'),
+  chatBack: $('#chat-back'), chatAvatar: $('#chat-avatar'), chatName: $('#chat-name'),
+  chatPresence: $('#chat-presence'), chatLog: $('#chat-log'),
+  chatForm: $('#chat-form'), chatInput: $('#chat-input'), chatSend: $('#chat-send'),
   binderEmpty: $('#binder-empty'), binderEmptyMark: $('#binder-empty-mark'),
   binderEmptyText: $('#binder-empty-text'),
   filterOpen: $('#filter-open'), filterCount: $('#filter-count'),
@@ -216,7 +221,7 @@ bind({
   friendBack: $('#friend-back'), friendName: $('#friend-name'), friendRing: $('#friend-ring'),
   friendLevel: $('#friend-level'), friendRank: $('#friend-rank'), friendStats: $('#friend-stats'),
   friendCardsLabel: $('#friend-cards-label'), friendCardsStatus: $('#friend-cards-status'),
-  friendGrid: $('#friend-grid'), friendRemove: $('#friend-remove'),
+   friendRemove: $('#friend-remove'),
 
   gate: $('#gate'), gateMark: $('#gate-mark'), gateTitle: $('#gate-title'), gateBody: $('#gate-body'),
   gateSeg: $('#gate-seg'), gateForm: $('#gate-form'), gateStatus: $('#gate-status'),
@@ -330,7 +335,7 @@ function showScreen(name) {
  * Profile, so the bottom bar stays at five.
  */
 const navTabFor = (screen) =>
-  (['settings', 'friends', 'friend', 'ach'].includes(screen) ? 'profile' : screen);
+  (['settings', 'friends', 'friend', 'chat', 'ach'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -449,14 +454,55 @@ function closeDrawer() {
  * caused it, so it survives a restart and syncs with everything else.
  */
 
-const notifications = () =>
-  state.social.incoming.map((entry) => ({
-    id: entry.id,
-    icon: 'addFriend',
-    title: t('notifRequest', { name: entry.profile.username }),
-    when: entry.created_at,
-    run: () => { renderFriends(); showScreen('friends'); }
-  }));
+/**
+ * A persistent local feed for one-off events (a gift arrived, a trade was
+ * answered), capped so it cannot grow forever. Live rows — friend requests,
+ * unread chats, trades awaiting your answer — are derived fresh every time.
+ */
+function pushNote(icon, title, screen = 'friends') {
+  const feed = state.profile.notifFeed ??= [];
+  feed.unshift({ id: `note-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+    icon, title, when: new Date().toISOString(), screen });
+  if (feed.length > 30) feed.length = 30;
+  store.saveProfile(state.profile);
+  paintBell();
+}
+
+function notifications() {
+  const go = (screen) => () => {
+    if (screen === 'friends') { renderFriends(); showScreen('friends'); }
+    else if (screen === 'packs') { renderPacks(); showScreen('packs'); }
+    else showScreen(screen);
+  };
+  const rows = [];
+
+  for (const entry of state.social.incoming) {
+    rows.push({ id: entry.id, icon: 'addFriend',
+      title: t('notifRequest', { name: entry.profile.username }),
+      when: entry.created_at, run: go('friends') });
+  }
+  // Trades waiting on my answer.
+  for (const trade of state.social.trades ?? []) {
+    if (trade.status !== 'pending' || trade.recipient !== userId()) continue;
+    const who = state.social.friends.find((f) => f.otherId === trade.proposer)?.profile?.username ?? '?';
+    rows.push({ id: `trade-${trade.id}`, icon: 'trade',
+      title: t('notifTrade', { name: who }), when: trade.created_at, run: go('friends') });
+  }
+  // Unread chats, one row per sender.
+  for (const [sender, n] of state.social.unread ?? []) {
+    const who = state.social.friends.find((f) => f.otherId === sender);
+    if (!who) continue;
+    rows.push({ id: `chat-${sender}-${n}`, icon: 'chat',
+      title: t('notifMessages', { n, name: who.profile.username }),
+      when: null, run: () => openChat(who) });
+  }
+  // The stored feed (gifts received, trades resolved).
+  for (const note of state.profile.notifFeed ?? []) {
+    rows.push({ id: note.id, icon: note.icon, title: note.title,
+      when: note.when, run: go(note.screen) });
+  }
+  return rows;
+}
 
 const isRead = (id) => (state.profile.notifRead ?? []).includes(id);
 const unreadCount = () => notifications().filter((n) => !isRead(n.id)).length;
@@ -2804,7 +2850,7 @@ let socialTimer = null;
 function startSocialPoll() {
   stopSocialPoll();
   if (!signedIn() || document.visibilityState !== 'visible') return;
-  socialTimer = setInterval(loadFriends, SOCIAL_POLL);
+  socialTimer = setInterval(syncSocial, SOCIAL_POLL);
 }
 
 function stopSocialPoll() {
@@ -2823,7 +2869,7 @@ async function resumeAccount() {
   // A profile that only just arrived means nothing has ever been pushed on
   // this run, so push rather than waiting for the next change.
   if (state.account.failed || !had) syncSoon();
-  loadFriends();
+  syncSocial();
   startSocialPoll();
 }
 
@@ -2843,7 +2889,7 @@ async function enterApp() {
   hideGate();
   reloadFromStorage();
   if (!state.account.failed) state.account.syncedAt = Date.now();
-  loadFriends();
+  syncSocial();
   startSocialPoll();
 
   if (!languageChosen() || !state.profile.started) showWelcome();
@@ -2879,7 +2925,7 @@ async function leaveAccount() {
   // Cleared here rather than waiting on the sign-out event, so signing back
   // in as the same account is not mistaken for a repeat of the same session.
   handledUser = null;
-  state.social = { friends: [], incoming: [], outgoing: [], results: [], loaded: false };
+  state.social = { friends: [], incoming: [], outgoing: [], results: [], loaded: false, unread: new Map(), trades: [] };
   stopSocialPoll();
   el.welcome.hidden = true;
   showScreen('packs');
@@ -2944,7 +2990,13 @@ function personRow(profile, actions, { onOpen = null, note = null } = {}) {
     <span class="person-copy"><b></b><span></span></span>
     <span class="person-actions"></span>`;
 
-  row.querySelector('.person-mark').textContent = String(profile.username ?? '?').slice(0, 1);
+  const mark = row.querySelector('.person-mark');
+  paintAvatarInto(mark, profile);
+  if ('presence' in profile) {
+    const dot = document.createElement('span');
+    dot.className = `presence-dot${account.isOnline(profile) ? ' is-online' : ''}`;
+    mark.appendChild(dot);
+  }
   row.querySelector('b').textContent = profile.username ?? '';
   row.querySelector('.person-copy span').textContent = t('friendsLevelLine', {
     n: profile.level ?? 1,
@@ -3014,6 +3066,513 @@ async function loadFriends() {
   if (state.tab === 'profile') renderProfile();
 }
 
+/**
+ * The full social heartbeat: friendships, presence, post, trades, unread.
+ * Runs on resume and once a minute. Every part is best-effort — a dead
+ * network costs freshness, never state.
+ */
+async function syncSocial() {
+  if (!signedIn() || !state.account.profile) return;
+  await loadFriends();
+  account.heartbeat(userId()).catch(() => {});
+  try { await collectDeliveries(); } catch { /* next pass */ }
+  try { state.social.unread = await account.unreadBySender(userId()); } catch { /* keep old */ }
+  try {
+    state.social.trades = await account.openTrades(userId());
+    await reconcileTrades();
+  } catch { /* keep old */ }
+  updateBadges();
+  if (state.tab === 'friends') renderFriends();
+  if (state.tab === 'chat' && state.chat) refreshChat();
+}
+
+/**
+ * Claim everything in my postbox: gifted cards, gifted boosters, and the
+ * goods side of accepted trades. Each item lands in the local save first and
+ * is marked claimed second, so a crash in between duplicates rather than
+ * destroys — the kinder failure.
+ */
+async function collectDeliveries() {
+  const waiting = await account.pendingDeliveries(userId());
+  if (!waiting.length) return;
+  for (const item of waiting) {
+    const from = state.social.friends.find((f) => f.otherId === item.sender)?.profile?.username
+      ?? t('friendSomeone');
+    if (item.kind === 'booster' && item.payload?.spec) {
+      store.addBooster(state.inventory, item.payload.spec, item.payload.count ?? 1);
+      pushNote('gift', t('notifGiftBooster', { name: esc(from) }), 'packs');
+    } else if (item.kind === 'card' && item.payload?.key) {
+      store.receiveCardEntry(state.collection, item.payload);
+      pushNote('gift', t('notifGiftCard', { name: esc(from), card: esc(item.payload.title) }), 'binder');
+    } else if (item.kind === 'trade-return' && Array.isArray(item.payload?.cards)) {
+      for (const card of item.payload.cards) store.receiveCardEntry(state.collection, card);
+      pushNote('trade', t('notifTradeDone', { name: esc(from) }), 'binder');
+    }
+    await account.claimDelivery(item.id);
+  }
+  synth.playTrade();
+  renderPacks();
+  if (state.tab === 'binder') renderBinder();
+  syncSoon();
+}
+
+/**
+ * The proposer's side of a finished trade: an accepted one just needs
+ * closing (the goods arrive by delivery); a declined one hands the escrowed
+ * cards back.
+ */
+async function reconcileTrades() {
+  for (const trade of state.social.trades) {
+    if (trade.proposer !== userId()) continue;
+    if (trade.status === 'declined' || trade.status === 'cancelled') {
+      for (const card of trade.offer ?? []) store.receiveCardEntry(state.collection, card);
+      await account.setTradeStatus(trade.id, 'closed');
+      const who = state.social.friends.find((f) => f.otherId === trade.recipient)?.profile?.username ?? '?';
+      pushNote('trade', t('notifTradeDeclined', { name: esc(who) }), 'binder');
+      syncSoon();
+    } else if (trade.status === 'accepted') {
+      await account.setTradeStatus(trade.id, 'closed');
+      // The cards arrive as a delivery; the note for that is written there.
+    }
+  }
+  state.social.trades = state.social.trades.filter((tr) => tr.status === 'pending');
+}
+
+/* --- favourites (local) ------------------------------------------------------ */
+
+const isFavFriend = (id) => (state.profile.favFriends ?? []).includes(id);
+function toggleFavFriend(id) {
+  const list = state.profile.favFriends ??= [];
+  const at = list.indexOf(id);
+  if (at >= 0) list.splice(at, 1); else list.push(id);
+  store.saveProfile(state.profile);
+}
+
+/* --- gifting ------------------------------------------------------------------ */
+
+/** Pick one of my cards; hand it over. The card leaves my save first. */
+function openGiftCard(entry) {
+  const mine = store.allEntries(state.collection)
+    .sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
+  openSheet(t('giftCardTitle', { name: entry.profile.username }), (body) => {
+    if (!mine.length) {
+      body.innerHTML = '<p class="muted"></p>';
+      body.querySelector('p').textContent = t('giftNothing');
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'pick-list';
+    list.replaceChildren(...mine.map((card) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'pick-row';
+      row.innerHTML = `
+        <span class="pick-thumb"></span>
+        <span class="pick-copy"><b></b><span></span></span>
+        <span class="chip tabular">×${card.count}</span>`;
+      if (card.thumbnail) row.querySelector('.pick-thumb').style.backgroundImage = `url("${card.thumbnail}")`;
+      row.querySelector('b').textContent = card.title;
+      const tier = row.querySelector('.pick-copy span');
+      tier.textContent = tx(rarityById(card.rarityId).name);
+      tier.style.color = rarityById(card.rarityId).color;
+      press(row, { sound: null });
+      row.addEventListener('click', async () => {
+        row.disabled = true;
+        const snapshot = store.takeCardCopy(state.collection, card.key);
+        if (!snapshot) return;
+        try {
+          await account.sendDelivery(userId(), entry.otherId, 'card', snapshot);
+          toast(t('giftSent', { name: esc(entry.profile.username) }));
+          synth.playTrade();
+          sheet.hide();
+          renderBinder();
+          syncSoon();
+        } catch (error) {
+          store.receiveCardEntry(state.collection, snapshot);   // undo
+          toast(esc(describeError(error)), 'error');
+          row.disabled = false;
+        }
+      });
+      return row;
+    }));
+    body.appendChild(list);
+  });
+}
+
+/** Pick one of my unopened boosters; hand it over. */
+function openGiftBooster(entry) {
+  const owned = store.ownedBoosters(state.inventory);
+  openSheet(t('giftBoosterTitle', { name: entry.profile.username }), (body) => {
+    if (!owned.length) {
+      body.innerHTML = '<p class="muted"></p>';
+      body.querySelector('p').textContent = t('giftNoBoosters');
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'pick-list';
+    list.replaceChildren(...owned.map((slot) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'pick-row';
+      row.innerHTML = `
+        <span class="pick-art"></span>
+        <span class="pick-copy"><b></b><span></span></span>
+        <span class="chip tabular">×${slot.count}</span>`;
+      row.querySelector('.pick-art').appendChild(buildBooster(slot.spec, { size: 'is-tiny' }));
+      row.querySelector('b').textContent = specName(slot.spec);
+      row.querySelector('.pick-copy span').textContent = `${slot.spec.cards} ${t('cards')}`;
+      press(row, { sound: null });
+      row.addEventListener('click', async () => {
+        row.disabled = true;
+        if (!store.takeBooster(state.inventory, specId(slot.spec))) return;
+        try {
+          await account.sendDelivery(userId(), entry.otherId, 'booster', { spec: slot.spec });
+          toast(t('giftSent', { name: esc(entry.profile.username) }));
+          synth.playTrade();
+          sheet.hide();
+          renderPacks();
+          syncSoon();
+        } catch (error) {
+          store.addBooster(state.inventory, slot.spec, 1);      // undo
+          toast(esc(describeError(error)), 'error');
+          row.disabled = false;
+        }
+      });
+      return row;
+    }));
+    body.appendChild(list);
+  });
+}
+
+/* --- trading ------------------------------------------------------------------- */
+
+/**
+ * Propose a trade: pick up to three of my cards to give and up to three of
+ * theirs to ask for. My cards go into escrow the moment the trade is posted.
+ */
+async function openTradeSheet(entry) {
+  let theirs = [];
+  try { theirs = (await account.friendCollection(entry.otherId)) ?? []; } catch { theirs = []; }
+  const mine = store.allEntries(state.collection)
+    .sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
+  theirs.sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
+
+  const give = new Set();
+  const ask = new Set();
+
+  openSheet(t('tradeTitle', { name: entry.profile.username }), (body) => {
+    body.innerHTML = `
+      <p class="label" data-give-label style="margin-bottom:8px"></p>
+      <div class="pick-list is-short" data-give></div>
+      <p class="label" data-ask-label style="margin:16px 0 8px"></p>
+      <div class="pick-list is-short" data-ask></div>
+      <button class="btn btn-primary btn-block" type="button" data-send style="margin-top:16px"></button>`;
+    body.querySelector('[data-give-label]').textContent = t('tradeGive');
+    body.querySelector('[data-ask-label]').textContent = t('tradeAsk');
+    const sendBtn = body.querySelector('[data-send]');
+
+    const paintSend = () => {
+      sendBtn.textContent = t('tradeSend', { give: give.size, ask: ask.size });
+      sendBtn.disabled = give.size === 0 || ask.size === 0;
+    };
+    const pickRow = (card, bag, cap = 3) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = 'pick-row is-tick';
+      row.innerHTML = `
+        <span class="pick-thumb"></span>
+        <span class="pick-copy"><b></b><span></span></span>
+        <span class="pick-tick">${iconSvg('check', { size: 15 })}</span>`;
+      if (card.thumbnail) row.querySelector('.pick-thumb').style.backgroundImage = `url("${card.thumbnail}")`;
+      row.querySelector('b').textContent = card.title;
+      const tier = row.querySelector('.pick-copy span');
+      tier.textContent = tx(rarityById(card.rarityId).name);
+      tier.style.color = rarityById(card.rarityId).color;
+      press(row, { sound: null });
+      row.addEventListener('click', () => {
+        if (bag.has(card.key)) bag.delete(card.key);
+        else if (bag.size < cap) bag.add(card.key);
+        row.classList.toggle('is-on', bag.has(card.key));
+        paintSend();
+      });
+      return row;
+    };
+
+    body.querySelector('[data-give]').replaceChildren(...mine.slice(0, 60).map((c) => pickRow(c, give)));
+    const askBay = body.querySelector('[data-ask]');
+    if (!theirs.length) {
+      askBay.innerHTML = '<p class="muted" style="font-size:.84rem"></p>';
+      askBay.querySelector('p').textContent = t('tradeTheirsHidden');
+    } else {
+      askBay.replaceChildren(...theirs.slice(0, 60).map((c) => pickRow(c, ask)));
+    }
+
+    paintSend();
+    press(sendBtn, { sound: null });
+    sendBtn.addEventListener('click', async () => {
+      sendBtn.disabled = true;
+      // Escrow: the offered cards leave my save now.
+      const offer = [...give].map((key) => store.takeCardCopy(state.collection, key)).filter(Boolean);
+      const askList = [...ask].map((key) => {
+        const card = theirs.find((c) => c.key === key);
+        return card ? { key: card.key, title: card.title, rarityId: card.rarityId } : null;
+      }).filter(Boolean);
+      try {
+        await account.proposeTrade(userId(), entry.otherId, offer, askList);
+        toast(t('tradeSentToast', { name: esc(entry.profile.username) }));
+        synth.playTrade();
+        sheet.hide();
+        renderBinder();
+        syncSoon();
+        syncSocial();
+      } catch (error) {
+        for (const card of offer) store.receiveCardEntry(state.collection, card);   // undo escrow
+        toast(esc(describeError(error)), 'error');
+        sendBtn.disabled = false;
+      }
+    });
+  });
+}
+
+/** The recipient's view of a pending trade: what changes hands, and the answer. */
+function openTradeAnswer(trade) {
+  const who = state.social.friends.find((f) => f.otherId === trade.proposer);
+  const name = who?.profile?.username ?? '?';
+  openSheet(t('tradeFromTitle', { name }), (body) => {
+    const line = (cards, labelKey) => `
+      <p class="label" style="margin:10px 0 6px">${esc(t(labelKey))}</p>
+      ${cards.map((c) => `<p class="trade-line"><b>${esc(c.title)}</b>
+        <span style="color:${rarityById(c.rarityId).color}">${esc(tx(rarityById(c.rarityId).name))}</span></p>`).join('')}`;
+    body.innerHTML = `
+      ${line(trade.offer ?? [], 'tradeYouGet')}
+      ${line(trade.ask ?? [], 'tradeYouGive')}
+      <div style="display:flex;gap:10px;margin-top:18px">
+        <button class="btn btn-primary" type="button" data-accept style="flex:1"></button>
+        <button class="btn btn-ghost" type="button" data-decline style="flex:1"></button>
+      </div>
+      <p class="find-status" data-status role="status"></p>`;
+    const acceptBtn = body.querySelector('[data-accept]');
+    const declineBtn = body.querySelector('[data-decline]');
+    acceptBtn.textContent = t('tradeAccept');
+    declineBtn.textContent = t('tradeDecline');
+
+    // Can I actually pay? Every asked card must still be in my collection.
+    const missing = (trade.ask ?? []).filter((c) => !state.collection.entries[c.key]);
+    if (missing.length) {
+      acceptBtn.disabled = true;
+      body.querySelector('[data-status]').textContent = t('tradeMissing');
+    }
+
+    press(acceptBtn, { sound: null });
+    acceptBtn.addEventListener('click', async () => {
+      acceptBtn.disabled = true; declineBtn.disabled = true;
+      const paid = (trade.ask ?? []).map((c) => store.takeCardCopy(state.collection, c.key)).filter(Boolean);
+      try {
+        await account.sendDelivery(userId(), trade.proposer, 'trade-return', { cards: paid });
+        for (const card of trade.offer ?? []) store.receiveCardEntry(state.collection, card);
+        await account.setTradeStatus(trade.id, 'accepted');
+        toast(t('tradeDone', { name: esc(name) }));
+        synth.playTrade();
+        sheet.hide();
+        renderBinder();
+        syncSoon();
+        syncSocial();
+      } catch (error) {
+        for (const card of paid) store.receiveCardEntry(state.collection, card);   // undo
+        toast(esc(describeError(error)), 'error');
+        acceptBtn.disabled = false; declineBtn.disabled = false;
+      }
+    });
+    press(declineBtn, { sound: null });
+    declineBtn.addEventListener('click', async () => {
+      acceptBtn.disabled = true; declineBtn.disabled = true;
+      try {
+        await account.setTradeStatus(trade.id, 'declined');
+        sheet.hide();
+        syncSocial();
+      } catch (error) {
+        toast(esc(describeError(error)), 'error');
+        acceptBtn.disabled = false; declineBtn.disabled = false;
+      }
+    });
+  });
+}
+
+/* --- chat ---------------------------------------------------------------------- */
+
+let chatTimer = null;
+
+function openChat(entry) {
+  state.chat = entry;
+  renderChatFrame();
+  showScreen('chat');
+  refreshChat({ markRead: true });
+  clearInterval(chatTimer);
+  chatTimer = setInterval(() => { if (state.tab === 'chat') refreshChat(); }, 10000);
+}
+
+function renderChatFrame() {
+  const person = state.chat?.profile;
+  if (!person) return;
+  el.chatBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  el.chatName.textContent = person.username ?? '';
+  paintAvatarInto(el.chatAvatar, person);
+  const online = account.isOnline(person);
+  el.chatPresence.textContent = online ? t('friendOnline') : t('friendOffline');
+  el.chatPresence.className = `chat-presence${online ? ' is-online' : ''}`;
+  el.chatInput.placeholder = t('chatPlaceholder');
+  el.chatSend.textContent = t('chatSend');
+}
+
+async function refreshChat({ markRead = false } = {}) {
+  const entry = state.chat;
+  if (!entry) return;
+  try {
+    const rows = await account.listMessages(userId(), entry.otherId);
+    if (state.chat !== entry) return;
+    paintChat(rows);
+    if (markRead || rows.some((m) => m.recipient === userId() && !m.read_at)) {
+      await account.markConversationRead(userId(), entry.otherId);
+      state.social.unread.delete(entry.otherId);
+      updateBadges();
+    }
+  } catch { /* next poll */ }
+}
+
+function paintChat(rows) {
+  const mine = userId();
+  const atBottom = el.chatLog.scrollHeight - el.chatLog.scrollTop - el.chatLog.clientHeight < 60;
+  el.chatLog.replaceChildren(...rows.map((m) => {
+    const bubble = document.createElement('div');
+    bubble.className = `bubble${m.sender === mine ? ' is-mine' : ''}`;
+    bubble.textContent = m.body;
+    const when = document.createElement('span');
+    when.className = 'bubble-when';
+    when.textContent = whenText(m.created_at);
+    bubble.appendChild(when);
+    return bubble;
+  }));
+  if (atBottom || rows.length) el.chatLog.scrollTop = el.chatLog.scrollHeight;
+}
+
+async function sendChat(event) {
+  event.preventDefault();
+  const entry = state.chat;
+  const text = el.chatInput.value.trim();
+  if (!entry || !text) return;
+  el.chatInput.value = '';
+  try {
+    await account.sendChatMessage(userId(), entry.otherId, text);
+    synth.playMessage();
+    refreshChat();
+  } catch (error) {
+    el.chatInput.value = text;   // let them retry
+    toast(esc(describeError(error)), 'error');
+  }
+}
+
+/* --- avatars -------------------------------------------------------------------- */
+
+/** Paint a person's avatar (their chosen card art, at their chosen crop)
+ *  into a .person-mark-style circle, or fall back to their initial. */
+function paintAvatarInto(node, profile) {
+  const avatar = profile?.avatar;
+  if (avatar?.url) {
+    node.textContent = '';
+    node.style.backgroundImage = `url("${String(avatar.url).replace(/"/g, '%22')}")`;
+    node.style.backgroundSize = 'cover';
+    node.style.backgroundPosition = `${Number(avatar.x) || 50}% ${Number(avatar.y) || 50}%`;
+    node.classList.add('has-avatar');
+  } else {
+    node.style.backgroundImage = '';
+    node.classList.remove('has-avatar');
+    node.textContent = String(profile?.username ?? '?').slice(0, 1);
+  }
+}
+
+/**
+ * Choose a card as your face. Step one: pick any card you own that has a
+ * picture. Step two: drag the picture behind a fixed circle to choose the
+ * crop, exactly like every other app does it.
+ */
+function openAvatarPicker() {
+  const mine = store.allEntries(state.collection).filter((c) => c.thumbnail);
+  openSheet(t('avatarTitle'), (body) => {
+    if (!mine.length) {
+      body.innerHTML = '<p class="muted"></p>';
+      body.querySelector('p').textContent = t('avatarNoCards');
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'avatar-grid';
+    grid.replaceChildren(...mine.slice(0, 60).map((card) => {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'avatar-cell';
+      cell.style.backgroundImage = `url("${String(card.thumbnail).replace(/"/g, '%22')}")`;
+      cell.setAttribute('aria-label', card.title);
+      press(cell, { sound: null });
+      cell.addEventListener('click', () => openAvatarCrop(card));
+      return cell;
+    }));
+    body.appendChild(grid);
+  });
+}
+
+function openAvatarCrop(card) {
+  openSheet(t('avatarCropTitle'), (body) => {
+    body.innerHTML = `
+      <p class="muted" style="font-size:.84rem;margin-bottom:12px" data-hint></p>
+      <div class="crop-stage" data-stage>
+        <div class="crop-img" data-img></div>
+        <div class="crop-ring" aria-hidden="true"></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:16px">
+        <button class="btn btn-primary" type="button" data-save style="flex:1"></button>
+      </div>`;
+    body.querySelector('[data-hint]').textContent = t('avatarCropHint');
+    const saveBtn = body.querySelector('[data-save]');
+    saveBtn.textContent = t('avatarSave');
+
+    const img = body.querySelector('[data-img]');
+    const stage = body.querySelector('[data-stage]');
+    img.style.backgroundImage = `url("${String(card.thumbnail).replace(/"/g, '%22')}")`;
+    let x = 50, y = 50;
+    const paint = () => { img.style.backgroundPosition = `${x}% ${y}%`; };
+    paint();
+    stage.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      const x0 = x, y0 = y;
+      const rect = stage.getBoundingClientRect();
+      trackDrag(event, {
+        onMove: (dx, dy) => {
+          x = Math.min(100, Math.max(0, x0 - (dx / rect.width) * 100));
+          y = Math.min(100, Math.max(0, y0 - (dy / rect.height) * 100));
+          paint();
+        },
+        onEnd: () => {}
+      });
+    });
+
+    press(saveBtn, { sound: null });
+    saveBtn.addEventListener('click', async () => {
+      saveBtn.disabled = true;
+      const avatar = { url: card.thumbnail, x: Math.round(x), y: Math.round(y) };
+      try {
+        await account.updateProfileFields(userId(), { avatar });
+        state.account.profile.avatar = avatar;
+        toast(t('avatarSaved'));
+        synth.playResolved();
+        sheet.hide();
+        if (state.tab === 'profile') renderProfile();
+      } catch (error) {
+        toast(esc(describeError(error)), 'error');
+        saveBtn.disabled = false;
+      }
+    });
+  });
+}
+
 function findStatus(key, kind = 'muted', vars = {}) {
   el.findStatus.textContent = key ? t(key, vars) : '';
   el.findStatus.className = `find-status${kind ? ` is-${kind}` : ''}`;
@@ -3054,6 +3613,7 @@ function renderFriends() {
   el.incomingLabel.textContent = t('friendsIncoming');
   el.friendsLabel.textContent = t('friendsYours');
   el.outgoingLabel.textContent = t('friendsOutgoing');
+  el.tradesLabel.textContent = t('friendsTrades');
 
   const { friends, incoming, outgoing, results } = state.social;
   // Someone you are already connected to still appears in a search, showing
@@ -3085,8 +3645,68 @@ function renderFriends() {
         () => account.removeFriendship(entry.id), 'friendsRemoved')]
     ])));
 
-  el.friendsList.replaceChildren(...friends.map((entry) =>
-    personRow(entry.profile, [], { onOpen: () => openFriend(entry) })));
+  // Favourites first, then whoever is online now, then the alphabet.
+  const orderedFriends = [...friends].sort((a, b) =>
+    (isFavFriend(b.otherId) - isFavFriend(a.otherId))
+    || (account.isOnline(b.profile) - account.isOnline(a.profile))
+    || a.profile.username.localeCompare(b.profile.username));
+
+  el.friendsList.replaceChildren(...orderedFriends.map((entry) => {
+    const row = personRow(entry.profile, [], { onOpen: () => openFriend(entry) });
+    const bay = row.querySelector('.person-actions');
+    bay.innerHTML = '';
+
+    const unread = state.social.unread?.get?.(entry.otherId) ?? 0;
+    const chatBtn = document.createElement('button');
+    chatBtn.type = 'button';
+    chatBtn.className = 'icon-btn is-mini';
+    chatBtn.setAttribute('aria-label', t('chatOpen'));
+    chatBtn.innerHTML = `${iconSvg('chat', { size: 17 })}${unread ? `<span class="count">${unread > 9 ? '9+' : unread}</span>` : ''}`;
+    chatBtn.addEventListener('click', (e) => { e.stopPropagation(); synth.playTap(); openChat(entry); });
+
+    const favBtn = document.createElement('button');
+    favBtn.type = 'button';
+    favBtn.className = `icon-btn is-mini fav-friend${isFavFriend(entry.otherId) ? ' is-on' : ''}`;
+    favBtn.setAttribute('aria-label', t('friendFavourite'));
+    favBtn.innerHTML = iconSvg(isFavFriend(entry.otherId) ? 'starFilled' : 'star', { size: 16 });
+    favBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      synth.playTap();
+      toggleFavFriend(entry.otherId);
+      renderFriends();
+    });
+
+    const dropBtn = document.createElement('button');
+    dropBtn.type = 'button';
+    dropBtn.className = 'icon-btn is-mini drop-friend';
+    dropBtn.setAttribute('aria-label', t('friendsRemove'));
+    dropBtn.innerHTML = iconSvg('trash', { size: 15 });
+    dropBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!dropBtn.classList.contains('is-armed')) {
+        dropBtn.classList.add('is-armed');
+        toast(t('deleteArmed'));
+        setTimeout(() => dropBtn.classList.remove('is-armed'), 3500);
+        return;
+      }
+      socialAction(() => account.removeFriendship(entry.id), 'friendsRemoved');
+    });
+
+    bay.append(chatBtn, favBtn, dropBtn);
+    return row;
+  }));
+
+  // Trades waiting on my answer sit above the friend list.
+  const myTrades = (state.social.trades ?? [])
+    .filter((tr) => tr.status === 'pending' && tr.recipient === userId());
+  el.tradesHead.hidden = !myTrades.length;
+  el.tradesList.replaceChildren(...myTrades.map((trade) => {
+    const who = friends.find((f) => f.otherId === trade.proposer)?.profile
+      ?? { username: '?' };
+    return personRow(who, [
+      ['tradeView', 'btn-primary', () => openTradeAnswer(trade)]
+    ]);
+  }));
 
   el.outgoingList.replaceChildren(...outgoing.map((entry) =>
     personRow(entry.profile, [
@@ -3122,14 +3742,33 @@ function renderFriend() {
   if (!entry) return;
   const person = entry.profile;
   const level = person.level ?? 1;
+  const online = account.isOnline(person);
 
   el.friendBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
   el.friendName.textContent = person.username ?? '';
   friendRing.set(0, String(level));
   el.friendLevel.textContent = t('profileLevel', { n: level });
-  el.friendRank.textContent = tx(rankFor(level).name);
-  el.friendCardsLabel.textContent = t('friendCollection');
+  el.friendRank.innerHTML = `<span class="presence-dot is-inline${online ? ' is-online' : ''}"></span> `
+    + esc(online ? t('friendOnline') : t('friendOffline')) + ' · ' + esc(tx(rankFor(level).name));
+  el.friendCardsLabel.textContent = t('friendAlbums');
   el.friendRemove.textContent = t('friendsRemove');
+
+  // What you can do with a friend, in one row.
+  const actionBtn = (icon, labelKey, run, kind = 'btn-ghost') => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `btn btn-sm ${kind}`;
+    btn.innerHTML = `${iconSvg(icon, { size: 15 })}<span style="margin-left:6px">${esc(t(labelKey))}</span>`;
+    press(btn, { sound: null });
+    btn.addEventListener('click', () => { synth.playTap(); run(); });
+    return btn;
+  };
+  el.friendActions.replaceChildren(
+    actionBtn('chat', 'chatOpen', () => openChat(entry), 'btn-primary'),
+    actionBtn('trade', 'tradeOpen', () => openTradeSheet(entry)),
+    actionBtn('gift', 'giftCardOpen', () => openGiftCard(entry)),
+    actionBtn('packs', 'giftBoosterOpen', () => openGiftBooster(entry))
+  );
 
   const best = rarityById(person.best_rarity);
   const stats = [
@@ -3156,7 +3795,7 @@ function renderFriend() {
  * see their wallet or their settings even though they are in the same blob.
  */
 async function loadFriendCards(entry) {
-  el.friendGrid.replaceChildren();
+  el.friendAlbums.replaceChildren();
   el.friendCardsStatus.textContent = t('friendLoading');
   el.friendCardsStatus.className = 'find-status is-working';
   try {
@@ -3168,10 +3807,39 @@ async function loadFriendCards(entry) {
       el.friendCardsStatus.className = 'find-status is-muted';
       return;
     }
-    const sorted = [...cards].sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
-    el.friendCardsStatus.textContent = sorted.length ? '' : t('friendNoCards');
+    el.friendCardsStatus.textContent = cards.length ? '' : t('friendNoCards');
     el.friendCardsStatus.className = 'find-status is-muted';
-    el.friendGrid.replaceChildren(...sorted.map((card) => {
+
+    // Their collection, shown the way yours is: as albums. Tapping an
+    // unlocked one lists its cards in a sheet.
+    const albums = buildAlbums(cards, []).filter((a) => a.unlocked);
+    el.friendAlbums.replaceChildren(...albums.map((album) => {
+      // cloneNode drops buildAlbumCover's own click (which drives YOUR
+      // collection); this cover opens the friend's album instead.
+      const cover = buildAlbumCover(album).cloneNode(true);
+      press(cover, { sound: null });
+      cover.addEventListener('click', () => {
+        synth.playTap();
+        openFriendAlbum(entry, album);
+      });
+      return cover;
+    }));
+    reveal(el.friendAlbums.children, { step: 22, from: 10 });
+  } catch (error) {
+    if (state.viewing !== entry) return;
+    el.friendCardsStatus.textContent = describeError(error);
+    el.friendCardsStatus.className = 'find-status is-error';
+  }
+}
+
+/** One of a friend's albums, as a sheet of its cards. */
+function openFriendAlbum(entry, album) {
+  openSheet(`${album.name} · ${entry.profile.username}`, (body) => {
+    const grid = document.createElement('div');
+    grid.className = 'sheet-card-grid';
+    const sorted = [...album.entries]
+      .sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
+    grid.replaceChildren(...sorted.map((card) => {
       const node = buildStaticCard(card, rarityById(card.rarityId), null, { fav: false });
       if ((card.count ?? 1) > 1) {
         const badge = document.createElement('span');
@@ -3181,12 +3849,8 @@ async function loadFriendCards(entry) {
       }
       return node;
     }));
-    reveal(el.friendGrid.children, { step: 22, from: 10 });
-  } catch (error) {
-    if (state.viewing !== entry) return;
-    el.friendCardsStatus.textContent = describeError(error);
-    el.friendCardsStatus.className = 'find-status is-error';
-  }
+    body.appendChild(grid);
+  });
 }
 
 /* --- settings ------------------------------------------------------------------------------------------- */
@@ -3343,7 +4007,115 @@ function accountRows() {
   outBtn.addEventListener('click', () => { synth.playTap(); leaveAccount(); });
 
   paintSyncLine(who);
-  return [who, out];
+
+  // --- identity: avatar, username, who can see you, whether you look online.
+  const rowShell = (titleKey, noteKey) => {
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>`;
+    row.querySelector('h4').textContent = t(titleKey);
+    row.querySelector('p').textContent = t(noteKey);
+    return row;
+  };
+  const rowButton = (row, label, run) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-sm btn-ghost row-action';
+    btn.textContent = label;
+    press(btn, { sound: null });
+    btn.addEventListener('click', () => { synth.playTap(); run(btn); });
+    row.appendChild(btn);
+    return btn;
+  };
+
+  const avatarRow = rowShell('avatarTitle', 'avatarNote');
+  const face = document.createElement('span');
+  face.className = 'person-mark row-action';
+  paintAvatarInto(face, state.account.profile);
+  face.style.cursor = 'pointer';
+  face.addEventListener('click', () => { synth.playTap(); openAvatarPicker(); });
+  avatarRow.appendChild(face);
+
+  const nameRow = rowShell('usernameTitle', 'usernameNote');
+  rowButton(nameRow, t('usernameChange'), () => openUsernameChange());
+
+  const visRow = rowShell('visibilityTitle', 'visibilityNote');
+  const visOrder = ['public', 'friends', 'private'];
+  const visLabel = (v) => t(`visibility_${v}`);
+  rowButton(visRow, visLabel(state.account.profile?.visibility ?? 'public'), async (btn) => {
+    const current = state.account.profile?.visibility ?? 'public';
+    const next = visOrder[(visOrder.indexOf(current) + 1) % visOrder.length];
+    btn.disabled = true;
+    try {
+      await account.updateProfileFields(userId(), { visibility: next });
+      state.account.profile.visibility = next;
+      btn.textContent = visLabel(next);
+    } catch (error) { toast(esc(describeError(error)), 'error'); }
+    btn.disabled = false;
+  });
+
+  const presRow = rowShell('presenceTitle', 'presenceNote');
+  const presLabel = (v) => (v === 'hidden' ? t('presence_hidden') : t('presence_online'));
+  rowButton(presRow, presLabel(state.account.profile?.presence ?? 'online'), async (btn) => {
+    const next = (state.account.profile?.presence ?? 'online') === 'online' ? 'hidden' : 'online';
+    btn.disabled = true;
+    try {
+      await account.updateProfileFields(userId(), { presence: next });
+      state.account.profile.presence = next;
+      btn.textContent = presLabel(next);
+    } catch (error) { toast(esc(describeError(error)), 'error'); }
+    btn.disabled = false;
+  });
+
+  return [who, avatarRow, nameRow, visRow, presRow, out];
+}
+
+/** A new name, checked and claimed. */
+function openUsernameChange() {
+  openSheet(t('usernameTitle'), (body) => {
+    body.innerHTML = `
+      <p class="muted" style="font-size:.86rem;margin-bottom:14px" data-note></p>
+      <input class="creator-input" type="text" maxlength="20" data-name
+        autocapitalize="off" autocomplete="off" spellcheck="false" />
+      <p class="find-status" data-status role="status" style="margin-top:8px"></p>
+      <button class="btn btn-primary btn-block" type="button" data-save style="margin-top:12px"></button>`;
+    body.querySelector('[data-note]').textContent = t('usernameSheetNote');
+    const input = body.querySelector('[data-name]');
+    input.value = state.account.profile?.username ?? '';
+    const status = body.querySelector('[data-status]');
+    const saveBtn = body.querySelector('[data-save]');
+    saveBtn.textContent = t('usernameSave');
+    press(saveBtn, { sound: null });
+    saveBtn.addEventListener('click', async () => {
+      const name = input.value.trim();
+      if (!account.USERNAME_RE.test(name)) {
+        status.textContent = t('usernameRules');
+        status.className = 'find-status is-error';
+        return;
+      }
+      saveBtn.disabled = true;
+      status.textContent = t('usernameChecking');
+      status.className = 'find-status is-working';
+      try {
+        const updated = await account.changeUsername(userId(), name);
+        if (!updated) {
+          status.textContent = t('authNameTaken');
+          status.className = 'find-status is-error';
+          saveBtn.disabled = false;
+          return;
+        }
+        state.account.profile = updated;
+        toast(t('usernameChanged', { name: esc(name) }));
+        synth.playResolved();
+        sheet.hide();
+        renderSettings();
+      } catch (error) {
+        status.textContent = describeError(error);
+        status.className = 'find-status is-error';
+        saveBtn.disabled = false;
+      }
+    });
+  });
 }
 
 /** When the save last reached the server, in words. */
@@ -3811,6 +4583,11 @@ function init() {
   el.splashMark.innerHTML = logoSvg({ size: 78 });
   backdrop.mount(el.backdrop).setTheme(storedTheme());
 
+  // Cards without a picture no longer exist: draws refuse them now, and any
+  // already in the collection are swept out once here.
+  const pruned = store.pruneImagelessCards(state.collection);
+  if (pruned) console.info(`Removed ${pruned} pictureless card(s) from the collection`);
+
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
   profileRing = new Ring(el.profileRing, { size: 62, width: 4 });
@@ -3877,6 +4654,13 @@ function init() {
     button.addEventListener('click', () => { synth.playTap(); openHelp(button.dataset.help); });
   });
   el.filterOpen.addEventListener('click', openFilters);
+  el.chatBack.addEventListener('click', () => {
+    clearInterval(chatTimer);
+    state.chat = null;
+    renderFriends();
+    showScreen('friends');
+  });
+  el.chatForm.addEventListener('submit', sendChat);
   el.albumBack.addEventListener('click', () => {
     synth.playSheet(false);
     state.album = null;
@@ -4047,7 +4831,7 @@ init();
 
 window.__packywiki = {
   state, store, debug, RARITIES, synth, backdrop, THEMES,
-  draw: drawArticles, generateShop,
+  draw: drawArticles, generateShop, syncSocial,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderSettings(); },
   debugRarity(id) {
     const forced = rarityById(id);

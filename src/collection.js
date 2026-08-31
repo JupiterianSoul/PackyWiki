@@ -119,6 +119,20 @@ export function recordPulls(collection, pulls, spec) {
   return results;
 }
 
+/**
+ * One-time cleanup: every card must carry a picture now, and draws enforce
+ * it — this sweeps out the pictureless cards players already own. Their
+ * copies are simply removed (they were the cards nobody wanted to look at).
+ * Returns how many entries were dropped.
+ */
+export function pruneImagelessCards(collection) {
+  const doomed = Object.values(collection.entries ?? {}).filter((e) => !e.thumbnail);
+  if (!doomed.length) return 0;
+  for (const entry of doomed) delete collection.entries[entry.key];
+  saveCollection(collection);
+  return doomed.length;
+}
+
 export function toggleFavorite(collection, key) {
   const entry = collection.entries[key];
   if (!entry) return false;
@@ -135,6 +149,43 @@ export function sellCopy(collection, key) {
   if (entry.count <= 0) delete collection.entries[key];
   saveCollection(collection);
   return entry;
+}
+
+/**
+ * Take one copy of a card OUT of the collection (a gift, a trade), returning
+ * a single-copy snapshot suitable for handing to another player. Null when
+ * the card is not owned.
+ */
+export function takeCardCopy(collection, key) {
+  const entry = collection.entries[key];
+  if (!entry) return null;
+  const snapshot = { ...entry, count: 1, favorite: false };
+  entry.count -= 1;
+  if (entry.count <= 0) delete collection.entries[key];
+  saveCollection(collection);
+  return snapshot;
+}
+
+/**
+ * Put a received card entry INTO the collection (a gift, a trade, an escrow
+ * refund). Merges with an existing entry the same way pulling does: counts
+ * add, the better rarity wins.
+ */
+export function receiveCardEntry(collection, incoming) {
+  if (!incoming?.key || !incoming.title) return null;
+  const existing = collection.entries[incoming.key];
+  if (!existing) {
+    collection.entries[incoming.key] = { ...incoming, count: incoming.count ?? 1, favorite: false };
+  } else {
+    existing.count += incoming.count ?? 1;
+    if (rarityRank(incoming.rarityId) > rarityRank(existing.rarityId)) {
+      existing.rarityId = incoming.rarityId;
+      existing.price = incoming.price ?? existing.price;
+    }
+    existing.lastPulledAt = Date.now();
+  }
+  saveCollection(collection);
+  return collection.entries[incoming.key];
 }
 
 export const allEntries = (collection) => Object.values(collection.entries);

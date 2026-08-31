@@ -244,6 +244,11 @@
           </div>
           <div id="find-results" class="people"></div>
 
+          <div class="section-head" id="trades-head" hidden>
+            <h3 class="label" id="trades-label"></h3>
+          </div>
+          <div id="trades-list" class="people"></div>
+
           <div class="section-head" id="incoming-head" hidden>
             <h3 class="label" id="incoming-label"></h3>
           </div>
@@ -284,13 +289,31 @@
             <div class="stat-grid" id="friend-stats"></div>
           </div>
 
+          <div class="friend-actions pad" id="friend-actions"></div>
+
           <div class="section-head"><h3 class="label" id="friend-cards-label"></h3></div>
           <p id="friend-cards-status" class="find-status" role="status" aria-live="polite"></p>
-          <div id="friend-grid" class="binder-grid"></div>
+          <div id="friend-albums" class="album-shelf"></div>
 
           <div class="hero-actions">
             <button id="friend-remove" class="btn btn-ghost btn-sm" type="button"></button>
           </div>
+        </section>
+
+        <section id="screen-chat" class="screen">
+          <div class="screen-head" style="gap:10px">
+            <button id="chat-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <span class="person-mark" id="chat-avatar" aria-hidden="true"></span>
+            <div style="flex:1;min-width:0">
+              <h2 class="open-title" id="chat-name" style="text-align:left"></h2>
+              <p class="chat-presence" id="chat-presence"></p>
+            </div>
+          </div>
+          <div class="chat-log pad" id="chat-log" aria-live="polite"></div>
+          <form class="chat-bar" id="chat-form" autocomplete="off">
+            <input id="chat-input" class="chat-input" type="text" maxlength="500" />
+            <button id="chat-send" class="btn btn-primary btn-sm" type="submit"></button>
+          </form>
         </section>
 
         <!-- SETTINGS ---------------------------------------------------------- -->

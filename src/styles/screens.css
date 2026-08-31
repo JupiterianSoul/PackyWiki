@@ -1217,3 +1217,178 @@
 .ach-progress { font-size: 0.74rem; font-weight: 700; color: var(--ink-faint); }
 .ach-progress b { color: var(--ink-dim); }
 .ach-claimed { color: var(--positive); }
+
+/* --- social v2 -------------------------------------------------------------- */
+
+.friend-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 16px; }
+
+.presence-dot {
+  position: absolute;
+  right: -1px; bottom: -1px;
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  background: #f87171;
+  border: 2px solid var(--surface-solid);
+}
+.presence-dot.is-online { background: #4ade80; }
+.presence-dot.is-inline { position: static; display: inline-block; width: 9px; height: 9px; border-width: 1.5px; vertical-align: baseline; }
+
+.person-mark { position: relative; }
+.person-mark.has-avatar { color: transparent; }
+
+.icon-btn.is-mini { width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: var(--radius-pill); border: var(--border) var(--border-style) var(--line); }
+.fav-friend.is-on { color: var(--warning); border-color: color-mix(in srgb, var(--warning) 45%, transparent); }
+.drop-friend.is-armed { color: #fff; background: var(--negative); border-color: transparent; }
+
+/* --- chat ------------------------------------------------------------------- */
+
+#screen-chat { display: none; }
+#screen-chat.is-active { display: flex; flex-direction: column; min-height: calc(100dvh - 140px); }
+.chat-presence { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); }
+.chat-presence.is-online { color: #4ade80; }
+.chat-log {
+  flex: 1;
+  min-height: 200px;
+  max-height: calc(100dvh - 300px);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 6px;
+  padding-bottom: 12px;
+  overscroll-behavior: contain;
+}
+.bubble {
+  position: relative;
+  max-width: 78%;
+  align-self: flex-start;
+  padding: 9px 12px 16px;
+  border-radius: 4px 14px 14px 14px;
+  background: var(--surface-2);
+  border: var(--border) var(--border-style) var(--line);
+  font-size: 0.9rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.bubble.is-mine {
+  align-self: flex-end;
+  border-radius: 14px 4px 14px 14px;
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-solid));
+  border-color: color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.bubble-when {
+  position: absolute;
+  right: 10px; bottom: 3px;
+  font-size: 0.58rem;
+  color: var(--ink-faint);
+}
+.chat-bar {
+  display: flex;
+  gap: 8px;
+  padding: 8px var(--gutter) 12px;
+}
+.chat-input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: var(--ink);
+}
+.chat-input:focus { outline: none; border-color: var(--accent); }
+
+/* --- pickers (gifts, trades) ------------------------------------------------- */
+
+.pick-list { display: grid; gap: 7px; }
+.pick-list.is-short { max-height: 200px; overflow-y: auto; overscroll-behavior: contain; }
+.pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  text-align: left;
+}
+.pick-row.is-on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pick-thumb {
+  flex: none;
+  width: 40px; height: 40px;
+  border-radius: 8px;
+  background-color: color-mix(in srgb, var(--ink) 10%, transparent);
+  background-size: cover;
+  background-position: center;
+}
+.pick-art { flex: none; display: grid; place-items: center; }
+.pick-copy { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.pick-copy b { font-size: 0.86rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pick-copy span { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+.pick-tick { flex: none; color: var(--accent); opacity: 0; }
+.pick-row.is-on .pick-tick { opacity: 1; }
+
+.trade-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 0;
+  font-size: 0.88rem;
+  border-bottom: 1px solid var(--line);
+}
+.trade-line span { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; }
+
+.sheet-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.sheet-card-grid .card { width: 100%; }
+
+/* --- avatar picking + cropping ----------------------------------------------- */
+
+.avatar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(74px, 1fr));
+  gap: 8px;
+}
+.avatar-cell {
+  aspect-ratio: 1;
+  border-radius: 12px;
+  border: var(--border) var(--border-style) var(--line);
+  background-size: cover;
+  background-position: center;
+}
+.crop-stage {
+  position: relative;
+  width: min(280px, 80vw);
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border-radius: var(--radius);
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+.crop-img {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: 50% 50%;
+}
+.crop-ring {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* Everything outside the circle dims; the circle is what you get. */
+  background: radial-gradient(circle at 50% 50%, transparent 34%, rgba(0, 0, 0, 0.62) 35%);
+}
+.crop-ring::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 50%;
+  width: 69%; aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
