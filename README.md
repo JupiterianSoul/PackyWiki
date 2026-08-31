@@ -289,8 +289,25 @@ meant storing passwords, which is not a thing to do casually or at all.
 4. For the APK, add the same two values as repository secrets named
    `SUPABASE_URL` and `SUPABASE_ANON_KEY`. The workflow compiles them in.
 
-Optionally turn off "Confirm email" under **Authentication → Providers →
-Email** if you would rather sign-up let you straight in; the app handles both.
+### Email links, and why you probably want confirmation off
+
+The app is a WebView with no address bar and no website behind it, so any email
+Supabase sends that works by *link* has nowhere to land. Two settings follow
+from that:
+
+- **Turn off "Confirm email"** under **Authentication → Providers → Email**.
+  Sign-up then hands you straight in. Leave it on and the app still behaves
+  correctly — it tells you to go and confirm, and creates the profile on your
+  first sign-in instead — but you have to open the link on the same device and
+  then come back, which is a poor first minute.
+- **Password reset is a link too.** It goes to the project's **Site URL**
+  (Authentication → URL Configuration), which by default is `localhost`. Set it
+  to somewhere real if you deploy the web build; otherwise the reset email
+  arrives and the link goes nowhere, and the way back into an account is to
+  make a new one and paste the save in from Settings → Transfer save.
+
+The app never claims more than it can do here: the reset screen says a link is
+on its way and nothing about it working.
 
 **A build with no keys still works.** It skips the gate entirely, plays
 offline, hides Friends, and says so in Settings. Shipping an APK whose sign-in
