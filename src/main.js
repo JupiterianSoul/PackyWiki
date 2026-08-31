@@ -437,11 +437,13 @@ function openDrawer() {
   el.drawer.hidden = false;
   el.menuBtn.setAttribute('aria-expanded', 'true');
   requestAnimationFrame(() => el.drawer.classList.add('is-open'));
-  synth.playSheetOpen?.();
+  synth.resume();
+  synth.playDrawer(true);
 }
 
 function closeDrawer() {
   if (el.drawer.hidden) return;
+  synth.playDrawer(false);
   el.drawer.classList.remove('is-open');
   el.menuBtn.setAttribute('aria-expanded', 'false');
   setTimeout(() => { el.drawer.hidden = true; }, dur(300));
@@ -1741,7 +1743,8 @@ function wireFavButton(button, entryKey) {
   paint();
   button.addEventListener('click', (event) => {
     event.stopPropagation();
-    store.toggleFavorite(state.collection, entryKey);
+    const on = store.toggleFavorite(state.collection, entryKey);
+    synth.playFav(on);
     paint();
     synth.playTap();
     if (state.tab === 'binder') renderBinder();
@@ -1848,7 +1851,9 @@ function showSummary() {
   clearTimeout(state.summaryTimer);
   el.summary.replaceChildren(...state.pulls.map((pull) => {
     const data = { ...pull.article, price: pull.price, packIcon: pull.packIcon };
-    return buildStaticCard(data, pull.rarity, pull.article.key);
+    const card = buildStaticCard(data, pull.rarity, pull.article.key);
+    card.classList.add('is-mini');
+    return card;
   }));
   reveal(el.summary.children, { step: 70, from: 20 });
   el.openScreen.classList.replace('phase-reveal', 'phase-summary');
@@ -2317,6 +2322,7 @@ function fillAlbumPage(node, entries, offset, album) {
     const entry = entries[offset + i];
     if (entry) {
       const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
+      card.classList.add('is-mini');
       if (entry.count > 1) {
         const badge = document.createElement('span');
         badge.className = 'copy-badge';
@@ -3555,7 +3561,8 @@ function openAvatarCrop(card) {
       <p class="muted" style="font-size:.84rem;margin-bottom:12px" data-hint></p>
       <div class="crop-stage" data-stage>
         <div class="crop-img" data-img></div>
-        <div class="crop-ring" aria-hidden="true"></div>
+        <div class="crop-shade" aria-hidden="true"></div>
+        <div class="crop-circle" data-circle aria-hidden="true"></div>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px">
         <button class="btn btn-primary" type="button" data-save style="flex:1"></button>
@@ -3564,23 +3571,50 @@ function openAvatarCrop(card) {
     const saveBtn = body.querySelector('[data-save]');
     saveBtn.textContent = t('avatarSave');
 
-    const img = body.querySelector('[data-img]');
     const stage = body.querySelector('[data-stage]');
+    const img = body.querySelector('[data-img]');
+    const circle = body.querySelector('[data-circle]');
+    const shade = body.querySelector('.crop-shade');
     img.style.backgroundImage = `url("${String(card.thumbnail).replace(/"/g, '%22')}")`;
-    let x = 50, y = 50;
-    const paint = () => { img.style.backgroundPosition = `${x}% ${y}%`; };
+
+    // The picture stays put; the CIRCLE is what you move over it. Its centre,
+    // as a percentage of the stage, is exactly what avatars store.
+    let x = Number(state.account.profile?.avatar?.x);
+    let y = Number(state.account.profile?.avatar?.y);
+    if (!Number.isFinite(x)) x = 50;
+    if (!Number.isFinite(y)) y = 50;
+
+    // The circle's radius, as a percentage of the stage, sets how far the
+    // centre may travel before the ring leaves the picture.
+    const R = 27;
+    const clampPos = () => {
+      x = Math.min(100 - R, Math.max(R, x));
+      y = Math.min(100 - R, Math.max(R, y));
+    };
+    const paint = () => {
+      clampPos();
+      circle.style.left = `${x}%`;
+      circle.style.top = `${y}%`;
+      shade.style.setProperty('--cx', `${x}%`);
+      shade.style.setProperty('--cy', `${y}%`);
+    };
     paint();
+
     stage.addEventListener('pointerdown', (event) => {
       event.preventDefault();
-      const x0 = x, y0 = y;
       const rect = stage.getBoundingClientRect();
+      // The circle jumps under the finger, then follows it.
+      x = ((event.clientX - rect.left) / rect.width) * 100;
+      y = ((event.clientY - rect.top) / rect.height) * 100;
+      paint();
+      circle.classList.add('is-held');
       trackDrag(event, {
-        onMove: (dx, dy) => {
-          x = Math.min(100, Math.max(0, x0 - (dx / rect.width) * 100));
-          y = Math.min(100, Math.max(0, y0 - (dy / rect.height) * 100));
+        onMove: (dx, dy, _moved, e) => {
+          x = ((e.clientX - rect.left) / rect.width) * 100;
+          y = ((e.clientY - rect.top) / rect.height) * 100;
           paint();
         },
-        onEnd: () => {}
+        onEnd: () => circle.classList.remove('is-held')
       });
     });
 
@@ -4690,7 +4724,7 @@ function init() {
   [el.wallet, el.menuBtn, el.bell, el.giftBtn, el.levelBadge, el.packsOpen, el.timedOpen,
    el.filterOpen, el.openBack, el.openDone, el.sheetClose, el.starterGo,
    el.packsEmptyCta, el.creatorGo, el.findGo, el.friendBack,
-   el.friendRemove, el.gateAlt, el.oddsBtn].forEach((node) => press(node, { sound: null }));
+   el.friendRemove, el.gateAlt, el.oddsBtn, el.albumBack, el.chatBack].forEach((node) => press(node));
 
   el.wallet.addEventListener('click', openWallet);
   el.bell.addEventListener('click', openNotifications);

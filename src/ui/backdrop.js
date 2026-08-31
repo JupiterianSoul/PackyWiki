@@ -55,12 +55,10 @@ class Backdrop {
 
   setLowPower(low) {
     this.lowPower = low;
-    if (low) {
-      this.stop();
-      this.#frame(performance.now(), true);   // one static frame, then nothing
-    } else if (!this.paused) {
-      this.start();
-    }
+    // Battery saver does not freeze the scene any more; it halves the frame
+    // rate instead. The loop reads this.lowPower each frame, so nothing to
+    // restart here beyond making sure it is running.
+    if (!this.paused) this.start();
   }
 
   /** Paused while a pack is being opened, or the app is in the background. */
@@ -71,16 +69,17 @@ class Backdrop {
   }
 
   start() {
-    if (this.running || this.lowPower || this.paused || !this.ctx) return;
+    if (this.running || this.paused || !this.ctx) return;
     this.running = true;
-    // 30fps, not display rate: these are slow ambient fields, and painting a
-    // full-screen canvas at 60/120Hz is the single biggest battery drain in
-    // the app. Nobody can see the difference; the thermal camera can.
+    // Full 60fps when the phone can afford it, 30fps under battery saver.
+    // (Capped at 60 either way: painting a full-screen canvas at 120Hz is
+    // heat for a difference nobody can see.)
     let last = 0;
     const loop = (now) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
-      if (now - last < 31) return;
+      const budget = this.lowPower ? 31 : 15;
+      if (now - last < budget) return;
       last = now;
       this.#frame(now);
     };
@@ -112,7 +111,6 @@ class Backdrop {
 
   #frame(now, force = false) {
     if (!this.ctx || !this.theme) return;
-    if (this.lowPower && !force) return;
     const { ctx } = this;
     const w = this.width;
     const h = this.height;
@@ -456,40 +454,57 @@ class Backdrop {
   }
 
   /**
-   * MEADOW — dusk over soft hills: layered green ridges, a warm sky, and
-   * seeds/fireflies drifting up on their own slow sines.
+   * MEADOW, rebuilt. The first version drove its hills and motes with raw
+   * millisecond time, so the whole field vibrated at ten hertz. This one is
+   * still: fixed ridge silhouettes, a warm afterglow, and the only things
+   * that move are fireflies wandering on slow loops, seeds climbing over
+   * half a minute, and stars breathing over ten seconds.
    */
   #meadow(ctx, w, h, t) {
-    const speed = this.theme.backdrop.speed ?? 0.00008;
+    // Seconds, not milliseconds: every rate below reads as "per second".
+    const sec = t / 1000;
 
     const sky = ctx.createLinearGradient(0, 0, 0, h);
-    sky.addColorStop(0, '#243318');
-    sky.addColorStop(0.45, '#1d2914');
-    sky.addColorStop(1, '#131c0c');
+    sky.addColorStop(0, '#1c2913');
+    sky.addColorStop(0.5, '#1a2511');
+    sky.addColorStop(1, '#10180a');
     ctx.fillStyle = sky;
     ctx.fillRect(0, 0, w, h);
 
-    // A low warm glow, as if the sun just left.
-    const glow = ctx.createRadialGradient(w * 0.3, h * 0.32, 0, w * 0.3, h * 0.32, w * 0.5);
-    glow.addColorStop(0, 'rgba(251, 191, 36, 0.12)');
+    // A handful of stars, each on its own ten-second breath.
+    for (let i = 0; i < 26; i++) {
+      const sx = ((i * 379.7) % w);
+      const sy = ((i * 173.3) % (h * 0.42));
+      const tw = 0.45 + 0.35 * Math.sin(sec * 0.6 + i * 1.7);
+      ctx.globalAlpha = tw * 0.55;
+      ctx.fillStyle = '#f5fbe8';
+      ctx.fillRect(sx, sy, 1.4, 1.4);
+    }
+    ctx.globalAlpha = 1;
+
+    // The afterglow of a sun that just left.
+    const glow = ctx.createRadialGradient(w * 0.28, h * 0.4, 0, w * 0.28, h * 0.4, w * 0.55);
+    glow.addColorStop(0, 'rgba(251, 191, 36, 0.13)');
     glow.addColorStop(1, 'rgba(251, 191, 36, 0)');
     ctx.fillStyle = glow;
     ctx.fillRect(0, 0, w, h);
 
-    // Three ridges, each swaying imperceptibly.
+    // Three still ridges. Shape comes from position alone; the slow phase
+    // term drifts a full cycle in about two minutes, which reads as weather,
+    // not motion.
     const ridges = [
-      { base: 0.62, amp: 26, tone: 'rgba(74, 222, 128, 0.10)', k: 1.3 },
-      { base: 0.74, amp: 34, tone: 'rgba(54, 83, 20, 0.55)', k: 0.9 },
-      { base: 0.86, amp: 40, tone: 'rgba(20, 33, 10, 0.9)', k: 0.6 }
+      { base: 0.6, amp: 22, tone: 'rgba(96, 142, 54, 0.16)', k: 1.15, drift: 0.05 },
+      { base: 0.73, amp: 30, tone: 'rgba(45, 74, 22, 0.7)', k: 0.85, drift: 0.035 },
+      { base: 0.85, amp: 36, tone: 'rgba(18, 30, 9, 0.95)', k: 0.6, drift: 0.02 }
     ];
     for (const ridge of ridges) {
       ctx.fillStyle = ridge.tone;
       ctx.beginPath();
       ctx.moveTo(0, h);
-      for (let x = 0; x <= w; x += 16) {
+      for (let x = 0; x <= w + 16; x += 16) {
         const y = h * ridge.base
-          + Math.sin(x * 0.008 * ridge.k + t * speed * 900) * ridge.amp * 0.2
-          + Math.sin(x * 0.002 * ridge.k + 2) * ridge.amp;
+          + Math.sin(x * 0.0045 * ridge.k + sec * ridge.drift) * ridge.amp
+          + Math.sin(x * 0.011 * ridge.k + 2.4) * ridge.amp * 0.35;
         ctx.lineTo(x, y);
       }
       ctx.lineTo(w, h);
@@ -497,23 +512,41 @@ class Backdrop {
       ctx.fill();
     }
 
-    // The motes: seeds low, fireflies high, all on individual loops.
-    const count = this.theme.backdrop.motes ?? 40;
+    // Fireflies: a dozen, each wandering a slow loop of its own and pulsing
+    // every few seconds. Seeds: pale motes climbing the air over ~35s.
+    const count = this.theme.backdrop.motes ?? 34;
     for (let i = 0; i < count; i++) {
-      const seed = i * 127.3;
-      const p = ((t * speed * (0.5 + (i % 5) * 0.22)) + seed / 97) % 1;
-      const x = ((seed * 7.13) % w) + Math.sin(t * speed * 600 + seed) * 30;
-      const y = h - p * h * 0.9;
-      const firefly = i % 4 === 0;
-      const flicker = firefly ? (0.5 + 0.5 * Math.sin(t * 0.004 + seed)) : 1;
-      ctx.globalAlpha = (1 - p) * 0.5 * flicker;
-      ctx.fillStyle = firefly ? '#fde68a' : '#e5f9c9';
-      ctx.beginPath();
-      ctx.arc(((x % w) + w) % w, y, firefly ? 1.8 : 1.1, 0, Math.PI * 2);
-      ctx.fill();
+      const seed = i * 127.31;
+      const firefly = i % 3 === 0;
+      if (firefly) {
+        const bx = ((seed * 7.13) % w);
+        const by = h * (0.35 + ((seed * 3.7) % 45) / 100);
+        const x = bx + Math.sin(sec * 0.16 + seed) * 34 + Math.sin(sec * 0.07 + seed * 2.1) * 18;
+        const y = by + Math.cos(sec * 0.12 + seed) * 22;
+        const pulse = Math.max(0, Math.sin(sec * 0.9 + seed));
+        ctx.globalAlpha = 0.15 + pulse * 0.6;
+        ctx.fillStyle = '#fde68a';
+        ctx.beginPath();
+        ctx.arc(((x % w) + w) % w, y, 1.9, 0, Math.PI * 2);
+        ctx.fill();
+        if (pulse > 0.75) {
+          ctx.globalAlpha = (pulse - 0.75) * 1.2;
+          ctx.beginPath();
+          ctx.arc(((x % w) + w) % w, y, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        const p = ((sec / 35) * (0.6 + (i % 5) * 0.16) + seed / 97) % 1;
+        const x = ((seed * 5.77) % w) + Math.sin(sec * 0.1 + seed) * 26;
+        const y = h - p * h * 0.85;
+        ctx.globalAlpha = Math.sin(p * Math.PI) * 0.35;
+        ctx.fillStyle = '#e8f7cf';
+        ctx.beginPath();
+        ctx.arc(((x % w) + w) % w, y, 1.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
     ctx.globalAlpha = 1;
   }
-
 }
 export const backdrop = new Backdrop();

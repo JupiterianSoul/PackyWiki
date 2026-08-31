@@ -180,11 +180,12 @@ main {
 .pad { padding-inline: var(--gutter); }
 .stack { display: grid; gap: 14px; }
 
-/* A full-screen takeover hides the frame entirely. */
-html.is-immersive .appbar,
-html.is-immersive .navbar { opacity: 0; pointer-events: none; transform: translateY(12px); }
-html.is-immersive .appbar,
-html.is-immersive .navbar { transition: opacity calc(260ms * var(--motion-scale)) var(--ease), transform calc(260ms * var(--motion-scale)) var(--ease); }
+/* A full-screen takeover hides the frame entirely. The app bar must not
+   just fade: while invisible it still occupied its row, which pushed the
+   opening screen down and left a little scroll of dead space above it. */
+html.is-immersive .appbar { display: none; }
+html.is-immersive .navbar { opacity: 0; pointer-events: none; transform: translateY(12px);
+  transition: opacity calc(260ms * var(--motion-scale)) var(--ease), transform calc(260ms * var(--motion-scale)) var(--ease); }
 html.is-immersive main { padding-bottom: 0; }
 
 /* --- entrance ------------------------------------------------------------- */

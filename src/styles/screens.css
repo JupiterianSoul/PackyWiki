@@ -357,8 +357,17 @@
   display: none;
   flex-direction: column;
   padding: calc(var(--safe-top) + 12px) 0 calc(var(--safe-bottom) + 20px);
+  /* The pack scales down on short screens so the whole scene always fits:
+     back arrow and title at the top, pack centred, nothing to scroll. */
+  --pack-w: min(56vw, 226px, 40dvh);
 }
 #screen-open.is-active { display: flex; }
+/* Everything before the summary is a fixed stage, pinned to the viewport.
+   The summary is a list again and scrolls normally. */
+#screen-open.is-active:not(.phase-summary) {
+  height: 100dvh;
+  overflow: clip;
+}
 
 .open-top { display: flex; align-items: center; gap: 12px; padding: 0 var(--gutter) 6px; }
 .open-title { flex: 1; text-align: center; font-size: 1.05rem; }
@@ -413,12 +422,21 @@
 #screen-open.phase-summary .summary { display: grid; }
 #screen-open.phase-summary .open-stage { display: none; }
 .summary .card { width: 100%; }
-.summary .card-desc,
-.summary .card-extract,
-.summary .card-views { display: none; }
-.summary .card-body { gap: 2px; }
-.summary .card-title { -webkit-line-clamp: 3; font-size: 1rem; }
-.summary .card-stats { justify-content: flex-start; }
+
+/* The mini card: artwork, name, price, rarity, nothing else. Used by the
+   pack summary and the album pages; the full story lives in the detail. */
+.card.is-mini .card-desc,
+.card.is-mini .card-extract,
+.card.is-mini .card-views { display: none; }
+.card.is-mini .card-body { gap: 2px; }
+.card.is-mini .card-title { -webkit-line-clamp: 2; font-size: 9cqw; }
+.card.is-mini .card-stats { justify-content: flex-start; padding-bottom: 1cqw; }
+.card.is-mini .card-price { font-size: 8cqw; }
+.card.is-mini .rarity-badge { font-size: 5.6cqw; padding: 1.8cqw 4.6cqw; }
+/* The art soaks up whatever height the card has: on a stretched album page
+   the picture grows, and the name/price/rarity keep their strip below. */
+.card.is-mini .card-art { height: auto; flex: 1; min-height: 34%; }
+.card.is-mini .fx-art { display: none; }
 
 /* --- binder -------------------------------------------------------------------- */
 
@@ -446,6 +464,9 @@
   padding: 0 var(--gutter) 8px;
 }
 .album-cover {
+  /* transform only: the pressable base also transitions `filter`, which made
+     a locked (grayscaled) cover paint lit for a beat before greying. */
+  transition: transform calc(160ms * var(--motion-scale)) var(--ease-pop);
   --e2: var(--accent); --e3: var(--accent2);
   --e1: color-mix(in srgb, var(--accent) 42%, #ffffff);
   position: relative;
@@ -524,6 +545,13 @@
   position: relative;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  /* pan-y: the browser keeps vertical scrolling, we keep horizontal swipes.
+     Without this the page-turn drag was cancelled mid-gesture on real
+     phones, which is why turning back never seemed to work. */
+  touch-action: pan-y;
+  /* Fill the space between the header and the dots instead of hugging the
+     top half of the screen. */
+  min-height: min(60dvh, 560px);
   border-radius: var(--radius);
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--accent2, #334155) 30%, var(--surface-solid)),
@@ -545,6 +573,8 @@
 }
 .album-page {
   position: relative;
+  display: flex;
+  flex-direction: column;
   padding: 10px 8px 26px;
   min-height: 0;
   backface-visibility: hidden;
@@ -566,11 +596,16 @@
 @keyframes book-bump-l { 30% { transform: translateX(7px) rotate(0.5deg); } }
 
 .album-slots {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
   gap: 7px;
 }
-.album-slots .card { width: 100%; }
+/* Cards stretch to the row the book gives them rather than pinning their
+   own aspect, so a taller book means bigger cards, never overflow. */
+.album-slots .card { width: 100%; height: 100%; aspect-ratio: auto; min-height: 0; }
 .album-slot-empty {
   position: relative;
   aspect-ratio: 5 / 7;
@@ -1362,7 +1397,7 @@
 }
 .crop-stage {
   position: relative;
-  width: min(280px, 80vw);
+  width: min(300px, 82vw);
   aspect-ratio: 1;
   margin: 0 auto;
   border-radius: var(--radius);
@@ -1376,21 +1411,35 @@
   background-size: cover;
   background-position: 50% 50%;
 }
-.crop-ring {
+/* Everything outside the circle dims; the circle is what you keep. */
+.crop-shade {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  /* Everything outside the circle dims; the circle is what you get. */
-  background: radial-gradient(circle at 50% 50%, transparent 34%, rgba(0, 0, 0, 0.62) 35%);
+  background: radial-gradient(ellipse 27% 27% at var(--cx, 50%) var(--cy, 50%),
+    transparent 98%, rgba(0, 0, 0, 0.62) 100%);
 }
-.crop-ring::after {
-  content: '';
+.crop-circle {
   position: absolute;
-  left: 50%; top: 50%;
-  width: 69%; aspect-ratio: 1;
+  width: 54%;
+  aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.85);
+  border: 2.5px solid rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+  transition: transform 120ms var(--ease);
+}
+.crop-circle.is-held { transform: translate(-50%, -50%) scale(1.04); }
+/* A little grab handle drawn on the ring, so it reads as the movable thing. */
+.crop-circle::after {
+  content: '';
+  position: absolute;
+  left: 50%; bottom: -7px;
+  width: 26px; height: 5px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 /* A database that predates a feature: said once, quietly, where it matters. */
@@ -1402,3 +1451,10 @@
 }
 .row.is-warning { border-color: color-mix(in srgb, var(--warning) 55%, transparent); }
 .row.is-warning h4 { color: var(--warning); }
+
+/* Off-screen rows cost nothing: the browser skips laying out and painting
+   what cannot be seen, which is most of a long shelf or list. */
+.album-cover, .ach, .pick-row, .shop-tile { content-visibility: auto; }
+.album-cover { contain-intrinsic-size: 170px 190px; }
+.ach { contain-intrinsic-size: auto 92px; }
+.pick-row { contain-intrinsic-size: auto 58px; }

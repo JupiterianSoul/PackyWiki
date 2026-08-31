@@ -42,7 +42,7 @@ class Synth {
     const ctx = this.ctx;
 
     const master = ctx.createGain();
-    master.gain.value = this.muted ? 0 : 0.85;
+    master.gain.value = this.muted ? 0 : 0.62;
 
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -18;
@@ -98,7 +98,7 @@ class Synth {
   setMuted(muted) {
     this.muted = muted;
     if (this.nodes) {
-      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.85, this.ctx.currentTime, 0.02);
+      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.62, this.ctx.currentTime, 0.02);
     }
   }
 
@@ -439,6 +439,28 @@ class Synth {
     this.#note({ freq: this.#degree(deg, 1), dur: 0.08, gain: 0.042 + Math.random() * 0.016 });
   }
 
+  /** The side drawer sliding in or away: felt, not glass. */
+  playDrawer(open = true) {
+    if (!this.#ready()) return;
+    this.#noise({
+      dur: 0.22, gain: 0.05, type: 'lowpass',
+      from: open ? 300 : 900, to: open ? 900 : 300, q: 0.7
+    });
+    this.#note({ freq: this.#degree(open ? 0 : 4, 0), dur: 0.16, gain: 0.035 });
+  }
+
+  /** A favourite star turning on (a bright doublet) or off (a soft step down). */
+  playFav(on = true) {
+    if (!this.#ready()) return;
+    if (on) {
+      this.#note({ freq: this.#degree(5, 1), dur: 0.1, gain: 0.06 });
+      this.#note({ freq: this.#degree(7, 1), at: 0.06, dur: 0.16, gain: 0.055 });
+      this.#noise({ at: 0.02, dur: 0.1, gain: 0.02, type: 'highpass', from: 6000, to: 9000 });
+    } else {
+      this.#note({ freq: this.#degree(2, 0), dur: 0.12, gain: 0.05 });
+    }
+  }
+
   /** An album page turning: paper, then the soft landing of the spread. */
   playPageTurn() {
     if (!this.#ready()) return;
@@ -512,7 +534,7 @@ class Synth {
     if (!this.#ready()) return;
     const p = clamp(progress, 0, 1);
     this.#noise({
-      dur: 0.05 + p * 0.02, gain: 0.07 + p * 0.09, type: 'bandpass',
+      dur: 0.05 + p * 0.02, gain: 0.055 + p * 0.07, type: 'bandpass',
       from: 900 + p * 2600, to: 500 + p * 900, q: 1.1 + p * 2
     });
   }
@@ -527,7 +549,7 @@ class Synth {
     const p = clamp(progress, 0, 1);
     this.#transient(0.09);
     this.#noise({
-      dur: 0.09, gain: 0.2, type: 'bandpass',
+      dur: 0.09, gain: 0.15, type: 'bandpass',
       from: 2600 + p * 1800, to: 700, q: 2.2
     });
     this.#noise({ at: 0.015, dur: 0.06, gain: 0.08, type: 'highpass', from: 4500, to: 7000 });
@@ -537,7 +559,7 @@ class Synth {
   playRip() {
     if (!this.#ready()) return;
     this.resume();
-    this.#noise({ dur: 0.42, gain: 0.3, type: 'bandpass', from: 3200, to: 260, q: 0.8 });
+    this.#noise({ dur: 0.42, gain: 0.24, type: 'bandpass', from: 3200, to: 260, q: 0.8 });
     this.#noise({ at: 0.03, dur: 0.3, gain: 0.16, type: 'highpass', from: 2000, to: 6000 });
     this.#note({ freq: this.#degree(0, -1), dur: 0.5, gain: 0.12 });
   }
