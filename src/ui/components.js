@@ -304,9 +304,10 @@ export class Sheet {
     synth.playSheet(true);
   }
 
+  /** Returns whether it actually closed: a locked sheet refuses. */
   hide({ silent = false, force = false } = {}) {
-    if (!this.open) return;
-    if (this.locked && !force) return;
+    if (!this.open) return false;
+    if (this.locked && !force) return false;
     this.open = false;
     this.node.classList.remove('is-open');
     this.panel.style.transition = `transform ${dur(320)}ms var(--ease)`;
@@ -319,6 +320,7 @@ export class Sheet {
       this.onClose?.();
     };
     setTimeout(done, dur(340));
+    return true;
   }
 
   #bind() {
@@ -348,8 +350,11 @@ export class Sheet {
           this.panel.style.transition = `transform ${dur(340)}ms var(--ease)`;
           const height = this.panel.offsetHeight || 1;
           // Distance OR velocity: a flick should close as surely as a haul.
-          if (dy > height * 0.32 || velocity > 0.7) this.hide();
-          else this.panel.style.transform = '';
+          const wantsClose = dy > height * 0.32 || velocity > 0.7;
+          // A locked sheet refuses to close, so it has to be put back: without
+          // this it stays wherever the drag left it, off the bottom of the
+          // screen, with its own buttons out of reach.
+          if (!wantsClose || !this.hide()) this.panel.style.transform = '';
         }
       });
     };
