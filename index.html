@@ -18,26 +18,34 @@
 
     <div id="app">
       <header class="appbar">
-        <button id="level-badge" class="ring" type="button" aria-label="Profile"></button>
-        <div class="appbar-title">
-          <span class="appbar-sub" id="appbar-sub"></span>
-          <span id="appbar-title"></span>
-        </div>
+        <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu"
+                aria-haspopup="dialog" aria-expanded="false">
+          <span id="menu-icon" aria-hidden="true"></span>
+          <span class="dot" id="menu-dot" hidden></span>
+        </button>
+        <span class="appbar-brand" id="appbar-brand">Wiklodo</span>
         <div class="appbar-actions">
           <button id="wallet" class="wallet-chip" type="button" aria-haspopup="dialog">
             <span id="wallet-mark" aria-hidden="true"></span>
             <span id="wallet-amount"></span>
           </button>
-          <button id="gift" class="icon-btn" type="button" aria-haspopup="dialog" aria-label="Daily gift">
-            <span id="gift-icon" aria-hidden="true"></span>
-            <span class="dot" id="gift-dot" hidden></span>
+          <button id="bell" class="icon-btn" type="button" aria-haspopup="dialog" aria-label="Notifications">
+            <span id="bell-icon" aria-hidden="true"></span>
+            <span class="count" id="bell-count" hidden></span>
           </button>
+          <button id="level-badge" class="ring" type="button" aria-label="Profile"></button>
         </div>
       </header>
 
       <main>
         <!-- PACKS: what you own, and the custom builder ------------------- -->
         <section id="screen-packs" class="screen is-active">
+          <div class="packs-tools">
+            <button id="odds-btn" class="pill-btn" type="button">
+              <span id="odds-icon" aria-hidden="true"></span><span id="odds-label"></span>
+            </button>
+            <button class="help-btn" data-help="packs" type="button" aria-label="What is this?">?</button>
+          </div>
           <div class="seg-wrap"><div id="packs-seg"></div></div>
           <div id="packs-rail" class="rail"></div>
           <div class="hero-caption" id="packs-caption">
@@ -55,39 +63,65 @@
             <button id="packs-empty-cta" class="btn btn-ghost btn-sm" type="button"></button>
           </div>
 
-          <form id="creator" class="creator panel" hidden autocomplete="off">
-            <p class="label" id="creator-label"></p>
-            <p class="muted" id="creator-note" style="font-size:.82rem;line-height:1.55"></p>
-            <div class="creator-field">
-              <input id="creator-input" class="creator-input" type="text" maxlength="60" aria-label="Subject" />
-              <button id="creator-go" class="btn btn-primary btn-sm" type="submit"></button>
+          <!-- CUSTOM BUILDER: name a subject, get a pack made of its own wiki -->
+          <div id="creator-wrap" class="creator-wrap" hidden>
+            <form id="creator" class="creator panel" autocomplete="off">
+              <div class="creator-head">
+                <span class="creator-mark" id="creator-mark" aria-hidden="true"></span>
+                <div>
+                  <h3 id="creator-label"></h3>
+                  <p id="creator-note"></p>
+                </div>
+              </div>
+              <div class="creator-field">
+                <input id="creator-input" class="creator-input" type="text" maxlength="60"
+                       aria-label="Subject" />
+                <button id="creator-go" class="btn btn-primary" type="submit"></button>
+              </div>
+              <div class="creator-examples" id="creator-examples"></div>
+              <p id="creator-status" class="creator-status" role="status" aria-live="polite"></p>
+            </form>
+            <div class="section-head"><h3 class="label" id="creator-mine-label"></h3></div>
+            <div class="creator-mine" id="creator-mine"></div>
+            <div class="empty" id="creator-empty" hidden>
+              <span class="empty-mark" id="creator-empty-mark"></span>
+              <p id="creator-empty-text"></p>
             </div>
-            <p id="creator-status" class="creator-status" role="status" aria-live="polite"></p>
-          </form>
+          </div>
         </section>
 
-        <!-- TIMED ---------------------------------------------------------- -->
+        <!-- FREE PACKS: one arrives on a timer, whether you are playing or not -->
         <section id="screen-timed" class="screen">
           <div class="screen-head">
             <h2 id="timed-title"></h2>
-            <p id="timed-intro"></p>
+            <button class="help-btn" data-help="timed" type="button" aria-label="What is this?">?</button>
           </div>
-          <div class="timed-stage panel">
-            <div id="timed-pack"></div>
-            <div>
-              <p class="timed-count" id="timed-count"></p>
-              <p class="timed-next" id="timed-next"></p>
+
+          <!-- The whole state of the feature, read left to right in one look:
+               how many are waiting, and how long until the next. -->
+          <div class="free-hero panel">
+            <div class="free-dial">
+              <span id="free-ring"></span>
+              <div class="free-dial-copy">
+                <b id="free-count"></b>
+                <span id="free-cap"></span>
+              </div>
             </div>
-            <button id="timed-open" class="btn btn-primary" type="button"></button>
+            <p class="free-state" id="free-state"></p>
+            <div class="free-pips" id="free-pips" aria-hidden="true"></div>
+            <button id="timed-open" class="btn btn-primary btn-block" type="button"></button>
+            <p class="free-foot" id="free-foot"></p>
           </div>
-          <div class="track panel">
-            <div class="track-head">
-              <h3 id="track-level"></h3>
-              <span class="track-note tabular" id="track-remaining"></span>
+
+          <div class="section-head"><h3 class="label" id="free-track-label"></h3></div>
+          <div class="free-track panel">
+            <div class="free-track-head">
+              <span class="free-level" id="track-level"></span>
+              <span class="free-remaining tabular" id="track-remaining"></span>
             </div>
             <div id="track-bar"></div>
-            <p class="track-note" id="track-perks"></p>
-            <p class="track-note" id="track-next"></p>
+            <div class="free-perks" id="free-perks"></div>
+            <p class="free-next" id="track-next"></p>
           </div>
         </section>
 
@@ -95,15 +129,37 @@
         <section id="screen-shop" class="screen">
           <div class="screen-head">
             <h2 id="shop-title"></h2>
-            <p id="shop-intro"></p>
-            <span class="restock" id="restock"></span>
+            <button class="help-btn" data-help="shop" type="button" aria-label="What is this?">?</button>
           </div>
+
+          <!-- One banner carrying the two things you need before browsing:
+               what you can spend, and how long this stock lasts. -->
+          <div class="shop-banner panel">
+            <div class="shop-banner-cell">
+              <span class="label" id="shop-purse-label"></span>
+              <b id="shop-purse"></b>
+            </div>
+            <div class="shop-banner-rule" aria-hidden="true"></div>
+            <div class="shop-banner-cell">
+              <span class="label" id="shop-restock-label"></span>
+              <b class="tabular" id="restock"></b>
+            </div>
+          </div>
+
+          <div class="shop-filter" id="shop-filter"></div>
           <div id="shop-rows" class="shop-rows"></div>
+          <div class="empty" id="shop-empty" hidden>
+            <span class="empty-mark" id="shop-empty-mark"></span>
+            <p id="shop-empty-text"></p>
+          </div>
         </section>
 
         <!-- BINDER ---------------------------------------------------------- -->
         <section id="screen-binder" class="screen">
-          <div class="screen-head"><h2 id="binder-title"></h2></div>
+          <div class="screen-head">
+            <h2 id="binder-title"></h2>
+            <button class="help-btn" data-help="binder" type="button" aria-label="What is this?">?</button>
+          </div>
           <div class="binder-stats" id="binder-stats"></div>
           <div class="binder-bar">
             <button id="filter-open" class="btn btn-ghost btn-sm" type="button"></button>
@@ -142,8 +198,6 @@
           <div class="section-head" style="padding-top:24px"><h3 class="label" id="rarity-label"></h3></div>
           <div class="rarity-bars" id="rarity-bars"></div>
 
-          <div class="section-head" style="padding-top:24px"><h3 class="label" id="more-label"></h3></div>
-          <div class="settings-list" id="profile-links"></div>
         </section>
 
         <!-- FRIENDS ------------------------------------------------------------ -->
@@ -151,6 +205,7 @@
           <div class="screen-head">
             <h2 id="friends-title"></h2>
             <p id="friends-intro"></p>
+            <button class="help-btn" data-help="friends" type="button" aria-label="What is this?">?</button>
           </div>
 
           <form id="find" class="find panel" autocomplete="off">
@@ -291,6 +346,29 @@
         <button id="gate-alt" class="gate-alt" type="button"></button>
         <p class="gate-foot" id="gate-foot"></p>
       </div>
+    </div>
+
+    <!-- The drawer: every destination in the app, including the ones with no
+         room in the bottom bar. ------------------------------------------- -->
+    <div id="drawer" class="drawer" hidden>
+      <div class="drawer-scrim"></div>
+      <nav class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-brand">
+        <div class="drawer-head">
+          <span class="drawer-mark" id="drawer-mark" aria-hidden="true"></span>
+          <div>
+            <h2 id="drawer-brand">Wiklodo</h2>
+            <p id="drawer-who"></p>
+          </div>
+        </div>
+        <div class="drawer-links" id="drawer-links"></div>
+      </nav>
+    </div>
+
+    <!-- Opening animation. Also what the account gate hides behind until the
+         stored session has been read, so it cannot flash on every launch. -->
+    <div id="splash" class="splash">
+      <div class="splash-mark" id="splash-mark" aria-hidden="true"></div>
+      <div class="splash-word" id="splash-word">Wiklodo</div>
     </div>
 
     <div id="xp-pop" class="xp-pop" hidden></div>

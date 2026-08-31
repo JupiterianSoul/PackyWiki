@@ -127,7 +127,7 @@ const STRINGS = {
     freeAgainIn: 'New ones in {time}.',
 
     // tabs added later
-    tabTimed: 'Timed',
+    tabTimed: 'Free Packs',
     tabProfile: 'Profile',
     tabSettings: 'Settings',
 
@@ -140,7 +140,7 @@ const STRINGS = {
     timedNext: 'Next in {time}',
     timedFull: 'Full. Open one to start the timer again.',
     timedNone: 'None ready yet.',
-    timedOpen: 'Open a timed booster',
+    timedOpen: 'Open a free pack',
     timedTrack: 'Track level {level}',
     timedTrackMax: 'Track level {level} · maxed',
     timedToNext: '{n} more to level {level}',
@@ -326,7 +326,83 @@ const STRINGS = {
     friendCollection: 'Their collection',
     friendLoading: 'Loading their collection…',
     friendNoCards: 'They have not pulled any cards yet.',
-    friendPrivate: 'You need to be friends to see this collection.'
+    friendPrivate: 'You need to be friends to see this collection.',
+    // chrome
+    menu: 'Menu',
+    notifTitle: 'Notifications',
+    notifEmpty: 'Nothing new. Friend requests will show up here.',
+    notifRequest: '{name} wants to be friends',
+    notifHoursAgo: '{n}h ago',
+    notifDaysAgo: '{n}d ago',
+
+    // free packs (the tab formerly called Timed)
+    freeOf: 'of {max}',
+    freeFull: 'Full — open one to start the clock',
+    freeNextIn: 'Next one in {time}',
+    freeFoot: '{cards} cards each, and one arrives every {minutes} minutes whether the app is open or not.',
+    freeTrackLabel: 'Track',
+    freeLevel: 'Level {level}',
+    freeMaxed: 'Fully levelled',
+    freePerkSpeed: 'One every *{minutes} min*',
+    freePerkCap: 'Holds up to *{max}*',
+    freePerkOdds: 'Top tiers *{factor}x rarer* than normal',
+    freePerkOddsMax: 'Normal odds, same as any pack',
+
+    // shop
+    shopPurse: 'Your balance',
+    shopRestockIn: 'New stock in',
+    shopAll: 'Everything',
+    shopFree: 'Free',
+    shopCheap: 'Can afford',
+    shopBig: 'Big packs',
+    shopNoMatch: 'Nothing on the shelves matches that. Try another filter.',
+    shopFrom: 'From {amount}',
+    shopItemMeta: '{n} cards',
+    freeShelfNote: 'One of each, free, once every four hours.',
+
+    // custom builder
+    creatorTitle: 'Build your own booster',
+    creatorNote: 'Name a game, book, film or show. Wiklodo finds that subject’s own wiki and builds a pack entirely out of it.',
+    creatorMine: 'Boosters you built',
+    creatorNoneYet: 'Nothing built yet. Try one of the examples above.',
+    creatorInShop: 'On sale in the Shop',
+
+    // help
+    help_packs_title: 'Boosters',
+    help_packs_lead: 'This is your shelf: the packs you own and have not opened yet.',
+    help_packs_1: 'Swipe the shelf sideways to *pick a booster*.',
+    help_packs_2: 'Tap Open, then *slide the rip line* across the pack to tear it.',
+    help_packs_3: '*Swipe through the cards* one at a time. They are saved to your Collection.',
+    help_packs_tip: 'Odds are the same for every article. Tap the Odds button to see the exact chances.',
+
+    help_timed_title: 'Free packs',
+    help_timed_lead: 'A small pack builds up on its own, so you always have something to open.',
+    help_timed_1: 'One arrives *every few minutes*, whether or not the app is open.',
+    help_timed_2: 'They *stack up to a limit*, so a day away is not wasted — but a week away is.',
+    help_timed_3: 'Opening them *levels the track*, which makes them faster, hold more, and pull better.',
+    help_timed_tip: 'The odds start well below a bought pack. That is on purpose: these are a floor, not a shortcut.',
+
+    help_shop_title: 'Shop',
+    help_shop_lead: 'Where you spend Buckarooz on boosters. The stock changes every two hours.',
+    help_shop_1: 'Every restock also pays you a *bonus*, so coming back is worth something.',
+    help_shop_2: 'The *free shelf* gives one of each, once every four hours. It costs nothing.',
+    help_shop_3: 'Bigger and rarer packs cost more, and *the price follows what is inside*.',
+    help_shop_tip: 'Selling a whole pack never pays back what it cost. Collecting gets you further than churning.',
+
+    help_binder_title: 'Collection',
+    help_binder_lead: 'Every card you have ever pulled, in one place.',
+    help_binder_1: '*Tap a card* to read the article, favourite it, or sell it.',
+    help_binder_2: 'Use *Filters* to narrow by pack, rarity, price or popularity.',
+    help_binder_3: 'Selling a duplicate returns *part of its value* — enough to keep you moving.',
+    help_binder_tip: 'A duplicate keeps the best rarity you have pulled for that article.',
+
+    help_friends_title: 'Friends',
+    help_friends_lead: 'Add other players and look through what they have collected.',
+    help_friends_1: '*Search a username* and send a request.',
+    help_friends_2: 'They *accept* from their own Friends screen, and you both appear in each other’s list.',
+    help_friends_3: '*Tap a friend* to see their level, their stats and every card they own.',
+    help_friends_tip: 'Only your cards are shared. Your balance, settings and progress stay private.'
+
   },
 
   fr: {
@@ -427,7 +503,7 @@ const STRINGS = {
     freeAgainIn: 'Renouvelés dans {time}.',
 
     // tabs added later
-    tabTimed: 'Minutés',
+    tabTimed: 'Packs gratuits',
     tabProfile: 'Profil',
     tabSettings: 'Réglages',
 
@@ -440,7 +516,7 @@ const STRINGS = {
     timedNext: 'Prochain dans {time}',
     timedFull: 'Plein. Ouvrez-en un pour relancer le minuteur.',
     timedNone: 'Aucun disponible pour l’instant.',
-    timedOpen: 'Ouvrir un booster minuté',
+    timedOpen: 'Ouvrir un pack gratuit',
     timedTrack: 'Palier {level}',
     timedTrackMax: 'Palier {level} · maximum',
     timedToNext: 'Encore {n} avant le palier {level}',
@@ -622,7 +698,78 @@ const STRINGS = {
     friendCollection: 'Sa collection',
     friendLoading: 'Chargement de sa collection…',
     friendNoCards: 'Il n’a encore tiré aucune carte.',
-    friendPrivate: 'Vous devez être amis pour voir cette collection.'
+    friendPrivate: 'Vous devez être amis pour voir cette collection.',
+    menu: 'Menu',
+    notifTitle: 'Notifications',
+    notifEmpty: 'Rien de neuf. Les demandes d’amis apparaîtront ici.',
+    notifRequest: '{name} veut être votre ami',
+    notifHoursAgo: 'il y a {n} h',
+    notifDaysAgo: 'il y a {n} j',
+
+    freeOf: 'sur {max}',
+    freeFull: 'Plein — ouvrez-en un pour relancer le compteur',
+    freeNextIn: 'Prochain dans {time}',
+    freeFoot: '{cards} cartes chacun, et il en arrive un toutes les {minutes} minutes, que l’application soit ouverte ou non.',
+    freeTrackLabel: 'Progression',
+    freeLevel: 'Niveau {level}',
+    freeMaxed: 'Niveau maximum',
+    freePerkSpeed: 'Un toutes les *{minutes} min*',
+    freePerkCap: 'Jusqu’à *{max}* en réserve',
+    freePerkOdds: 'Hauts paliers *{factor}x plus rares* que la normale',
+    freePerkOddsMax: 'Chances normales, comme n’importe quel pack',
+
+    shopPurse: 'Votre solde',
+    shopRestockIn: 'Nouveau stock dans',
+    shopAll: 'Tout',
+    shopFree: 'Gratuit',
+    shopCheap: 'Abordable',
+    shopBig: 'Gros packs',
+    shopNoMatch: 'Rien ne correspond dans les rayons. Essayez un autre filtre.',
+    shopFrom: 'Dès {amount}',
+    shopItemMeta: '{n} cartes',
+    freeShelfNote: 'Un de chaque, gratuitement, toutes les quatre heures.',
+
+    creatorTitle: 'Créez votre propre booster',
+    creatorNote: 'Nommez un jeu, un livre, un film ou une série. Wiklodo trouve le wiki dédié à ce sujet et en fait un pack entier.',
+    creatorMine: 'Vos boosters créés',
+    creatorNoneYet: 'Rien de créé pour l’instant. Essayez un des exemples ci-dessus.',
+    creatorInShop: 'En vente dans la Boutique',
+
+    help_packs_title: 'Boosters',
+    help_packs_lead: 'Votre étagère : les packs que vous possédez et n’avez pas encore ouverts.',
+    help_packs_1: 'Faites défiler l’étagère pour *choisir un booster*.',
+    help_packs_2: 'Touchez Ouvrir, puis *glissez le long de la ligne de déchirure* pour l’ouvrir.',
+    help_packs_3: '*Faites défiler les cartes* une à une. Elles rejoignent votre Collection.',
+    help_packs_tip: 'Les chances sont les mêmes pour chaque article. Le bouton Taux de tirage donne le détail.',
+
+    help_timed_title: 'Packs gratuits',
+    help_timed_lead: 'Un petit pack se recharge tout seul : vous avez toujours quelque chose à ouvrir.',
+    help_timed_1: 'Il en arrive un *toutes les quelques minutes*, application ouverte ou non.',
+    help_timed_2: 'Ils *s’accumulent jusqu’à une limite* : une journée d’absence n’est pas perdue, une semaine si.',
+    help_timed_3: 'Les ouvrir *fait monter la progression* : plus rapides, plus nombreux, meilleurs tirages.',
+    help_timed_tip: 'Leurs chances sont bien inférieures à celles d’un pack acheté. C’est voulu : c’est un filet, pas un raccourci.',
+
+    help_shop_title: 'Boutique',
+    help_shop_lead: 'Là où vous dépensez vos Buckarooz. Le stock change toutes les deux heures.',
+    help_shop_1: 'Chaque réassort vous verse aussi un *bonus* : revenir rapporte.',
+    help_shop_2: 'Le *rayon gratuit* offre un de chaque, toutes les quatre heures. Sans rien payer.',
+    help_shop_3: 'Les packs plus gros ou plus rares coûtent plus cher : *le prix suit le contenu*.',
+    help_shop_tip: 'Revendre un pack entier ne rembourse jamais son prix. Collectionner rapporte plus que tout revendre.',
+
+    help_binder_title: 'Collection',
+    help_binder_lead: 'Toutes les cartes que vous avez tirées, au même endroit.',
+    help_binder_1: '*Touchez une carte* pour lire l’article, la mettre en favori ou la vendre.',
+    help_binder_2: 'Les *Filtres* permettent de trier par pack, rareté, prix ou popularité.',
+    help_binder_3: 'Vendre un doublon rend *une partie de sa valeur* — de quoi repartir.',
+    help_binder_tip: 'Un doublon conserve la meilleure rareté que vous avez tirée pour cet article.',
+
+    help_friends_title: 'Amis',
+    help_friends_lead: 'Ajoutez d’autres joueurs et parcourez ce qu’ils ont collectionné.',
+    help_friends_1: '*Cherchez un pseudo* et envoyez une demande.',
+    help_friends_2: 'La personne *accepte* depuis son écran Amis, et vous apparaissez dans la liste de l’autre.',
+    help_friends_3: '*Touchez un ami* pour voir son niveau, ses statistiques et toutes ses cartes.',
+    help_friends_tip: 'Seules vos cartes sont partagées. Votre solde, vos réglages et votre progression restent privés.'
+
   }
 };
 

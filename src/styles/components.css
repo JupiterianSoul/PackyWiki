@@ -530,3 +530,225 @@ html.is-immersive .xp-pop.is-rising { animation-name: xp-rise-down; }
 }
 .empty-mark { color: var(--ink-faint); opacity: 0.6; }
 .empty p { font-size: 0.9rem; line-height: 1.6; max-width: 34ch; }
+
+/* --- the drawer ------------------------------------------------------------
+   Every destination in one place, including the ones the five-slot bottom bar
+   has no room for. It comes in from the left because that is where its button
+   is, and it is the same surface language as the sheet, not a second one. */
+
+.drawer { position: fixed; inset: 0; z-index: 220; }
+.drawer[hidden] { display: none !important; }
+.drawer-scrim {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  opacity: 0;
+  transition: opacity calc(280ms * var(--motion-scale)) var(--ease);
+}
+.drawer.is-open .drawer-scrim { opacity: 1; }
+
+.drawer-panel {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: min(320px, 84vw);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: calc(var(--safe-top) + 20px) 14px calc(var(--safe-bottom) + 20px);
+  background: var(--surface-solid);
+  border-right: var(--border) var(--border-style) var(--line-strong);
+  box-shadow: var(--raise-shadow);
+  overflow-y: auto;
+  transform: translateX(-100%);
+  transition: transform calc(340ms * var(--motion-scale)) var(--ease-pop);
+}
+.drawer.is-open .drawer-panel { transform: none; }
+
+.drawer-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 8px 18px;
+}
+.drawer-mark { color: var(--accent); display: flex; }
+.drawer-head h2 {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-transform);
+  font-size: 1.15rem;
+}
+.drawer-head p {
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 190px;
+}
+
+.drawer-links { display: grid; gap: 2px; }
+.drawer-sep {
+  height: 1px;
+  margin: 10px 8px;
+  background: var(--line);
+}
+.drawer-link {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 12px 12px;
+  border-radius: var(--radius);
+  text-align: left;
+  font-weight: 700;
+  font-size: 0.94rem;
+  color: var(--ink-dim);
+}
+.drawer-link .drawer-icon { display: flex; color: var(--ink-faint); flex: none; }
+.drawer-link span:nth-child(2) { flex: 1; min-width: 0; }
+.drawer-link.is-current {
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--ink);
+}
+.drawer-link.is-current .drawer-icon { color: var(--accent); }
+.drawer-link .chip { flex: none; }
+
+/* --- help and pill buttons -------------------------------------------------- */
+
+.help-btn {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: var(--ink-faint);
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+[data-theme='arcade'] .help-btn { border-radius: var(--radius); }
+
+.pill-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 13px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-dim);
+}
+[data-theme='arcade'] .pill-btn { border-radius: var(--radius); }
+.pill-btn span:first-child { display: flex; color: var(--accent); }
+
+/* --- the help panel's own little diagram ------------------------------------ */
+
+.help-body { display: grid; gap: 16px; }
+.help-lead { font-size: 0.95rem; line-height: 1.6; }
+.help-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+}
+.help-num {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--accent) 45%, transparent);
+  color: var(--accent);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+[data-theme='arcade'] .help-num { border-radius: var(--radius); }
+.help-step p { font-size: 0.86rem; line-height: 1.55; color: var(--ink-dim); }
+.help-step p b { color: var(--ink); font-weight: 700; }
+.help-tip {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: color-mix(in srgb, var(--ink) 5%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+
+/* --- notifications ---------------------------------------------------------- */
+
+.notes { display: grid; gap: 8px; }
+.note-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  text-align: left;
+  width: 100%;
+}
+.note-row.is-unread { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.note-mark {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+[data-theme='arcade'] .note-mark { border-radius: var(--radius); }
+.note-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.note-copy b { font-size: 0.9rem; font-weight: 700; }
+.note-copy span { font-size: 0.74rem; color: var(--ink-faint); }
+
+/* --- splash ------------------------------------------------------------------
+   Covers the first moment of every launch. The account gate reads a stored
+   session asynchronously, and without something in front of it the sign-in
+   card painted and vanished on each relaunch. */
+
+.splash {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 18px;
+  background: var(--surface-solid);
+  transition: opacity 420ms var(--ease);
+}
+.splash.is-going { opacity: 0; pointer-events: none; }
+.splash[hidden] { display: none !important; }
+.splash-mark {
+  color: var(--accent);
+  display: flex;
+  animation: splash-mark 1100ms var(--ease-pop) both;
+}
+.splash-word {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-size: 0.92rem;
+  color: var(--ink-faint);
+  animation: splash-word 900ms 260ms var(--ease) both;
+}
+@keyframes splash-mark {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.82); }
+  55%  { opacity: 1; transform: translateY(0) scale(1.06); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes splash-word {
+  from { opacity: 0; letter-spacing: 0.42em; }
+  to   { opacity: 1; letter-spacing: 0.16em; }
+}

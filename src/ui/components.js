@@ -36,19 +36,39 @@ export function trackDrag(event, { onMove, onEnd }) {
   const x0 = event.clientX;
   const y0 = event.clientY;
   let moved = false;
+  let live = true;
+
+  const unbind = () => {
+    live = false;
+    window.removeEventListener('pointermove', move);
+    window.removeEventListener('pointerup', end);
+    window.removeEventListener('pointercancel', end);
+  };
   const move = (e) => {
+    if (!live) return;
     if (Math.abs(e.clientX - x0) > 3 || Math.abs(e.clientY - y0) > 3) moved = true;
     onMove?.(e.clientX - x0, e.clientY - y0, e);
   };
   const end = (e) => {
-    window.removeEventListener('pointermove', move);
-    window.removeEventListener('pointerup', end);
-    window.removeEventListener('pointercancel', end);
+    if (!live) return;
+    unbind();
     onEnd?.(e.clientX - x0, e.clientY - y0, moved, e);
   };
   window.addEventListener('pointermove', move);
   window.addEventListener('pointerup', end);
   window.addEventListener('pointercancel', end);
+
+  /*
+   * Drop the gesture without running onEnd.
+   *
+   * A pointerup does not always arrive — the system takes the gesture (a
+   * notification pull, a back swipe), or the app is backgrounded mid-drag —
+   * and the listeners then sit on window belonging to a finger that is no
+   * longer down. The next drag would run alongside that ghost, measuring from
+   * an origin two gestures old. Callers that own a single drag at a time
+   * cancel the previous one before starting the next.
+   */
+  return unbind;
 }
 
 /* --- press ---------------------------------------------------------------- */

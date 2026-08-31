@@ -121,27 +121,51 @@ h1, h2, h3, h4 {
   background: linear-gradient(180deg, rgba(246, 242, 233, 0.96) 62%, transparent);
 }
 
-.appbar-title {
+/*
+ * The app name sits in the middle and is the first thing to go: it is the one
+ * item that tells you nothing you did not already know. Below 380px the row is
+ * the menu, the purse, the bell and your level, which are all controls.
+ */
+.appbar-brand {
   flex: 1;
   min-width: 0;
-  font-size: 1.02rem;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  letter-spacing: var(--display-tracking);
+  text-transform: var(--display-transform);
+  font-size: 1.05rem;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.appbar-sub {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 0.66rem;
-  font-weight: 700;
-  letter-spacing: var(--label-tracking);
-  text-transform: uppercase;
-  color: var(--ink-faint);
+@media (max-width: 379px) {
+  .appbar-brand { display: none; }
+  .appbar { justify-content: space-between; }
+  .appbar-actions { flex: 1; justify-content: flex-end; }
 }
 
 .appbar-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+
+/* The unread count on the bell. Sits on the icon rather than beside it, so a
+   two-digit count does not push the level badge off the row. */
+.icon-btn { position: relative; }
+.count {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  background: var(--negative);
+  color: #fff;
+  font-size: 0.62rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
 
 /* --- screens -------------------------------------------------------------- */
 

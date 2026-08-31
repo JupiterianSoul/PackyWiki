@@ -6,13 +6,25 @@
 
 /* --- shared screen furniture ---------------------------------------------- */
 
+/* The title row: heading on the left, the "?" pinned to the right of it, and
+   any supporting line wrapping underneath both. */
 .screen-head {
-  display: grid;
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
   padding: 6px var(--gutter) 18px;
 }
-.screen-head h2 { font-size: clamp(1.5rem, 6.5vw, 2rem); }
-.screen-head p { font-size: 0.86rem; line-height: 1.55; color: var(--ink-dim); max-width: 46ch; }
+.screen-head h2 { flex: 1; min-width: 0; font-size: clamp(1.5rem, 6.5vw, 2rem); }
+.screen-head p {
+  flex: 1 0 100%;
+  font-size: 0.86rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  max-width: 46ch;
+}
+.screen-head .help-btn { order: 2; }
+.screen-head p { order: 3; }
 
 .section-head {
   display: flex;
@@ -39,12 +51,34 @@
 
 .seg-wrap { display: flex; justify-content: center; padding: 0 var(--gutter) 14px; }
 
+/* --- the custom builder --------------------------------------------------------
+   Rebuilt as a workbench rather than a lone text field: it says what it makes,
+   offers examples so nobody has to guess what counts as a subject, and lists
+   what you have already built underneath instead of sending you to the Shop to
+   find out whether it worked. */
+
+.creator-wrap { display: grid; gap: 0; }
 .creator {
   display: grid;
-  gap: 12px;
-  margin: 22px var(--gutter) 0;
-  padding: 18px;
+  gap: 14px;
+  margin: 0 var(--gutter) 26px;
+  padding: 20px;
 }
+.creator-head { display: flex; align-items: flex-start; gap: 13px; }
+.creator-mark {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--accent) 45%, transparent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+.creator-head h3 { font-size: 1.02rem; margin-bottom: 4px; }
+.creator-head p { font-size: 0.82rem; line-height: 1.55; color: var(--ink-dim); }
+
 .creator-field { display: flex; gap: 10px; }
 .creator-input {
   flex: 1;
@@ -60,41 +94,191 @@
 [data-theme='paper'] .creator-input { background: transparent; }
 .creator-input::placeholder { color: var(--ink-faint); }
 .creator-input:focus { outline: none; border-color: var(--accent); }
+
+.creator-examples { display: flex; flex-wrap: wrap; gap: 7px; }
+.creator-example {
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: transparent;
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--ink-dim);
+}
+[data-theme='arcade'] .creator-example { border-radius: var(--radius); }
+
 .creator-status { font-size: 0.82rem; font-weight: 700; min-height: 1.2em; }
 .creator-status.is-working { color: var(--warning); }
 .creator-status.is-ok { color: var(--positive); }
 .creator-status.is-error { color: var(--negative); }
 
-/* --- timed ------------------------------------------------------------------ */
+.creator-mine { display: grid; gap: 8px; padding: 0 var(--gutter); }
+.made {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  width: 100%;
+  text-align: left;
+}
+.made-art { flex: none; display: grid; place-items: center; }
+.made-copy { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.made-copy b {
+  font-size: 0.92rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.made-copy span { font-size: 0.73rem; color: var(--ink-faint); }
 
-.timed-stage {
+.packs-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 var(--gutter) 12px;
+}
+
+/* --- free packs ---------------------------------------------------------------
+   Rebuilt around one question — how many have I got, and when is the next?
+   The dial answers both at once: the number in the middle, the ring filling
+   towards the one that is coming. The pips under it give the cap a shape, so
+   "5 of 7" is something you see rather than read. */
+
+.free-hero {
+  margin: 0 var(--gutter) 26px;
+  padding: 24px 20px 20px;
   display: grid;
   justify-items: center;
-  gap: 16px;
-  margin: 0 var(--gutter);
-  padding: 26px 20px;
+  gap: 14px;
   text-align: center;
 }
-.timed-count { font-size: clamp(1.6rem, 7vw, 2.2rem); font-weight: 800; letter-spacing: -0.03em; }
-.timed-next { font-size: 0.86rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
-
-.track {
-  margin: 18px var(--gutter) 0;
-  padding: 18px;
+.free-dial { position: relative; display: grid; place-items: center; }
+.free-dial-copy {
+  position: absolute;
   display: grid;
-  gap: 10px;
+  justify-items: center;
+  gap: 0;
+  pointer-events: none;
 }
-.track-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.track-head h3 { font-size: 1rem; }
-.track-note { font-size: 0.78rem; color: var(--ink-dim); line-height: 1.5; }
+.free-dial-copy b {
+  font-size: clamp(2rem, 9vw, 2.7rem);
+  font-weight: 800;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.free-dial-copy span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.free-state { font-size: 0.92rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.free-state.is-ready { color: var(--positive); font-weight: 700; }
 
-/* --- shop -------------------------------------------------------------------- */
+.free-pips { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.free-pip {
+  width: 11px;
+  height: 11px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line-strong);
+}
+[data-theme='arcade'] .free-pip { border-radius: 0; }
+.free-pip.is-full { background: var(--accent); border-color: var(--accent); }
+.free-pip.is-next { border-color: var(--accent); opacity: 0.55; }
 
-.shop-rows { display: grid; gap: 28px; }
+.free-foot { font-size: 0.76rem; color: var(--ink-faint); line-height: 1.5; max-width: 34ch; }
+
+.free-track { margin: 0 var(--gutter); padding: 18px; display: grid; gap: 12px; }
+.free-track-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.free-level { font-size: 1rem; font-weight: 800; }
+.free-remaining { font-size: 0.76rem; color: var(--ink-faint); }
+.free-perks { display: grid; gap: 8px; }
+.free-perk { display: flex; align-items: center; gap: 10px; font-size: 0.82rem; }
+.free-perk-icon { display: flex; color: var(--accent); flex: none; }
+.free-perk b { font-weight: 800; font-variant-numeric: tabular-nums; }
+.free-perk span { color: var(--ink-dim); }
+.free-next {
+  font-size: 0.78rem;
+  color: var(--ink-faint);
+  line-height: 1.5;
+  border-top: var(--border) var(--border-style) var(--line);
+  padding-top: 10px;
+}
+
+/* --- shop ---------------------------------------------------------------------
+   Rebuilt so the two facts you need before spending anything are above the
+   stock rather than buried in a paragraph, and so a shelf is a labelled row of
+   real cards rather than a strip of unlabelled art. */
+
+.shop-banner {
+  display: flex;
+  align-items: center;
+  margin: 0 var(--gutter) 16px;
+  padding: 14px 18px;
+}
+.shop-banner-cell { flex: 1; display: grid; gap: 3px; min-width: 0; }
+.shop-banner-cell .label { font-size: 0.64rem; }
+.shop-banner-cell b {
+  font-size: 1.15rem;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+.shop-banner-cell:first-child b { color: var(--positive); }
+.shop-banner-rule { width: 1px; align-self: stretch; margin: 0 16px; background: var(--line); }
+
+.shop-filter {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+  padding: 0 var(--gutter) 18px;
+}
+.shop-filter::-webkit-scrollbar { display: none; }
+.shop-chip {
+  flex: none;
+  padding: 8px 15px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+[data-theme='arcade'] .shop-chip { border-radius: var(--radius); }
+.shop-chip.is-on { border-color: var(--accent); color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+
+.shop-rows { display: grid; gap: 26px; }
 .shop-row { min-width: 0; }        /* grid items default to min-width:auto and blow the page out */
-.shop-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; padding: 0 var(--gutter) 4px; }
-.shop-row-head h3 { font-size: 1.02rem; }
-.shop-row.is-free .shop-row-head h3 { color: var(--positive); }
+.shop-row-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 var(--gutter) 8px;
+}
+.shop-row-head h3 { font-size: 1rem; flex: 1; min-width: 0; }
+.shop-row-tag {
+  flex: none;
+  font-size: 0.64rem;
+  font-weight: 800;
+  letter-spacing: var(--label-tracking);
+  text-transform: uppercase;
+  padding: 4px 9px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  color: var(--ink-faint);
+}
+[data-theme='arcade'] .shop-row-tag { border-radius: var(--radius); }
+.shop-row.is-free .shop-row-tag { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 50%, transparent); }
 .shop-note { font-size: 0.75rem; color: var(--ink-faint); padding: 0 var(--gutter) 10px; }
 
 .shelf {
@@ -109,7 +293,35 @@
 }
 .shelf::-webkit-scrollbar { display: none; }
 
-.shop-item { flex: none; width: 128px; display: grid; gap: 8px; scroll-snap-align: start; }
+/* A shop item is now a card: art, name, size, then the price button. */
+.shop-item {
+  flex: none;
+  width: 132px;
+  display: grid;
+  gap: 0;
+  scroll-snap-align: start;
+  padding: 10px 10px 10px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+}
+.shop-item-art { display: grid; place-items: center; padding-bottom: 8px; }
+.shop-item-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.3;
+  min-height: 2.1em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.shop-item-meta {
+  font-size: 0.68rem;
+  color: var(--ink-faint);
+  padding: 2px 0 9px;
+  font-variant-numeric: tabular-nums;
+}
 .buy {
   display: grid;
   justify-items: center;
@@ -125,13 +337,9 @@
 .buy.is-free { border-color: color-mix(in srgb, var(--positive) 50%, transparent); background: color-mix(in srgb, var(--positive) 14%, transparent); }
 .buy.is-taken { opacity: 0.4; border-color: var(--line); background: transparent; }
 .buy.is-bought { border-color: var(--positive); background: color-mix(in srgb, var(--positive) 28%, transparent); }
+.buy.is-poor { opacity: 0.5; }
 
-.restock {
-  font-size: 0.74rem;
-  font-weight: 700;
-  color: var(--ink-dim);
-  font-variant-numeric: tabular-nums;
-}
+.restock { font-variant-numeric: tabular-nums; }
 
 /* --- opening (full-screen takeover) ------------------------------------------ */
 
@@ -178,10 +386,16 @@
 .open-hint { font-size: 0.8rem; color: var(--ink-faint); text-align: center; min-height: 1.2em; }
 .open-hint.is-error { color: var(--negative); }
 
+/*
+ * The summary is a glance, not a read: two to a row so each card is big enough
+ * to recognise, carrying only the three things you compare across a pack —
+ * what it is, how rare, what it is worth. The article text, the readership and
+ * the category are one tap away in the card itself.
+ */
 .summary {
   display: none;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
   padding: 6px var(--gutter) 0;
   width: 100%;
   max-width: 620px;
@@ -190,6 +404,12 @@
 #screen-open.phase-summary .summary { display: grid; }
 #screen-open.phase-summary .open-stage { display: none; }
 .summary .card { width: 100%; }
+.summary .card-desc,
+.summary .card-extract,
+.summary .card-views { display: none; }
+.summary .card-body { gap: 2px; }
+.summary .card-title { -webkit-line-clamp: 3; font-size: 1rem; }
+.summary .card-stats { justify-content: flex-start; }
 
 /* --- binder -------------------------------------------------------------------- */
 
@@ -650,6 +870,6 @@
 @media (min-width: 700px) {
   .binder-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); }
   .theme-grid { grid-template-columns: repeat(4, 1fr); }
-  .summary { grid-template-columns: repeat(5, 1fr); }
+  .summary { grid-template-columns: repeat(3, 1fr); }
   .people { grid-template-columns: repeat(2, 1fr); }
 }

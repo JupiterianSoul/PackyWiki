@@ -40,8 +40,8 @@ import {
   msUntilNextDay, dayNumber
 } from './daily.js';
 import {
-  MAX_TIMED_LEVEL, accrue, msToNext, timedLevel, timedSpec, maxHeld, regenMs,
-  levelBounds, levelProgress, timedRollOptions
+  MAX_TIMED_LEVEL, TIMED_CARDS, accrue, msToNext, timedLevel, timedSpec, maxHeld,
+  regenMs, levelBounds, levelProgress, timedRollOptions
 } from './timed.js';
 import { t, tx, getLanguage, setLanguage, languageChosen, LANGUAGES } from './i18n.js';
 import {
@@ -64,6 +64,8 @@ const SWIPE_COMMIT = 78;
 const EMERGE_STAGGER = 110;
 const EMERGE_DURATION = 820;
 const PREFETCH_DELAY = 350;
+/** How long the last card stays up before the summary takes over. */
+const LAST_CARD_HOLD = 2000;
 const TILT_MAX = 16;
 
 const $ = (sel) => document.querySelector(sel);
@@ -87,6 +89,7 @@ const RIP_DIR_KEY = 'packywiki.ripDirection';
 const state = {
   tab: 'packs',
   packMode: 'owned',           // 'owned' | 'custom'
+  shopFilter: 'all',
   spec: null,
   customPacks: store.loadCustomPacks(),
   collection: store.loadCollection(),
@@ -97,6 +100,7 @@ const state = {
   ripDir: Number(localStorage.getItem?.(RIP_DIR_KEY)) || 0,
   prefetch: null,
   prefetchTimer: null,
+  summaryTimer: null,
   busy: false,
   pulls: [], cards: [], index: 0, seen: new Set(),
   detail: null,
@@ -109,6 +113,9 @@ const state = {
   social: { friends: [], incoming: [], outgoing: [], results: [], loaded: false },
   viewing: null
 };
+
+/** Test-only switches, reachable through window.__packywiki. */
+const debug = { failNextOpen: false };
 
 const settings = () => state.profile.settings;
 const money = (amount) => `${buckSvg({ size: 12 })}${formatAmount(amount)}`;
@@ -128,24 +135,41 @@ bind({
     friend: $('#screen-friend'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
-  levelBadge: $('#level-badge'), appbarTitle: $('#appbar-title'), appbarSub: $('#appbar-sub'),
+  menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'), menuDot: $('#menu-dot'),
+  appbarBrand: $('#appbar-brand'),
+  levelBadge: $('#level-badge'),
   wallet: $('#wallet'), walletMark: $('#wallet-mark'), walletAmount: $('#wallet-amount'),
-  gift: $('#gift'), giftIcon: $('#gift-icon'), giftDot: $('#gift-dot'),
+  bell: $('#bell'), bellIcon: $('#bell-icon'), bellCount: $('#bell-count'),
+
+  drawer: $('#drawer'), drawerScrim: $('#drawer .drawer-scrim'), drawerPanel: $('#drawer .drawer-panel'),
+  drawerMark: $('#drawer-mark'), drawerWho: $('#drawer-who'), drawerLinks: $('#drawer-links'),
+  splash: $('#splash'), splashMark: $('#splash-mark'),
 
   packsSeg: $('#packs-seg'), packsRail: $('#packs-rail'), packsCaption: $('#packs-caption'),
   packsName: $('#packs-name'), packsSub: $('#packs-sub'), packsOwn: $('#packs-own'),
   packsActions: $('#packs-actions'), packsOpen: $('#packs-open'), packsHint: $('#packs-hint'),
   packsEmpty: $('#packs-empty'), packsEmptyMark: $('#packs-empty-mark'),
   packsEmptyText: $('#packs-empty-text'), packsEmptyCta: $('#packs-empty-cta'),
-  creator: $('#creator'), creatorLabel: $('#creator-label'), creatorNote: $('#creator-note'),
+  creatorWrap: $('#creator-wrap'), creator: $('#creator'), creatorMark: $('#creator-mark'),
+  creatorLabel: $('#creator-label'), creatorNote: $('#creator-note'),
   creatorInput: $('#creator-input'), creatorGo: $('#creator-go'), creatorStatus: $('#creator-status'),
+  creatorExamples: $('#creator-examples'), creatorMineLabel: $('#creator-mine-label'),
+  creatorMine: $('#creator-mine'), creatorEmpty: $('#creator-empty'),
+  creatorEmptyMark: $('#creator-empty-mark'), creatorEmptyText: $('#creator-empty-text'),
 
-  timedTitle: $('#timed-title'), timedIntro: $('#timed-intro'), timedPack: $('#timed-pack'),
-  timedCount: $('#timed-count'), timedNext: $('#timed-next'), timedOpen: $('#timed-open'),
+  timedTitle: $('#timed-title'), timedOpen: $('#timed-open'),
+  freeRing: $('#free-ring'), freeCount: $('#free-count'), freeCap: $('#free-cap'),
+  freeState: $('#free-state'), freePips: $('#free-pips'), freeFoot: $('#free-foot'),
+  freeTrackLabel: $('#free-track-label'), freePerks: $('#free-perks'),
   trackLevel: $('#track-level'), trackRemaining: $('#track-remaining'), trackBar: $('#track-bar'),
-  trackPerks: $('#track-perks'), trackNext: $('#track-next'),
+  trackNext: $('#track-next'),
 
-  shopTitle: $('#shop-title'), shopIntro: $('#shop-intro'), restock: $('#restock'), shopRows: $('#shop-rows'),
+  shopTitle: $('#shop-title'), restock: $('#restock'), shopRows: $('#shop-rows'),
+  shopPurse: $('#shop-purse'), shopPurseLabel: $('#shop-purse-label'),
+  shopRestockLabel: $('#shop-restock-label'), shopFilter: $('#shop-filter'),
+  shopEmpty: $('#shop-empty'), shopEmptyMark: $('#shop-empty-mark'), shopEmptyText: $('#shop-empty-text'),
+
+  oddsBtn: $('#odds-btn'), oddsIcon: $('#odds-icon'), oddsLabel: $('#odds-label'),
 
   binderTitle: $('#binder-title'), binderStats: $('#binder-stats'), binderGrid: $('#binder-grid'),
   binderEmpty: $('#binder-empty'), binderEmptyMark: $('#binder-empty-mark'),
@@ -156,7 +180,6 @@ bind({
   xpBar: $('#xp-bar'), xpLine: $('#xp-line'), nextRewardLabel: $('#next-reward-label'),
   nextReward: $('#next-reward'), statsLabel: $('#stats-label'), statGrid: $('#stat-grid'),
   rarityLabel: $('#rarity-label'), rarityBars: $('#rarity-bars'),
-  moreLabel: $('#more-label'), profileLinks: $('#profile-links'),
 
   settingsTitle: $('#settings-title'), themeLabel: $('#theme-label'), themeGrid: $('#theme-grid'),
   prefsLabel: $('#prefs-label'), settingsList: $('#settings-list'),
@@ -195,7 +218,7 @@ bind({
   flash: $('#flash'), toast: $('#toast'), xpPop: $('#xp-pop')
 });
 
-let nav, sheet, walletOdo, levelRing, profileRing, xpBar, trackBar, packsSeg, gateSeg, friendRing;
+let nav, sheet, walletOdo, levelRing, profileRing, xpBar, trackBar, packsSeg, gateSeg, friendRing, freeRing;
 
 /* --- the one timer ----------------------------------------------------------- */
 
@@ -275,7 +298,7 @@ function showScreen(name) {
   if (name !== 'open') {
     state.tab = name;
     nav?.select(navTabFor(name), { silent: true });
-    el.appbarTitle.textContent = t(SCREEN_TITLES[name] ?? 'tabBoosters');
+    paintDrawerLinks();
   }
 
   // Opening a pack is a takeover: the frame gets out of the way, and the
@@ -306,22 +329,226 @@ function refreshLevelBadge() {
   const level = state.profile.progress.level ?? 1;
   levelRing.set(levelFraction(state.profile.progress), String(level));
   el.levelBadge.setAttribute('aria-label', `${t('profileLevel', { n: level })}`);
-  // The strap line said the same thing on every screen and was too long for
-  // the bar. The rank is short, and it changes as you play.
-  el.appbarSub.textContent = tx(rankFor(level).name);
 }
 
 function updateBadges() {
-  const cards = store.allEntries(state.collection).length;
-  nav.setBadge('binder', cards ? String(cards) : '');
+  // The collection count is deliberately not badged: it only ever grows, so it
+  // is a number that is always there and never means anything has happened.
   const timed = state.profile.timed.count ?? 0;
   nav.setBadge('timed', timed ? String(timed) : '');
   const ready = canClaim(state.profile.daily);
-  el.giftDot.hidden = !ready;
-  el.gift.classList.toggle('is-hot', ready);
-  // Friend requests live two taps down, so the count is carried up to the bar.
-  const waiting = state.social.incoming.length;
-  nav.setBadge('profile', waiting ? String(waiting) : '');
+  el.menuDot.hidden = !ready;
+  paintBell();
+}
+
+/* --- the drawer --------------------------------------------------------------------
+ *
+ * Everything you can go to, in one list. The bottom bar holds five; the app has
+ * more than five places, and the ones that did not fit were previously hidden
+ * behind a "More" heading on the Profile — which is a strange place to keep the
+ * way to Settings.
+ */
+
+/** id, icon, label key, and what opening it does. */
+function drawerItems() {
+  const go = (screen, paint) => () => { paint?.(); showScreen(screen); };
+  return [
+    { id: 'packs',  icon: 'packs',      key: 'tabBoosters',    run: go('packs', renderPacks) },
+    { id: 'timed',  icon: 'hourglass',  key: 'tabTimed',       run: go('timed', renderTimed) },
+    { id: 'shop',   icon: 'gem',        key: 'tabShop',        run: go('shop', () => { payStipend(); renderShop(); }) },
+    { id: 'binder', icon: 'collection', key: 'tabCollection',  run: go('binder', renderBinder) },
+    { id: 'profile', icon: 'profile',   key: 'tabProfile',     run: go('profile', renderProfile) },
+    { sep: true },
+    ...(account.configured
+      ? [{ id: 'friends', icon: 'friends', key: 'tabFriends',
+           badge: () => state.social.incoming.length,
+           run: go('friends', () => { renderFriends(); loadFriends(); }) }]
+      : []),
+    { id: 'daily',    icon: 'gift',     key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
+      run: () => openDaily() },
+    { id: 'settings', icon: 'settings', key: 'tabSettings', run: go('settings', renderSettings) }
+  ];
+}
+
+function buildDrawer() {
+  el.drawerMark.innerHTML = logoSvg({ size: 34 });
+  el.drawerLinks.replaceChildren(...drawerItems().map((item) => {
+    if (item.sep) {
+      const rule = document.createElement('div');
+      rule.className = 'drawer-sep';
+      return rule;
+    }
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'drawer-link';
+    row.dataset.link = item.id;
+    row.innerHTML = `<span class="drawer-icon">${iconSvg(item.icon, { size: 20 })}</span>
+      <span></span><span class="chip" hidden></span>`;
+    row.querySelector('span:nth-child(2)').textContent = t(item.key);
+    press(row, { sound: null });
+    row.addEventListener('click', () => {
+      synth.playTap();
+      closeDrawer();
+      item.run();
+    });
+    return row;
+  }));
+  paintDrawerLinks();
+}
+
+/** Keep the drawer's highlight and counts honest without rebuilding it. */
+function paintDrawerLinks() {
+  const items = new Map(drawerItems().filter((i) => !i.sep).map((i) => [i.id, i]));
+  el.drawerLinks.querySelectorAll('.drawer-link').forEach((row) => {
+    const item = items.get(row.dataset.link);
+    row.classList.toggle('is-current', row.dataset.link === navTabFor(state.tab));
+    const chip = row.querySelector('.chip');
+    const n = item?.badge?.() ?? 0;
+    const dot = item?.dot?.() ?? false;
+    chip.textContent = n ? String(n) : (dot ? '!' : '');
+    chip.hidden = !n && !dot;
+  });
+}
+
+function openDrawer() {
+  buildDrawer();
+  el.drawer.hidden = false;
+  el.menuBtn.setAttribute('aria-expanded', 'true');
+  requestAnimationFrame(() => el.drawer.classList.add('is-open'));
+  synth.playSheetOpen?.();
+}
+
+function closeDrawer() {
+  if (el.drawer.hidden) return;
+  el.drawer.classList.remove('is-open');
+  el.menuBtn.setAttribute('aria-expanded', 'false');
+  setTimeout(() => { el.drawer.hidden = true; }, dur(300));
+}
+
+/* --- notifications -----------------------------------------------------------------
+ *
+ * One list, one unread count. The only thing that raises a notification today
+ * is a friend request; the shape is general so the next one has somewhere to
+ * go. Read state lives in the profile, keyed by the id of the thing that
+ * caused it, so it survives a restart and syncs with everything else.
+ */
+
+const notifications = () =>
+  state.social.incoming.map((entry) => ({
+    id: entry.id,
+    icon: 'addFriend',
+    title: t('notifRequest', { name: entry.profile.username }),
+    when: entry.created_at,
+    run: () => { renderFriends(); showScreen('friends'); }
+  }));
+
+const isRead = (id) => (state.profile.notifRead ?? []).includes(id);
+const unreadCount = () => notifications().filter((n) => !isRead(n.id)).length;
+
+function markRead(ids) {
+  const seen = new Set(state.profile.notifRead ?? []);
+  const live = new Set(notifications().map((n) => n.id));
+  ids.forEach((id) => seen.add(id));
+  // Drop ids for things that no longer exist, or the list grows forever.
+  state.profile.notifRead = [...seen].filter((id) => live.has(id));
+  store.saveProfile(state.profile);
+  paintBell();
+}
+
+function paintBell() {
+  const n = unreadCount();
+  el.bellCount.textContent = n > 9 ? '9+' : String(n);
+  el.bellCount.hidden = n === 0;
+  el.bell.classList.toggle('is-hot', n > 0);
+}
+
+function openNotifications() {
+  const list = notifications();
+  openSheet(t('notifTitle'), (body) => {
+    if (!list.length) {
+      body.innerHTML = `<p class="muted" style="font-size:.88rem;line-height:1.6"></p>`;
+      body.querySelector('p').textContent = t('notifEmpty');
+      return;
+    }
+    const wrap = document.createElement('div');
+    wrap.className = 'notes';
+    wrap.replaceChildren(...list.map((note) => {
+      const row = document.createElement('button');
+      row.type = 'button';
+      row.className = `note-row${isRead(note.id) ? '' : ' is-unread'}`;
+      row.innerHTML = `<span class="note-mark">${iconSvg(note.icon, { size: 18 })}</span>
+        <span class="note-copy"><b></b><span></span></span>
+        <span class="muted">${iconSvg('chevron', { size: 17 })}</span>`;
+      row.querySelector('b').textContent = note.title;
+      row.querySelector('.note-copy span').textContent = whenText(note.when);
+      press(row, { sound: null });
+      row.addEventListener('click', () => { sheet.hide(); note.run(); });
+      return row;
+    }));
+    body.appendChild(wrap);
+  });
+  // Opening the list is reading it.
+  markRead(list.map((n) => n.id));
+}
+
+/** "3 min ago", "2 days ago" — enough to place it, no more. */
+function whenText(iso) {
+  const at = Date.parse(iso ?? '');
+  if (!Number.isFinite(at)) return '';
+  const mins = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (mins < 1) return t('accountJustNow');
+  if (mins < 60) return t('accountMinsAgo', { n: mins });
+  const hours = Math.round(mins / 60);
+  if (hours < 24) return t('notifHoursAgo', { n: hours });
+  return t('notifDaysAgo', { n: Math.round(hours / 24) });
+}
+
+/* --- help ---------------------------------------------------------------------------
+ *
+ * A "?" on each screen that explains what the screen is for, in the fewest
+ * words that actually answer the question. Numbered steps rather than prose,
+ * because the answer is nearly always "here is the loop".
+ */
+
+const HELP = {
+  packs:   { steps: 3, tip: true },
+  timed:   { steps: 3, tip: true },
+  shop:    { steps: 3, tip: true },
+  binder:  { steps: 3, tip: true },
+  friends: { steps: 3, tip: true }
+};
+
+function openHelp(topic) {
+  const shape = HELP[topic];
+  if (!shape) return;
+  openSheet(t(`help_${topic}_title`), (body) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'help-body';
+
+    const lead = document.createElement('p');
+    lead.className = 'help-lead';
+    lead.textContent = t(`help_${topic}_lead`);
+    wrap.appendChild(lead);
+
+    for (let i = 1; i <= shape.steps; i++) {
+      const step = document.createElement('div');
+      step.className = 'help-step';
+      step.innerHTML = `<span class="help-num">${i}</span><p></p>`;
+      // The copy marks one phrase per step with *stars*; that phrase is the
+      // thing you actually do, so it is the thing that should stand out.
+      step.querySelector('p').innerHTML = esc(t(`help_${topic}_${i}`))
+        .replace(/\*([^*]+)\*/g, '<b>$1</b>');
+      wrap.appendChild(step);
+    }
+
+    if (shape.tip) {
+      const tip = document.createElement('p');
+      tip.className = 'help-tip';
+      tip.textContent = t(`help_${topic}_tip`);
+      wrap.appendChild(tip);
+    }
+    body.appendChild(wrap);
+  });
 }
 
 /* --- booster art ------------------------------------------------------------------ */
@@ -397,7 +624,9 @@ function renderPacks() {
   const slots = ownedFor(state.packMode);
   state.packSlots = slots;
 
-  el.creator.hidden = state.packMode !== 'custom';
+  const custom = state.packMode === 'custom';
+  el.creatorWrap.hidden = !custom;
+  if (custom) renderCreator();
   const has = slots.length > 0;
   el.packsRail.hidden = !has;
   el.packsCaption.hidden = !has;
@@ -409,10 +638,13 @@ function renderPacks() {
     // DOM means switching to an empty shelf still has boosters behind the
     // empty state, which is exactly the bug the `[hidden]` fix was for.
     packsRail.setItems([]);
-    el.packsEmptyMark.innerHTML = iconSvg(state.packMode === 'custom' ? 'wand' : 'packs', { size: 46 });
-    el.packsEmptyText.textContent = state.packMode === 'custom' ? t('shelfEmptyCustom') : t('shelfEmpty');
+    // On the custom tab the builder below already says what to do, so the
+    // shelf's own empty state would be the same advice twice.
+    el.packsEmpty.hidden = custom;
+    el.packsEmptyMark.innerHTML = iconSvg('packs', { size: 46 });
+    el.packsEmptyText.textContent = t('shelfEmpty');
     el.packsEmptyCta.textContent = t('goShop');
-    el.packsEmptyCta.hidden = state.packMode === 'custom';
+    el.packsEmptyCta.hidden = false;
     return;
   }
 
@@ -451,6 +683,67 @@ function paintPackCaption(index) {
 }
 
 /* --- custom boosters ---------------------------------------------------------------- */
+
+/*
+ * Rebuilt as a workbench rather than a bare text field.
+ *
+ * The old version was a label, an input and a button, and gave no clue what
+ * counted as a subject or whether anything you had built still existed — you
+ * had to go and look in the Shop. It now says what it makes, offers real
+ * examples to tap, and lists what you have already built underneath.
+ */
+const CREATOR_EXAMPLES = ['Terraria', 'Stardew Valley', 'Zelda', 'Minecraft', 'One Piece'];
+
+function renderCreator() {
+  el.creatorMark.innerHTML = iconSvg('wand', { size: 22 });
+  el.creatorLabel.textContent = t('creatorTitle');
+  el.creatorNote.textContent = t('creatorNote');
+  el.creatorInput.placeholder = t('customPlaceholder');
+  el.creatorGo.textContent = t('create');
+  el.creatorMineLabel.textContent = t('creatorMine');
+
+  el.creatorExamples.replaceChildren(...CREATOR_EXAMPLES.map((name) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = 'creator-example';
+    chip.textContent = name;
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => {
+      el.creatorInput.value = name;
+      el.creatorInput.focus();
+    });
+    return chip;
+  }));
+
+  const made = state.customPacks ?? [];
+  el.creatorEmpty.hidden = made.length > 0;
+  if (!made.length) {
+    el.creatorEmptyMark.innerHTML = iconSvg('wand', { size: 40 });
+    el.creatorEmptyText.textContent = t('creatorNoneYet');
+  }
+
+  el.creatorMine.replaceChildren(...made.map((pack) => {
+    const spec = { kind: 'custom', themeId: pack.id, rarityId: null, cards: 5 };
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'made';
+    row.innerHTML = `<span class="made-art"></span>
+      <span class="made-copy"><b></b><span></span></span>
+      <span class="muted">${iconSvg('chevron', { size: 17 })}</span>`;
+    row.querySelector('.made-art').appendChild(buildBooster(spec, { size: 'is-tiny' }));
+    row.querySelector('b').textContent = pack.name;
+    row.querySelector('.made-copy span').textContent = t('creatorInShop');
+    press(row, { sound: null });
+    row.addEventListener('click', () => {
+      synth.playTap();
+      payStipend();
+      renderShop();
+      showScreen('shop');
+    });
+    return row;
+  }));
+}
+
 
 function customPackName(typed, sitename) {
   const trimmed = (sitename ?? '').replace(/\s*(fandom|wiki|wikia)\s*$/i, '').trim();
@@ -528,34 +821,68 @@ function timedTopScarcity(level) {
   return timed > 0 ? top({}) / timed : Infinity;
 }
 
+/*
+ * FREE PACKS
+ * ----------------------------------------------------------------------------
+ * Rebuilt around the only two things anyone comes to this screen for: how many
+ * are waiting, and when the next one lands. The dial answers both at once —
+ * the number is the count, the ring is the fill towards the next — and the
+ * pips give the cap a shape, so "5 of 7" is something you see before you read.
+ *
+ * The old screen led with a paragraph of rules and a pack sitting off-centre.
+ * The rules are now behind the "?" where rules belong, and the track below
+ * says what levelling actually buys, one line per thing it changes, instead of
+ * one dense sentence.
+ */
 function renderTimed() {
   const timed = syncTimed();
   const level = timedLevel(timed.opened ?? 0);
   const cap = maxHeld(level);
+  const held = timed.count ?? 0;
 
-  el.timedTitle.textContent = t('timedTitle');
-  el.timedIntro.textContent = t('timedIntro', { minutes: Math.round(regenMs(level) / 60000) });
+  el.timedTitle.textContent = t('tabTimed');
+  el.freeCap.textContent = t('freeOf', { max: cap });
+  el.freeFoot.textContent = t('freeFoot', {
+    cards: TIMED_CARDS, minutes: Math.round(regenMs(level) / 60000)
+  });
 
-  const pack = buildBooster(currentTimedSpec(), { size: 'is-small' });
-  pack.classList.toggle('is-empty', timed.count <= 0);
-  el.timedPack.replaceChildren(pack);
+  // Pips: one per slot the cap allows, filled for what is banked.
+  el.freePips.replaceChildren(...Array.from({ length: cap }, (_, i) => {
+    const pip = document.createElement('span');
+    pip.className = `free-pip${i < held ? ' is-full' : (i === held ? ' is-next' : '')}`;
+    return pip;
+  }));
 
   el.timedOpen.textContent = t('timedOpen');
+  el.timedOpen.disabled = held <= 0;
   el.timedOpen.onclick = openTimed;
 
+  el.freeTrackLabel.textContent = t('freeTrackLabel');
   const { to } = levelBounds(timed.opened ?? 0);
   const atMax = level >= MAX_TIMED_LEVEL;
-  el.trackLevel.textContent = atMax ? t('timedTrackMax', { level }) : t('timedTrack', { level });
-  el.trackRemaining.textContent = atMax ? '' : t('timedToNext', { n: to - (timed.opened ?? 0), level: level + 1 });
+  el.trackLevel.textContent = t('freeLevel', { level });
+  el.trackRemaining.textContent = atMax
+    ? t('freeMaxed')
+    : t('timedToNext', { n: to - (timed.opened ?? 0), level: level + 1 });
   trackBar.set(levelProgress(timed.opened ?? 0));
 
+  // What this level buys, one line each, rather than one dense sentence.
   const scarcity = timedTopScarcity(level);
-  el.trackPerks.textContent = scarcity <= 1.05
-    ? t('timedPerksMax', { minutes: Math.round(regenMs(level) / 60000), max: cap })
-    : t('timedPerks', {
-        minutes: Math.round(regenMs(level) / 60000), max: cap,
-        factor: scarcity >= 10 ? Math.round(scarcity) : scarcity.toFixed(1)
-      });
+  const perks = [
+    ['clock', t('freePerkSpeed', { minutes: Math.round(regenMs(level) / 60000) })],
+    ['packs', t('freePerkCap', { max: cap })],
+    ['gem', scarcity <= 1.05
+      ? t('freePerkOddsMax')
+      : t('freePerkOdds', { factor: scarcity >= 10 ? Math.round(scarcity) : scarcity.toFixed(1) })]
+  ];
+  el.freePerks.replaceChildren(...perks.map(([icon, text]) => {
+    const row = document.createElement('div');
+    row.className = 'free-perk';
+    row.innerHTML = `<span class="free-perk-icon">${iconSvg(icon, { size: 17 })}</span><span></span>`;
+    row.querySelector('span:last-child').innerHTML = esc(text).replace(/\*([^*]+)\*/g, '<b>$1</b>');
+    return row;
+  }));
+
   el.trackNext.textContent = atMax ? '' : t('timedNextPerks', {
     minutes: Math.round(regenMs(level + 1) / 60000), max: maxHeld(level + 1)
   });
@@ -564,25 +891,39 @@ function renderTimed() {
   tickTimed();
 }
 
-/** The 1 Hz part: counters only, and only while this screen is on display. */
+/** The 1 Hz part: the dial and the countdown, only while this screen is up. */
 function tickTimed() {
   const timed = state.profile.timed;
-  const before = timed.count;
+  const before = timed.count ?? 0;
   accrue(timed);
-  if (timed.count !== before) {
+  const level = timedLevel(timed.opened ?? 0);
+  const cap = maxHeld(level);
+  const held = timed.count ?? 0;
+
+  if (held !== before) {
     store.saveProfile(state.profile);
-    if (timed.count > before) synth.playReady();
-    renderTimed();
     updateBadges();
+    synth.playReady();
+    renderTimed();
     return;
   }
-  const level = timedLevel(timed.opened ?? 0);
-  el.timedCount.textContent = t('timedHeld', { n: timed.count, max: maxHeld(level) });
-  const remaining = msToNext(timed);
-  el.timedNext.textContent = remaining == null
-    ? t('timedFull')
-    : t('timedNext', { time: formatCountdown(remaining) });
-  el.timedOpen.disabled = timed.count <= 0;
+
+  el.freeCount.textContent = String(held);
+  el.timedOpen.disabled = held <= 0;
+
+  const left = msToNext(timed);
+  if (left === null) {
+    freeRing.set(1, '');
+    el.freeState.textContent = t('freeFull');
+    el.freeState.className = 'free-state is-ready';
+  } else {
+    // The ring is the fraction of the current interval already elapsed.
+    const step = regenMs(level);
+    freeRing.set(step > 0 ? 1 - left / step : 0, '');
+    el.freeState.textContent = t('freeNextIn', { time: formatCountdown(left) });
+    el.freeState.className = `free-state${held > 0 ? ' is-ready' : ''}`;
+  }
+  el.freeCap.textContent = t('freeOf', { max: cap });
 }
 
 function openTimed() {
@@ -602,21 +943,73 @@ function openTimed() {
 /* --- shop -------------------------------------------------------------------------------- */
 
 const freeNoteText = () =>
-  `${t('freeNote')} ${t('freeAgainIn', { time: formatCountdown(nextFreeAt() - Date.now()) })}`;
+  `${t('freeShelfNote')} ${t('freeAgainIn', { time: formatCountdown(nextFreeAt() - Date.now()) })}`;
 
+/** Which kinds of shelf the filter chips offer, and what each keeps. */
+const SHOP_FILTERS = [
+  { id: 'all',   key: 'shopAll',   keep: () => true },
+  { id: 'free',  key: 'shopFree',  keep: (row) => Boolean(row.free) },
+  { id: 'cheap', key: 'shopCheap', keep: (row) => row.specs.some((s) => s.price <= state.wallet) },
+  { id: 'big',   key: 'shopBig',   keep: (row) => row.specs.some((s) => s.spec.cards >= 6) }
+];
+
+/*
+ * THE SHOP
+ * ----------------------------------------------------------------------------
+ * Rebuilt so that the two things you need before spending anything — what is
+ * in your purse and how long this stock lasts — sit above the stock instead of
+ * inside a paragraph, and so a shelf item is a labelled card rather than a
+ * strip of art with a price under it. You could not previously tell what you
+ * were buying without recognising the picture.
+ *
+ * Filter chips are a plain client-side pass over the generated shelves: the
+ * stock itself is still whatever the two-hour window decided, so filtering
+ * cannot conjure anything that was not on sale.
+ */
 function renderShop() {
   el.shopTitle.textContent = t('tabShop');
-  el.shopIntro.textContent = t('shopIntro');
-  const rows = generateShop(windowIndexAt(), state.customPacks, freeWindowAt());
+  el.shopPurseLabel.textContent = t('shopPurse');
+  el.shopRestockLabel.textContent = t('shopRestockIn');
+  el.shopPurse.innerHTML = money(state.wallet);
+
+  const all = generateShop(windowIndexAt(), state.customPacks, freeWindowAt());
+  const filter = SHOP_FILTERS.find((f) => f.id === state.shopFilter) ?? SHOP_FILTERS[0];
+  const rows = all.filter(filter.keep);
+
+  el.shopFilter.replaceChildren(...SHOP_FILTERS.map((f) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `shop-chip${f.id === filter.id ? ' is-on' : ''}`;
+    chip.textContent = t(f.key);
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => {
+      state.shopFilter = f.id;
+      synth.playTab?.(1);
+      renderShop();
+    });
+    return chip;
+  }));
+
+  el.shopEmpty.hidden = rows.length > 0;
+  if (!rows.length) {
+    el.shopEmptyMark.innerHTML = iconSvg('gem', { size: 46 });
+    el.shopEmptyText.textContent = t('shopNoMatch');
+  }
 
   el.shopRows.replaceChildren(...rows.map((row) => {
     const section = document.createElement('section');
     section.className = `shop-row${row.free ? ' is-free' : ''}`;
     section.innerHTML = `
-      <div class="shop-row-head"><h3></h3></div>
+      <div class="shop-row-head"><h3></h3><span class="shop-row-tag"></span></div>
       ${row.free ? '<p class="shop-note"></p>' : ''}
       <div class="shelf"></div>`;
     section.querySelector('h3').textContent = row.title;
+    // The tag says the one thing the row's title does not: what it costs, or
+    // that it is free.
+    const prices = row.specs.map((s) => s.price).filter((p) => p > 0);
+    section.querySelector('.shop-row-tag').textContent = row.free
+      ? t('free')
+      : (prices.length ? t('shopFrom', { amount: formatAmount(Math.min(...prices)) }) : '');
     if (row.free) section.querySelector('.shop-note').textContent = freeNoteText();
 
     const shelf = section.querySelector('.shelf');
@@ -624,7 +1017,26 @@ function renderShop() {
       const item = document.createElement('div');
       item.className = 'shop-item';
       item.dataset.spec = id;
-      item.appendChild(buildBooster(spec, { size: 'is-small' }));
+
+      const art = document.createElement('div');
+      art.className = 'shop-item-art';
+      art.appendChild(buildBooster(spec, { size: 'is-tiny' }));
+      item.appendChild(art);
+
+      // Name and size in words, so the shelf can be read rather than decoded.
+      const name = document.createElement('p');
+      name.className = 'shop-item-name';
+      name.textContent = specName(spec);
+      item.appendChild(name);
+
+      const meta = document.createElement('p');
+      meta.className = 'shop-item-meta';
+      const tier = spec.rarityId ? rarityById(spec.rarityId) : null;
+      meta.textContent = tier
+        ? `${t('shopItemMeta', { n: spec.cards })} · ${tx(tier.name)}`
+        : t('shopItemMeta', { n: spec.cards });
+      if (tier) meta.style.color = tier.color;
+      item.appendChild(meta);
 
       const buy = document.createElement('button');
       buy.type = 'button';
@@ -632,6 +1044,7 @@ function renderShop() {
       press(buy, { sound: null });
       if (row.free) paintFreeButton(buy, id, spec);
       else {
+        buy.classList.toggle('is-poor', price > state.wallet);
         buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
         buy.addEventListener('click', () => purchase(spec, price, buy));
       }
@@ -688,7 +1101,7 @@ function purchase(spec, price, button) {
 
 function tickRestock() {
   const remaining = nextRefreshAt() - Date.now();
-  el.restock.textContent = t('restockIn', { time: formatCountdown(remaining) });
+  el.restock.textContent = formatCountdown(remaining);
   const note = el.shopRows.querySelector('.shop-row.is-free .shop-note');
   if (note) note.textContent = freeNoteText();
   if (remaining <= 0) { payStipend(); renderShop(); }
@@ -705,7 +1118,25 @@ function payStipend() {
 
 /* --- opening: the rip ---------------------------------------------------------------------- */
 
-const rip = { progress: 0, dragging: false, lastTick: 0, done: false, booster: null, zone: null };
+const rip = {
+  progress: 0, dragging: false, lastTick: 0, done: false,
+  booster: null, zone: null,
+  // The teardown for the drag currently in flight, if any. See endRipDrag().
+  release: null
+};
+
+/**
+ * Abandon whatever drag the rip thinks is in progress.
+ *
+ * Called before starting a new one and whenever a booster is set up, so a
+ * gesture the system swallowed (no pointerup ever arrives) cannot leave
+ * listeners behind that fight with the next finger.
+ */
+function endRipDrag() {
+  rip.release?.();
+  rip.release = null;
+  rip.dragging = false;
+}
 
 function paintRip() {
   const dir = state.ripDir || 1;
@@ -754,9 +1185,10 @@ function lockRipDirection(dx) {
 }
 
 function initRip(booster) {
+  endRipDrag();
   rip.booster = booster;
   rip.zone = booster.querySelector('.rip-zone');
-  rip.progress = 0; rip.lastTick = 0; rip.done = false; rip.dragging = false;
+  rip.progress = 0; rip.lastTick = 0; rip.done = false;
   paintRip();
 
   const zone = rip.zone;
@@ -764,13 +1196,14 @@ function initRip(booster) {
 
   zone.addEventListener('pointerdown', (event) => {
     if (rip.done) return;
+    endRipDrag();                       // drop any gesture that never ended
     rip.dragging = true;
     rip.lastTick = rip.progress;
     booster.classList.add('is-tearing');
     synth.resume();
     event.preventDefault();
 
-    trackDrag(event, {
+    rip.release = trackDrag(event, {
       onMove: (dx) => {
         if (!rip.dragging || Math.abs(dx) < RIP_LOCK_SLOP) return;
         lockRipDirection(dx);
@@ -780,6 +1213,7 @@ function initRip(booster) {
       onEnd: async () => {
         if (!rip.dragging) return;
         rip.dragging = false;
+        rip.release = null;
         booster.classList.remove('is-tearing');
         if (rip.progress >= RIP_COMMIT) completeRip();
         else if (rip.progress > 0.01) {
@@ -824,7 +1258,22 @@ async function completeRip() {
   synth.playRip();
   booster.classList.add('is-open');
   dropScrap(booster);
-  openPack(booster);
+
+  // If the open does not take, put the pack back the way it was rather than
+  // leaving a torn booster that no longer answers to anything. openPack() is
+  // awaited so a failure inside it lands here instead of becoming an unhandled
+  // rejection nobody sees.
+  let opened = false;
+  try {
+    opened = await openPack(booster);
+  } catch (error) {
+    console.error('opening failed', error);
+  }
+  if (!opened) {
+    rip.done = false;
+    booster.classList.remove('is-open');
+    setRip(0);
+  }
 }
 
 /* --- opening: drawing ------------------------------------------------------------------------ */
@@ -876,15 +1325,36 @@ function openScreenFor(spec) {
   showScreen('open');
 }
 
+/**
+ * Open the torn pack. Returns whether it actually opened.
+ *
+ * The whole body runs inside a try/finally for one reason: `state.busy` used
+ * to be cleared on the happy path and on the one handled error, so ANY other
+ * throw left it set for the rest of the session. Nothing clears it again, and
+ * every later open returns at the guard above — so no booster could be opened
+ * at all until the app was restarted, with the tear itself silently doing
+ * nothing. A flag that gates the whole feature has to be released by the
+ * language, not by remembering to.
+ */
 async function openPack(booster) {
-  if (state.busy) return;
+  if (state.busy) return false;
   state.busy = true;
+  try {
+    // A seam for the test that proves the invariant above: a throw from
+    // anywhere in here must still release the flag and leave the pack
+    // openable. Without it the regression is only reachable by a real crash,
+    // which is exactly the thing that is hard to arrange on purpose.
+    if (debug.failNextOpen) { debug.failNextOpen = false; throw new Error('debug: forced open failure'); }
+    return await runOpen(booster);
+  } finally {
+    state.busy = false;
+  }
+}
+
+async function runOpen(booster) {
   clearTimeout(state.prefetchTimer);
 
-  if (!store.takeBooster(state.inventory, specId(state.spec))) {
-    state.busy = false;
-    return;
-  }
+  if (!store.takeBooster(state.inventory, specId(state.spec))) return false;
   renderPacks();
 
   const drawing = drawFor(state.spec);
@@ -929,8 +1399,7 @@ async function openPack(booster) {
     fresh.classList.add('is-idle');
     el.boosterSlot.replaceChildren(fresh);
     initRip(fresh);
-    state.busy = false;
-    return;
+    return false;
   }
 
   const options = rollOptionsFor(state.spec);
@@ -964,7 +1433,7 @@ async function openPack(booster) {
   state.index = 0;
   layoutDeck();
   revealCurrent();
-  state.busy = false;
+  return true;
 }
 
 /* --- cards --------------------------------------------------------------------------------- */
@@ -1115,16 +1584,25 @@ async function revealCurrent() {
   }
 
   if (state.seen.size >= state.pulls.length) {
-    el.openHint.textContent = '';
-    await wait(950);
-    if (state.seen.size >= state.pulls.length) showSummary();
+    // The last card is the one you most want to look at, and the summary used
+    // to take it away almost immediately. Hold it, and let a swipe move on
+    // early for anyone who has already seen enough.
+    el.openHint.textContent = t('swipeToSummary');
+    clearTimeout(state.summaryTimer);
+    state.summaryTimer = setTimeout(() => {
+      if (state.seen.size >= state.pulls.length) showSummary();
+    }, LAST_CARD_HOLD);
   } else {
     el.openHint.textContent = state.index === 0 ? t('swipeToReveal') : t('swipeEitherWay');
   }
 }
 
 function goTo(index) {
-  const next = clamp(index, 0, state.pulls.length - 1);
+  const last = state.pulls.length - 1;
+  // Swiping past the last card, once every card has been turned, is how you
+  // ask for the summary before the hold is up.
+  if (index > last && state.seen.size >= state.pulls.length) { showSummary(); return; }
+  const next = clamp(index, 0, last);
   if (next === state.index) { layoutDeck(); return; }
   state.index = next;
   layoutDeck();
@@ -1133,6 +1611,8 @@ function goTo(index) {
 }
 
 function showSummary() {
+  if (el.openScreen.classList.contains('phase-summary')) return;
+  clearTimeout(state.summaryTimer);
   el.summary.replaceChildren(...state.pulls.map((pull) => {
     const data = { ...pull.article, price: pull.price, packIcon: pull.packIcon };
     return buildStaticCard(data, pull.rarity, pull.article.key);
@@ -1630,33 +2110,6 @@ function renderProfile() {
     return row;
   }));
 
-  // Everything that is not a destination of its own hangs off the profile.
-  el.moreLabel.textContent = t('moreTitle');
-  const links = [
-    ...(account.configured
-      ? [['friends', 'tabFriends', () => { renderFriends(); showScreen('friends'); loadFriends(); },
-          state.social.incoming.length]]
-      : []),
-    ['settings', 'tabSettings', () => { renderSettings(); showScreen('settings'); }],
-    ['gift', 'dailyTitle', () => openDaily()],
-    ['gem', 'pullRates', () => openOdds()],
-    ['spark', 'walletTitle', () => openWallet()]
-  ];
-  el.profileLinks.replaceChildren(...links.map(([icon, key, go, badge = 0]) => {
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'row';
-    row.style.alignItems = 'center';
-    row.innerHTML = `<span style="display:flex;align-items:center;gap:12px">
-      <span style="color:var(--accent)">${iconSvg(icon, { size: 20 })}</span>
-      <span style="font-weight:700">${t(key)}</span></span>
-      <span style="display:flex;align-items:center;gap:8px">
-        ${badge ? `<span class="chip">${badge}</span>` : ''}
-        <span class="muted">${iconSvg('chevron', { size: 18 })}</span></span>`;
-    press(row, { sound: null });
-    row.addEventListener('click', () => { synth.playTap(); go(); });
-    return row;
-  }));
 }
 
 /* --- the account gate -------------------------------------------------------------------------------------- */
@@ -1921,6 +2374,28 @@ function syncSoon() {
   syncTimer = setTimeout(flushSync, SYNC_DEBOUNCE);
 }
 
+/*
+ * A slow poll for anything that arrives from someone else.
+ *
+ * A friend request is the one thing in the app that happens without you doing
+ * it, so waiting until you next open the Friends screen to find out is no use
+ * — the bell would only ever be right by accident. One read a minute while the
+ * app is actually on screen is cheap, and it stops entirely in the background.
+ */
+const SOCIAL_POLL = 60000;
+let socialTimer = null;
+
+function startSocialPoll() {
+  stopSocialPoll();
+  if (!signedIn() || document.visibilityState !== 'visible') return;
+  socialTimer = setInterval(loadFriends, SOCIAL_POLL);
+}
+
+function stopSocialPoll() {
+  clearInterval(socialTimer);
+  socialTimer = null;
+}
+
 /**
  * Foregrounding the app: pick up the profile if the last attempt failed, push
  * anything that has not landed, and refresh the friend lists.
@@ -1933,6 +2408,7 @@ async function resumeAccount() {
   // this run, so push rather than waiting for the next change.
   if (state.account.failed || !had) syncSoon();
   loadFriends();
+  startSocialPoll();
 }
 
 /**
@@ -1952,6 +2428,7 @@ async function enterApp() {
   reloadFromStorage();
   if (!state.account.failed) state.account.syncedAt = Date.now();
   loadFriends();
+  startSocialPoll();
 
   if (!languageChosen() || !state.profile.started) showWelcome();
   else {
@@ -1988,6 +2465,7 @@ async function leaveAccount() {
   // in as the same account is not mistaken for a repeat of the same session.
   handledUser = null;
   state.social = { friends: [], incoming: [], outgoing: [], results: [], loaded: false };
+  stopSocialPoll();
   el.welcome.hidden = true;
   showScreen('packs');
   showGate();
@@ -2009,11 +2487,12 @@ async function onSession(session) {
   handledUser = id;
 
   state.account.session = session ?? null;
-  if (!session) { showGate(); return; }
+  if (!session) { showGate(); endSplash(); return; }
 
   const ready = await fetchAccountProfile();
-  if (ready === 'no-name') { showNameGate(); return; }
+  if (ready === 'no-name') { showNameGate(); endSplash(); return; }
   await enterApp();
+  endSplash();
 }
 
 /**
@@ -2863,16 +3342,15 @@ function showStarter() {
 
 function applyStrings() {
   document.documentElement.lang = getLanguage();
-  el.appbarTitle.textContent = t(SCREEN_TITLES[state.tab] ?? 'tabBoosters');
-  el.giftIcon.innerHTML = iconSvg('gift', { size: 18 });
+  el.menuIcon.innerHTML = iconSvg('menu', { size: 20 });
+  el.bellIcon.innerHTML = iconSvg('bell', { size: 19 });
   el.walletMark.innerHTML = buckSvg({ size: 12 });
   el.sheetClose.innerHTML = iconSvg('close', { size: 17 });
   el.openBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
-  el.creatorLabel.textContent = t('tabCustom');
-  el.creatorNote.textContent = `${t('customIntro')} ${t('customOwnNote')}`;
-  el.creatorInput.placeholder = t('customPlaceholder');
-  el.creatorGo.textContent = t('create');
+  el.oddsLabel.textContent = t('pullRates');
   el.packsEmptyCta.textContent = t('goShop');
+  el.menuBtn.setAttribute('aria-label', t('menu'));
+  el.bell.setAttribute('aria-label', t('notifTitle'));
 
   nav?.setLabels({
     packs: t('tabBoosters'), timed: t('tabTimed'), shop: t('tabShop'),
@@ -2911,12 +3389,14 @@ function specFromId(id) {
 
 function init() {
   useTheme(storedTheme());
+  el.splashMark.innerHTML = logoSvg({ size: 78 });
   backdrop.mount(el.backdrop).setTheme(storedTheme());
 
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
   profileRing = new Ring(el.profileRing, { size: 62, width: 4 });
   friendRing = new Ring(el.friendRing, { size: 62, width: 4 });
+  freeRing = new Ring(el.freeRing, { size: 132, width: 8 });
   xpBar = new Bar(el.xpBar);
   trackBar = new Bar(el.trackBar);
 
@@ -2960,14 +3440,23 @@ function init() {
   // Pack art is language-specific, so it waits until a language exists.
   if (languageChosen()) loadPackArt();
 
-  [el.wallet, el.gift, el.levelBadge, el.packsOpen, el.timedOpen,
+  [el.wallet, el.menuBtn, el.bell, el.levelBadge, el.packsOpen, el.timedOpen,
    el.filterOpen, el.openBack, el.openDone, el.sheetClose, el.starterGo,
    el.packsEmptyCta, el.creatorGo, el.findGo, el.friendBack,
-   el.friendRemove, el.gateAlt].forEach((node) => press(node, { sound: null }));
+   el.friendRemove, el.gateAlt, el.oddsBtn].forEach((node) => press(node, { sound: null }));
 
   el.wallet.addEventListener('click', openWallet);
-  el.gift.addEventListener('click', () => openDaily());
+  el.bell.addEventListener('click', openNotifications);
+  el.menuBtn.addEventListener('click', () => (el.drawer.hidden ? openDrawer() : closeDrawer()));
+  el.drawerScrim.addEventListener('click', closeDrawer);
   el.levelBadge.addEventListener('click', () => { renderProfile(); showScreen('profile'); });
+
+  el.oddsIcon.innerHTML = iconSvg('gem', { size: 15 });
+  el.oddsBtn.addEventListener('click', openOdds);
+  document.querySelectorAll('.help-btn').forEach((button) => {
+    press(button, { sound: null });
+    button.addEventListener('click', () => { synth.playTap(); openHelp(button.dataset.help); });
+  });
   el.filterOpen.addEventListener('click', openFilters);
   el.packsEmptyCta.addEventListener('click', () => { payStipend(); renderShop(); showScreen('shop'); });
   el.creator.addEventListener('submit', createCustomPack);
@@ -2983,7 +3472,9 @@ function init() {
 
   el.sheetClose.addEventListener('click', () => sheet.hide());
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && sheet.open) sheet.hide();
+    if (e.key !== 'Escape') return;
+    if (!el.drawer.hidden) closeDrawer();
+    else if (sheet.open) sheet.hide();
   });
 
   // Accounts and friends.
@@ -3039,6 +3530,7 @@ function init() {
       // and to pick up what happened while the app was away.
       resumeAccount();
     } else {
+      stopSocialPoll();
       flushPlaytime();
       visibleSince = null;
       synth.suspend();
@@ -3062,14 +3554,14 @@ function init() {
  * what everything else is filed under. Without one, the app is exactly what it
  * was before accounts existed — local, and honest about it in Settings.
  */
-function startSession() {
+async function startSession() {
   if (!account.configured) {
     if (!languageChosen() || !state.profile.started) showWelcome();
     else {
       payStipend();
       if (canClaim(state.profile.daily)) openDaily({ auto: true });
     }
-    return;
+    return endSplash();
   }
 
   onSaveChanged(syncSoon);
@@ -3078,16 +3570,51 @@ function startSession() {
   // is not guaranteed across client versions, so the session is read directly
   // as well; onSession() ignores the second of the two.
   account.onAuthChange((session) => { onSession(session); });
-  account.currentSession().then((session) => onSession(session)).catch(() => showGate());
-  // Until one of those lands there is nothing to show but the gate.
-  showGate();
+
+  /*
+   * Read the stored session BEFORE deciding what to show.
+   *
+   * The gate used to be painted immediately and taken away once the session
+   * came back, which meant a sign-in card flashed up on every single launch
+   * for anyone already signed in. Reading the session is a local, fast
+   * operation, so the splash covers it and nothing else is shown until the
+   * answer is known.
+   */
+  try {
+    await onSession(await account.currentSession());
+  } catch {
+    showGate();
+    endSplash();
+  }
+}
+
+/* --- the splash ---------------------------------------------------------------------
+ *
+ * Covers the first moment of a launch: the mark draws itself in while the
+ * stored session is read, so the app appears already decided rather than
+ * flickering through the gate on its way to the shelf.
+ */
+const SPLASH_MIN = 900;
+const splashStart = performance.now();
+let splashDone = false;
+
+function endSplash() {
+  if (splashDone) return;
+  splashDone = true;
+  // Hold it long enough to be an entrance rather than a flash of colour, but
+  // never add waiting on a launch that was already slow.
+  const wait = Math.max(0, SPLASH_MIN - (performance.now() - splashStart));
+  setTimeout(() => {
+    el.splash.classList.add('is-going');
+    setTimeout(() => { el.splash.hidden = true; }, 460);
+  }, wait);
 }
 
 let packsRail;
 init();
 
 window.__packywiki = {
-  state, store, RARITIES, synth, backdrop, THEMES,
+  state, store, debug, RARITIES, synth, backdrop, THEMES,
   draw: drawArticles, generateShop,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderSettings(); },
   debugRarity(id) {

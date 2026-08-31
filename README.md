@@ -132,11 +132,15 @@ save transfer.
 The app is not a web page with an app-shaped stylesheet on it. Its parts are
 built here rather than borrowed, and none of it is a component library.
 
-**The frame.** A live canvas backdrop, a floating app bar carrying the level
-ring, the screen, the wallet and the gift, five destinations in a floating
-bottom bar, and one sheet that every panel in the app uses. Opening a pack is
-a **takeover**: the frame gets out of the way and the backdrop stops, so the
-whole frame budget goes to the cards.
+**The frame.** A live canvas backdrop, a floating app bar carrying the menu,
+the app name, the wallet, notifications and the level ring, five destinations
+in a floating bottom bar, a drawer holding everything the bar has no room for,
+and one sheet that every panel in the app uses. Opening a pack is a
+**takeover**: the frame gets out of the way and the backdrop stops, so the
+whole frame budget goes to the cards. A launch is covered by the opening
+animation, which also hides the moment the account gate spends deciding
+whether there is a stored session — without it a sign-in card flashed up on
+every single launch.
 
 **The controls**, all in `src/ui/components.js`:
 
@@ -261,12 +265,24 @@ anywhere in the UI code.
 
 ### Destinations
 
-Five, in the bottom bar: **Packs** (owned, and the custom builder behind a
-segmented control) · **Timed** · **Shop** · **Binder** · **Profile**. The
-wallet and the daily gift live in the app bar; Settings, Friends, the odds and
-the wallet explainer hang off the Profile, because none of them is somewhere
-you go — they are things you look at once. Friends keeps a badge on the
-Profile tab when someone is waiting, so a request does not need finding.
+Five, in the bottom bar: **Boosters** (owned, and the custom builder behind a
+segmented control) · **Free Packs** · **Shop** · **Collection** · **Profile**.
+
+Everything the bar has no room for lives in the **drawer** behind the menu
+button — the same five, plus Friends, the daily gift and Settings. That
+replaces a "More" list that used to sit at the bottom of the Profile, which is
+a strange place to keep the way to Settings.
+
+The app bar is the menu, the app name, your balance, notifications and your
+level ring, in that order. The name is the first thing dropped when the row is
+tight, because it is the only item that tells you nothing you did not know.
+The odds moved onto the Boosters tab as a button, and the explanation of
+Buckarooz opens from the balance itself — both were entries in a list of links
+before, one tap further from the thing they describe.
+
+Each screen carries a **?** that explains what it is for in three numbered
+steps. **Free Packs** was called "Timed", which described the mechanism rather
+than the offer.
 
 ---
 
