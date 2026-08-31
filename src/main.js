@@ -50,6 +50,8 @@ import {
 import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
+import { buildPackElement } from './packview.js';
+import { styleForSpec, rarityBurst } from './packstyle.js';
 import { synth } from './ui/sound.js';
 import { backdrop } from './ui/backdrop.js';
 import {
@@ -186,6 +188,7 @@ bind({
   dataLabel: $('#data-label'), dataList: $('#data-list'),
 
   openScreen: $('#screen-open'), openBack: $('#open-back'), openTitle: $('#open-title'),
+  burstLayer: $('#burst-layer'),
   openProgress: $('#open-progress'), openStage: $('#open-stage'), boosterSlot: $('#booster-slot'),
   cardStack: $('#card-stack'), summary: $('#summary'), openHint: $('#open-hint'), openDone: $('#open-done'),
 
@@ -554,44 +557,7 @@ function openHelp(topic) {
 /* --- booster art ------------------------------------------------------------------ */
 
 function buildBooster(spec, { interactive = false, size = '' } = {}) {
-  const colours = specColours(spec);
-  const booster = document.createElement('div');
-  booster.className = `booster ${size}`.trim();
-  booster.dataset.spec = specId(spec);
-  booster.style.setProperty('--accent', colours.accent);
-  booster.style.setProperty('--accent2', colours.accent2);
-  if (spec.rarityId) {
-    const rarity = rarityById(spec.rarityId);
-    booster.dataset.rarity = rarity.id;
-    booster.classList.add('is-lit');
-    booster.style.setProperty('--rarity', rarity.color);
-    booster.style.setProperty('--rarity-glow', rarity.glow);
-  }
-
-  booster.innerHTML = `
-    <div class="booster-body">
-      ${interactive ? '<div class="booster-mouth" aria-hidden="true"></div>' : ''}
-      <div class="booster-crimp is-top" aria-hidden="true"></div>
-      <div class="booster-crimp is-bottom" aria-hidden="true"></div>
-      <div class="booster-face">
-        <div class="booster-photo"></div>
-        <div class="booster-banner"><span class="booster-name"></span></div>
-        <span class="booster-count"></span>
-      </div>
-      <div class="fx fx-a" aria-hidden="true"></div>
-      <div class="fx fx-b" aria-hidden="true"></div>
-      ${interactive ? `
-        <div class="booster-tear" aria-hidden="true"></div>
-        <div class="rip-front" aria-hidden="true"></div>
-        <div class="rip-zone" role="slider" tabindex="0" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
-          <div class="rip-line"></div>
-          <div class="rip-grip is-left"></div>
-          <div class="rip-grip is-right"></div>
-        </div>` : ''}
-    </div>`;
-
-  booster.querySelector('.booster-name').textContent = specName(spec);
-  booster.querySelector('.booster-count').textContent = `${spec.cards} ${t('cards')}`;
+  const booster = buildPackElement(spec, { interactive, size });
   paintPackPhoto(booster.querySelector('.booster-photo'), spec);
   if (interactive && state.ripDir) booster.dataset.ripDir = String(state.ripDir);
   return booster;
@@ -1116,10 +1082,100 @@ function payStipend() {
   }
 }
 
+/* --- opening: the burst ------------------------------------------------------------------
+ *
+ * The pack does not fade out; it ERUPTS. When the tear completes, the bag
+ * snaps, a column of the pack's own light stands up out of the mouth, and the
+ * subject's particles — checker confetti for F1, pages for Books, stars for
+ * Space, whatever packstyle.js says this pack throws — blow outward. Then the
+ * cards climb out through the light.
+ *
+ * All of it is spawned into one layer over the stage and driven by custom
+ * properties, so one keyframe animates every subject's language. Battery
+ * saver skips the lot.
+ */
+
+/** Where the pack's mouth sits, in burst-layer coordinates. */
+function mouthPoint(booster) {
+  const stage = el.burstLayer.getBoundingClientRect();
+  const rect = booster.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2 - stage.left, y: rect.top + rect.height * 0.15 - stage.top };
+}
+
+/**
+ * Throw one round of particles. `style.particles` is the pack's own language;
+ * `lift` biases the cone upward (the mouth points up).
+ */
+function spawnBurst(style, { x, y }, { scale = 1 } = {}) {
+  if (settings().lowPower) return;
+  const p = style.particles ?? style;
+  const frag = document.createDocumentFragment();
+  const count = Math.round(p.count * scale);
+  for (let i = 0; i < count; i++) {
+    const node = document.createElement('div');
+    node.className = `pcl pcl-${p.shapes[i % p.shapes.length]}`;
+    // A cone pointing up, widened by the pack's own spread.
+    const angle = (-90 + (Math.random() - 0.5) * 120 * (p.spread ?? 1)) * (Math.PI / 180);
+    const dist = (80 + Math.random() * 230) * scale;
+    node.style.setProperty('--x', `${x}px`);
+    node.style.setProperty('--y', `${y}px`);
+    node.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+    node.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+    node.style.setProperty('--g', `${(p.gravity ?? 0.35) * (120 + Math.random() * 180)}px`);
+    node.style.setProperty('--rot', `${((Math.random() - 0.5) * 640).toFixed(0)}deg`);
+    node.style.setProperty('--dur', `${(0.65 + Math.random() * 0.75).toFixed(2)}s`);
+    node.style.setProperty('--delay', `${(Math.random() * 0.12).toFixed(2)}s`);
+    node.style.setProperty('--size', String(Math.round(6 + Math.random() * 9)));
+    node.style.setProperty('--c', p.colors[i % p.colors.length]);
+    node.addEventListener('animationend', () => node.remove(), { once: true });
+    frag.appendChild(node);
+  }
+  el.burstLayer.appendChild(frag);
+}
+
+/** The column of light standing up out of the mouth. */
+function raiseBeam(booster, accent) {
+  if (settings().lowPower) return;
+  const stage = el.burstLayer.getBoundingClientRect();
+  const rect = booster.getBoundingClientRect();
+  const beam = document.createElement('div');
+  beam.className = 'mouth-beam';
+  beam.style.setProperty('--accent', accent);
+  beam.style.left = `${rect.left + rect.width * 0.22 - stage.left}px`;
+  beam.style.width = `${rect.width * 0.56}px`;
+  beam.style.bottom = `${stage.bottom - rect.top - rect.height * 0.16}px`;
+  beam.style.height = `${Math.min(rect.top - stage.top + rect.height * 0.16, stage.height * 0.6)}px`;
+  beam.addEventListener('animationend', () => beam.remove(), { once: true });
+  el.burstLayer.appendChild(beam);
+}
+
+/** The whole eruption: snap, light, particles, tinted flash. */
+function eruptPack(booster) {
+  const style = styleForSpec(state.spec);
+  booster.classList.add('is-bursting');
+  booster.addEventListener('animationend', function done(e) {
+    if (e.animationName !== 'pack-burst') return;
+    booster.removeEventListener('animationend', done);
+    booster.classList.remove('is-bursting');
+  });
+  raiseBeam(booster, style.accent);
+  spawnBurst(style, mouthPoint(booster));
+  el.flash.style.setProperty('--flash-tint', style.accent);
+  fireFlash(0.34);
+}
+
 /* --- opening: the rip ---------------------------------------------------------------------- */
 
 const rip = {
-  progress: 0, dragging: false, lastTick: 0, done: false,
+  // Where the tear actually is (what is painted) and where the finger is
+  // asking it to be. They differ: the tear chases the finger through a
+  // spring, and snags in the foil hold it back until they pop.
+  progress: 0, target: 0, vel: 0,
+  // Weak spots in the seam. Each { at, give, popped }: the tear catches at
+  // `at` until the finger has pulled `give` past it.
+  snags: [],
+  raf: 0,
+  dragging: false, lastTick: 0, done: false,
   booster: null, zone: null,
   // The teardown for the drag currently in flight, if any. See endRipDrag().
   release: null
@@ -1155,13 +1211,79 @@ function paintRip() {
   rip.zone?.setAttribute('aria-valuenow', String(Math.round(pct)));
 }
 
-function setRip(progress) {
+function applyRipProgress(progress) {
   rip.progress = clamp01(progress);
   paintRip();
   if (Math.abs(rip.progress - rip.lastTick) >= RIP_TICK_STEP) {
     rip.lastTick = rip.progress;
     synth.playRipTick(rip.progress);
   }
+}
+
+/** Authoritative set: target and tear move together, no spring in between. */
+function setRip(progress) {
+  rip.target = clamp01(progress);
+  rip.vel = 0;
+  applyRipProgress(progress);
+}
+
+/**
+ * The tear chasing the finger, one frame at a time.
+ *
+ * The finger writes rip.target; this spring drags rip.progress after it. On
+ * the way it catches on each unpopped snag: progress holds at the snag while
+ * the finger keeps going, strain builds (the pack tilts and lifts — CSS reads
+ * --shear/--strain off the booster), and once the finger is far enough past,
+ * the snag pops, the spring gets a kick, and the tear leaps forward. That
+ * catch-and-release is the whole feel of the thing.
+ */
+function ripFrame(now) {
+  rip.raf = 0;
+  const booster = rip.booster;
+  if (!booster) return;
+  const dt = Math.min(0.032, (now - (rip.frameAt || now)) / 1000 || 0.016);
+  rip.frameAt = now;
+
+  // Where the spring is allowed to go: the finger, unless a snag is in the way.
+  let goal = rip.target;
+  const snag = rip.snags.find((s) => !s.popped && rip.target > s.at);
+  if (snag) {
+    if (rip.target >= snag.at + snag.give) {
+      snag.popped = true;
+      synth.playSnagPop(snag.at);
+      rip.vel += 2.6;                    // the weld lets go: the tear leaps
+    } else {
+      goal = snag.at;
+    }
+  }
+
+  // Slightly underdamped, so a pop overshoots a hair before settling.
+  rip.vel += (goal - rip.progress) * 190 * dt;
+  rip.vel *= Math.exp(-16 * dt);
+  applyRipProgress(rip.progress + rip.vel * dt);
+
+  // Strain: how hard the finger is pulling against whatever is holding on.
+  const strain = clamp01((rip.target - rip.progress) * 4);
+  const dir = state.ripDir || 1;
+  booster.style.setProperty('--strain', strain.toFixed(3));
+  booster.style.setProperty('--shear', (dir * strain * 2.2).toFixed(3));
+
+  const settled = !rip.dragging
+    && Math.abs(rip.vel) < 0.01 && Math.abs(goal - rip.progress) < 0.002;
+  if (!settled) rip.raf = requestAnimationFrame(ripFrame);
+}
+
+function startRipLoop() {
+  if (rip.raf) return;
+  rip.frameAt = 0;
+  rip.raf = requestAnimationFrame(ripFrame);
+}
+
+function stopRipLoop() {
+  if (rip.raf) cancelAnimationFrame(rip.raf);
+  rip.raf = 0;
+  rip.booster?.style.removeProperty('--strain');
+  rip.booster?.style.removeProperty('--shear');
 }
 
 function animateRip(from, to, duration) {
@@ -1184,11 +1306,29 @@ function lockRipDirection(dx) {
   if (rip.booster) rip.booster.dataset.ripDir = String(state.ripDir);
 }
 
+/**
+ * Every pack tears differently: a few weak welds along the seam, never in
+ * the same places. Kept clear of the start (the first pull should always
+ * bite) and of the commit point (the last stretch is a clean run).
+ */
+function rollSnags() {
+  const count = 3 + Math.floor(Math.random() * 3);
+  const lane = (0.55 - 0.1) / count;
+  return Array.from({ length: count }, (_, i) => ({
+    at: 0.1 + lane * (i + 0.2 + Math.random() * 0.6),
+    give: 0.045 + Math.random() * 0.035,
+    popped: false
+  }));
+}
+
 function initRip(booster) {
   endRipDrag();
+  stopRipLoop();
   rip.booster = booster;
   rip.zone = booster.querySelector('.rip-zone');
-  rip.progress = 0; rip.lastTick = 0; rip.done = false;
+  rip.progress = 0; rip.target = 0; rip.vel = 0;
+  rip.lastTick = 0; rip.done = false;
+  rip.snags = rollSnags();
   paintRip();
 
   const zone = rip.zone;
@@ -1208,17 +1348,24 @@ function initRip(booster) {
         if (!rip.dragging || Math.abs(dx) < RIP_LOCK_SLOP) return;
         lockRipDirection(dx);
         const span = Math.max(120, zone.getBoundingClientRect().width * 0.72);
-        setRip((dx * state.ripDir) / span);
+        rip.target = clamp01((dx * state.ripDir) / span);
+        startRipLoop();
       },
       onEnd: async () => {
         if (!rip.dragging) return;
         rip.dragging = false;
         rip.release = null;
+        stopRipLoop();
         booster.classList.remove('is-tearing');
-        if (rip.progress >= RIP_COMMIT) completeRip();
+        // The finger decides, not the lagging tear: if it was pulled past the
+        // commit point, the pack opens even while the spring is still catching
+        // up (or held on a snag it would have popped anyway).
+        if (rip.target >= RIP_COMMIT) completeRip();
         else if (rip.progress > 0.01) {
           await animateRip(rip.progress, 0, 300);
           synth.playRipTick(0.35);
+        } else {
+          setRip(0);
         }
       }
     });
@@ -1242,17 +1389,28 @@ function initRip(booster) {
 /** The torn-off piece, which tumbles away rather than fading out. */
 function dropScrap(booster) {
   const dir = state.ripDir || 1;
+  const stage = el.burstLayer.getBoundingClientRect();
+  const rect = booster.getBoundingClientRect();
   const scrap = document.createElement('div');
   scrap.className = 'tear-scrap';
+  // Spawned into the stage layer, not the bag: the bag's serrated clip-path
+  // would cut the scrap off the moment it left the silhouette.
+  scrap.style.left = `${rect.left - stage.left}px`;
+  scrap.style.top = `${rect.top - stage.top}px`;
+  scrap.style.width = `${rect.width}px`;
+  scrap.style.height = `${rect.height * 0.15}px`;
+  scrap.style.setProperty('--accent', styleForSpec(state.spec).accent);
+  scrap.style.setProperty('--holo', styleForSpec(state.spec).holo);
   scrap.style.setProperty('--drift', `${dir * (70 + Math.random() * 50)}px`);
   scrap.style.setProperty('--spin', `${dir * (150 + Math.random() * 120)}deg`);
-  booster.querySelector('.booster-body').appendChild(scrap);
+  el.burstLayer.appendChild(scrap);
   scrap.addEventListener('animationend', () => scrap.remove(), { once: true });
 }
 
 async function completeRip() {
   if (rip.done) return;
   rip.done = true;
+  stopRipLoop();
   const booster = rip.booster;
   await animateRip(rip.progress, 1, 220);
   synth.playRip();
@@ -1365,11 +1523,16 @@ async function runOpen(booster) {
   el.openHint.textContent = '';
   booster.classList.remove('is-idle');
 
+  // The eruption: snap, light column, the subject's own particles.
+  eruptPack(booster);
+  await wait(190);
+
   const count = state.spec.cards;
   state.cards = Array.from({ length: count }, (_, i) => buildPlaceholderCard(i, count));
   el.cardStack.replaceChildren(...state.cards);
   state.cards.forEach((card, i) => {
     card.style.setProperty('--spin', `${(Math.random() * 34 - 17).toFixed(1)}deg`);
+    card.style.setProperty('--sway', `${(Math.random() * 52 - 26).toFixed(0)}px`);
     card.style.animationDelay = `${i * EMERGE_STAGGER}ms`;
     card.classList.add('is-emerging');
     card.addEventListener('animationend', function done(event) {
@@ -1439,6 +1602,8 @@ async function runOpen(booster) {
 /* --- cards --------------------------------------------------------------------------------- */
 
 const CARD_FRONT_MARKUP = `
+  <div class="fx fx-a" aria-hidden="true"></div>
+  <div class="fx-c" aria-hidden="true"></div>
   <div class="card-art"></div>
   <button class="fav-button" type="button" aria-pressed="false"></button>
   <div class="card-body">
@@ -1448,8 +1613,8 @@ const CARD_FRONT_MARKUP = `
   </div>
   <div class="card-stats"><span class="card-price"></span><span class="card-views"></span></div>
   <div class="card-footer"><span class="rarity-badge"></span></div>
-  <div class="fx fx-a" aria-hidden="true"></div>
-  <div class="fx fx-b" aria-hidden="true"></div>`;
+  <div class="fx fx-b" aria-hidden="true"></div>
+  <div class="fx-ring" aria-hidden="true"></div>`;
 
 /**
  * A face-down card. The back takes the booster's colour and icon so a card
@@ -1466,8 +1631,14 @@ function buildPlaceholderCard(index, total) {
   card.innerHTML = `
     <div class="card-inner">
       <div class="card-face card-back">
-        <div class="back-art"></div>
+        <div class="back-field">
+          <div class="back-rays"></div>
+          <div class="back-dots"></div>
+        </div>
+        <div class="back-zip"></div>
+        <div class="back-burst">${iconSvg('burst', { size: 120 })}</div>
         <div class="back-icon">${iconSvg(specIcon(state.spec), { size: 52 })}</div>
+        <div class="back-word">WIKLODO</div>
       </div>
       <div class="card-face card-front">${CARD_FRONT_MARKUP}</div>
     </div>`;
@@ -1580,7 +1751,19 @@ async function revealCurrent() {
   if (isNew) {
     state.seen.add(state.index);
     synth.playReveal(rarityRank(pull.rarity.id));
-    if (pull.rarity.flash > 0) fireFlash(pull.rarity.flash);
+    if (pull.rarity.flash > 0) {
+      el.flash.style.setProperty('--flash-tint', pull.rarity.color);
+      fireFlash(pull.rarity.flash);
+    }
+    // Legendary and above: the card announces itself.
+    if (rarityRank(pull.rarity.id) >= 4) {
+      const stage = el.burstLayer.getBoundingClientRect();
+      const rect = card.getBoundingClientRect();
+      spawnBurst(rarityBurst(pull.rarity), {
+        x: rect.left + rect.width / 2 - stage.left,
+        y: rect.top + rect.height / 2 - stage.top
+      }, { scale: 0.8 + rarityRank(pull.rarity.id) * 0.16 });
+    }
   }
 
   if (state.seen.size >= state.pulls.length) {

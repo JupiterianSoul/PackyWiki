@@ -1,210 +1,313 @@
 /* ==========================================================================
-   THE BOOSTER
-   The foil pack itself, its art, and the rip that opens it. Proportions and
-   structure are shared; each theme re-skins the foil through the tokens.
+   THE BOOSTER — PRISM FOIL
+   A serrated mylar bag: metallic body in the subject's palette, the subject's
+   own pattern embossed into the foil, holographic interference bands drifting
+   over it, a photograph printed on the foil, and a foil-stamped name.
+
+   The structure is one design language; what changes per pack comes in
+   through four custom properties set by buildBooster():
+
+     --accent / --accent2   the palette
+     --foil                 the subject's embossed pattern (a background stack)
+     --holo                 the interference bands (angle varies per subject)
+
+   Layer order inside .booster-body (which carries the serrated clip):
+     .booster-foil   metal + pattern            (static)
+     .booster-mouth  the dark inside            (under the tear strip)
+     .booster-holo   interference bands         (drifts slowly)
+     .booster-crimp  pressed seals top & bottom
+     .booster-face   photo, name, count
+     .booster-shine  cylinder shading + travelling gloss
+     .booster-tear   the strip above the rip line (a copy of the foil; JS
+                     clips it away as the line is dragged)
    ========================================================================== */
 
-:root { --pack-w: clamp(180px, 56vw, 226px); --pack-h: calc(var(--pack-w) * 1.79); }
+:root {
+  --pack-w: clamp(180px, 56vw, 226px);
+  --pack-h: calc(var(--pack-w) * 1.79);
+  /* The serrated crimp edge, as a fraction of pack height. */
+  --serration: 2.4%;
+}
 
 .booster {
   position: relative;
   width: var(--pack-w);
   height: var(--pack-h);
   flex: none;
+  /* Type scales with the bag, so a shelf-tiny pack keeps its proportions
+     instead of overflowing its own name. */
+  font-size: var(--pack-w);
+}
+
+/* Ground shadow: box-shadow cannot follow a serrated clip-path, so the pack
+   floats over its own soft ellipse instead. */
+.booster::before {
+  content: '';
+  position: absolute;
+  left: 8%; right: 8%; bottom: -4%;
+  height: 9%;
+  border-radius: 50%;
+  background: radial-gradient(50% 50% at 50% 50%, rgba(0, 0, 0, 0.55), transparent 70%);
 }
 
 .booster-body {
   position: absolute;
   inset: 0;
-  border-radius: 7px;
-  overflow: hidden;
-  background:
-    linear-gradient(163deg,
-      color-mix(in srgb, var(--accent) 84%, #fff) 0%,
-      color-mix(in srgb, var(--accent) 70%, #000) 26%,
-      var(--accent2) 62%,
-      #0b0e18 100%);
-  box-shadow:
-    0 34px 60px -26px rgba(0, 0, 0, 0.95),
-    0 6px 16px -8px rgba(0, 0, 0, 0.8);
+  clip-path: polygon(
+    0 var(--serration), 2.5% 0, 5% var(--serration), 7.5% 0, 10% var(--serration),
+    12.5% 0, 15% var(--serration), 17.5% 0, 20% var(--serration), 22.5% 0,
+    25% var(--serration), 27.5% 0, 30% var(--serration), 32.5% 0, 35% var(--serration),
+    37.5% 0, 40% var(--serration), 42.5% 0, 45% var(--serration), 47.5% 0,
+    50% var(--serration), 52.5% 0, 55% var(--serration), 57.5% 0, 60% var(--serration),
+    62.5% 0, 65% var(--serration), 67.5% 0, 70% var(--serration), 72.5% 0,
+    75% var(--serration), 77.5% 0, 80% var(--serration), 82.5% 0, 85% var(--serration),
+    87.5% 0, 90% var(--serration), 92.5% 0, 95% var(--serration), 97.5% 0,
+    100% var(--serration),
+    100% calc(100% - var(--serration)), 97.5% 100%, 95% calc(100% - var(--serration)),
+    92.5% 100%, 90% calc(100% - var(--serration)), 87.5% 100%, 85% calc(100% - var(--serration)),
+    82.5% 100%, 80% calc(100% - var(--serration)), 77.5% 100%, 75% calc(100% - var(--serration)),
+    72.5% 100%, 70% calc(100% - var(--serration)), 67.5% 100%, 65% calc(100% - var(--serration)),
+    62.5% 100%, 60% calc(100% - var(--serration)), 57.5% 100%, 55% calc(100% - var(--serration)),
+    52.5% 100%, 50% calc(100% - var(--serration)), 47.5% 100%, 45% calc(100% - var(--serration)),
+    42.5% 100%, 40% calc(100% - var(--serration)), 37.5% 100%, 35% calc(100% - var(--serration)),
+    32.5% 100%, 30% calc(100% - var(--serration)), 27.5% 100%, 25% calc(100% - var(--serration)),
+    22.5% 100%, 20% calc(100% - var(--serration)), 17.5% 100%, 15% calc(100% - var(--serration)),
+    12.5% 100%, 10% calc(100% - var(--serration)), 7.5% 100%, 5% calc(100% - var(--serration)),
+    2.5% 100%, 0 calc(100% - var(--serration)));
 }
 
-/* Cylindrical shading: a foil pack is a tube, not a flat card. */
-.booster-body::before {
-  content: "";
+/* The metal and the subject's embossed pattern. `background` shorthand, not
+   background-image: pattern layers carry their own position/size. */
+.booster-foil {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg,
-    rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.16) 9%,
-    rgba(255, 255, 255, 0.14) 22%, rgba(255, 255, 255, 0) 42%,
-    rgba(0, 0, 0, 0) 66%, rgba(0, 0, 0, 0.26) 88%, rgba(0, 0, 0, 0.58) 100%);
-  pointer-events: none;
-}
-/* Slow travelling gloss. */
-.booster-body::after {
-  content: "";
-  position: absolute;
-  inset: -25%;
-  background: linear-gradient(102deg, transparent 38%, rgba(255, 255, 255, 0.3) 47%,
-    rgba(255, 255, 255, 0.04) 53%, transparent 64%);
-  animation: pack-gloss 6s ease-in-out infinite;
-  pointer-events: none;
-}
-@keyframes pack-gloss {
-  0%, 100% { transform: translateX(-30%); }
-  50% { transform: translateX(30%); }
+  background:
+    var(--foil, none),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.05) 0 1px, rgba(0,0,0,.06) 1px 3px),
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--accent) 46%, #10142a) 0%,
+      color-mix(in srgb, var(--accent) 27%, #0b0f20) 42%,
+      color-mix(in srgb, var(--accent2) 80%, #05070d) 100%);
 }
 
-/* Crimped seals, top and bottom, with a scalloped outer edge. */
+/* The interference bands. They drift, slowly, like light moving on mylar. */
+.booster-holo {
+  position: absolute;
+  inset: -12%;
+  background: var(--holo, none);
+  mix-blend-mode: screen;
+  opacity: 0.5;
+  animation: holo-drift 9s ease-in-out infinite alternate;
+}
+@keyframes holo-drift {
+  from { transform: translate(-3.5%, -2%); }
+  to   { transform: translate(3.5%, 2%); }
+}
+
+/* Pressed crimp seals. */
 .booster-crimp {
   position: absolute;
   left: 0; right: 0;
-  height: 17px;
+  height: 6.2%;
   z-index: 4;
-  background:
-    repeating-linear-gradient(90deg,
-      rgba(255, 255, 255, 0.34) 0 2px,
-      rgba(0, 0, 0, 0.3) 2px 5px);
-  opacity: 0.9;
+  background: repeating-linear-gradient(90deg,
+    rgba(255, 255, 255, 0.30) 0 2px, rgba(0, 0, 0, 0.28) 2px 5px);
+  mix-blend-mode: overlay;
 }
-.booster-crimp.is-top {
-  top: 0;
-  -webkit-mask: radial-gradient(circle 5px at 50% 100%, transparent 98%, #000) 0 0 / 10px 100% repeat-x;
-  mask: radial-gradient(circle 5px at 50% 100%, transparent 98%, #000) 0 0 / 10px 100% repeat-x;
-}
-.booster-crimp.is-bottom {
-  bottom: 0;
-  -webkit-mask: radial-gradient(circle 5px at 50% 0%, transparent 98%, #000) 0 0 / 10px 100% repeat-x;
-  mask: radial-gradient(circle 5px at 50% 0%, transparent 98%, #000) 0 0 / 10px 100% repeat-x;
-}
+.booster-crimp.is-top { top: 0; box-shadow: 0 1px 0 rgba(255,255,255,.14); }
+.booster-crimp.is-bottom { bottom: 0; box-shadow: 0 -1px 0 rgba(255,255,255,.14); }
+
+/* --- the face -------------------------------------------------------------- */
 
 .booster-face {
   position: absolute;
-  /* Starts just under the tear strip (15%): with the logo gone the photo can
-     sit higher and take more of the pack. */
-  inset: 17% 0 18px;
+  inset: 17% 0 7%;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 6px 15px 0;
+  padding: 0 7.5%;
 }
 
-/* Real photograph, not a symbol. */
+/* The photograph, printed straight onto the foil: no frame box — it fades out
+   into the metal on every side, and the holo bands pass over it. */
 .booster-photo {
   position: relative;
   width: 100%;
   flex: 1;
   min-height: 0;
-  border-radius: 5px;
   overflow: hidden;
-  background: linear-gradient(160deg, rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.72));
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3), 0 8px 20px -10px #000;
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 84%, transparent 100%);
+  mask-image: linear-gradient(180deg, transparent 0, #000 9%, #000 84%, transparent 100%);
 }
 .booster-photo img {
   width: 100%; height: 100%;
   object-fit: cover;
   display: block;
 }
+/* Printed-on-foil: the pack's own colour breathes through the ink. */
 .booster-photo::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.5));
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--accent2) 55%, transparent) 0%,
+      transparent 30% 62%, color-mix(in srgb, var(--accent2) 70%, transparent) 100%),
+    repeating-linear-gradient(90deg, rgba(255,255,255,.04) 0 1px, transparent 1px 3px);
+  mix-blend-mode: normal;
 }
 .booster-photo-fallback {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  color: rgba(255, 255, 255, 0.55);
+  color: rgba(255, 255, 255, 0.5);
+}
+.booster-photo-fallback svg { width: 34%; height: 34%; }
+
+/* Foil-stamped name: metallic gradient text tinted by the pack itself. */
+.booster-name {
+  flex: none;
+  max-width: 100%;
+  margin-top: 0.02em;
+  text-align: center;
+  font-size: 0.104em;
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  background: linear-gradient(100deg,
+    color-mix(in srgb, var(--accent) 30%, #dfe8ff) 12%,
+    #ffffff 36%,
+    color-mix(in srgb, var(--accent) 55%, #cfe0ff) 55%,
+    color-mix(in srgb, var(--accent) 20%, #f2e9ff) 82%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0.014em 0.02em rgba(0, 0, 0, 0.75));
 }
 
-.booster-banner {
-  position: relative;
-  width: calc(100% + 12px);
-  flex: none;
-  padding: 7px 10px;
-  text-align: center;
-  background: linear-gradient(180deg, rgba(6, 8, 14, 0.9), rgba(6, 8, 14, 0.72));
-  border-top: 1px solid rgba(255, 255, 255, 0.28);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.16);
-  box-shadow: 0 6px 16px -8px #000;
-}
-.booster-name {
-  display: block;
-  font-size: 1.02rem;
-  font-weight: 800;
-  letter-spacing: 0.01em;
-  line-height: 1.15;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.9);
-}
 .booster-count {
   flex: none;
-  font-size: 0.63rem;
+  margin-top: 0.045em;
+  font-size: 0.052em;
   font-weight: 800;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
   text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.78);
-  padding: 3px 11px;
+  color: rgba(255, 255, 255, 0.82);
+  padding: 0.5em 1.6em;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  background: rgba(0, 0, 0, 0.32);
 }
 
-/* --- the tear strip ------------------------------------------------------ */
-/* Everything above the rip line. JS clips it as the line is dragged. */
+/* Cylinder shading + travelling gloss, above everything on the face. */
+.booster-shine {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.15) 9%,
+    rgba(255, 255, 255, 0.07) 22%, rgba(255, 255, 255, 0) 42%,
+    rgba(0, 0, 0, 0) 66%, rgba(0, 0, 0, 0.24) 88%, rgba(0, 0, 0, 0.55) 100%);
+}
+.booster-shine::after {
+  content: "";
+  position: absolute;
+  inset: -25%;
+  background: linear-gradient(104deg, transparent 38%, rgba(255, 255, 255, 0.16) 47%,
+    rgba(190, 220, 255, 0.07) 53%, transparent 63%);
+  animation: pack-gloss 6.5s ease-in-out infinite;
+}
+@keyframes pack-gloss {
+  0%, 100% { transform: translateX(-30%); }
+  50% { transform: translateX(30%); }
+}
+
+/* ==========================================================================
+   THE RIP
+   The strip above the line is a copy of the foil. Dragging clips it away,
+   showing the dark mouth and the cards' shoulders waiting inside.
+   ========================================================================== */
+
 .booster-tear {
   position: absolute;
   inset: 0 0 auto 0;
   height: 15%;
   z-index: 5;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.03)),
-    linear-gradient(163deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent2));
+    linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.02)),
+    var(--holo, none),
+    var(--foil, none),
+    linear-gradient(168deg,
+      color-mix(in srgb, var(--accent) 46%, #10142a) 0%,
+      color-mix(in srgb, var(--accent) 30%, #0b0f20) 100%);
 }
+/* Its own crimp, and a torn micro-serration along its bottom edge. */
 .booster-tear::before {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0;
-  height: 17px;
+  height: 41%;
   background: repeating-linear-gradient(90deg,
-    rgba(255, 255, 255, 0.34) 0 2px, rgba(0, 0, 0, 0.3) 2px 5px);
-  opacity: 0.9;
-  -webkit-mask: radial-gradient(circle 5px at 50% 100%, transparent 98%, #000) 0 0 / 10px 100% repeat-x;
-  mask: radial-gradient(circle 5px at 50% 100%, transparent 98%, #000) 0 0 / 10px 100% repeat-x;
+    rgba(255, 255, 255, 0.30) 0 2px, rgba(0, 0, 0, 0.28) 2px 5px);
+  mix-blend-mode: overlay;
 }
 .booster-tear::after {
   content: "";
   position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 4px;
-  background: repeating-linear-gradient(90deg,
-    rgba(255, 255, 255, 0.6) 0 5px, transparent 5px 10px);
+  left: 0; right: 0; bottom: -1px;
+  height: 5px;
+  background: rgba(255, 255, 255, 0.75);
+  clip-path: polygon(0 100%, 3% 20%, 7% 90%, 11% 10%, 16% 80%, 21% 25%, 26% 95%,
+    31% 15%, 36% 75%, 41% 30%, 46% 100%, 51% 20%, 56% 85%, 61% 10%, 66% 90%,
+    71% 30%, 76% 100%, 81% 15%, 86% 80%, 91% 25%, 95% 95%, 100% 40%,
+    100% 100%, 0 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
 }
+.booster.is-tearing .booster-tear::after { opacity: 1; }
 
-/* The mouth of the pack, revealed as the strip comes away. */
+/* The mouth: dark inside, torn foil remnant along its lip, the cards waiting. */
 .booster-mouth {
   position: absolute;
   inset: 0 0 auto 0;
   height: 15%;
   z-index: 3;
-  background: linear-gradient(180deg, #04050a, #0a0e18 60%, #141a2e);
+  background: linear-gradient(180deg, #04050a, #0a0e18 60%, #131829);
   box-shadow: inset 0 -12px 18px -10px #000;
 }
+.booster-mouth::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: color-mix(in srgb, var(--accent) 55%, #fff);
+  clip-path: polygon(0 0, 4% 70%, 9% 10%, 14% 85%, 19% 25%, 24% 95%, 29% 15%,
+    34% 70%, 39% 20%, 44% 90%, 49% 30%, 54% 100%, 59% 20%, 64% 80%, 69% 10%,
+    74% 90%, 79% 35%, 84% 95%, 89% 15%, 94% 75%, 100% 30%, 100% 0);
+  opacity: 0.8;
+}
+/* The shoulders of the cards inside. */
 .booster-mouth::after {
   content: "";
   position: absolute;
-  left: 11%; right: 11%; bottom: 0;
+  left: 12%; right: 12%; bottom: 0;
   height: 52%;
   border-radius: 4px 4px 0 0;
-  background: linear-gradient(180deg, #3b4570, #1b2038);
+  background: linear-gradient(180deg, #46507e, #1b2038);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4),
-    -8px 3px 0 -3px #2a3152, 8px 3px 0 -3px #2a3152;
+    -8px 3px 0 -3px #2c3358, 8px 3px 0 -3px #2c3358;
 }
 
-/* The rip line and its drag zone. No pull-tab: the line IS the control. */
+/* The rip line and its drag zone. The line IS the control. */
 .rip-zone {
   position: absolute;
   top: 15%;
@@ -218,16 +321,30 @@
 .rip-line {
   position: absolute;
   top: 50%;
-  transition: clip-path 0s;
-  left: 5%; right: 5%;
+  left: 4%; right: 4%;
   height: 2px;
   margin-top: -1px;
   background: repeating-linear-gradient(90deg,
-    rgba(255, 255, 255, 0.75) 0 6px, rgba(255, 255, 255, 0.08) 6px 12px);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.35);
+    rgba(255, 255, 255, 0.8) 0 6px, rgba(255, 255, 255, 0.1) 6px 12px);
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
 }
-/* Notches marking where to grab. The unused side is dropped once the player
-   has chosen a direction. */
+/* An invitation: a glint runs the line while the pack waits. */
+.booster.is-idle .rip-line::after {
+  content: '';
+  position: absolute;
+  inset: -2px -8px;
+  background: linear-gradient(90deg, transparent 20%, #fff 50%, transparent 80%);
+  background-size: 34% 100%;
+  background-repeat: no-repeat;
+  mix-blend-mode: screen;
+  animation: rip-glint 2.8s ease-in-out infinite;
+}
+@keyframes rip-glint {
+  0%, 20% { background-position: -40% 0; opacity: 0; }
+  35% { opacity: 1; }
+  60%, 100% { background-position: 140% 0; opacity: 0; }
+}
+
 .rip-grip {
   position: absolute;
   top: 50%;
@@ -252,7 +369,7 @@
 .booster.is-tearing .rip-grip { animation: none; }
 .booster.is-open .rip-zone, .booster.is-open .rip-line { opacity: 0; pointer-events: none; }
 
-/* Glowing edge where the foil is currently parting. */
+/* The glowing edge where the foil is parting, plus a crinkle bloom around it. */
 .rip-front {
   position: absolute;
   top: 0;
@@ -266,18 +383,48 @@
   filter: blur(2px);
   transition: opacity 0.15s ease;
 }
+.rip-front::after {
+  content: '';
+  position: absolute;
+  inset: -14px -22px;
+  background: radial-gradient(closest-side, rgba(255, 255, 255, 0.5), transparent 70%);
+  animation: crinkle 0.12s steps(2) infinite;
+}
+@keyframes crinkle {
+  0% { opacity: 0.4; transform: scale(0.9); }
+  100% { opacity: 0.9; transform: scale(1.1); }
+}
 
-/* The torn-off scrap, which falls away rather than fading out. */
+/* The pack answers the hand: JS drives --shear (deg) and --strain (0..1)
+   while the finger pulls. */
+.booster.is-tearing {
+  animation: none;
+  transform: rotate(calc(var(--shear, 0) * 1deg))
+             translateY(calc(var(--strain, 0) * -3px));
+}
+/* Pulling against a snag stresses the foil: it catches more light. */
+.booster.is-tearing .booster-foil {
+  filter: brightness(calc(1 + var(--strain, 0) * 0.3));
+}
+.booster.is-tearing .booster-holo {
+  opacity: calc(0.5 + var(--strain, 0) * 0.25);
+}
+
+/* The torn-off strip: same foil, serrated lower edge, tumbling away. */
 .tear-scrap {
   position: absolute;
   z-index: 9;
-  border-radius: 2px;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.04)),
-    linear-gradient(163deg, color-mix(in srgb, var(--accent) 78%, #fff), var(--accent2));
-  box-shadow: 0 8px 20px -8px rgba(0, 0, 0, 0.9);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.05)),
+    var(--holo, none),
+    linear-gradient(168deg, color-mix(in srgb, var(--accent) 46%, #10142a),
+      color-mix(in srgb, var(--accent) 30%, #0b0f20));
+  clip-path: polygon(0 0, 100% 0, 100% 78%, 96% 100%, 92% 74%, 87% 96%, 82% 70%,
+    77% 100%, 72% 76%, 67% 94%, 62% 72%, 57% 100%, 52% 78%, 47% 92%, 42% 70%,
+    37% 98%, 32% 74%, 27% 96%, 22% 72%, 17% 100%, 12% 76%, 7% 92%, 3% 72%, 0 88%);
+  filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.6));
   pointer-events: none;
-  animation: scrap-fall 1.15s var(--gravity) forwards;
+  animation: scrap-fall 1.15s var(--gravity, cubic-bezier(0.5, 0, 0.9, 0.4)) forwards;
 }
 @keyframes scrap-fall {
   0%   { transform: translate(0, 0) rotate(0deg); opacity: 1; }
@@ -285,44 +432,131 @@
   100% { transform: translate(var(--drift), 460px) rotate(var(--spin)); opacity: 0; }
 }
 
-/* The pack sinks away once the cards are out. */
-.booster.is-leaving { animation: pack-leave 0.85s var(--ease-out) forwards; }
-@keyframes pack-leave {
-  0%   { transform: translateY(0) scale(1); opacity: 1; }
-  30%  { transform: translateY(-10px) scale(1.02); }
-  100% { transform: translateY(190px) scale(0.86); opacity: 0; }
-}
+/* ==========================================================================
+   THE OPENING — anticipation, burst, emergence
+   ========================================================================== */
 
 .booster.is-idle { animation: pack-float 5.5s ease-in-out infinite; }
 @keyframes pack-float {
   0%, 100% { transform: translateY(0) rotate(-0.8deg); }
   50% { transform: translateY(-14px) rotate(0.8deg); }
 }
-.booster.is-tearing { animation: none; }
 
-
-/* --- per-theme skins ------------------------------------------------------- */
-/* The pack is the same object everywhere; each theme changes what it is made
-   of. Paper prints it, Arcade back-lights it, Noir lets one light fall on it. */
-
-[data-theme='paper'] .booster-body {
-  border-radius: var(--radius-sm);
-  border: 2px solid var(--line);
-  box-shadow: var(--surface-shadow);
+/* The half-beat between the tear completing and the cards: the bag snaps. */
+.booster.is-bursting { animation: pack-burst 0.42s var(--ease-pop, ease-out); }
+@keyframes pack-burst {
+  0%   { transform: scale(1) rotate(0); }
+  30%  { transform: scale(1.06, 0.96) rotate(-1.2deg); }
+  55%  { transform: scale(0.97, 1.05) rotate(0.8deg); }
+  100% { transform: scale(1); }
 }
-[data-theme='paper'] .booster-face { mix-blend-mode: normal; }
-[data-theme='paper'] .booster-name { color: #fffdf7; }
 
-[data-theme='arcade'] .booster-body {
-  border-radius: 0;
-  border: 2px solid var(--accent);
-  box-shadow: var(--surface-shadow);
+/* Light erupting from the mouth. Spawned by JS at burst time. */
+.mouth-beam {
+  position: absolute;
+  z-index: 8;
+  pointer-events: none;
+  background: linear-gradient(0deg,
+    color-mix(in srgb, var(--accent, #fff) 75%, #fff),
+    color-mix(in srgb, var(--accent, #fff) 25%, #fff) 45%,
+    transparent);
+  filter: blur(6px);
+  mix-blend-mode: screen;
+  transform-origin: 50% 100%;
+  animation: beam-up 0.9s ease-out forwards;
 }
-[data-theme='arcade'] .booster-banner { border-radius: 0; }
-[data-theme='arcade'] .booster-count { border-radius: 0; }
+@keyframes beam-up {
+  0%   { opacity: 0; transform: scaleY(0.1) scaleX(0.6); }
+  22%  { opacity: 0.95; transform: scaleY(1.05) scaleX(1); }
+  100% { opacity: 0; transform: scaleY(1.4) scaleX(1.6); }
+}
 
-[data-theme='noir'] .booster-body { border-radius: var(--radius); filter: saturate(0.25) contrast(1.1); }
+.booster.is-leaving { animation: pack-leave 0.85s var(--ease) forwards; }
+@keyframes pack-leave {
+  0%   { transform: translateY(0) scale(1); opacity: 1; }
+  30%  { transform: translateY(-10px) scale(1.02); }
+  100% { transform: translateY(190px) scale(0.86); opacity: 0; }
+}
+
+/* --- the particles ----------------------------------------------------------
+ * One layer over the stage; JS spawns ~24 elements per burst, each driven
+ * entirely by custom properties, so one keyframe serves every subject's
+ * particle language. --dx/--dy: flight vector; --g: how far gravity drags the
+ * tail of the flight down; --rot: total spin.
+ */
+.burst-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  pointer-events: none;
+  overflow: hidden;
+}
+.pcl {
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  width: calc(var(--size, 10) * 1px);
+  height: calc(var(--size, 10) * 1px);
+  color: var(--c, #fff);
+  animation: pcl-fly var(--dur, 1s) cubic-bezier(0.16, 0.6, 0.4, 1) var(--delay, 0s) forwards;
+  opacity: 0;
+  will-change: transform, opacity;
+}
+@keyframes pcl-fly {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.4) rotate(0deg);
+  }
+  8% { opacity: 1; }
+  60% {
+    opacity: 1;
+    transform: translate(calc(-50% + var(--dx) * 0.8), calc(-50% + var(--dy) * 0.8 + var(--g) * 0.25))
+      scale(1) rotate(calc(var(--rot) * 0.7));
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy) + var(--g)))
+      scale(0.7) rotate(var(--rot));
+  }
+}
+
+/* Shapes. Drawn with backgrounds and clip-paths; colour comes from --c. */
+.pcl-orb    { border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff, var(--c) 55%, transparent 75%); }
+.pcl-ring   { border-radius: 50%; border: 2px solid var(--c); background: none; }
+.pcl-shard  { background: linear-gradient(160deg, #fff, var(--c)); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.pcl-spike  { background: linear-gradient(0deg, var(--c), #fff); clip-path: polygon(50% 0, 82% 100%, 18% 100%); height: calc(var(--size, 10) * 2.4px) !important; }
+.pcl-square { background: var(--c); }
+.pcl-square-alt { background: linear-gradient(135deg, #fff 0 50%, var(--c) 50% 100%); }
+.pcl-page   { background: linear-gradient(100deg, #fff, var(--c)); width: calc(var(--size, 10) * 0.8px) !important; height: calc(var(--size, 10) * 1.3px) !important; }
+.pcl-frame  { background: var(--c); box-shadow: inset 0 0 0 2px rgba(0,0,0,0.55); }
+.pcl-streak { background: linear-gradient(90deg, transparent, #fff, var(--c)); height: 3px !important; width: calc(var(--size, 10) * 2.6px) !important; border-radius: 2px; }
+.pcl-star4  { background: var(--c); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); }
+.pcl-star5  { background: var(--c); clip-path: polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%); }
+.pcl-petal  { background: linear-gradient(50deg, var(--c), #fff); border-radius: 80% 0 80% 0; }
+.pcl-blob   { background: var(--c); border-radius: 46% 54% 52% 48% / 52% 46% 54% 48%; }
+.pcl-comma  { background: var(--c); border-radius: 50% 50% 50% 4%; }
+
+/* ==========================================================================
+   APP THEMES — the same bag under four lights
+   ========================================================================== */
+
+[data-theme='paper'] .booster { filter: saturate(0.92); }
+[data-theme='paper'] .booster-holo { opacity: 0.55; }
+
+[data-theme='arcade'] .booster {
+  filter: saturate(1.25) drop-shadow(0 0 14px color-mix(in srgb, var(--accent) 40%, transparent));
+}
+
+[data-theme='noir'] .booster { filter: saturate(0.3) contrast(1.12); }
 [data-theme='noir'] .booster-photo img { filter: grayscale(1) contrast(1.15); }
+[data-theme='noir'] .booster-holo { opacity: 0.4; }
+
+/* Battery saver: the bag holds still. */
+html[data-lowpower='1'] .booster-holo,
+html[data-lowpower='1'] .booster-shine::after,
+html[data-lowpower='1'] .rip-line::after,
+html[data-lowpower='1'] .rip-front::after,
+html[data-lowpower='1'] .rip-grip { animation: none !important; }
 
 /* Sizes used around the app. */
 .booster.is-small { --pack-w: 128px; --pack-h: 229px; }

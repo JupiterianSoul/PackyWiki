@@ -386,6 +386,22 @@ class Synth {
     });
   }
 
+  /**
+   * A snag in the foil letting go — the weld the tear was caught on popping
+   * loose. Louder and snappier than a tick, so the catch-and-release of the
+   * drag reads through the speaker as well as the finger.
+   */
+  playSnagPop(progress = 0) {
+    if (!this.#ready()) return;
+    const p = clamp(progress, 0, 1);
+    this.#transient(0.09);
+    this.#noise({
+      dur: 0.09, gain: 0.2, type: 'bandpass',
+      from: 2600 + p * 1800, to: 700, q: 2.2
+    });
+    this.#noise({ at: 0.015, dur: 0.06, gain: 0.08, type: 'highpass', from: 4500, to: 7000 });
+  }
+
   /** The foil giving way. */
   playRip() {
     if (!this.#ready()) return;

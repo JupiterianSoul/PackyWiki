@@ -20,6 +20,7 @@
 import { THEME_PACKS, themeById } from './data/packs.js';
 import { rarityById, rarityRank } from './data/rarities.js';
 import { tx, t, getLanguage } from './i18n.js';
+import { proceduralStyle, customSeed } from './packstyle.js';
 
 /** Colour used for open boosters, which belong to no subject. */
 const OPEN_ACCENT = { accent: '#94a3b8', accent2: '#334155' };
@@ -65,11 +66,17 @@ export function specTagline(spec) {
 /**
  * Colours. A rarity booster keeps its subject's colours and wears the rarity
  * as an effect on top; a pure rarity booster has nothing else to go on, so it
- * takes the tier's own colour.
+ * takes the tier's own colour. A custom pack's palette is PROCEDURAL — derived
+ * from its wiki's identity by src/packstyle.js — so the accents stored on old
+ * packs are ignored: every custom pack owns its own colours now, and they
+ * regenerate identically on every device.
  */
 export function specColours(spec) {
   if (spec.kind === 'timed') return { accent: '#38bdf8', accent2: '#0c4a6e' };
-  if (spec.kind === 'custom') return { accent: spec.accent ?? '#a78bfa', accent2: spec.accent2 ?? '#4c1d95' };
+  if (spec.kind === 'custom') {
+    const style = proceduralStyle(customSeed(spec));
+    return { accent: style.accent, accent2: style.accent2 };
+  }
   const theme = themeById(spec.themeId);
   if (theme) return { accent: theme.accent, accent2: theme.accent2 };
   if (spec.rarityId) {

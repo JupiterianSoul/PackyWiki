@@ -693,7 +693,9 @@
   z-index: 350;
   pointer-events: none;
   opacity: 0;
-  background: radial-gradient(circle at 50% 45%, #fff, rgba(255, 255, 255, 0) 62%);
+  background: radial-gradient(circle at 50% 45%,
+    color-mix(in srgb, var(--flash-tint, #fff) 55%, #fff),
+    transparent 62%);
 }
 #flash.is-firing { animation: flash calc(620ms * var(--motion-scale)) ease-out; }
 @keyframes flash {
