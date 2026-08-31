@@ -581,6 +581,17 @@ async function drawCustomCard(pack, seen) {
   throw new Error(`No usable page found on ${wiki.sitename}`);
 }
 
+/** The article's full plain text (lead and body), for the quiz. */
+export async function fetchArticleText(title, { limit = 7000 } = {}) {
+  const params = new URLSearchParams({
+    action: 'query', titles: title, prop: 'extracts', explaintext: '1',
+    exsectionformat: 'plain', format: 'json', origin: '*'
+  });
+  const pages = (await fetchJson(`${ACTION()}?${params}`))?.query?.pages ?? {};
+  const page = Object.values(pages)[0];
+  return String(page?.extract ?? '').slice(0, limit);
+}
+
 /* --- public API ---------------------------------------------------------- */
 
 /**

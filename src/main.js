@@ -21,7 +21,7 @@
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
 import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityThresholds } from './data/rarities.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
-import { drawArticles, resolveCustomWiki } from './wiki.js';
+import { drawArticles, resolveCustomWiki, fetchArticleText } from './wiki.js';
 import {
   priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS,
   popularityFromViews, popularityFromWordCount
@@ -55,6 +55,8 @@ import * as account from './account.js';
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsCompleted, fetchAlbumTotal, CARDS_PER_PAGE, CARDS_PER_SPREAD } from './albums.js';
+import { RELEASES } from './data/releases.js';
+import { groqKey, saveGroqKey, buildQuiz, questionCountFor, quizRewards } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { proceduralStyle } from './packstyle.js';
@@ -140,7 +142,8 @@ bind({
     packs: $('#screen-packs'), timed: $('#screen-timed'), shop: $('#screen-shop'),
     binder: $('#screen-binder'), profile: $('#screen-profile'),
     settings: $('#screen-settings'), friends: $('#screen-friends'),
-    friend: $('#screen-friend'), chat: $('#screen-chat'), ach: $('#screen-ach'), open: $('#screen-open')
+    friend: $('#screen-friend'), chat: $('#screen-chat'), ach: $('#screen-ach'),
+    updates: $('#screen-updates'), quiz: $('#screen-quiz'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
@@ -151,6 +154,8 @@ bind({
 
   drawer: $('#drawer'), drawerScrim: $('#drawer .drawer-scrim'), drawerPanel: $('#drawer .drawer-panel'),
   drawerMark: $('#drawer-mark'), drawerWho: $('#drawer-who'), drawerLinks: $('#drawer-links'),
+  updatesTitle: $('#updates-title'), updatesSub: $('#updates-sub'), updatesList: $('#updates-list'),
+  quizTitle: $('#quiz-title'), quizBody: $('#quiz-body'),
   splash: $('#splash'), splashMark: $('#splash-mark'),
 
   packsSeg: $('#packs-seg'), packsRail: $('#packs-rail'), packsCaption: $('#packs-caption'),
@@ -347,7 +352,7 @@ function showScreen(name) {
  * Profile, so the bottom bar stays at five.
  */
 const navTabFor = (screen) =>
-  (['settings', 'friends', 'friend', 'chat', 'ach'].includes(screen) ? 'profile' : screen);
+  (['settings', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -392,6 +397,7 @@ function drawerItems() {
     { id: 'ach',    icon: 'trophy',     key: 'achTitle',
       badge: () => achRedeemableCount(),
       run: go('ach', renderAchievements) },
+    { id: 'quiz',   icon: 'quiz',       key: 'tabQuiz',        run: go('quiz', renderQuiz) },
     { sep: true },
     ...(account.configured
       ? [{ id: 'friends', icon: 'friends', key: 'tabFriends',
@@ -399,6 +405,7 @@ function drawerItems() {
            run: go('friends', () => { renderFriends(); loadFriends(); }) }]
       : []),
     { id: 'profile',  icon: 'profile',  key: 'tabProfile',  run: go('profile', renderProfile) },
+    { id: 'updates',  icon: 'spark',    key: 'tabUpdates',  run: go('updates', renderUpdates) },
     { id: 'settings', icon: 'settings', key: 'tabSettings', run: go('settings', renderSettings) }
   ];
 }
@@ -4033,6 +4040,315 @@ function openFriendAlbum(entry, album) {
   });
 }
 
+/* --- the updates timeline ------------------------------------------------------------------------- */
+
+/**
+ * Every release since the first, newest on top, no dates: the order is the
+ * story. Content lives in src/data/releases.js, bilingual.
+ */
+function renderUpdates() {
+  el.updatesTitle.textContent = t('tabUpdates');
+  el.updatesSub.textContent = t('updatesIntro');
+  const list = [...RELEASES].reverse();
+  el.updatesList.replaceChildren(...list.map((release, i) => {
+    const item = document.createElement('div');
+    item.className = 'tl-item';
+    item.style.setProperty('--tl', release.accent);
+    item.innerHTML = `
+      <span class="tl-node">${iconSvg(release.icon, { size: 16 })}</span>
+      <div class="tl-head"><h3></h3>${i === 0 ? '<span class="tl-latest"></span>' : ''}</div>
+      <ul class="tl-points"></ul>`;
+    item.querySelector('h3').textContent = tx(release.title);
+    if (i === 0) item.querySelector('.tl-latest').textContent = t('updatesLatest');
+    item.querySelector('.tl-points').replaceChildren(...release.points.map((point) => {
+      const li = document.createElement('li');
+      li.textContent = tx(point);
+      return li;
+    }));
+    return item;
+  }));
+  reveal(el.updatesList.children, { step: 50 });
+}
+
+/* --- the quiz ------------------------------------------------------------------------------------- */
+
+/*
+ * One subject, one card you probably do not own, three to five questions
+ * written on the spot from the article's own text, and a reward ladder that
+ * tops out at the card, big money and a Rare booster. No feedback until the
+ * end: the recap is where you learn what was right.
+ */
+
+function resetQuiz() {
+  state.quiz = { step: groqKey() ? 'pick' : 'nokey' };
+}
+
+/** The quiz card as a collection-shaped entry (bare = no article text). */
+function quizEntry(q, { bare = false } = {}) {
+  const spec = { kind: 'theme', themeId: q.themeId, rarityId: null, cards: 1 };
+  return {
+    key: q.card.key, title: q.card.title,
+    description: bare ? '' : (q.card.description ?? ''),
+    extract: bare ? '' : (q.card.extract ?? ''),
+    thumbnail: q.card.thumbnail, url: q.card.url, lang: q.card.lang,
+    sourceId: q.card.sourceId, sourceName: q.card.sourceName,
+    views: q.card.views, popularity: q.card.popularity,
+    rarityId: q.rarity.id, price: priceFor(q.card.popularity, q.rarity),
+    packId: specId(spec), packName: specName(spec), packIcon: specIcon(spec),
+    packAccent: specColours(spec).accent,
+    count: 1, favorite: false, firstPulledAt: Date.now(), lastPulledAt: Date.now()
+  };
+}
+
+async function startQuiz(themeId) {
+  const q = state.quiz = { step: 'draw', themeId };
+  renderQuiz();
+  try {
+    const spec = { kind: 'theme', themeId, rarityId: null, cards: 1 };
+    let article = null;
+    // Prefer a card the player does NOT own; three draws, then take what came.
+    for (let i = 0; i < 3; i++) {
+      const [drawn] = await drawArticles(toDrawPack(spec));
+      article = drawn;
+      if (!state.collection.entries[drawn.key]) break;
+    }
+    if (state.quiz !== q) return;
+    q.card = article;
+    q.rarity = rarityFromPopularity(article.popularity);
+    q.count = questionCountFor(q.rarity.id);
+    q.step = 'preview';
+    renderQuiz();
+  } catch {
+    if (state.quiz !== q) return;
+    toast(t('quizFailed'), 'error');
+    synth.playDenied();
+    resetQuiz();
+    renderQuiz();
+  }
+}
+
+async function beginQuizQuestions() {
+  const q = state.quiz;
+  q.step = 'writing';
+  renderQuiz();
+  try {
+    const text = await fetchArticleText(q.card.title).catch(() => '');
+    const questions = await buildQuiz({
+      title: q.card.title,
+      text: text || q.card.extract,
+      rarityId: q.rarity.id,
+      apiKey: groqKey()
+    });
+    if (state.quiz !== q) return;
+    q.questions = questions;
+    q.index = 0;
+    q.answers = [];
+    q.step = 'ask';
+    renderQuiz();
+  } catch (err) {
+    if (state.quiz !== q) return;
+    toast(err?.message === 'QUIZ_KEY' ? t('quizKeyBad') : t('quizFailed'), 'error');
+    synth.playDenied();
+    q.step = 'preview';
+    renderQuiz();
+  }
+}
+
+function answerQuiz(choice) {
+  const q = state.quiz;
+  if (q.step !== 'ask') return;
+  q.answers.push(choice);
+  synth.playTap();
+  if (q.answers.length >= q.questions.length) return finishQuiz();
+  q.index += 1;
+  renderQuiz();
+}
+
+function finishQuiz() {
+  const q = state.quiz;
+  q.correct = q.answers.filter((a, i) => a === q.questions[i].answer).length;
+  q.rewards = quizRewards(q.correct, q.themeId);
+  if (q.rewards.money > 0) {
+    store.saveWallet(store.loadWallet() + q.rewards.money);
+    refreshWallet();
+  }
+  if (q.rewards.card) store.receiveCardEntry(state.collection, quizEntry(q));
+  if (q.rewards.booster) {
+    store.addBooster(state.inventory, q.rewards.booster, 1);
+    renderPacks();
+  }
+  updateBadges();
+  if (q.correct >= 2) synth.playFanfare(); else synth.playResolved();
+  q.step = 'done';
+  renderQuiz();
+}
+
+function renderQuiz() {
+  // A finished quiz starts over on the next visit; a missing key un-blocks
+  // itself the moment one is saved in Settings.
+  if (!state.quiz || state.quiz.step === 'done' && state.tab !== 'quiz') resetQuiz();
+  if (state.quiz.step === 'nokey' && groqKey()) resetQuiz();
+  el.quizTitle.textContent = t('tabQuiz');
+  const q = state.quiz;
+  const body = el.quizBody;
+  const div = (cls, html = '') => {
+    const node = document.createElement('div');
+    node.className = cls;
+    if (html) node.innerHTML = html;
+    return node;
+  };
+
+  if (q.step === 'nokey') {
+    const box = div('quiz-stage');
+    box.innerHTML = `<span class="quiz-bigicon">${iconSvg('quiz', { size: 46 })}</span><p class="quiz-note"></p>`;
+    box.querySelector('.quiz-note').textContent = t('quizNoKey');
+    const go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'btn btn-primary';
+    go.textContent = t('quizGoSettings');
+    press(go, { sound: null });
+    go.addEventListener('click', () => { synth.playTap(); renderSettings(); showScreen('settings'); });
+    box.appendChild(go);
+    body.replaceChildren(box);
+    return;
+  }
+
+  if (q.step === 'pick') {
+    const sub = div('quiz-sub');
+    sub.textContent = t('quizIntro');
+    const grid = div('quiz-cats');
+    grid.replaceChildren(...THEME_PACKS.map((theme) => {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'quiz-cat';
+      tile.style.setProperty('--qa', theme.accent);
+      tile.style.setProperty('--qa2', theme.accent2);
+      tile.innerHTML = `<span class="quiz-cat-emblem">${emblemSvg(theme.id, { size: 40 })}</span><b></b>`;
+      tile.querySelector('b').textContent = tx(theme.name);
+      press(tile, { sound: null });
+      tile.addEventListener('click', () => { synth.playTap(); startQuiz(theme.id); });
+      return tile;
+    }));
+    body.replaceChildren(sub, grid);
+    reveal(grid.children, { step: 14, from: 8 });
+    return;
+  }
+
+  if (q.step === 'draw' || q.step === 'writing') {
+    const box = div('quiz-spin');
+    box.innerHTML = `<span class="quiz-spin-mark">${iconSvg('hourglass', { size: 34 })}</span><p></p>`;
+    box.querySelector('p').textContent = q.step === 'draw' ? t('quizDrawing') : t('quizWriting');
+    body.replaceChildren(box);
+    return;
+  }
+
+  if (q.step === 'preview') {
+    const stage = div('quiz-stage');
+    const label = div('quiz-progress');
+    label.textContent = t('quizMeet');
+    // The card WITHOUT its description: what it is stays the first question.
+    const card = buildStaticCard(quizEntry(q, { bare: true }), q.rarity, null, { fav: false, lit: true });
+    card.classList.add('quiz-mystery');
+    const note = div('quiz-note');
+    note.textContent = t('quizNotice', { n: q.count });
+    const start = document.createElement('button');
+    start.type = 'button';
+    start.className = 'btn btn-primary quiz-start';
+    start.textContent = t('quizStart');
+    press(start, { sound: null });
+    start.addEventListener('click', () => { synth.playTap(); beginQuizQuestions(); });
+    stage.replaceChildren(label, card, note, start);
+    body.replaceChildren(stage);
+    return;
+  }
+
+  if (q.step === 'ask') {
+    const item = q.questions[q.index];
+    const progress = div('quiz-progress');
+    progress.textContent = t('quizQuestionOf', { i: q.index + 1, n: q.questions.length });
+    const question = div('quiz-q');
+    question.textContent = item.question;
+    const choices = div('quiz-choices');
+    choices.replaceChildren(...item.choices.map((choice, idx) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'quiz-choice';
+      btn.textContent = choice;
+      press(btn, { sound: null });
+      btn.addEventListener('click', () => answerQuiz(idx));
+      return btn;
+    }));
+    body.replaceChildren(progress, question, choices);
+    reveal(choices.children, { step: 40, from: 8 });
+    return;
+  }
+
+  // done: the score, what it paid, and the full recap.
+  const score = div('quiz-score');
+  score.textContent = t('quizScore', { n: q.correct, total: q.questions.length });
+
+  const rewards = div('quiz-rewards');
+  const rewardRow = (icon, html) => {
+    const row = div('quiz-reward');
+    row.innerHTML = `<span class="quiz-reward-icon">${iconSvg(icon, { size: 18 })}</span><span></span>`;
+    row.querySelector('span:last-child').innerHTML = html;
+    return row;
+  };
+  if (q.rewards.money > 0) rewards.appendChild(rewardRow('gift', `${esc(t('quizRewardMoney'))} ${money(q.rewards.money)}`));
+  if (q.rewards.card) rewards.appendChild(rewardRow('collection', esc(t('quizRewardCard'))));
+  if (q.rewards.booster) rewards.appendChild(rewardRow('packs', esc(t('quizRewardBooster', { name: specName(q.rewards.booster) }))));
+  if (!rewards.children.length) {
+    const none = div('quiz-note');
+    none.textContent = t('quizRewardNone');
+    rewards.appendChild(none);
+  }
+
+  const recap = div('quiz-recap');
+  recap.replaceChildren(...q.questions.map((item, i) => {
+    const right = q.answers[i] === item.answer;
+    const node = div('quiz-recap-item');
+    node.innerHTML = `
+      <p></p>
+      <span class="quiz-recap-a ${right ? 'is-right' : 'is-wrong'}"><b></b><span data-mine></span></span>
+      ${right ? '' : '<span class="quiz-recap-a is-answer"><b></b><span data-good></span></span>'}`;
+    node.querySelector('p').textContent = `${i + 1}. ${item.question}`;
+    node.querySelector('.quiz-recap-a b').textContent = t('quizYourAnswer');
+    node.querySelector('[data-mine]').textContent = item.choices[q.answers[i]];
+    if (!right) {
+      node.querySelector('.is-answer b').textContent = t('quizCorrectAnswer');
+      node.querySelector('[data-good]').textContent = item.choices[item.answer];
+    }
+    return node;
+  }));
+
+  const again = document.createElement('button');
+  again.type = 'button';
+  again.className = 'btn btn-primary quiz-start';
+  again.textContent = t('quizAgain');
+  press(again, { sound: null });
+  again.addEventListener('click', () => { synth.playTap(); resetQuiz(); renderQuiz(); });
+
+  body.replaceChildren(score, rewards, recap, again);
+}
+
+/** The Settings row where the player pastes their own Groq key. */
+function quizKeyRow() {
+  const row = document.createElement('div');
+  row.className = 'row row-stack';
+  row.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <input class="key-input" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..." aria-label="Groq API key" />`;
+  row.querySelector('h4').textContent = t('settingsQuizKey');
+  row.querySelector('p').textContent = t('settingsQuizKeyNote');
+  const input = row.querySelector('input');
+  input.value = groqKey();
+  input.addEventListener('change', () => {
+    saveGroqKey(input.value);
+    toast(input.value.trim() ? t('quizKeySaved') : t('quizKeyCleared'), 'ok');
+  });
+  return row;
+}
+
 /* --- settings ------------------------------------------------------------------------------------------- */
 
 function settingRow(key, titleKey, noteKey) {
@@ -4139,7 +4455,7 @@ function renderSettings() {
   paintResetButton(resetBtn);
   resetBtn.addEventListener('click', () => handleReset(resetBtn));
 
-  el.dataList.replaceChildren(...accountRows(), language, transferRow, resetRow);
+  el.dataList.replaceChildren(...accountRows(), language, quizKeyRow(), transferRow, resetRow);
 }
 
 /**

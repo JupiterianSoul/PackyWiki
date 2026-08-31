@@ -1496,3 +1496,174 @@
 .album-cover { contain-intrinsic-size: 170px 190px; }
 .ach { contain-intrinsic-size: auto 92px; }
 .pick-row { contain-intrinsic-size: auto 58px; }
+
+/* --- the updates timeline ------------------------------------------------------ */
+
+.timeline { display: grid; padding: 0 var(--gutter); }
+.tl-item { position: relative; padding: 0 0 26px 46px; min-width: 0; }
+.tl-item::before {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 36px;
+  bottom: -2px;
+  width: 2px;
+  background: color-mix(in srgb, var(--tl, var(--accent)) 30%, var(--line));
+}
+.tl-item:last-child { padding-bottom: 6px; }
+.tl-item:last-child::before { display: none; }
+.tl-node {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  color: var(--tl, var(--accent));
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--tl, var(--accent)) 45%, var(--line));
+  background: color-mix(in srgb, var(--tl, var(--accent)) 12%, var(--surface-solid));
+}
+.tl-head { display: flex; align-items: center; gap: 8px; padding: 5px 0 8px; }
+.tl-head h3 { font-size: 1rem; min-width: 0; }
+.tl-latest {
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--positive);
+  border: 1px solid color-mix(in srgb, var(--positive) 45%, transparent);
+  padding: 2px 7px;
+  border-radius: var(--radius-pill);
+}
+.tl-points { display: grid; gap: 6px; }
+.tl-points li {
+  position: relative;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  padding-left: 14px;
+}
+.tl-points li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.55em;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--tl, var(--accent));
+  opacity: 0.7;
+}
+
+/* --- the quiz ------------------------------------------------------------------ */
+
+.quiz-body { display: grid; gap: 14px; }
+.quiz-sub { font-size: 0.84rem; color: var(--ink-dim); }
+.quiz-cats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.quiz-cat {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 12px 6px 10px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--qa, var(--accent)) 30%, var(--line));
+  background:
+    linear-gradient(160deg,
+      color-mix(in srgb, var(--qa, var(--accent)) 10%, var(--surface-solid)),
+      var(--surface));
+  min-width: 0;
+  --e1: color-mix(in srgb, var(--qa, var(--accent)) 55%, #ffffff);
+  --e2: var(--qa, var(--accent));
+  --e3: color-mix(in srgb, var(--qa2, #101528) 70%, #05060c);
+}
+.quiz-cat b {
+  max-width: 100%;
+  font-size: 0.72rem;
+  line-height: 1.2;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.quiz-stage { display: grid; justify-items: center; gap: 14px; padding-top: 8px; }
+.quiz-stage .card { width: min(64vw, 250px); }
+/* The mystery card: what it is stays the first question. */
+.quiz-mystery .card-desc, .quiz-mystery .card-extract { display: none; }
+.quiz-bigicon { color: var(--accent); opacity: 0.9; padding-top: 26px; }
+.quiz-note { text-align: center; font-size: 0.85rem; line-height: 1.55; color: var(--ink-dim); max-width: 38ch; margin: 0 auto; }
+.quiz-start { width: min(100%, 320px); }
+.quiz-progress {
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  text-align: center;
+}
+.quiz-q { font-size: 1.06rem; font-weight: 700; line-height: 1.45; text-align: center; padding: 2px 4px 6px; }
+.quiz-choices { display: grid; gap: 10px; }
+.quiz-choice {
+  padding: 13px 14px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+  text-align: left;
+}
+.quiz-choice:active { border-color: var(--accent); }
+.quiz-spin { display: grid; justify-items: center; gap: 12px; padding: 44px 0; color: var(--ink-dim); }
+.quiz-spin-mark { color: var(--accent); animation: quiz-spin 1.6s var(--ease) infinite; }
+@keyframes quiz-spin {
+  0% { transform: rotate(0); }
+  50% { transform: rotate(180deg); }
+  100% { transform: rotate(360deg); }
+}
+.quiz-score { font-size: 1.5rem; font-weight: 800; text-align: center; padding-top: 4px; }
+.quiz-rewards { display: grid; gap: 8px; }
+.quiz-reward {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--positive) 40%, var(--line));
+  background: color-mix(in srgb, var(--positive) 10%, transparent);
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+.quiz-reward-icon { flex: none; color: var(--positive); display: grid; place-items: center; }
+.quiz-recap { display: grid; gap: 10px; }
+.quiz-recap-item {
+  padding: 12px 13px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.quiz-recap-item p { font-size: 0.86rem; font-weight: 700; line-height: 1.45; }
+.quiz-recap-a { font-size: 0.78rem; display: flex; gap: 6px; align-items: baseline; min-width: 0; }
+.quiz-recap-a b { flex: none; font-weight: 800; }
+.quiz-recap-a.is-right { color: var(--positive); }
+.quiz-recap-a.is-wrong { color: var(--negative); }
+.quiz-recap-a.is-answer { color: var(--positive); }
+
+/* --- settings extras ----------------------------------------------------------- */
+
+.row.row-stack { flex-direction: column; align-items: stretch; gap: 10px; }
+.key-input {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: color-mix(in srgb, var(--ink) 6%, transparent);
+  color: var(--ink);
+  font-size: 0.88rem;
+  font-family: ui-monospace, monospace;
+}
+.key-input:focus { outline: none; border-color: var(--accent); }
