@@ -276,6 +276,7 @@ const STRINGS = {
     authBadName: 'Usernames are 3 to 20 characters: letters, numbers and underscores.',
     authTooMany: 'Too many attempts. Wait a minute and try again.',
     authOffline: 'Cannot reach the server. Check your connection.',
+    authNoSchema: 'This app\u2019s database has not been set up yet.',
     authUnknown: 'That did not work. Try again.',
 
     // account, in settings
@@ -572,6 +573,7 @@ const STRINGS = {
     authBadName: 'Les pseudos font de 3 à 20 caractères : lettres, chiffres et tirets bas.',
     authTooMany: 'Trop de tentatives. Attendez une minute et réessayez.',
     authOffline: 'Serveur injoignable. Vérifiez votre connexion.',
+    authNoSchema: 'La base de données de l\u2019application n\u2019a pas encore été configurée.',
     authUnknown: 'Cela n’a pas fonctionné. Réessayez.',
 
     settingsAccount: 'Compte',

@@ -291,9 +291,12 @@ To point a build at a **different** project:
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
    and run it. That creates the tables, the policies and the three functions.
 3. Take the **Project URL** and the **publishable** key (`sb_publishable_...`)
-   from **Project Settings → API**, and put them either in `.env.production`
-   (committed, what this repo does) or in a local `.env.local` (ignored by git,
-   and it wins over `.env.production`). `.env.example` is the template.
+   from **Project Settings → API** and put them in `.env.production`, which is
+   what this repo does. To override it for one machine without committing, use
+   `.env.production.local` — Vite loads `.env`, `.env.local`, `.env.production`,
+   `.env.production.local` in that order and the last one wins, so a plain
+   `.env.local` will NOT override `.env.production`. `.env.example` is the
+   template for either.
 
 Never use the `sb_secret_...` key anywhere in this app. It bypasses every
 policy below, and the app has no need of it.

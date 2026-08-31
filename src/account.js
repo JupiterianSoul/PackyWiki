@@ -54,6 +54,11 @@ export function readableError(error) {
   if (raw.includes('email')) return 'authBadEmail';
   if (raw.includes('rate limit') || raw.includes('too many')) return 'authTooMany';
   if (raw.includes('failed to fetch') || raw.includes('network')) return 'authOffline';
+  // The project exists but schema.sql was never run: PostgREST answers with a
+  // missing relation or a function it cannot find in its schema cache. Worth
+  // its own message, because "try again" will never fix it.
+  if (raw.includes('does not exist') || raw.includes('schema cache')
+      || raw.includes('could not find')) return 'authNoSchema';
   return 'authUnknown';
 }
 
