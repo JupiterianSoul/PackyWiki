@@ -3,9 +3,10 @@
 A WikiMaster-style booster pack opener where the cards are **real Wikipedia
 articles**. Buy boosters from a shop that restocks every two hours, slide the rip line to
 tear one open, watch the cards fly out of it, then swipe through them - each
-rolled against an eight-tier rarity table with its own visual treatment and its
-own synthesised chime, priced in Buckarooz by how many people actually read the
-article, and saved to a collection you can filter, favourite and sell from.
+graded on an eight-tier rarity table by how many people actually read its
+article (the same article is the same rarity for everyone), with its own visual
+treatment and its own synthesised chime, priced in Buckarooz from that same
+popularity, and saved to a collection you can filter, favourite and sell from.
 
 Four themes, and a theme here is not a palette: each carries its own shapes,
 typeface, pace, texture, live backdrop and musical instrument.
@@ -246,7 +247,7 @@ src/
   i18n.js             English/French strings and the language lock
   data/
     packs.js          PACK TABLE    - themes and custom-pack kinds
-    rarities.js       RARITY TABLE  - one row per tier, with weights
+    rarities.js       RARITY TABLE  - one row per tier, with its popularity floor
     icons.js          ICON SET      - fallback art, logo, Buckarooz glyph
 vite.config.js
 supabase/schema.sql   the three tables, and the row-level rules that guard them
@@ -417,19 +418,18 @@ A three-card booster accrues on a timer whether the app is open or not, up to a
 cap. This is the floor of the game: a player with no cards and no money still
 has something to open in ten minutes.
 
-They must not become the whole game, so the odds start heavily nerfed. Level 1
-multiplies each tier's weight by `0.55^rank`, which barely moves the expected
-value - commons dominate that - but makes an Artifact **42x scarcer**, one in
-28,000 rather than one in 667. The nerf is entirely at the top, which is where
-it belongs.
+They must not become the whole game, so the track gates FAME instead of odds:
+rarity belongs to the article itself now, and a low-level free pack is simply
+not allowed to draw very famous pages. Level 1 caps pulls at the Rare band;
+each level raises the ceiling, and level 10 lifts it entirely.
 
 Levelling the track improves all three axes at once:
 
-| Level | Every | Holds | Top tier |
+| Level | Every | Holds | Fame ceiling |
 |---|---|---|---|
-| 1 | 10 min | 7 | 42x scarcer |
-| 5 | 7 min | 13 | 7x scarcer |
-| 10 | 3 min | 20 | standard odds |
+| 1 | 10 min | 7 | up to Rare |
+| 5 | 7 min | 13 | up to Legendary |
+| 10 | 3 min | 20 | none |
 
 Level 10 needs **2,100 opened boosters**, and the steps grow the whole way
 (20, 55, 110, 200, 340, 560, 900, 1,400, 2,100). At a realistic thirty to fifty
@@ -520,12 +520,13 @@ Stock is generated from the current two-hour window index, so it is stable
 across reloads and restocks on its own - no server involved. Each booster's
 size is rolled between 3 and 7 cards, and price scales with both size and tier
 automatically, because it is derived from the booster's own expected contents.
+A tier booster is a FAME FLOOR on the draw: it only pulls pages famous enough
+to be at least its tier.
 
-Two shelves are always present: **Free every restock**, and **Boosters you
-built** if you have made any custom packs. The rest of the shop is five to
-seven shelves drawn from a pool of nine kinds - by tier, by subject, mixed,
-cheap, jumbo, a two-subject matchup, one subject climbing the tiers, wildcards
-only, and a single-size bundle - so no two windows look quite alike.
+The shop is a market of fixed stalls: a **spotlight deal** at a real discount
+(safe by construction - even at 25% off, opening and selling still loses
+money), the **free shelf**, a two-column grid of six **subject boosters**, the
+**tier vault**, and **boosters you built** if you have made any custom packs.
 
 The free shelf is the anti-lockout guarantee: two three-card boosters,
 occasionally upgraded to a low tier. It runs on its own **four-hour** clock
