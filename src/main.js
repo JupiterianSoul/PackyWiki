@@ -171,6 +171,7 @@ bind({
   friendsTitle: $('#friends-title'), friendsIntro: $('#friends-intro'),
   find: $('#find'), findMark: $('#find-mark'), findInput: $('#find-input'),
   findGo: $('#find-go'), findStatus: $('#find-status'), findResults: $('#find-results'),
+  resultsHead: $('#results-head'), resultsLabel: $('#results-label'),
   incomingHead: $('#incoming-head'), incomingLabel: $('#incoming-label'), incomingList: $('#incoming-list'),
   friendsHead: $('#friends-head'), friendsLabel: $('#friends-label'), friendsList: $('#friends-list'),
   outgoingHead: $('#outgoing-head'), outgoingLabel: $('#outgoing-label'), outgoingList: $('#outgoing-list'),
@@ -1900,6 +1901,20 @@ function syncSoon() {
 }
 
 /**
+ * Foregrounding the app: pick up the profile if the last attempt failed, push
+ * anything that has not landed, and refresh the friend lists.
+ */
+async function resumeAccount() {
+  if (!signedIn()) return;
+  const had = Boolean(state.account.profile);
+  await fetchAccountProfile();
+  // A profile that only just arrived means nothing has ever been pushed on
+  // this run, so push rather than waiting for the next change.
+  if (state.account.failed || !had) syncSoon();
+  loadFriends();
+}
+
+/**
  * Sign in has happened. Pull the account's save over the local one, then start
  * the app on whatever that turns out to contain — which is what makes a fresh
  * install on a new phone come up with the collection already in it.
@@ -1975,22 +1990,37 @@ async function onSession(session) {
   state.account.session = session ?? null;
   if (!session) { showGate(); return; }
 
-  try {
-    const profile = await account.profileForSession(session);
-    if (!profile) { showNameGate(); return; }
-    state.account.profile = profile;
-  } catch {
-    // The profile read failed (usually offline). Play on the local save; the
-    // next successful sync will publish.
-    state.account.failed = true;
-  }
+  const ready = await fetchAccountProfile();
+  if (ready === 'no-name') { showNameGate(); return; }
   await enterApp();
+}
+
+/**
+ * Load the profile for the current session.
+ *
+ * Everything that talks to the server needs it, so a failure here (which
+ * offline at launch is) would otherwise leave the app signed in but unable to
+ * sync or list friends for the rest of the session. It is retried whenever the
+ * app comes back to the foreground.
+ */
+async function fetchAccountProfile() {
+  if (!signedIn() || state.account.profile) return 'ok';
+  try {
+    const profile = await account.profileForSession(state.account.session);
+    if (!profile) return 'no-name';
+    state.account.profile = profile;
+    state.account.failed = false;
+    return 'ok';
+  } catch {
+    state.account.failed = true;
+    return 'offline';
+  }
 }
 
 /* --- friends -------------------------------------------------------------------------------------------------- */
 
 /** One person, however they are related to you: result, friend or request. */
-function personRow(profile, actions, { onOpen = null } = {}) {
+function personRow(profile, actions, { onOpen = null, note = null } = {}) {
   const row = document.createElement(onOpen ? 'button' : 'div');
   if (onOpen) row.type = 'button';
   row.className = 'person';
@@ -2019,7 +2049,15 @@ function personRow(profile, actions, { onOpen = null } = {}) {
     });
     bay.appendChild(button);
   }
-  if (!actions.length) bay.innerHTML = `<span class="muted">${iconSvg('chevron', { size: 18 })}</span>`;
+  if (note) {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.innerHTML = `${iconSvg('hourglass', { size: 13 })}<span></span>`;
+    chip.querySelector('span').textContent = t(note);
+    bay.appendChild(chip);
+  } else if (!actions.length) {
+    bay.innerHTML = `<span class="muted">${iconSvg('chevron', { size: 18 })}</span>`;
+  }
 
   if (onOpen) {
     press(row, { sound: null });
@@ -2092,19 +2130,32 @@ function renderFriends() {
   el.findInput.placeholder = t('friendsFindPlaceholder');
   el.findInput.setAttribute('aria-label', t('friendsFind'));
   el.findGo.textContent = t('friendsSearch');
+  el.resultsLabel.textContent = t('friendsResults');
   el.incomingLabel.textContent = t('friendsIncoming');
   el.friendsLabel.textContent = t('friendsYours');
   el.outgoingLabel.textContent = t('friendsOutgoing');
 
   const { friends, incoming, outgoing, results } = state.social;
-  // Anyone already connected to is shown by their section, not as a result.
-  const connected = new Set([...friends, ...incoming, ...outgoing].map((entry) => entry.otherId));
+  // Someone you are already connected to still appears in a search, showing
+  // what the connection is. Hiding them would read as the search being broken.
+  const known = new Map();
+  for (const entry of friends) known.set(entry.otherId, { kind: 'friend', entry });
+  for (const entry of incoming) known.set(entry.otherId, { kind: 'incoming', entry });
+  for (const entry of outgoing) known.set(entry.otherId, { kind: 'outgoing', entry });
 
-  el.findResults.replaceChildren(...results.map((person) =>
-    personRow(person, connected.has(person.id)
-      ? []
-      : [['friendsAdd', 'btn-primary', () => socialAction(
-          () => account.sendRequest(userId(), person.id), 'friendsSent', { name: person.username })]])));
+  el.findResults.replaceChildren(...results.map((person) => {
+    const link = known.get(person.id);
+    if (link?.kind === 'friend') {
+      return personRow(person, [], { onOpen: () => openFriend(link.entry) });
+    }
+    if (link?.kind === 'incoming') {
+      return personRow(person, [['friendsAccept', 'btn-primary', () => socialAction(
+        () => account.acceptRequest(link.entry.id), 'friendsAccepted', { name: person.username })]]);
+    }
+    if (link?.kind === 'outgoing') return personRow(person, [], { note: 'friendsPending' });
+    return personRow(person, [['friendsAdd', 'btn-primary', () => socialAction(
+      () => account.sendRequest(userId(), person.id), 'friendsSent', { name: person.username })]]);
+  }));
 
   el.incomingList.replaceChildren(...incoming.map((entry) =>
     personRow(entry.profile, [
@@ -2123,6 +2174,7 @@ function renderFriends() {
         () => account.removeFriendship(entry.id), 'friendsRemoved')]
     ])));
 
+  el.resultsHead.hidden = !results.length;
   el.incomingHead.hidden = !incoming.length;
   el.friendsHead.hidden = !friends.length;
   el.outgoingHead.hidden = !outgoing.length;
@@ -2957,10 +3009,9 @@ function init() {
       visibleSince = Date.now();
       syncTimed();
       updateBadges();
-      // Coming back is the natural moment to retry a sync that did not land,
-      // and to pick up anything that happened while the app was away.
-      if (state.account.failed) syncSoon();
-      loadFriends();
+      // Coming back is the natural moment to retry anything that did not land,
+      // and to pick up what happened while the app was away.
+      resumeAccount();
     } else {
       flushPlaytime();
       visibleSince = null;
