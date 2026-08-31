@@ -802,3 +802,50 @@ html[data-lowpower='1'] .fx-b::before,
 html[data-lowpower='1'] .fx-b::after,
 html[data-lowpower='1'] .fx-c::before,
 html[data-lowpower='1'] .fx-c { animation: none !important; }
+
+/* --- the giant card (the detail view) --------------------------------------
+   The same card, at full width and natural height: the faces stop being
+   absolutely stacked so the content sets the size, the art keeps a wide
+   ratio, and the type — in container units — scales up with it. */
+
+.giant-card {
+  width: 100%;
+  aspect-ratio: auto;
+  perspective: none;
+}
+.giant-card .card-inner { position: relative; inset: auto; transform: none !important; }
+.giant-card .card-face {
+  position: relative;
+  inset: auto;
+  transform: none !important;
+  backface-visibility: visible;
+}
+.giant-card .card-art {
+  height: auto;
+  aspect-ratio: 16 / 10;
+}
+.giant-card .fx-art {
+  inset: 3.2% 3.2% auto;
+  aspect-ratio: 16 / 10;
+  height: auto;
+}
+.giant-card .card-title { font-size: 6.4cqw; -webkit-line-clamp: 3; line-clamp: 3; }
+.giant-extract {
+  font-size: 3.8cqw;
+  line-height: 1.6;
+  color: var(--ink-dim);
+  margin-top: 1.4cqw;
+}
+.giant-facts { display: flex; flex-wrap: wrap; gap: 6px; padding: 1.6cqw 0 0; }
+.giant-actions {
+  position: relative;
+  z-index: 4;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 0 4.9cqw 4cqw;
+}
+/* The tier's travelling comets orbit a 5:7 card; on a tall free-height card
+   they wander over the text, so the giant card keeps only the frame, the
+   art effects and the plate tint. */
+.giant-card .fx-b { display: none; }

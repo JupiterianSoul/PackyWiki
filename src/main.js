@@ -2047,43 +2047,68 @@ function openCardDetail(entryKey, data, rarity) {
   state.detail = { key: entryKey, data, rarity, sellArmed: false };
 
   openSheet(data.title, (body) => {
-    body.innerHTML = `
-      <div class="detail-body">
-        <div class="detail-card-wrap"></div>
-        <div class="detail-side">
-          <p class="detail-sub"></p>
-          <div class="detail-facts"></div>
-          <p class="detail-text"></p>
-          <div class="detail-actions">
+    // The detail IS the card, blown up: same frame, same tier treatment,
+    // with the full text and the actions living inside it — not a small
+    // card floating over a separate description.
+    const card = document.createElement('article');
+    card.className = 'card giant-card is-revealed is-lit';
+    applyRarityVars(card, rarity);
+    card.innerHTML = `
+      <div class="card-inner">
+        <div class="card-face card-front">
+          <div class="fx fx-a" aria-hidden="true"></div>
+          <div class="fx-c" aria-hidden="true"></div>
+          <div class="fx-art" aria-hidden="true"></div>
+          <div class="card-art"></div>
+          <div class="card-body">
+            <h3 class="card-title"></h3>
+            <p class="card-desc"></p>
+            <div class="detail-facts giant-facts"></div>
+            <p class="giant-extract selectable"></p>
+          </div>
+          <div class="card-stats">
+            <span class="card-price"></span><span class="card-views"></span>
+          </div>
+          <div class="giant-actions">
             <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer"></a>
             <button class="btn btn-ghost btn-sm sell" type="button" hidden></button>
           </div>
+          <div class="fx fx-b" aria-hidden="true"></div>
+          <div class="fx-ring" aria-hidden="true"></div>
         </div>
       </div>`;
+    body.appendChild(card);
 
-    const card = buildStaticCard(data, rarity, null, { fav: false, lit: true });
-    card.classList.add('detail-card');
-    body.querySelector('.detail-card-wrap').appendChild(card);
-    attachTilt(card);
-    card.style.setProperty('--rarity', rarity.color);
+    const art = card.querySelector('.card-art');
+    if (data.thumbnail) {
+      const img = document.createElement('img');
+      img.src = data.thumbnail;
+      img.alt = '';
+      img.addEventListener('error', () => { img.remove(); art.insertAdjacentHTML('afterbegin',
+        `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 54 })}</div>`); });
+      art.appendChild(img);
+    } else {
+      art.innerHTML = `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 54 })}</div>`;
+    }
 
-    body.querySelector('.detail-sub').textContent = data.description || data.sourceName || '';
-    body.querySelector('.detail-side').style.setProperty('--rarity', rarity.color);
-    body.querySelector('.detail-facts').innerHTML = [
+    card.querySelector('.card-title').textContent = data.title;
+    card.querySelector('.card-desc').textContent = data.description || data.sourceName || '';
+    card.querySelector('.giant-extract').textContent = data.extract;
+    card.querySelector('.card-price').innerHTML = money(data.price);
+    card.querySelector('.card-views').textContent =
+      data.views ? t('viewsPerMonth', { views: formatViews(data.views) }) : '';
+    card.querySelector('.giant-facts').innerHTML = [
       `<span class="chip" style="color:${rarity.color};border-color:${rarity.color}">${tx(rarity.name)}</span>`,
-      `<span class="chip">${money(data.price)}</span>`,
-      data.views ? `<span class="chip">${t('viewsPerMonth', { views: formatViews(data.views) })}</span>` : '',
       entry && entry.count > 1 ? `<span class="chip">${t('copiesOwned', { n: entry.count })}</span>` : ''
     ].filter(Boolean).join('');
-    body.querySelector('.detail-text').textContent = data.extract;
 
-    const read = body.querySelector('a');
+    const read = card.querySelector('a');
     read.href = data.url;
     read.textContent = t('read');
     press(read, { sound: null });
 
     // Selling only makes sense for a card actually in the binder.
-    const sell = body.querySelector('.sell');
+    const sell = card.querySelector('.sell');
     sell.hidden = !entry;
     if (entry) {
       state.detail.sellButton = sell;
