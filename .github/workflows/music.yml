@@ -1,0 +1,50 @@
+# Fills src/assets/music with slow jazz that is free to ship, and writes the
+# attributions beside it. Run by hand from the Actions tab: sourcing music is
+# not something that should happen on every push.
+name: Find the music
+
+on:
+  workflow_dispatch:
+    inputs:
+      tracks:
+        description: 'How many tracks to keep'
+        required: false
+        default: '4'
+
+permissions:
+  contents: write
+
+jobs:
+  find:
+    name: Find and commit the music
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Look for it
+        run: node tools/find-music.mjs "${{ inputs.tracks || '4' }}"
+
+      - name: Show what was found
+        run: |
+          ls -la src/assets/music
+          echo '--- LICENSE.md ---'
+          cat src/assets/music/LICENSE.md
+
+      - name: Commit it
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/assets/music
+          git diff --staged --quiet && { echo "Nothing changed."; exit 0; }
+          git commit -m "Music: slow jazz, found and credited
+
+          Filled by tools/find-music.mjs from Openverse and the Internet
+          Archive's 78rpm collection. Licences are in
+          src/assets/music/LICENSE.md."
+          git push origin HEAD:${{ github.ref_name }}
