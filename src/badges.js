@@ -1,0 +1,182 @@
+/**
+ * BADGES
+ * ============================================================================
+ * The trophies above the statistics: holographic foil chips, one per family
+ * of hard achievements, shown on the profile between the level card and the
+ * numbers. A badge is not another achievement - it is what the top rungs of
+ * a chain LOOK like once you are standing on them.
+ *
+ * Each badge hangs off one achievement chain (src/achievements.js) and starts
+ * counting at that chain's hard end: `from` names the first rung that shows
+ * on the chip. Climb further and the same chip upgrades in place - the foil
+ * re-tints, a pip is added, the rank rises. Two hang off single feats
+ * instead. Everything is computed from live achievement state; nothing is
+ * stored.
+ *
+ * The look is the "holo foil chip" the player picked from ten candidates: a
+ * rounded hexagon of iridescent foil, a dark inset, the motif in white line
+ * art, a diagonal sheen, and one pip per rank along the bottom edge.
+ */
+import { tx } from './i18n.js';
+import { ACHIEVEMENTS } from './achievements.js';
+
+/* --- the set ---------------------------------------------------------------
+ * `chain` + `from`: upgradeable, one rank per unlocked rung from `from` up.
+ * `ach`: a single feat, one rank. `motif` picks the line art below. */
+export const BADGES = [
+  { id: 'ripper',     chain: 'pack',      from: 4, motif: 'pack',
+    name: { en: 'Ripper', fr: 'Déchireur' } },
+  { id: 'collector',  chain: 'cards',     from: 4, motif: 'cards',
+    name: { en: 'Collector', fr: 'Collectionneur' } },
+  { id: 'archivist',  chain: 'album',     from: 3, motif: 'book',
+    name: { en: 'Archivist', fr: 'Archiviste' } },
+  { id: 'tycoon',     chain: 'value',     from: 3, motif: 'gem',
+    name: { en: 'Tycoon', fr: 'Magnat' } },
+  { id: 'ascendant',  chain: 'level',     from: 5, motif: 'peak',
+    name: { en: 'Ascendant', fr: 'Ascendant' } },
+  { id: 'starcatcher', chain: 'legendary', from: 2, motif: 'star',
+    name: { en: 'Starcatcher', fr: 'Attrapeur d’étoiles' } },
+  { id: 'relichunter', chain: 'artifact',  from: 1, motif: 'relic',
+    name: { en: 'Relic Hunter', fr: 'Chasseur de reliques' } },
+  { id: 'scholar',    chain: 'perfect',   from: 2, motif: 'quiz',
+    name: { en: 'Scholar', fr: 'Érudit' } },
+  { id: 'timekeeper', chain: 'timed',     from: 3, motif: 'hourglass',
+    name: { en: 'Timekeeper', fr: 'Gardien du temps' } },
+  { id: 'devoted',    chain: 'daily',     from: 3, motif: 'gift',
+    name: { en: 'Devoted', fr: 'Fidèle' } },
+  { id: 'magnate',    chain: 'rich',      from: 2, motif: 'coin',
+    name: { en: 'Deep Pockets', fr: 'Poches profondes' } },
+  { id: 'prismatic',  ach: 'one-of-each', motif: 'prism',
+    name: { en: 'One of Each', fr: 'Un de chaque' } }
+];
+
+/**
+ * Where every badge stands, from the evaluated achievement list
+ * (achievements.evaluate() output - names already translated).
+ * Returns [{ badge, rank, max, rungs, next }] in BADGES order:
+ * rank 0 = locked; rungs = the achievements the chip counts, in order;
+ * next = the first rung not yet unlocked, if any.
+ */
+export function badgeStates(evaluated) {
+  const byChain = new Map();
+  for (const a of evaluated) {
+    if (!a.chain) continue;
+    if (!byChain.has(a.chain)) byChain.set(a.chain, []);
+    byChain.get(a.chain).push(a);
+  }
+  for (const list of byChain.values()) list.sort((a, b) => a.tier - b.tier);
+
+  return BADGES.map((badge) => {
+    const rungs = badge.chain
+      ? (byChain.get(badge.chain) ?? []).filter((a) => a.tier >= badge.from)
+      : evaluated.filter((a) => a.id === badge.ach);
+    let rank = 0;
+    for (const r of rungs) { if (r.unlocked) rank++; else break; }
+    return {
+      badge, rank, max: rungs.length, rungs,
+      next: rungs.find((r) => !r.unlocked) ?? null,
+      name: tx(badge.name)
+    };
+  });
+}
+
+export const badgesEarned = (evaluated) =>
+  badgeStates(evaluated).filter((s) => s.rank > 0).length;
+
+/* --- the chip --------------------------------------------------------------
+ * Foil sets by rank: cool holo first, warmer and wider the higher the chip
+ * has been carried. Locked chips are pressed in grey. */
+
+const FOILS = [
+  ['#3a4160', '#4a5478', '#3a4160'],                                  // locked
+  ['#7ef2ff', '#7d8bff', '#e07dff'],                                  // rank I
+  ['#7d8bff', '#e07dff', '#ffb37d'],                                  // rank II
+  ['#7ef2ff', '#7d8bff', '#e07dff', '#ffb37d', '#7ef77f'],            // rank III
+  ['#ffd75e', '#ff9d7d', '#e07dff', '#7d8bff', '#7ef2ff'],            // rank IV
+  ['#fff3b8', '#ffd75e', '#ff9d7d', '#e07dff', '#8ff2ff'],            // rank V
+  ['#ffffff', '#fff3b8', '#ffc5e8', '#c5b8ff', '#b8fff4']             // rank VI+
+];
+const ROMANS = ['', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII'];
+export const romanRank = (n) => ROMANS[Math.min(n, ROMANS.length - 1)];
+
+const hexPoints = (r) => Array.from({ length: 6 }, (_, i) => {
+  const a = (-90 + i * 60) * Math.PI / 180;
+  return `${(r * Math.cos(a)).toFixed(2)},${(r * Math.sin(a)).toFixed(2)}`;
+}).join(' ');
+
+/* Line-art motifs, drawn for a 44-unit box centred on 0,0; stroke colour and
+ * width come from the chip so locked and earned share the same drawings. */
+const MOTIFS = {
+  pack: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M -11 -17 L 11 -17 L 14 -12 L 14 14 Q 14 17 11 17 L -11 17 Q -14 17 -14 14 L -14 -12 Z"/>
+    <path d="M -11 -17 L -6 -12 L 0 -17 L 6 -12 L 11 -17"/>
+    <line x1="-7" y1="5" x2="7" y2="5"/><line x1="-7" y1="10" x2="4" y2="10"/></g>`,
+  cards: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <rect x="-16" y="-12" width="20" height="27" rx="3" transform="rotate(-8)"/>
+    <rect x="-3" y="-15" width="20" height="27" rx="3" transform="rotate(7)"/>
+    <polygon points="7.5,-6 9.3,-1.8 13.8,-1.6 10.3,1.2 11.5,5.6 7.5,3 3.5,5.6 4.7,1.2 1.2,-1.6 5.7,-1.8" fill="${s}" stroke="none" transform="rotate(7)"/></g>`,
+  book: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M -15 -14 Q -15 -17 -12 -17 L 12 -17 Q 15 -17 15 -14 L 15 14 Q 15 17 12 17 L -12 17 Q -15 17 -15 14 Z"/>
+    <line x1="-8" y1="-17" x2="-8" y2="17"/>
+    <polygon points="4,-5 5.8,-0.8 10.3,-0.6 6.8,2.2 8,6.6 4,4 0,6.6 1.2,2.2 -2.3,-0.6 2.2,-0.8" fill="${s}" stroke="none"/></g>`,
+  gem: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <polygon points="-14,-6 -7,-14 7,-14 14,-6 0,16"/>
+    <polyline points="-14,-6 14,-6"/><polyline points="-7,-14 -4,-6 0,16"/><polyline points="7,-14 4,-6 0,16"/></g>`,
+  peak: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M -16 14 L -5 -8 L 1 2 L 7 -12 L 16 14 Z"/>
+    <path d="M 7 -12 L 7 -17 L 12 -15 L 7 -13.2"/></g>`,
+  star: (s) => `<g stroke="${s}" stroke-width="2.2" stroke-linejoin="round" fill="none">
+    <path d="M 0 -16 Q 2.5 -2.5 16 0 Q 2.5 2.5 0 16 Q -2.5 2.5 -16 0 Q -2.5 -2.5 0 -16 Z"/>
+    <circle cx="10" cy="-11" r="1.6" fill="${s}" stroke="none"/></g>`,
+  relic: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <polygon points="0,-15 13,-4 8,14 -8,14 -13,-4"/>
+    <circle cx="0" cy="1" r="5.5"/><circle cx="0" cy="1" r="1.6" fill="${s}" stroke="none"/></g>`,
+  quiz: (s) => `<g fill="none" stroke="${s}" stroke-width="2.8" stroke-linecap="round">
+    <path d="M -7 -7 Q -7 -15 0 -15 Q 8 -15 8 -8 Q 8 -3 2 -1 Q 0 0 0 4"/>
+    <circle cx="0" cy="13" r="1.8" fill="${s}" stroke="none"/></g>`,
+  hourglass: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M -10 -16 L 10 -16 L 10 -10 Q 10 -4 3 0 Q 10 4 10 10 L 10 16 L -10 16 L -10 10 Q -10 4 -3 0 Q -10 -4 -10 -10 Z"/>
+    <path d="M -5 12 L 5 12 L 0 6 Z" fill="${s}" stroke="none"/></g>`,
+  gift: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <rect x="-13" y="-6" width="26" height="21" rx="2"/><line x1="0" y1="-6" x2="0" y2="15"/>
+    <path d="M 0 -6 Q -9 -8 -8 -13 Q -4 -16 0 -6 Q 4 -16 8 -13 Q 9 -8 0 -6"/></g>`,
+  coin: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4">
+    <circle cx="0" cy="0" r="14"/><circle cx="0" cy="0" r="9.5"/>
+    <line x1="0" y1="-9.5" x2="0" y2="-14"/><line x1="0" y1="9.5" x2="0" y2="14"/></g>`,
+  prism: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="0,-13 13,10 -13,10"/>
+    <line x1="-18" y1="-2" x2="-6" y2="-2"/>
+    <line x1="6" y1="1" x2="17" y2="-3"/><line x1="6" y1="4" x2="18" y2="3"/><line x1="6" y1="7" x2="17" y2="9"/></g>`
+};
+
+/**
+ * One chip. `rank` 0 draws the locked press; higher ranks brighten the foil
+ * and add a pip per rank under the motif. Ids are deterministic so repeated
+ * chips share definitions instead of fighting over them.
+ */
+export function badgeSvg(badge, rank, max, { size = 64 } = {}) {
+  const uid = `pwb-${badge.id}-${Math.min(rank, FOILS.length - 1)}`;
+  const foil = FOILS[Math.min(rank, FOILS.length - 1)];
+  const locked = rank <= 0;
+  const stops = foil.map((c, i) => [i / Math.max(foil.length - 1, 1), c]);
+  const ink = locked ? '#67719c' : '#ffffff';
+
+  const pipRow = max > 1 ? Array.from({ length: max }, (_, i) => {
+    const x = (i - (max - 1) / 2) * 8;
+    const on = i < rank;
+    return `<polygon points="${x},23.6 ${x + 2.6},26.2 ${x},28.8 ${x - 2.6},26.2"
+      fill="${on ? foil[Math.min(1, foil.length - 1)] : 'none'}" stroke="${on ? 'none' : '#4a5478'}" stroke-width="1"/>`;
+  }).join('') : '';
+
+  return `<svg viewBox="-50 -46 100 96" width="${size}" height="${size * 0.96}" aria-hidden="true" style="display:block">
+    <defs>
+      <linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1">${stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient>
+      <clipPath id="${uid}c"><polygon points="${hexPoints(40)}"/></clipPath>
+    </defs>
+    <polygon points="${hexPoints(40)}" fill="url(#${uid}g)" stroke="${locked ? '#4a5478' : '#ffffff'}" stroke-opacity="${locked ? 1 : 0.8}" stroke-width="1.8" stroke-linejoin="round"/>
+    <polygon points="${hexPoints(32.5)}" fill="#151936" fill-opacity="${locked ? 0.92 : 0.82}"/>
+    <g transform="translate(0,-3)">${(MOTIFS[badge.motif] ?? MOTIFS.star)(ink)}</g>
+    ${pipRow}
+    ${locked ? '' : `<g clip-path="url(#${uid}c)"><rect x="-64" y="-13" width="128" height="14" fill="#ffffff" opacity=".3" transform="rotate(-32)"/></g>`}
+  </svg>`;
+}

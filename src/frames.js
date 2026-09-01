@@ -1,0 +1,313 @@
+/**
+ * LEVEL FRAMES
+ * ============================================================================
+ * A frame is the wrapper a level wears: around the level ring in the app bar,
+ * around the big ring on the profile, and around your picture everywhere
+ * friends can see it. One new frame every 10 levels, from level 10 to the
+ * level cap at 500 - fifty tiers - in five styles the player picks between
+ * on the Customization screen.
+ *
+ * Everything here is drawn, not shipped: each style is a generator taking a
+ * tier (1..50) and returning SVG. Tiers 1..10 reproduce the design sheet the
+ * styles were chosen from; past that, each style keeps escalating with the
+ * same vocabulary. All of it is deterministic - the same tier always draws
+ * the same frame, because a frame is a rank, not a decoration roll.
+ *
+ * Geometry: the viewBox is -58..58 and the wrapped circle is assumed to sit
+ * at radius 26. CSS places the overlay at 223% of the circle's size so the
+ * drawn ring lands exactly on the element's edge (116 / 52 = 2.23).
+ */
+
+export const FRAME_STYLES = [
+  { id: 'metal',   name: { en: 'Metal Ages',    fr: 'Âges du métal' } },
+  { id: 'circuit', name: { en: 'Neon Circuit',  fr: 'Circuit néon' } },
+  { id: 'orbit',   name: { en: 'Cosmic Orbit',  fr: 'Orbite cosmique' } },
+  { id: 'crest',   name: { en: 'Foil Crest',    fr: 'Blason métallisé' } },
+  { id: 'crystal', name: { en: 'Crystal Bloom', fr: 'Floraison de cristal' } }
+];
+export const DEFAULT_FRAME_STYLE = 'metal';
+export const frameStyleById = (id) =>
+  FRAME_STYLES.find((s) => s.id === id) ?? FRAME_STYLES[0];
+
+/** Which frame a level wears: one tier per 10 levels, none below 10. */
+export const frameTier = (level) =>
+  Math.max(0, Math.min(50, Math.floor((Number(level) || 1) / 10)));
+
+/* --- small helpers --------------------------------------------------------- */
+
+const TAU = Math.PI / 180;
+const P = (r, deg) => `${(r * Math.cos(deg * TAU)).toFixed(2)},${(r * Math.sin(deg * TAU)).toFixed(2)}`;
+/** Deterministic jitter in [0,1): a frame is a rank, not a dice roll. */
+const jit = (i, salt = 0) => (((i + 1) * 73 + salt * 131) % 97) / 97;
+
+const grad = (id, stops, { x1 = 0, y1 = 0, x2 = 0, y2 = 1 } = {}) =>
+  `<linearGradient id="${id}" x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}">` +
+  stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('') + '</linearGradient>';
+
+const glowFilter = (id, dev = 2) =>
+  `<filter id="${id}" x="-60%" y="-60%" width="220%" height="220%">
+    <feGaussianBlur stdDeviation="${dev}" result="b"/>
+    <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+
+const arc = (r, a0, a1, attrs) =>
+  `<path d="M ${P(r, a0)} A ${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${P(r, a1)}" fill="none" ${attrs}/>`;
+
+const diamond = (cx, cy, r) =>
+  `${cx},${cy - r} ${cx + r},${cy} ${cx},${cy + r} ${cx - r},${cy}`;
+
+/* --- A. metal ages ---------------------------------------------------------
+ * Ten materials climb copper to diamond over the first hundred levels; the
+ * forty tiers past them work through gemstones and stranger alloys. */
+
+const METALS = [
+  ['#8a5a2b', '#c98f4e', '#5c3a18'], ['#9c6a1f', '#e0a33e', '#6b4310'],
+  ['#6f7683', '#aab3c2', '#474d59'], ['#9aa5b5', '#dfe7f2', '#5f6875'],
+  ['#b28414', '#f2ca4f', '#7a570a'], ['#c2922a', '#ffe08a', '#8a6410'],
+  ['#7f9ba8', '#d5ecf5', '#4d626d'], ['#8fa7c9', '#e8f2ff', '#54678a'],
+  ['#7e6bd6', '#c9baff', '#4a3d8f'], ['#4fc3d9', '#c5f6ff', '#22758a']
+];
+const METALS_X = [
+  ['#b3273b', '#ff7d8a', '#701020'], ['#1f9d55', '#7df0a8', '#0c5a2e'],
+  ['#2b5fd9', '#8ab8ff', '#173a8a'], ['#7e3fd0', '#c99bff', '#4a1f8a'],
+  ['#525a6e', '#a8b3c9', '#23283a'], ['#d97b16', '#ffd27d', '#8a4a08'],
+  ['#4fa8c9', '#c5f0ff', '#22637a'], ['#8a7ad0', '#e0d5ff', '#4a3f8a'],
+  ['#c2a22a', '#fff0a8', '#8a6c10'], ['#6bd0d9', '#eafcff', '#2a7a86']
+];
+
+function drawMetal(t, uid) {
+  const [mid, hi, lo] = t < 10 ? METALS[t] : METALS_X[Math.min(Math.floor((t - 10) / 4), 9)];
+  const g = `${uid}m`;
+  const defs = grad(g, [[0, hi], [0.55, mid], [1, lo]]);
+  const metal = `url(#${g})`;
+
+  const studCount = t < 2 ? 0 : Math.min(4 + t, 14);
+  const studs = Array.from({ length: studCount }, (_, i) => {
+    const a = -90 + i * 360 / studCount;
+    return `<circle cx="${P(33.5, a).split(',')[0]}" cy="${P(33.5, a).split(',')[1]}" r="${t >= 6 ? 2.2 : 1.7}" fill="${hi}" stroke="${lo}" stroke-width=".7"/>`;
+  }).join('');
+
+  const gem = t >= 4 ? `<polygon points="${diamond(0, -33.5, t >= 8 ? 5.5 : 4.4)}" fill="${t >= 8 ? '#9ef3ff' : '#ff5f6b'}" stroke="${lo}" stroke-width="1"/>` : '';
+  const wings = t >= 7 ? `<path d="M -31 14 Q -44 8 -45 -6 L -38 -2 Q -40 6 -31 10 Z" fill="${metal}" stroke="${lo}" stroke-width=".8"/>
+    <path d="M 31 14 Q 44 8 45 -6 L 38 -2 Q 40 6 31 10 Z" fill="${metal}" stroke="${lo}" stroke-width=".8"/>` : '';
+  const outer = t >= 14 ? `<circle cx="0" cy="0" r="${40 + Math.min((t - 14) * 0.1, 3)}" fill="none" stroke="${mid}" stroke-width="1.2" stroke-opacity=".8"/>` : '';
+  const sideGems = t >= 24 ? [-38, -142].map((a) =>
+    `<polygon points="${diamond(+P(37, a).split(',')[0], +P(37, a).split(',')[1], 3.2)}" fill="${hi}" stroke="${lo}" stroke-width=".8"/>`).join('') : '';
+  const ticks = t >= 34 ? Array.from({ length: 16 }, (_, i) => {
+    const a = -90 + i * 22.5;
+    return `<line x1="${P(43.5, a)}" x2="${P(46.5, a)}" y1="" y2="" stroke="${hi}" stroke-width="1"/>`
+      .replace(`x1="${P(43.5, a)}"`, `x1="${P(43.5, a).split(',')[0]}" y1="${P(43.5, a).split(',')[1]}"`)
+      .replace(`x2="${P(46.5, a)}"`, `x2="${P(46.5, a).split(',')[0]}" y2="${P(46.5, a).split(',')[1]}"`);
+  }).join('') : '';
+  const halo = t >= 44 ? `<circle cx="0" cy="0" r="47" fill="none" stroke="${hi}" stroke-width=".8" stroke-opacity=".5"/>` : '';
+
+  return `<defs>${defs}</defs>${outer}${halo}
+    <circle cx="0" cy="0" r="33.5" fill="none" stroke="${metal}" stroke-width="${5 + Math.min(t, 12) * 0.28}"/>
+    <circle cx="0" cy="0" r="30" fill="none" stroke="${lo}" stroke-width="1"/>
+    ${wings}${studs}${sideGems}${ticks}${gem}`;
+}
+
+/* --- C. neon circuit -------------------------------------------------------
+ * Ten segments light one per rank for the first hundred levels; the decades
+ * after keep the full ring and add instrumentation around it. */
+
+const CIRCUIT_HUES = ['#39d0ff', '#39d0ff', '#4fc7ff', '#7db2ff', '#a48cff',
+  '#c76bff', '#ef5fd8', '#ff5f9e', '#ffb04f', '#ffe14f'];
+
+function drawCircuit(t, uid) {
+  const g = `${uid}c`;
+  const col = CIRCUIT_HUES[t % 10];
+  const stage = Math.floor(t / 10);
+  const defs = glowFilter(g, 2);
+  const lit = t < 10 ? t + 1 : 10;
+
+  const segs = Array.from({ length: 10 }, (_, i) => {
+    const on = i < lit;
+    return arc(33, -90 + i * 36 + 3, -90 + (i + 1) * 36 - 3,
+      `stroke="${on ? col : '#232a4d'}" stroke-width="4.6" stroke-linecap="round" ${on ? `filter="url(#${g})"` : ''}`);
+  }).join('');
+
+  const ticks = stage >= 1 ? Array.from({ length: 20 }, (_, i) => {
+    const a = -90 + i * 18;
+    const [x1, y1] = P(39.5, a).split(','), [x2, y2] = P(42, a).split(',');
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width=".9" stroke-opacity=".7"/>`;
+  }).join('') : '';
+  const outerRing = stage >= 2 ? `<circle cx="0" cy="0" r="44.5" fill="none" stroke="${col}" stroke-width="1" stroke-opacity=".55"/>` : '';
+  const nodes = stage >= 3 ? [45, 135, 225, 315].map((a) => {
+    const [x, y] = P(44.5, a).split(',');
+    return `<circle cx="${x}" cy="${y}" r="2" fill="${col}" filter="url(#${g})"/>`;
+  }).join('') : '';
+  const core = stage >= 4 ? `<circle cx="0" cy="0" r="28.5" fill="none" stroke="#ffffff" stroke-width="1.2" stroke-opacity=".85" filter="url(#${g})"/>` : '';
+  const crownNode = t >= 9 ? `<circle cx="0" cy="-33" r="3" fill="#ffffff" filter="url(#${g})"/>` : '';
+
+  return `<defs>${defs}</defs>
+    <circle cx="0" cy="0" r="33" fill="none" stroke="#161b38" stroke-width="6.5"/>
+    ${segs}${ticks}${outerRing}${nodes}${core}${crownNode}`;
+}
+
+/* --- D. cosmic orbit -------------------------------------------------------
+ * Orbits, moons and stars accumulate; comets arrive late; the deep tiers
+ * pick up a nebula and one blazing star. */
+
+const ORBIT_INKS = ['#5c6bb0', '#5c6bb0', '#6a77c2', '#7a83d4', '#8a8fe6',
+  '#9a9bf0', '#ab9df5', '#c0a8fa', '#d5b4ff', '#ecc8ff'];
+const ORBIT_INKS_X = ['#f3d2ff', '#f9dcff', '#ffe6f8', '#fff0ea', '#fff5da',
+  '#fff9d0', '#fffbda', '#fffde4', '#fffff0', '#ffffff'];
+
+function drawOrbit(t, uid) {
+  const g = `${uid}o`;
+  const ink = t < 10 ? ORBIT_INKS[t] : ORBIT_INKS_X[Math.min(Math.floor((t - 10) / 4), 9)];
+  const defs = glowFilter(g, 1.6);
+  const orbits = Math.min(1 + Math.floor(t / 5), 5);
+
+  const nebula = t >= 16 ? `<circle cx="0" cy="0" r="40" fill="none" stroke="#8a5fd0" stroke-width="10" stroke-opacity=".12"/>` : '';
+  const rings = Array.from({ length: orbits }, (_, i) =>
+    `<ellipse cx="0" cy="0" rx="${34 + i * 3.2}" ry="${30 + i * 2.1}" fill="none" stroke="${ink}" stroke-width="1.2"
+      transform="rotate(${-18 + i * 16})"/>`).join('');
+  const moons = Array.from({ length: Math.min(1 + t, 14) }, (_, i) => {
+    const a = (i * 137 + 40);
+    const rx = 34 + (i % orbits) * 3.2, ry = 30 + (i % orbits) * 2.1;
+    const x = rx * Math.cos(a * TAU), y = ry * Math.sin(a * TAU);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${1.6 + (i % 3) * 0.5}" fill="#dfe7ff"/>`;
+  }).join('');
+  const sparks = t >= 4 ? Array.from({ length: Math.min(t, 20) }, (_, i) => {
+    const a = i * 61, r = 41 + (i % 3) * 3;
+    const [x, y] = P(r, a).split(',');
+    return `<circle cx="${x}" cy="${y}" r=".9" fill="#aebdf5"/>`;
+  }).join('') : '';
+  const comet = t >= 8 ? `<g filter="url(#${g})">
+      <path d="M 26 -30 Q 38 -38 50 -42" stroke="#9ef3ff" stroke-width="2" fill="none" stroke-linecap="round"/>
+      <circle cx="26" cy="-30" r="3" fill="#e6fbff"/></g>` : '';
+  const comet2 = t >= 26 ? `<g filter="url(#${g})">
+      <path d="M -26 30 Q -38 38 -50 42" stroke="#ffb8f0" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+      <circle cx="-26" cy="30" r="2.4" fill="#ffe6fb"/></g>` : '';
+  const star = t >= 40 ? `<g filter="url(#${g})">
+      <line x1="0" y1="-52" x2="0" y2="-40" stroke="#fff6c9" stroke-width="1.2"/>
+      <line x1="-6" y1="-46" x2="6" y2="-46" stroke="#fff6c9" stroke-width="1.2"/>
+      <circle cx="0" cy="-46" r="2.4" fill="#fffdf0"/></g>` : '';
+
+  return `<defs>${defs}</defs>${nebula}${rings}${moons}${sparks}${comet}${comet2}${star}`;
+}
+
+/* --- E. foil crest ---------------------------------------------------------
+ * Chevron wings multiply around the ring; the foil works through metals,
+ * then stays prismatic and picks up a crown, gems and a star. */
+
+const CREST_FOILS = [
+  ['#d09a5c', '#7a5426'], ['#d09a5c', '#7a5426'], ['#c9c9d4', '#767b87'],
+  ['#d9dee8', '#8d94a3'], ['#f2ca4f', '#8a6410'], ['#ffe08a', '#9a7524'],
+  ['#f2ca4f', '#8a6410'], ['#ffe08a', '#9a7524']
+];
+const CREST_PRISMS = [
+  ['#8ff2ff', '#c99bff', '#ffd08a'], ['#ffb8f0', '#ffd08a', '#8ff2b8'],
+  ['#c5ff8f', '#8ff2ff', '#ffb8d0'], ['#ffd08a', '#ff8fa8', '#c99bff'],
+  ['#8fb8ff', '#8ff2e0', '#ffe08a'], ['#e0c5ff', '#ffc5e8', '#c5f6ff'],
+  ['#fff0a8', '#8ff2ff', '#e0a8ff'], ['#ffffff', '#c5f6ff', '#ffe6fb']
+];
+
+function drawCrest(t, uid) {
+  const g = `${uid}f`;
+  const prism = t >= 8;
+  const set = prism ? CREST_PRISMS[t < 10 ? 0 : Math.min(1 + Math.floor((t - 10) / 6), 7)] : CREST_FOILS[t];
+  const defs = prism
+    ? grad(g, [[0, set[0]], [0.5, set[1]], [1, set[2]]], { x2: 1, y2: 1 })
+    : grad(g, [[0, set[0]], [1, set[1]]]);
+  const foil = `url(#${g})`;
+
+  const layers = t < 10 ? 1 + Math.floor(t / 3) : Math.min(4 + Math.floor((t - 10) / 13), 6);
+  const wing = (side) => Array.from({ length: layers }, (_, i) => {
+    const o = i * 9;
+    return `<path d="M ${side * (30 + o)} 12 L ${side * (44 + o)} ${2 - i * 3} L ${side * (36 + o)} ${-2 - i * 2} L ${side * (46 + o)} ${-14 - i * 3} L ${side * (32 + o)} ${-10 - i * 2} Z"
+      fill="${foil}" stroke="#3a2c10" stroke-width=".8" opacity="${1 - i * 0.14}"/>`;
+  }).join('');
+  const crown = t >= 5 ? `<path d="M -12 -32 L -6 -40 L 0 -33 L 6 -40 L 12 -32 Z" fill="${foil}" stroke="#3a2c10" stroke-width=".8"/>` : '';
+  const gem = t >= 9 ? `<circle cx="0" cy="-36" r="2.6" fill="#9ef3ff" stroke="#1c5e6b" stroke-width=".8"/>` : '';
+  const twinGems = t >= 22 ? `<circle cx="-10" cy="-35" r="1.8" fill="#ffb8f0" stroke="#6b1c50" stroke-width=".7"/>
+    <circle cx="10" cy="-35" r="1.8" fill="#ffb8f0" stroke="#6b1c50" stroke-width=".7"/>` : '';
+  const star = t >= 34 ? `<polygon points="0,-49 1.8,-44.4 6.6,-44.4 2.8,-41.6 4.2,-37 0,-39.8 -4.2,-37 -2.8,-41.6 -6.6,-44.4 -1.8,-44.4"
+    fill="#fff0a8" stroke="#8a6410" stroke-width=".6"/>` : '';
+  const radiance = t >= 46 ? Array.from({ length: 7 }, (_, i) => {
+    const a = -138 + i * 16;
+    const [x1, y1] = P(38, a).split(','), [x2, y2] = P(50, a).split(',');
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${set[i % 3]}" stroke-width="1" stroke-opacity=".6"/>`;
+  }).join('') : '';
+
+  return `<defs>${defs}</defs>${radiance}
+    <circle cx="0" cy="0" r="31.5" fill="none" stroke="${foil}" stroke-width="4"/>
+    ${wing(1)}${wing(-1)}${crown}${twinGems}${gem}${star}`;
+}
+
+/* --- F. crystal bloom (new for the frame rework) ---------------------------
+ * Shards grow around the ring like frost on a window: a few teal splinters
+ * at first, a full corona later, working through jade and amethyst to a
+ * prismatic bloom where every shard carries its own colour. */
+
+const CRYSTAL_SETS = [
+  ['#3ec9c9', '#b8fff4', '#1f7a7a'], ['#3eb8d9', '#c5f0ff', '#1f6a8a'],
+  ['#3ec98f', '#b8ffdc', '#1f7a4e'], ['#7a5fd0', '#d5c5ff', '#42308a'],
+  ['#9a4fd0', '#e0c5ff', '#5a2a8a'], ['#c94fb8', '#ffc5f0', '#801f70'],
+  ['#d94f7a', '#ffc5d8', '#8a1f42'], ['#d9924f', '#ffe0c5', '#8a541f'],
+  null, // prismatic: per-shard colours
+  ['#dfe7f2', '#ffffff', '#8a97a8']
+];
+const CRYSTAL_PRISM = [
+  ['#3ec9c9', '#b8fff4', '#1f7a7a'], ['#7a5fd0', '#d5c5ff', '#42308a'],
+  ['#c94fb8', '#ffc5f0', '#801f70'], ['#d9924f', '#ffe0c5', '#8a541f'],
+  ['#3ec98f', '#b8ffdc', '#1f7a4e']
+];
+
+function drawCrystal(t, uid) {
+  const g = `${uid}x`;
+  const setIndex = Math.min(Math.floor(t / 5), 9);
+  const fixed = CRYSTAL_SETS[setIndex];
+  const defs = glowFilter(g, 1.4);
+
+  const count = Math.min(3 + t, 24);
+  const shards = Array.from({ length: count }, (_, i) => {
+    // Sprout from the bottom and climb both sides as the count grows.
+    const side = i % 2 ? 1 : -1;
+    const climb = Math.floor(i / 2) * (168 / Math.max(Math.ceil(count / 2) - 1, 1));
+    const a = 90 + side * climb;
+    const [mid, hi, lo] = fixed ?? CRYSTAL_PRISM[i % CRYSTAL_PRISM.length];
+    const len = 9 + Math.min(t, 30) * 0.22 + jit(i, t) * 5 - (i % 3 === 0 ? 3 : 0);
+    const w = 3 + jit(i, 7) * 1.6;
+    const base = 28.5, tip = base + len;
+    const [bx, by] = P(base, a).split(',').map(Number);
+    const [tx2, ty2] = P(tip, a).split(',').map(Number);
+    const px = -Math.sin(a * TAU), py = Math.cos(a * TAU);
+    const m1 = base + len * 0.42;
+    const [mx, my] = P(m1, a).split(',').map(Number);
+    return `<polygon points="${bx + px * w},${by + py * w} ${mx + px * w * 1.25},${my + py * w * 1.25} ${tx2},${ty2} ${mx - px * w * 1.25},${my - py * w * 1.25} ${bx - px * w},${by - py * w}"
+      fill="${mid}" stroke="${lo}" stroke-width=".8"/>
+      <line x1="${mx}" y1="${my}" x2="${tx2}" y2="${ty2}" stroke="${hi}" stroke-width=".9" stroke-opacity=".9"/>`;
+  }).join('');
+
+  const ring = fixed ?? CRYSTAL_PRISM[0];
+  const glints = t >= 28 ? Array.from({ length: Math.min(3 + Math.floor((t - 28) / 6), 6) }, (_, i) => {
+    const a = 90 + (i % 2 ? 1 : -1) * (30 + i * 26);
+    const [x, y] = P(44 + jit(i, 3) * 4, a).split(',');
+    return `<g filter="url(#${g})" stroke="#ffffff" stroke-width="1"><line x1="${x}" y1="${+y - 3}" x2="${x}" y2="${+y + 3}"/><line x1="${+x - 3}" y1="${y}" x2="${+x + 3}" y2="${y}"/></g>`;
+  }).join('') : '';
+  const halo = t >= 45 ? `<circle cx="0" cy="0" r="47.5" fill="none" stroke="${ring[1]}" stroke-width=".8" stroke-opacity=".5"/>` : '';
+
+  return `<defs>${defs}</defs>${halo}
+    <circle cx="0" cy="0" r="29" fill="none" stroke="${ring[0]}" stroke-opacity=".55" stroke-width="2.4"/>
+    ${shards}${glints}`;
+}
+
+/* --- the one public drawing call ------------------------------------------ */
+
+const DRAWERS = { metal: drawMetal, circuit: drawCircuit, orbit: drawOrbit, crest: drawCrest, crystal: drawCrystal };
+
+/**
+ * The frame for a style at a tier, as an <svg> string, or '' below tier 1.
+ * The svg fills its container; put it in an absolutely-positioned overlay at
+ * 223% of the wrapped circle's size.
+ */
+export function frameSvg(styleId, tier, { size = null } = {}) {
+  const t = Math.min(Math.max(Math.round(tier), 0), 50) - 1;
+  if (t < 0) return '';
+  const draw = DRAWERS[styleId] ?? DRAWERS.metal;
+  const uid = `pwf-${styleId}-${t}-`;
+  const dim = size ? `width="${size}" height="${size}"` : 'width="100%" height="100%"';
+  return `<svg viewBox="-58 -58 116 116" ${dim} aria-hidden="true" style="overflow:visible;display:block">${draw(t, uid)}</svg>`;
+}

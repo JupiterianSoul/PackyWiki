@@ -138,4 +138,20 @@ export const RELEASES = [
         fr: 'Aurore, Papier, Arcade et Sunset moins forts : ils sonnaient plus fort que les autres' }
     ]
   },
+  {
+    id: 'regalia', icon: 'star', accent: '#7ef2ff',
+    title: { en: 'Badges and frames', fr: 'Insignes et cadres' },
+    points: [
+      { en: 'Twelve holographic badges for the hardest feats, upgrading in place as you climb',
+        fr: 'Douze insignes holographiques pour les plus grands exploits, qui montent en grade avec vous' },
+      { en: 'They sit on your profile, between your level and your statistics',
+        fr: 'Ils se placent sur votre profil, entre votre niveau et vos statistiques' },
+      { en: 'A frame around your level every 10 levels, all the way to 500',
+        fr: 'Un cadre autour de votre niveau tous les 10 niveaux, jusqu’au niveau 500' },
+      { en: 'Five frame styles to wear, picked on the Customization screen',
+        fr: 'Cinq styles de cadre à porter, choisis sur l’écran Personnalisation' },
+      { en: 'Friends see the frame you wear, on your picture and your profile',
+        fr: 'Vos amis voient le cadre que vous portez, sur votre photo et votre profil' }
+    ]
+  }
 ];

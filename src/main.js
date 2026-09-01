@@ -61,6 +61,8 @@ import {
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
 } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
+import { FRAME_STYLES, DEFAULT_FRAME_STYLE, frameStyleById, frameTier, frameSvg } from './frames.js';
+import { BADGES, badgeStates, romanRank, badgeSvg } from './badges.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { proceduralStyle } from './packstyle.js';
 import { styleForSpec, rarityBurst } from './packstyle.js';
@@ -218,6 +220,8 @@ bind({
 
   settingsTitle: $('#settings-title'), themeLabel: $('#theme-label'), themeGrid: $('#theme-grid'),
   customizeTitle: $('#customize-title'), identityLabel: $('#identity-label'), identityList: $('#identity-list'),
+  framesLabel: $('#frames-label'), framesNote: $('#frames-note'), frameStyles: $('#frame-styles'),
+  badgesLabel: $('#badges-label'), badgeGrid: $('#badge-grid'),
   prefsLabel: $('#prefs-label'), settingsList: $('#settings-list'),
   accountLabel: $('#account-label'), accountList: $('#account-list'),
   dataLabel: $('#data-label'), dataList: $('#data-list'),
@@ -373,10 +377,50 @@ function refreshWallet() {
   el.wallet.setAttribute('aria-label', `${t('walletTitle')}: ${formatAmount(state.wallet)}`);
 }
 
+/* --- level frames ------------------------------------------------------------------------
+ * The equipped style follows the account when there is one (so a second
+ * device and your friends see the same frame) and falls back to the local
+ * choice; the tier always comes from the level itself. */
+const frameStyle = () =>
+  state.account?.profile?.avatar?.frame?.style ?? state.frameStyle ?? DEFAULT_FRAME_STYLE;
+
+/** Wrap (or unwrap) a circular element with a frame overlay. */
+function paintFrameInto(node, styleId, tier) {
+  let overlay = node.querySelector(':scope > .frame-overlay');
+  const svg = tier >= 1 ? frameSvg(styleId, tier) : '';
+  if (!svg) { overlay?.remove(); return; }
+  if (!overlay) {
+    overlay = document.createElement('span');
+    overlay.className = 'frame-overlay';
+    overlay.setAttribute('aria-hidden', 'true');
+    node.appendChild(overlay);
+  }
+  const stamp = `${styleId}:${tier}`;
+  if (overlay.dataset.frame === stamp) return;
+  overlay.dataset.frame = stamp;
+  overlay.innerHTML = svg;
+}
+
+/** Equip a style: locally at once, and onto the account profile when it can
+ *  carry it, riding in the avatar column so friends' apps receive it with
+ *  the picture they already fetch. */
+function pickFrameStyle(styleId) {
+  state.frameStyle = styleId;
+  store.saveFrameStyle(styleId);
+  refreshLevelBadge();
+  if (signedIn() && account.socialSchemaReady()) {
+    const merged = { ...(state.account.profile?.avatar ?? {}), frame: { style: styleId } };
+    account.updateProfileFields(userId(), { avatar: merged })
+      .then(() => { if (state.account.profile) state.account.profile.avatar = merged; })
+      .catch((error) => console.error('frame sync failed:', error?.message ?? error));
+  }
+}
+
 function refreshLevelBadge() {
   const level = state.profile.progress.level ?? 1;
   levelRing.set(levelFraction(state.profile.progress), String(level));
   el.levelBadge.setAttribute('aria-label', `${t('profileLevel', { n: level })}`);
+  paintFrameInto(el.levelBadge, frameStyle(), frameTier(level));
 }
 
 function updateBadges() {
@@ -2735,6 +2779,7 @@ function renderProfile() {
   const atMax = level >= MAX_LEVEL;
 
   profileRing.set(levelFraction(progress), String(level));
+  paintFrameInto(el.profileRing, frameStyle(), frameTier(level));
   el.profileLevel.textContent = atMax ? t('profileMax') : t('profileLevel', { n: level });
   el.profileRank.textContent = tx(rank.name);
   xpBar.set(levelFraction(progress));
@@ -2747,6 +2792,8 @@ function renderProfile() {
     atMax ? document.createTextNode(t('profileMax'))
       : rewardCard(rewardForLevel(level + 1), { art: false })
   );
+
+  renderBadges();
 
   el.statsLabel.textContent = t('profileStats');
   const entries = store.allEntries(state.collection);
@@ -2790,6 +2837,53 @@ function renderProfile() {
     return row;
   }));
 
+}
+
+/* --- badges ------------------------------------------------------------------------------
+ * Holographic chips for the hard end of the achievement chains, between the
+ * level card and the statistics. Locked chips stay visible in grey: a shelf
+ * of things to want is worth more than a blank space. */
+
+function renderBadges() {
+  const evaluated = evaluateAchievements(achFacts(), state.profile.achievements?.redeemed ?? []);
+  const states = badgeStates(evaluated);
+  const earned = states.filter((st) => st.rank > 0).length;
+  el.badgesLabel.textContent = `${t('badgesTitle')} · ${earned}/${states.length}`;
+
+  el.badgeGrid.replaceChildren(...states.map((st) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `badge-chip${st.rank > 0 ? '' : ' is-locked'}`;
+    chip.innerHTML = `${badgeSvg(st.badge, st.rank, st.max, { size: 62 })}<b></b><span class="badge-rank"></span>`;
+    chip.querySelector('b').textContent = st.name;
+    chip.querySelector('.badge-rank').textContent =
+      st.max > 1 && st.rank > 0 ? romanRank(st.rank) : '';
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => { synth.playTap(); openBadgeSheet(st); });
+    return chip;
+  }));
+}
+
+function openBadgeSheet(st) {
+  openSheet(st.name, (body) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'badge-sheet';
+    wrap.innerHTML = `<div class="badge-sheet-chip"></div><p class="badge-sheet-line"></p><div class="badge-rungs"></div>`;
+    wrap.querySelector('.badge-sheet-chip').innerHTML = badgeSvg(st.badge, st.rank, st.max, { size: 120 });
+    wrap.querySelector('.badge-sheet-line').textContent = st.rank > 0
+      ? (st.max > 1 ? t('badgeRank', { n: romanRank(st.rank), max: romanRank(st.max) }) : t('badgeEarned'))
+      : t('badgeLockedLine');
+    wrap.querySelector('.badge-rungs').replaceChildren(...st.rungs.map((rung) => {
+      const row = document.createElement('div');
+      row.className = `badge-rung${rung.unlocked ? ' is-done' : ''}`;
+      row.innerHTML = `<span class="badge-rung-mark">${iconSvg(rung.unlocked ? 'check' : 'lock', { size: 14 })}</span>
+        <span class="badge-rung-copy"><b></b><span></span></span>`;
+      row.querySelector('b').textContent = rung.name;
+      row.querySelector('.badge-rung-copy span').textContent = rung.desc;
+      return row;
+    }));
+    body.appendChild(wrap);
+  });
 }
 
 /* --- achievements ------------------------------------------------------------------------ */
@@ -3221,6 +3315,7 @@ function reloadFromStorage() {
   state.collection = store.loadCollection();
   state.inventory = store.loadInventory();
   state.profile = store.loadProfile();
+  state.frameStyle = store.loadFrameStyle() ?? DEFAULT_FRAME_STYLE;
   state.customPacks = store.loadCustomPacks();
   state.wallet = store.loadWallet();
   applySettings();
@@ -3802,7 +3897,7 @@ async function sendChat(event) {
 
 /** Paint a person's avatar (their chosen card art, at their chosen crop)
  *  into a .person-mark-style circle, or fall back to their initial. */
-function paintAvatarInto(node, profile) {
+function paintAvatarInto(node, profile, { frame = null } = {}) {
   const avatar = profile?.avatar;
   if (avatar?.url) {
     node.textContent = '';
@@ -3815,6 +3910,10 @@ function paintAvatarInto(node, profile) {
     node.classList.remove('has-avatar');
     node.textContent = String(profile?.username ?? '?').slice(0, 1);
   }
+  // The frame travels with the picture: whatever profile object is being
+  // painted carries its owner's style, and the tier is read off their level.
+  const worn = frame ?? { style: avatar?.frame?.style, tier: frameTier(profile?.level) };
+  paintFrameInto(node, worn.style ?? null, worn.style ? worn.tier : 0);
 }
 
 /**
@@ -3913,6 +4012,8 @@ function openAvatarCrop(card) {
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
       const avatar = { url: card.thumbnail, x: Math.round(x), y: Math.round(y) };
+      // The frame rides in this same column; a new picture must not undress it.
+      if (state.account.profile?.avatar?.frame) avatar.frame = state.account.profile.avatar.frame;
       try {
         await account.updateProfileFields(userId(), { avatar });
         state.account.profile.avatar = avatar;
@@ -4688,6 +4789,38 @@ function renderCustomize() {
   }));
 
   el.identityList.replaceChildren(...identityRows());
+
+  // --- level frames: pick the style your level wears -----------------------
+  el.framesLabel.textContent = t('framesTitle');
+  const level = state.profile.progress.level ?? 1;
+  const tier = frameTier(level);
+  el.framesNote.textContent = tier >= 1
+    ? t('framesNote')
+    : `${t('framesNote')} ${t('framesLocked')}`;
+  const wearing = frameStyle();
+  el.frameStyles.replaceChildren(...FRAME_STYLES.map((style) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `frame-card${style.id === wearing ? ' is-on' : ''}${tier < 1 ? ' is-dim' : ''}`;
+    card.dataset.frame = style.id;
+    card.innerHTML = `
+      <span class="frame-prev">
+        <span class="frame-prev-core">${level}</span>
+        <span class="frame-overlay" aria-hidden="true">${frameSvg(style.id, Math.max(tier, 1))}</span>
+      </span>
+      <span class="frame-copy"><h4></h4></span>
+      <span class="theme-check">${iconSvg('check', { size: 14 })}</span>`;
+    card.querySelector('h4').textContent = tx(style.name);
+    press(card, { sound: null });
+    card.addEventListener('click', () => {
+      if (style.id === frameStyle()) return;
+      synth.playTap();
+      pickFrameStyle(style.id);
+      toast(t('frameEquipped', { name: tx(style.name) }));
+      renderCustomize();
+    });
+    return card;
+  }));
 }
 
 /* --- settings & customization rows ---------------------------------------- */
@@ -4752,7 +4885,8 @@ function identityRows() {
     const avatarRow = settingsRowShell('avatarTitle', 'avatarNote');
     const face = document.createElement('span');
     face.className = 'person-mark row-action';
-    paintAvatarInto(face, state.account.profile);
+    paintAvatarInto(face, state.account.profile,
+      { frame: { style: frameStyle(), tier: frameTier(state.profile.progress.level) } });
     face.style.cursor = 'pointer';
     face.addEventListener('click', () => { synth.playTap(); openAvatarPicker(); });
     avatarRow.appendChild(face);

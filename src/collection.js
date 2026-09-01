@@ -472,6 +472,17 @@ export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
 /* --- custom boosters ----------------------------------------------------- */
 
 /** Which way the collection was last read: as albums, or as one long list. */
+/* --- the equipped level-frame style ---------------------------------------
+ * Which of the five frame designs wraps your level and your picture. The
+ * frame's tier is never stored: it is always derived from the level. */
+const FRAME_KEY = 'packywiki.frameStyle.v1';
+export function loadFrameStyle() {
+  try { return localStorage.getItem(FRAME_KEY) || null; } catch { return null; }
+}
+export function saveFrameStyle(styleId) {
+  try { localStorage.setItem(FRAME_KEY, styleId); } catch { /* storage unavailable */ }
+}
+
 export function loadBinderView() {
   try {
     return localStorage.getItem(BINDER_VIEW_KEY) === 'classic' ? 'classic' : 'albums';

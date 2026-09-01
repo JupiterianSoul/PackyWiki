@@ -1601,6 +1601,90 @@
 .quiz-note.is-error { color: var(--negative); font-weight: 700; }
 .quiz-note { text-align: center; font-size: 0.85rem; line-height: 1.55; color: var(--ink-dim); max-width: 38ch; margin: 0 auto; }
 .quiz-start { width: min(100%, 320px); }
+/* --- level frames & badges ------------------------------------------------ */
+/* The wrapper around a circle: 223% because the frame art's ring sits at
+   52/116 of its viewBox, so this size lands it exactly on the element edge. */
+.frame-overlay {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 223%;
+  height: 223%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 3;
+}
+.person-mark, .ring { position: relative; }
+
+.badge-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.badge-chip {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  background: none;
+  border: none;
+  padding: 6px 2px;
+  color: inherit;
+}
+.badge-chip b { font-size: 0.66rem; font-weight: 700; line-height: 1.2; text-align: center; color: var(--ink-dim); }
+.badge-chip.is-locked b { color: var(--ink-faint); }
+.badge-chip .badge-rank { font-size: 0.6rem; font-weight: 800; color: var(--accent); min-height: 0.7em; }
+.badge-sheet { display: grid; gap: 12px; justify-items: center; }
+.badge-sheet-line { font-size: 0.84rem; color: var(--ink-dim); text-align: center; }
+.badge-rungs { display: grid; gap: 8px; width: 100%; }
+.badge-rung {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+}
+.badge-rung.is-done { border-color: color-mix(in srgb, var(--positive) 40%, var(--line)); }
+.badge-rung-mark { flex: none; color: var(--ink-faint); display: grid; place-items: center; }
+.badge-rung.is-done .badge-rung-mark { color: var(--positive); }
+.badge-rung-copy { display: grid; gap: 2px; min-width: 0; }
+.badge-rung-copy b { font-size: 0.82rem; }
+.badge-rung-copy span { font-size: 0.74rem; color: var(--ink-dim); }
+
+.frames-note { font-size: 0.8rem; color: var(--ink-dim); margin: 4px 0 12px; }
+.frame-styles { display: grid; grid-template-columns: 1fr; gap: 12px; }
+.frame-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: inherit;
+  position: relative;
+}
+.frame-card.is-on { border-color: var(--accent); }
+.frame-card.is-dim .frame-prev { opacity: 0.45; }
+.frame-card .theme-check { position: absolute; top: 10px; right: 10px; opacity: 0; color: var(--accent); }
+.frame-card.is-on .theme-check { opacity: 1; }
+.frame-copy h4 { font-size: 0.88rem; }
+/* The preview slot leaves the full wingspan clear of the label: the overlay
+   runs 223% of this box, so wide tiers stay inside their own lane. */
+.frame-prev { position: relative; width: 46px; height: 46px; flex: none; margin: 14px 30px 14px 16px; }
+.frame-prev-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 24px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border: 1px solid var(--line-strong);
+  display: grid;
+  place-items: center;
+  font-size: 0.58rem;
+  font-weight: 800;
+}
+
 .quiz-allowance {
   font-size: 0.74rem;
   font-weight: 700;
