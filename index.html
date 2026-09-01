@@ -154,7 +154,14 @@
             <button class="help-btn" data-help="binder" type="button" aria-label="What is this?">?</button>
           </div>
           <div class="binder-stats" id="binder-stats"></div>
+          <div class="seg-wrap" id="binder-seg-wrap"><div id="binder-seg"></div></div>
+          <div class="binder-tools" id="binder-tools" hidden>
+            <button id="classic-filter" class="btn btn-ghost btn-sm" type="button"></button>
+            <span class="chip" id="classic-filter-count" hidden></span>
+            <span class="muted" id="classic-count"></span>
+          </div>
           <div id="album-shelf" class="album-shelf"></div>
+          <div id="classic-view" class="classic-view" hidden></div>
           <div class="empty" id="binder-empty" hidden>
             <span class="empty-mark" id="binder-empty-mark"></span>
             <p id="binder-empty-text"></p>
@@ -172,13 +179,9 @@
             </div>
             <div class="album-book-wrap">
               <div id="album-book" class="album-book">
-                <div class="album-page is-left">
-                  <div class="album-slots" id="page-left"></div>
-                  <span class="album-pageno" id="pageno-left"></span>
-                </div>
-                <div class="album-page is-right">
-                  <div class="album-slots" id="page-right"></div>
-                  <span class="album-pageno" id="pageno-right"></span>
+                <div class="album-page" id="album-leaf">
+                  <div class="album-slots" id="page-slots"></div>
+                  <span class="album-pageno" id="pageno"></span>
                 </div>
               </div>
             </div>

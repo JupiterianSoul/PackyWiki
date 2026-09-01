@@ -10,14 +10,17 @@
  * the REAL size of the category: how many articles its queries actually match
  * on Wikipedia, or how many pages the custom wiki holds. Those numbers are
  * fetched once, cached, and honest: nobody is completing Wikipedia.
- * The book shows two pages at a time, four cards to a page.
+ *
+ * The book shows ONE page at a time, four cards to a page in a 2x2 grid.
+ * It used to show a two-page spread, which on a phone meant four cards
+ * across: every card was squeezed into a tall thin sliver and the next
+ * page's slots peeked in at the edge.
  */
 import { THEME_PACKS, themeById } from './data/packs.js';
 import { styleForSpec } from './packstyle.js';
 import { tx, getLanguage, wikiLang } from './i18n.js';
 
 export const CARDS_PER_PAGE = 4;
-export const CARDS_PER_SPREAD = CARDS_PER_PAGE * 2;
 
 /* --- real category sizes -------------------------------------------------- */
 
@@ -129,11 +132,33 @@ export function fetchAlbumTotal(album) {
   return job;
 }
 
+/**
+ * ONE canonical name per custom wiki.
+ *
+ * A custom pack has been written down three different ways over the app's
+ * life: `terraria.fandom.com`, `terraria.fandom.com/fr`, and the flattened
+ * `terraria-fandom-com` a stored pack id uses. Left alone those are three
+ * different albums for one subject, which is exactly the duplicate the
+ * shelf kept growing. Everything funnels through here instead: the language
+ * path is dropped (a French Terraria card belongs in the Terraria album)
+ * and the punctuation is flattened, so one subject is one album, forever.
+ */
+export function customSlug(raw) {
+  return String(raw ?? '')
+    .replace(/^custom-/, '')
+    .replace(/^https?:\/\//, '')
+    .replace(/\/api\.php$/, '')
+    .replace(/\/[a-z]{2}$/, '')
+    .toLowerCase()
+    .replace(/\W+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 /** Which album an owned card belongs to. */
 export function albumKeyOf(entry) {
   const [kind, ident] = String(entry.packId ?? '').split('|');
   if (kind === 'theme' && ident && ident !== 'any') return `theme:${ident}`;
-  if (kind === 'custom' && ident) return `custom:${ident}`;
+  if (kind === 'custom' && ident) return `custom:${customSlug(ident)}`;
   return 'wild';
 }
 
@@ -142,9 +167,12 @@ export function albumKeyOf(entry) {
 export function albumSpec(album) {
   if (album.kind === 'theme') return { kind: 'theme', themeId: album.themeId, rarityId: null, cards: 5 };
   if (album.kind === 'custom') {
+    // The slug lost the dots on the way in; the host it came from is kept on
+    // the album so styling and the article count still reach the real wiki.
+    const host = album.host ?? `${album.slug.replace(/-/g, '.')}`;
     return {
-      kind: 'custom', cards: 5, customName: album.name,
-      wiki: { apiUrl: `https://${album.host}/api.php`, sitename: album.name }
+      kind: 'custom', cards: 5, customName: album.name, customId: `custom-${album.slug}`,
+      wiki: { apiUrl: `https://${host}/api.php`, sitename: album.name }
     };
   }
   return { kind: 'open', themeId: null, rarityId: null, cards: 5 };
@@ -174,29 +202,35 @@ export function buildAlbums(entries, customPacks = []) {
     }));
   }
 
-  // Custom albums: one per pack ever pulled from, plus packs still built
-  // (so a freshly created pack's album shows locked on the shelf).
-  const customHosts = new Map();
+  // Custom albums: one per SUBJECT, never one per spelling. Both the packs
+  // the player still has built and the packs their cards remember collapse
+  // onto the same slug, so a subject can only ever hold one album.
+  const customs = new Map();
+  const remember = (slug, { name, host }) => {
+    if (!slug) return;
+    const found = customs.get(slug) ?? { slug, name: null, host: null };
+    found.name = found.name ?? name ?? null;
+    found.host = found.host ?? host ?? null;
+    customs.set(slug, found);
+  };
   for (const pack of customPacks) {
-    const host = String(pack.id ?? '').replace(/^custom-/, '');
-    if (host) customHosts.set(host, pack.name);
+    let host = null;
+    try {
+      const url = new URL(pack.wiki?.apiUrl ?? '');
+      host = url.host + url.pathname.replace('/api.php', '');
+    } catch { /* an older pack may have no wiki stored */ }
+    remember(customSlug(host || pack.id), { name: pack.name, host });
   }
   for (const [key, owned] of byKey) {
     if (!key.startsWith('custom:')) continue;
-    const host = key.slice('custom:'.length);
-    if (!customHosts.has(host)) customHosts.set(host, owned[0]?.packName ?? host);
+    const slug = key.slice('custom:'.length);
+    const raw = String(owned[0]?.packId ?? '').split('|')[1] ?? '';
+    remember(slug, { name: String(owned[0]?.packName ?? '').replace(/\u00b7.*$/, '').trim() || slug, host: raw || null });
   }
-  for (const [hostKey, name] of customHosts) {
-    // Stored pack ids flatten the host's punctuation; card packIds keep it.
-    // Match either shape.
-    const flat = hostKey.replace(/\W+/g, '-');
-    const owned = byKey.get(`custom:${hostKey}`)
-      ?? [...byKey.entries()].find(([k]) => k.startsWith('custom:')
-        && k.slice(7).replace(/\W+/g, '-') === flat)?.[1]
-      ?? [];
+  for (const [slug, info] of customs) {
     albums.push(decorate({
-      key: `custom:${hostKey}`, kind: 'custom', host: hostKey,
-      name: String(name).replace(/·.*$/, '').trim() || hostKey, entries: owned
+      key: `custom:${slug}`, kind: 'custom', slug, host: info.host,
+      name: info.name || slug, entries: byKey.get(`custom:${slug}`) ?? []
     }));
   }
 
@@ -215,10 +249,6 @@ function decorate(album) {
   album.total = known == null ? null : Math.max(known, album.owned);
   album.unlocked = album.owned > 0;
   album.complete = album.total != null && album.owned >= album.total;
-  // The book holds what you own, plus one blank spread that says there is
-  // more out there. A complete album closes exactly on its last card.
-  const filled = Math.max(1, Math.ceil(album.owned / CARDS_PER_SPREAD));
-  album.spreads = album.complete ? filled : filled + 1;
   return album;
 }
 

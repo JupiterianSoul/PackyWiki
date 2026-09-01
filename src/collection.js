@@ -11,6 +11,7 @@
  * again as a Legendary upgrades the entry.
  */
 import { rarityRank } from './data/rarities.js';
+import { albumKeyOf, customSlug } from './albums.js';
 import { bandFor } from './pricing.js';
 import { specId } from './booster.js';
 import {
@@ -32,6 +33,7 @@ const WALLET_KEY = 'packywiki.wallet.v1';
 const INVENTORY_KEY = 'packywiki.inventory.v1';
 const PROFILE_KEY = 'packywiki.profile.v1';
 const CUSTOM_KEY = 'packywiki.customPacks.v2';
+const BINDER_VIEW_KEY = 'packywiki.binderView.v1';
 
 /** Every read and write is guarded: localStorage throws in some privacy modes. */
 function readJson(key, fallback) {
@@ -188,6 +190,57 @@ export function receiveCardEntry(collection, incoming) {
   return collection.entries[incoming.key];
 }
 
+/**
+ * Swap a card for the same article in another language.
+ *
+ * The card keeps everything the player earned on it - how many copies, the
+ * favourite star, when it was first pulled and which booster it came from -
+ * and takes the translated article's identity, text and picture. Merging
+ * onto a card they already own in the right language is fine: the copies add
+ * up rather than one of them vanishing.
+ */
+export function replaceEntryWithTranslation(collection, oldEntry, card, lang) {
+  if (!card?.key || !oldEntry?.key) return false;
+  const kept = {
+    count: oldEntry.count ?? 1,
+    favorite: Boolean(oldEntry.favorite),
+    firstPulledAt: oldEntry.firstPulledAt ?? Date.now(),
+    lastPulledAt: oldEntry.lastPulledAt ?? Date.now(),
+    packId: oldEntry.packId,
+    packName: oldEntry.packName,
+    packIcon: oldEntry.packIcon,
+    packAccent: oldEntry.packAccent
+  };
+  delete collection.entries[oldEntry.key];
+
+  const existing = collection.entries[card.key];
+  if (existing) {
+    existing.count += kept.count;
+    existing.favorite = existing.favorite || kept.favorite;
+    existing.firstPulledAt = Math.min(existing.firstPulledAt ?? kept.firstPulledAt, kept.firstPulledAt);
+  } else {
+    collection.entries[card.key] = {
+      key: card.key,
+      title: card.title,
+      description: card.description,
+      extract: card.extract,
+      thumbnail: card.thumbnail,
+      url: card.url,
+      lang,
+      sourceId: card.sourceId,
+      sourceName: card.sourceName,
+      views: card.views,
+      popularity: card.popularity,
+      // The re-grade that follows sets the tier and the price from popularity.
+      rarityId: oldEntry.rarityId,
+      price: oldEntry.price,
+      ...kept
+    };
+  }
+  saveCollection(collection);
+  return true;
+}
+
 export const allEntries = (collection) => Object.values(collection.entries);
 
 /* --- filtering ----------------------------------------------------------- */
@@ -209,7 +262,7 @@ export function filterEntries(entries, filters) {
   return entries
     .filter((entry) => {
       if (filters.favoritesOnly && !entry.favorite) return false;
-      if (filters.pack && entry.packId !== filters.pack) return false;
+      if (filters.pack && albumKeyOf(entry) !== filters.pack) return false;
       if (filters.rarity && entry.rarityId !== filters.rarity) return false;
       if (filters.band && bandFor(entry.popularity ?? 0).id !== filters.band) return false;
       if (filters.minPrice && entry.price < Number(filters.minPrice)) return false;
@@ -379,20 +432,97 @@ export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
 
 /* --- custom boosters ----------------------------------------------------- */
 
+/** Which way the collection was last read: as albums, or as one long list. */
+export function loadBinderView() {
+  try {
+    return localStorage.getItem(BINDER_VIEW_KEY) === 'classic' ? 'classic' : 'albums';
+  } catch {
+    return 'albums';
+  }
+}
+
+export function saveBinderView(view) {
+  try { localStorage.setItem(BINDER_VIEW_KEY, view === 'classic' ? 'classic' : 'albums'); }
+  catch { /* storage unavailable */ }
+}
+
 export function loadCustomPacks() {
   const packs = readJson(CUSTOM_KEY, []);
   return Array.isArray(packs) ? packs : [];
 }
 
+/**
+ * One pack per subject, whatever it is called.
+ *
+ * "Terraria", "terraria" and the French community of the same wiki all
+ * collapse onto one slug, so building a pack you already have replaces it
+ * instead of stacking a second copy beside it (which is what put two
+ * Terraria albums on the shelf).
+ */
 export function saveCustomPack(pack) {
-  const packs = loadCustomPacks().filter((p) => p.id !== pack.id);
+  const slug = customSlug(packHost(pack) || pack.id);
+  const packs = loadCustomPacks().filter((p) => customSlug(packHost(p) || p.id) !== slug);
   packs.unshift(pack);
   writeJson(CUSTOM_KEY, packs);
   return packs;
 }
 
 export function deleteCustomPack(id) {
-  const packs = loadCustomPacks().filter((p) => p.id !== id);
+  const slug = customSlug(id);
+  const packs = loadCustomPacks().filter((p) => customSlug(packHost(p) || p.id) !== slug);
   writeJson(CUSTOM_KEY, packs);
   return packs;
+}
+
+/** The wiki host a stored pack points at, if it still remembers one. */
+export function packHost(pack) {
+  try {
+    const url = new URL(pack?.wiki?.apiUrl ?? '');
+    return url.host + url.pathname.replace('/api.php', '');
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * Rebuild the custom packs a save has lost, and drop the duplicates.
+ *
+ * A pack that disappears from the Custom tab takes its shop shelf with it,
+ * which is how somebody ends up rebuilding a pack they already had and
+ * finding two albums for one subject. Owned cards remember the wiki they
+ * came from, so anything missing is put back from them, and any pack stored
+ * twice under different spellings collapses to one.
+ * Returns how many packs were restored.
+ */
+export function healCustomPacks(collection) {
+  const packs = loadCustomPacks();
+  const bySlug = new Map();
+  for (const pack of packs) {
+    const slug = customSlug(packHost(pack) || pack.id);
+    if (slug && !bySlug.has(slug)) bySlug.set(slug, pack);
+  }
+  const before = bySlug.size;
+
+  let restored = 0;
+  for (const entry of Object.values(collection.entries ?? {})) {
+    const [kind, ident] = String(entry.packId ?? '').split('|');
+    if (kind !== 'custom' || !ident) continue;
+    const slug = customSlug(ident);
+    if (!slug || bySlug.has(slug)) continue;
+    const host = ident.replace(/^https?:\/\//, '');
+    bySlug.set(slug, {
+      id: `custom-${slug}`,
+      name: String(entry.packName ?? slug).replace(/\u00b7.*$/, '').trim() || slug,
+      tagline: entry.sourceName ?? '',
+      icon: 'wand',
+      accent: entry.packAccent ?? '#a78bfa',
+      accent2: '#4c1d95',
+      wiki: { apiUrl: `https://${host}/api.php`, sitename: entry.sourceName ?? entry.packName ?? slug }
+    });
+    restored++;
+  }
+  if (restored || bySlug.size !== packs.length || before !== packs.length) {
+    writeJson(CUSTOM_KEY, [...bySlug.values()]);
+  }
+  return restored;
 }

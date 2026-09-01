@@ -21,7 +21,7 @@
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
 import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityThresholds } from './data/rarities.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
-import { drawArticles, resolveCustomWiki, fetchArticleText } from './wiki.js';
+import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard } from './wiki.js';
 import {
   priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS,
   popularityFromViews, popularityFromWordCount
@@ -54,7 +54,7 @@ import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
-import { buildAlbums, albumsCompleted, fetchAlbumTotal, CARDS_PER_PAGE, CARDS_PER_SPREAD } from './albums.js';
+import { buildAlbums, albumsCompleted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
 import { groqKey, saveGroqKey, buildQuiz, questionCountFor, quizRewards } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
@@ -116,6 +116,7 @@ const state = {
   album: null, albumTurning: false,
   packSlots: [],
   filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'rarity', favoritesOnly: false },
+  binderView: store.loadBinderView(),   // 'albums' | 'classic'
 
   // Who is signed in, and what the server last told us about them.
   account: { session: null, profile: null, mode: 'signin', syncing: false, syncedAt: null, failed: false },
@@ -186,8 +187,12 @@ bind({
   binderTitle: $('#binder-title'), binderStats: $('#binder-stats'),
   albumShelf: $('#album-shelf'), albumView: $('#album-view'), albumBack: $('#album-back'),
   albumName: $('#album-name'), albumProgress: $('#album-progress'),
-  albumBook: $('#album-book'), pageLeft: $('#page-left'), pageRight: $('#page-right'),
-  pagenoLeft: $('#pageno-left'), pagenoRight: $('#pageno-right'),
+  binderSeg: $('#binder-seg'), binderSegWrap: $('#binder-seg-wrap'),
+  binderTools: $('#binder-tools'), classicView: $('#classic-view'),
+  classicFilter: $('#classic-filter'), classicFilterCount: $('#classic-filter-count'),
+  classicCount: $('#classic-count'),
+  albumBook: $('#album-book'), albumLeaf: $('#album-leaf'),
+  pageSlots: $('#page-slots'), pageno: $('#pageno'),
   albumDots: $('#album-dots'), albumHint: $('#album-hint'),
   achTitle: $('#ach-title'), achSub: $('#ach-sub'), achList: $('#ach-list'),
   friendActions: $('#friend-actions'), friendAlbums: $('#friend-albums'),
@@ -2186,10 +2191,15 @@ function openCardDetail(entryKey, data, rarity) {
     card.querySelector('.card-desc').textContent = data.description || data.sourceName || '';
     card.querySelector('.giant-extract').textContent = data.extract;
     card.querySelector('.card-price').innerHTML = money(data.price);
-    card.querySelector('.card-views').textContent =
-      data.views ? t('viewsPerMonth', { views: formatViews(data.views) }) : '';
+    // How read the article is decides its tier now, so the number that earned
+    // the card its rarity belongs on the card, not just on the small face.
+    const readership = data.views
+      ? t('viewsPerMonth', { views: formatViews(data.views) })
+      : bandFor(data.popularity ?? 0).name;
+    card.querySelector('.card-views').textContent = readership;
     card.querySelector('.giant-facts').innerHTML = [
       `<span class="chip" style="color:${rarity.color};border-color:${rarity.color}">${tx(rarity.name)}</span>`,
+      `<span class="chip">${esc(readership)}</span>`,
       entry && entry.count > 1 ? `<span class="chip">${t('copiesOwned', { n: entry.count })}</span>` : ''
     ].filter(Boolean).join('');
 
@@ -2298,8 +2308,8 @@ function renderBinder() {
 
   el.binderTitle.textContent = t('tabCollection');
   el.albumView.hidden = true;
-  el.albumShelf.hidden = false;
   el.binderStats.hidden = false;
+  el.binderSegWrap.hidden = false;
 
   const entries = store.allEntries(state.collection);
   const stats = store.collectionStats(entries);
@@ -2317,9 +2327,101 @@ function renderBinder() {
     el.binderEmptyText.textContent = t('emptyCollection');
   }
 
+  if (!binderSeg) {
+    binderSeg = new Segmented(el.binderSeg, [
+      { id: 'albums', label: t('viewAlbums') },
+      { id: 'classic', label: t('viewClassic') }
+    ], (view) => {
+      state.binderView = view;
+      store.saveBinderView(view);
+      renderBinder();
+    });
+    binderSeg.select(state.binderView, { silent: true });
+  }
+
+  const classic = state.binderView === 'classic';
+  el.albumShelf.hidden = classic;
+  el.classicView.hidden = !classic;
+  el.binderTools.hidden = !classic || !entries.length;
+  if (classic) return renderClassic(entries, albums);
+
   el.albumShelf.replaceChildren(...albums.map(buildAlbumCover));
   reveal(el.albumShelf.children, { step: 22, from: 10 });
   refreshAlbumTotals(albums.filter((a) => a.unlocked));
+}
+
+/*
+ * THE CLASSIC VIEW
+ * ----------------------------------------------------------------------------
+ * Every card at once, for when you want to see the whole collection rather
+ * than one category's book: grouped by category in shelf order, and inside
+ * each group sorted from the rarest card down. The filters are the same ones
+ * the albums use, so switching view keeps whatever you had narrowed down.
+ */
+function renderClassic(entries, albums) {
+  el.classicFilter.textContent = t('filters');
+  const active = activeFilterCount();
+  el.classicFilterCount.textContent = String(active);
+  el.classicFilterCount.hidden = !active;
+
+  // The filter sheet's own sort is respected inside each category; rarity is
+  // the default because a classic binder is read from the best card down.
+  const visible = store.filterEntries(entries, state.filters);
+  el.classicCount.textContent = t('classicShowing', { n: visible.length });
+
+  const byAlbum = new Map();
+  for (const entry of visible) {
+    const key = albumKeyOf(entry);
+    if (!byAlbum.has(key)) byAlbum.set(key, []);
+    byAlbum.get(key).push(entry);
+  }
+
+  const sections = [];
+  for (const album of albums) {
+    const group = byAlbum.get(album.key);
+    if (!group?.length) continue;
+    const section = document.createElement('section');
+    section.className = 'classic-group';
+    section.style.setProperty('--accent', album.style.accent);
+    section.innerHTML = `
+      <div class="classic-group-head">
+        <span class="classic-group-mark" aria-hidden="true"></span>
+        <h3></h3><span class="classic-group-n tabular"></span>
+      </div>
+      <div class="classic-grid"></div>`;
+    const emblem = album.style.emblem?.kind === 'monogram'
+      ? monogramSvg(album.style.emblem.letter, album.style.emblem.spin, { size: 24 })
+      : emblemSvg(album.style.emblem?.id ?? 'open', { size: 24 });
+    const mark = section.querySelector('.classic-group-mark');
+    mark.innerHTML = emblem;
+    mark.style.setProperty('--e1', `color-mix(in srgb, ${album.style.accent} 55%, #ffffff)`);
+    mark.style.setProperty('--e2', album.style.accent);
+    mark.style.setProperty('--e3', album.style.accent2);
+    section.querySelector('h3').textContent = album.name;
+    section.querySelector('.classic-group-n').textContent = String(group.length);
+
+    section.querySelector('.classic-grid').replaceChildren(...group.map((entry) => {
+      const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
+      card.classList.add('is-mini');
+      if (entry.count > 1) {
+        const badge = document.createElement('span');
+        badge.className = 'copy-badge';
+        badge.textContent = `\u00d7${entry.count}`;
+        card.appendChild(badge);
+      }
+      return card;
+    }));
+    sections.push(section);
+  }
+
+  if (!sections.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted classic-empty';
+    empty.textContent = t('noMatches');
+    sections.push(empty);
+  }
+  el.classicView.replaceChildren(...sections);
+  reveal(el.classicView.children, { step: 40 });
 }
 
 /**
@@ -2407,25 +2509,23 @@ function renderAlbum() {
   el.albumBook.style.setProperty('--accent2', album.style.accent2);
 
   const visible = store.filterEntries(album.entries, { ...state.filters, pack: '' });
-  const spreads = Math.max(album.spreads, 1);
-  const spread = Math.min(state.album.spread, spreads - 1);
-  state.album.spread = spread;
+  const pages = Math.max(pageCount(album, visible.length), 1);
+  const page = Math.min(state.album.spread, pages - 1);
+  state.album.spread = page;
 
-  fillAlbumPage(el.pageLeft, visible, spread * CARDS_PER_SPREAD, album);
-  fillAlbumPage(el.pageRight, visible, spread * CARDS_PER_SPREAD + CARDS_PER_PAGE, album);
-  el.pagenoLeft.textContent = String(spread * 2 + 1);
-  el.pagenoRight.textContent = String(spread * 2 + 2);
+  fillAlbumPage(el.pageSlots, visible, page * CARDS_PER_PAGE, album);
+  el.pageno.textContent = String(page + 1);
 
-  if (spreads <= 12) {
-    el.albumDots.replaceChildren(...Array.from({ length: spreads }, (_, i) => {
+  if (pages <= 12) {
+    el.albumDots.replaceChildren(...Array.from({ length: pages }, (_, i) => {
       const dot = document.createElement('span');
-      dot.className = `album-dot${i === spread ? ' is-on' : ''}`;
+      dot.className = `album-dot${i === page ? ' is-on' : ''}`;
       return dot;
     }));
   } else {
     const counter = document.createElement('span');
     counter.className = 'album-dot-count tabular';
-    counter.textContent = `${spread + 1} / ${spreads}`;
+    counter.textContent = `${page + 1} / ${pages}`;
     el.albumDots.replaceChildren(counter);
   }
   el.albumHint.textContent = t('albumSwipeHint');
@@ -2455,13 +2555,22 @@ function fillAlbumPage(node, entries, offset, album) {
   node.replaceChildren(...slots);
 }
 
-/** Turn the page: the book folds at the spine, then opens on the new spread. */
+/** How many pages this album's book holds, given what the filters let through. */
+function pageCount(album, visibleCount) {
+  const filled = Math.max(1, Math.ceil(visibleCount / CARDS_PER_PAGE));
+  // One blank page at the back says there is more of this category out there,
+  // unless you have actually finished it.
+  return album.complete ? filled : filled + 1;
+}
+
+/** Turn the page: the leaf folds away at the spine, then the next one opens. */
 function turnAlbumPage(dir) {
   const album = currentAlbum();
   if (!album || state.albumTurning) return;
-  const spreads = Math.max(album.spreads, 1);
+  const visible = store.filterEntries(album.entries, { ...state.filters, pack: '' });
+  const pages = Math.max(pageCount(album, visible.length), 1);
   const next = state.album.spread + dir;
-  if (next < 0 || next >= spreads) {
+  if (next < 0 || next >= pages) {
     // The cover thuds: there is nothing further.
     el.albumBook.classList.remove('turn-bump-l', 'turn-bump-r');
     void el.albumBook.offsetWidth;
@@ -2470,26 +2579,28 @@ function turnAlbumPage(dir) {
   }
   state.albumTurning = true;
   synth.playPageTurn();
-  const folding = dir > 0 ? el.albumBook.querySelector('.album-page.is-right')
-                          : el.albumBook.querySelector('.album-page.is-left');
-  folding.classList.add(dir > 0 ? 'is-folding-r' : 'is-folding-l');
+  const leaf = el.albumLeaf;
+  leaf.classList.add(dir > 0 ? 'is-folding-r' : 'is-folding-l');
   setTimeout(() => {
     state.album.spread = next;
     renderAlbum();
-    folding.classList.remove('is-folding-r', 'is-folding-l');
-    folding.classList.add(dir > 0 ? 'is-unfolding-r' : 'is-unfolding-l');
+    leaf.classList.remove('is-folding-r', 'is-folding-l');
+    leaf.classList.add(dir > 0 ? 'is-unfolding-r' : 'is-unfolding-l');
     setTimeout(() => {
-      folding.classList.remove('is-unfolding-r', 'is-unfolding-l');
+      leaf.classList.remove('is-unfolding-r', 'is-unfolding-l');
       state.albumTurning = false;
-    }, 240);
-  }, 230);
+    }, dur(240));
+  }, dur(230));
 }
 
 function openFilters() {
   openSheet(t('filters'), (body) => {
     const entries = store.allEntries(state.collection);
-    const packs = [...new Map(entries.map((e) => [e.packId, e.packName])).entries()]
-      .sort((a, b) => String(a[1]).localeCompare(String(b[1])));
+    // Categories, in shelf order, and only the ones actually owned: a filter
+    // that offers you empty categories is a filter that wastes a tap.
+    const packs = buildAlbums(entries, state.customPacks)
+      .filter((album) => album.owned > 0)
+      .map((album) => [album.key, album.name]);
 
     const wrap = document.createElement('div');
     wrap.className = 'filters';
@@ -2523,6 +2634,7 @@ function openFilters() {
     ['pack', 'rarity', 'band', 'minPrice', 'sort'].forEach((key) => { sel(key).value = state.filters[key]; });
 
     const apply = () => { renderBinder(); paintFav(); };
+    // Both views read the same filters, so both repaint from one place.
     wrap.querySelectorAll('select').forEach((node) => {
       node.addEventListener('change', (e) => { state.filters[e.target.dataset.key] = e.target.value; apply(); });
     });
@@ -5085,6 +5197,61 @@ function applyStrings() {
   if (!el.gate.hidden) showGate();
 }
 
+/**
+ * Cards in the wrong language, swapped for the real thing.
+ *
+ * Draws are language-locked now, but a collection built before that still
+ * holds English cards in a French binder and the other way round. Each one
+ * is looked up through its article's interlanguage links and rebuilt around
+ * the translated page, keeping its copies, its favourite star and the date
+ * it was first pulled. An article with no version in that language is left
+ * exactly where it is and never asked about again.
+ */
+const NO_TWIN_KEY = 'packywiki.noTranslation.v1';
+const MIGRATE_PER_LAUNCH = 12;
+
+function loadNoTwin() {
+  try {
+    const list = JSON.parse(localStorage.getItem(NO_TWIN_KEY) ?? '[]');
+    return new Set(Array.isArray(list) ? list : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveNoTwin(set) {
+  // Only the most recent few hundred matter; the list is a courtesy, not a record.
+  try { localStorage.setItem(NO_TWIN_KEY, JSON.stringify([...set].slice(-400))); }
+  catch { /* storage unavailable */ }
+}
+
+async function migrateLanguages() {
+  if (!navigator.onLine) return;
+  const lang = getLanguage();
+  const skip = loadNoTwin();
+  const stale = Object.values(state.collection.entries ?? {})
+    .filter((entry) => (entry.lang ?? 'en') !== lang && !skip.has(entry.key))
+    .slice(0, MIGRATE_PER_LAUNCH);
+  if (!stale.length) return;
+
+  let moved = 0;
+  for (let i = 0; i < stale.length; i += 3) {
+    const batch = stale.slice(i, i + 3);
+    const results = await Promise.all(batch.map((entry) =>
+      translateCard(entry, lang).catch(() => null)));
+    batch.forEach((entry, n) => {
+      const card = results[n];
+      if (!card) { skip.add(entry.key); return; }
+      if (store.replaceEntryWithTranslation(state.collection, entry, card, lang)) moved++;
+    });
+  }
+  saveNoTwin(skip);
+  if (!moved) return;
+  regradeCollection();
+  if (state.tab === 'binder') renderBinder();
+  toast(t('langMigrated', { n: moved }), 'ok');
+}
+
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
 /**
@@ -5129,13 +5296,24 @@ function init() {
 
   // Cards without a picture no longer exist: draws refuse them now, and any
   // already in the collection are swept out once here.
+  // A custom pack that goes missing takes its shop shelf with it, and the
+  // player rebuilds it: two packs, two albums, one subject. Put back
+  // whatever the collection still remembers, and collapse the duplicates.
+  const healed = store.healCustomPacks(state.collection);
+  if (healed) state.customPacks = store.loadCustomPacks();
+
   const pruned = store.pruneImagelessCards(state.collection);
   if (pruned) console.info(`Removed ${pruned} pictureless card(s) from the collection`);
 
   // Rarity belongs to the article now. Saves from before the rework carry
   // rolled rarities, so owned cards are re-graded from popularity once here.
-  const regraded = regradeCollection();
-  if (regraded) setTimeout(() => toast(t('regradeToast', { n: regraded })), 2600);
+  // Silent on purpose: it runs on every launch so a save can never drift
+  // out of step with the rarity table, and nobody needs telling twice.
+  regradeCollection();
+
+  // Cards in the wrong language are swapped for their translation in the
+  // background, a few at a time, so launch is never held up by the network.
+  setTimeout(migrateLanguages, 3200);
 
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
@@ -5203,6 +5381,7 @@ function init() {
     button.addEventListener('click', () => { synth.playTap(); openHelp(button.dataset.help); });
   });
   el.filterOpen.addEventListener('click', openFilters);
+  el.classicFilter.addEventListener('click', openFilters);
   el.chatBack.addEventListener('click', () => {
     clearInterval(chatTimer);
     state.chat = null;
@@ -5377,10 +5556,11 @@ function endSplash() {
 }
 
 let packsRail;
+let binderSeg;
 init();
 
 window.__packywiki = {
-  state, store, debug, RARITIES, synth, backdrop, THEMES,
+  state, store, debug, RARITIES, synth, backdrop, THEMES, THEME_PACKS,
   draw: drawArticles, generateShop, syncSocial,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderSettings(); },
   debugRarity(id) {

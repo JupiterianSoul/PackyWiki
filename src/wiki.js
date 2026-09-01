@@ -93,48 +93,151 @@ function toCard({ sourceId, sourceName, pageId, title, description, extract, thu
   };
 }
 
-/* --- Wikipedia ----------------------------------------------------------- */
+/* --- Wikipedia -----------------------------------------------------------
+ *
+ * ONE request brings back twenty candidates COMPLETE: opening text, picture,
+ * short description, categories and url. That is the whole redesign here.
+ * The old draw asked for a search hit, then a summary, then pageviews, one
+ * card at a time, three round trips deep, which is why a five-card booster
+ * could sit there for ten seconds. Now a booster is one search plus a
+ * handful of pageview lookups running side by side.
+ *
+ * Having the categories in hand is also what makes a booster honest: a
+ * full-text search returns anything that merely mentions the words, which is
+ * how an actor turned up in the Weird booster. Every candidate is scored
+ * against the pack's own terms (see `match` in src/data/packs.js) and the
+ * ones that are not about the subject are thrown away.
+ */
 
-function searchUrl(query, offset) {
-  const params = new URLSearchParams({
-    action: 'query', list: 'search', srsearch: query,
-    srnamespace: '0', srlimit: String(SEARCH_PAGE_SIZE), sroffset: String(offset),
-    srinfo: 'totalhits', srprop: 'wordcount', format: 'json', origin: '*'
-  });
-  return `${ACTION()}?${params}`;
-}
+const POOL_LIMIT = 20;
 
-/** A random hit for one query, sampled across the whole result set. */
-async function searchOne(query, { preferBig = false } = {}) {
+/** Everything a card needs, asked for in the same breath as the search. */
+const PAGE_PROPS = {
+  prop: 'extracts|pageimages|categories|info|description',
+  exintro: '1', explaintext: '1', exchars: '600', exlimit: String(POOL_LIMIT),
+  piprop: 'thumbnail|original', pithumbsize: '640', pilimit: String(POOL_LIMIT),
+  cllimit: '500', clshow: '!hidden',
+  inprop: 'url'
+};
+
+const pagesOf = (data) => Object.values(data?.query?.pages ?? {}).filter((page) => page?.title);
+
+/** A pool of candidates for one search query, sampled across the result set. */
+async function searchPool(query, { preferBig = false } = {}) {
   const cacheKey = `${wikiLang()}|${query}`;
   let offset = 0;
   const known = querySizeCache.get(cacheKey);
-  // Famous pages cluster near the top of the ranking, so a fame hunt samples
-  // only the first few hundred hits; an open draw roams the whole result set.
-  const roam = preferBig ? 400 : MAX_SEARCH_OFFSET;
-  if (known && known > SEARCH_PAGE_SIZE) {
-    const ceiling = Math.min(known, roam) - SEARCH_PAGE_SIZE;
+  // Famous pages cluster at the top of the ranking, so a fame hunt samples
+  // the first few hundred hits; an ordinary draw roams the whole result set.
+  const roam = preferBig ? 300 : MAX_SEARCH_OFFSET;
+  if (known && known > POOL_LIMIT) {
+    const ceiling = Math.min(known, roam) - POOL_LIMIT;
     if (ceiling > 0) offset = Math.max(0, Math.floor(Math.random() * ceiling));
   }
 
-  const data = await fetchJson(searchUrl(query, offset));
-  const totalHits = data?.query?.searchinfo?.totalhits ?? 0;
-  querySizeCache.set(cacheKey, totalHits);
-
-  const results = data?.query?.search ?? [];
-  if (!results.length) {
+  const params = new URLSearchParams({
+    action: 'query', generator: 'search', gsrsearch: query,
+    gsrnamespace: '0', gsrlimit: String(POOL_LIMIT), gsroffset: String(offset),
+    gsrinfo: 'totalhits', gsrprop: 'wordcount',
+    ...PAGE_PROPS, format: 'json', origin: '*'
+  });
+  const data = await fetchJson(`${ACTION()}?${params}`);
+  const totalHits = data?.query?.searchinfo?.totalhits;
+  if (Number.isFinite(totalHits)) {
+    querySizeCache.set(cacheKey, totalHits);
     if (totalHits === 0) deadQueries.add(cacheKey);
-    return null;
   }
-  if (preferBig) {
-    // Within the window, the long articles are the famous ones far more often
-    // than not. Pick among the biggest few rather than the single biggest, so
-    // two draws from one query do not fight over the same page.
-    const biggest = [...results].sort((a, b) => (b.wordcount ?? 0) - (a.wordcount ?? 0));
-    return pick(biggest.slice(0, Math.min(6, biggest.length)));
-  }
-  return pick(results);
+  return pagesOf(data);
 }
+
+/** A pool of random articles, for open boosters. Also one request for twenty. */
+async function randomPool() {
+  const params = new URLSearchParams({
+    action: 'query', generator: 'random',
+    grnnamespace: '0', grnlimit: String(POOL_LIMIT),
+    ...PAGE_PROPS, format: 'json', origin: '*'
+  });
+  return pagesOf(await fetchJson(`${ACTION()}?${params}`));
+}
+
+/** Details for named articles, up to twenty at a time. */
+async function pagesByTitle(titles) {
+  if (!titles.length) return [];
+  const params = new URLSearchParams({
+    action: 'query', titles: titles.slice(0, POOL_LIMIT).join('|'),
+    ...PAGE_PROPS, format: 'json', origin: '*'
+  });
+  return pagesOf(await fetchJson(`${ACTION()}?${params}`));
+}
+
+/* --- the most-read list --------------------------------------------------
+ * A booster with a high fame floor cannot get there by drawing at random:
+ * almost nothing clears it. Wikipedia publishes its own most-read list, so a
+ * Legendary booster draws from that instead, and the views come back with
+ * the list rather than costing a request each.
+ */
+let topCache = null;
+
+async function topArticles() {
+  const lang = wikiLang();
+  if (topCache?.lang === lang && Date.now() - topCache.at < 12 * 60 * 60 * 1000) return topCache.rows;
+  const now = new Date();
+  // Last month, which is always complete.
+  const when = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
+  const y = when.getUTCFullYear();
+  const m = String(when.getUTCMonth() + 1).padStart(2, '0');
+  try {
+    const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/${lang}.wikipedia/all-access/${y}/${m}/all-days`;
+    const rows = ((await fetchJson(url))?.items?.[0]?.articles ?? [])
+      .map((row) => ({ title: String(row.article ?? '').replace(/_/g, ' '), views: Math.round((row.views ?? 0) / 30) }))
+      .filter((row) => row.title && !row.title.includes(':') && !BAD_TITLE.test(row.title));
+    topCache = { lang, at: Date.now(), rows };
+    return rows;
+  } catch {
+    topCache = { lang, at: Date.now(), rows: [] };
+    return [];
+  }
+}
+
+/* --- is this page actually about the subject? ---------------------------- */
+
+/**
+ * 2 = the page's own categories, title or short description say so.
+ * 1 = only its opening text mentions the subject, which is weaker.
+ * 0 = nothing lines up; this page does not belong in this booster.
+ */
+function subjectScore(pack, page) {
+  const terms = pack.match ?? [];
+  if (!terms.length) return 2;
+  const strong = [page.title, page.description, ...(page.categories ?? []).map((c) => c.title)]
+    .join(' ').toLowerCase();
+  if (terms.some((term) => strong.includes(term))) return 2;
+  return terms.some((term) => String(page.extract ?? '').toLowerCase().includes(term)) ? 1 : 0;
+}
+
+const bestImage = (page) => page.thumbnail?.source ?? page.original?.source ?? null;
+
+/** A raw API page turned into a card, or null when it is not card material. */
+function pageToCard(page, views) {
+  const thumbnail = bestImage(page);
+  if (!thumbnail) return null;
+  if (!isUsableText(page.title, page.extract)) return null;
+  const lang = wikiLang();
+  return toCard({
+    sourceId: `wikipedia:${lang}`,
+    sourceName: 'Wikipedia',
+    pageId: page.pageid,
+    title: page.title,
+    description: page.description,
+    extract: page.extract,
+    thumbnail,
+    url: page.fullurl ?? `https://${lang}.wikipedia.org/wiki/${encodeTitle(page.title)}`,
+    views,
+    wordCount: page.index != null ? null : null
+  });
+}
+
+/* --- pageviews ------------------------------------------------------------ */
 
 /** Month range covering the two most recent complete months. */
 function pageviewRange() {
@@ -159,80 +262,115 @@ async function fetchMonthlyViews(title) {
   }
 }
 
-const summaryFor = (title) => fetchJson(`${REST()}/page/summary/${encodeTitle(title)}`);
+/* --- drawing a whole booster --------------------------------------------- */
 
-function summaryToCard(summary, wordCount, views) {
-  const lang = wikiLang();
-  return toCard({
-    sourceId: `wikipedia:${lang}`,
-    sourceName: 'Wikipedia',
-    pageId: summary.pageid,
-    title: summary.titles?.normalized ?? summary.title,
-    description: summary.description,
-    extract: summary.extract,
-    thumbnail: summary.thumbnail?.source ?? summary.originalimage?.source ?? null,
-    url: summary.content_urls?.desktop?.page ??
-      `https://${lang}.wikipedia.org/wiki/${encodeTitle(summary.title)}`,
-    views, wordCount
-  });
-}
+const shuffled = (arr) => arr.map((v) => [Math.random(), v]).sort((a, b) => a[0] - b[0]).map(([, v]) => v);
 
-async function drawWikipediaCard(pack, seen) {
+/**
+ * Candidates for this booster, best first: on-subject pages with a picture.
+ * Every card in a booster is drawn from this one pool, so the whole booster
+ * costs about one search rather than one search per card.
+ */
+async function gatherCandidates(pack) {
   const live = (pack.queries ?? []).filter((q) => !deadQueries.has(`${wikiLang()}|${q}`));
-  const banded = pack.minPopularity != null || pack.maxPopularity != null;
-  const maxAttempts = banded ? MAX_ATTEMPTS_PER_CARD + 4 : MAX_ATTEMPTS_PER_CARD;
-  // A high floor means hunting fame, and uniform sampling would starve it.
-  const preferBig = (pack.minPopularity ?? 0) >= 0.65;
-  let nearest = null;   // best card OUTSIDE the band, if the hunt runs dry
-  let nearestMiss = Infinity;
-  let lastError = null;
+  const floor = pack.minPopularity ?? 0;
+  const pages = [];
 
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    try {
-      let summary = null;
-      let wordCount = null;
-      // The search hit already names the article, so its pageviews can be
-      // fetched alongside the summary: one fewer round trip per card.
-      let viewsPromise = null;
-
-      // The final two attempts fall back to a fully random article, so a
-      // renamed category can never leave a booster unopenable.
-      const useQuery = live.length > 0 && attempt < maxAttempts - 2;
-
-      if (useQuery) {
-        const hit = await searchOne(pick(live), { preferBig });
-        if (!hit || seen.has(hit.title)) continue;
-        wordCount = hit.wordcount ?? null;
-        viewsPromise = fetchMonthlyViews(hit.title);
-        summary = await summaryFor(hit.title);
-      } else {
-        summary = await fetchJson(`${REST()}/page/random/summary`);
-      }
-
-      if (!summary || summary.type !== 'standard') continue;
-      const title = summary.titles?.normalized ?? summary.title;
-      if (!isUsableText(title, summary.extract) || seen.has(title)) continue;
-      // Every card must carry a picture. Only the very last attempt may
-      // hand over a bare one, so a booster can never fail to open at all.
-      const hasImage = Boolean(summary.thumbnail?.source ?? summary.originalimage?.source);
-      if (!hasImage && attempt < maxAttempts - 1) continue;
-      seen.add(title);
-
-      const views = viewsPromise ? await viewsPromise : await fetchMonthlyViews(title);
-      const card = summaryToCard(summary, wordCount, views);
-      if (fitsBand(pack, card.popularity)) return card;
-
-      // Outside what this booster may draw. Remember the nearest miss: a
-      // booster must never fail to open, so it ships if nothing qualifies.
-      const miss = bandMiss(pack, card.popularity);
-      if (miss < nearestMiss) { nearest = card; nearestMiss = miss; }
-    } catch (err) {
-      lastError = err;
+  // A high floor with no subject to search: draw from the most-read list,
+  // which is the only place those pages actually live.
+  if (!live.length && floor >= 0.755) {
+    const rows = await topArticles();
+    if (rows.length) {
+      const picked = shuffled(rows).slice(0, POOL_LIMIT);
+      const byTitle = new Map(picked.map((row) => [row.title, row.views]));
+      const detailed = await pagesByTitle(picked.map((row) => row.title));
+      for (const page of detailed) page.knownViews = byTitle.get(page.title) ?? null;
+      pages.push(...detailed);
     }
   }
-  if (nearest) return nearest;
-  if (lastError) throw lastError;
-  throw new Error(`No usable article found for "${pack.name}"`);
+
+  if (live.length) {
+    // Two different queries widen a booster without costing a request per card.
+    const queries = shuffled(live).slice(0, Math.min(2, live.length));
+    const pools = await Promise.all(queries.map((q) =>
+      searchPool(q, { preferBig: floor >= 0.65 }).catch(() => [])));
+    for (const pool of pools) pages.push(...pool);
+  }
+
+  if (!pages.length) pages.push(...await randomPool().catch(() => []));
+
+  const seen = new Set();
+  const scored = [];
+  for (const page of pages) {
+    if (seen.has(page.title)) continue;
+    seen.add(page.title);
+    if (!bestImage(page) || !isUsableText(page.title, page.extract)) continue;
+    const score = subjectScore(pack, page);
+    if (score > 0) scored.push({ page, score });
+  }
+  // On-subject first, shuffled inside each tier so a booster is not the same
+  // five pages every time.
+  return [...shuffled(scored.filter((c) => c.score === 2)), ...shuffled(scored.filter((c) => c.score === 1))]
+    .map((c) => c.page);
+}
+
+async function drawWikipediaSet(pack) {
+  const wanted = Math.max(1, pack.cards ?? 5);
+  const seen = new Set();
+  const out = [];
+  const nearMisses = [];
+
+  let pool = await gatherCandidates(pack);
+
+  // Views decide rarity, so they decide whether a candidate is allowed in a
+  // tiered booster. Look them up several at a time instead of one by one.
+  const consider = async (page) => {
+    if (seen.has(page.title)) return null;
+    const views = page.knownViews ?? await fetchMonthlyViews(page.title);
+    const card = pageToCard(page, views);
+    if (!card) return null;
+    if (fitsBand(pack, card.popularity)) return card;
+    nearMisses.push({ card, miss: bandMiss(pack, card.popularity) });
+    return null;
+  };
+
+  for (let i = 0; i < pool.length && out.length < wanted; i += 5) {
+    const chunk = pool.slice(i, i + 5);
+    const cards = await Promise.all(chunk.map((page) => consider(page).catch(() => null)));
+    for (const card of cards) {
+      if (!card || out.length >= wanted || seen.has(card.title)) continue;
+      seen.add(card.title);
+      out.push(card);
+    }
+  }
+
+  // A booster ALWAYS opens. Anything that was merely outside the tier's band
+  // fills the rest, closest first, before we go looking any further.
+  if (out.length < wanted) {
+    nearMisses.sort((a, b) => a.miss - b.miss);
+    for (const { card } of nearMisses) {
+      if (out.length >= wanted) break;
+      if (seen.has(card.title)) continue;
+      seen.add(card.title);
+      out.push(card);
+    }
+  }
+
+  // Still short (a dead query, a thin subject): random articles, which always
+  // exist, rather than an error the player cannot do anything about.
+  for (let round = 0; out.length < wanted && round < 3; round++) {
+    const extra = await randomPool().catch(() => []);
+    for (const page of extra) {
+      if (out.length >= wanted || seen.has(page.title)) continue;
+      const card = pageToCard(page, await fetchMonthlyViews(page.title).catch(() => null));
+      if (!card) continue;
+      seen.add(card.title);
+      out.push(card);
+    }
+  }
+
+  if (!out.length) throw new Error(`No usable article found for "${pack.name}"`);
+  return out;
 }
 
 /* --- custom wikis -------------------------------------------------------- */
@@ -402,7 +540,60 @@ function usableThumb(page, width = 640) {
  * icon or an infobox glyph. We ask for each image's real dimensions instead,
  * throw away anything too small to be an illustration, and take the largest.
  */
-async function customPageImage(wiki, pageId) {
+/** Words that say what a page is about, for matching a picture to it. */
+function titleWords(title) {
+  return String(title ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9À-ſ\s]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length >= 3);
+}
+
+/**
+ * The picture the ARTICLE ITSELF leads with.
+ *
+ * A Fandom page's lead section opens with its infobox, and the infobox image
+ * is the picture of the thing. Going straight to the biggest image on the
+ * page instead is how an ore ended up wearing a boss's head: a navigation
+ * template further down the page happened to hold a larger picture.
+ */
+async function customLeadImage(wiki, pageId) {
+  try {
+    const params = new URLSearchParams({
+      action: 'parse', pageid: String(pageId), prop: 'text', section: '0',
+      format: 'json', origin: '*'
+    });
+    const html = (await fetchJson(`${wiki.apiUrl}?${params}`))?.parse?.text?.['*'];
+    if (!html) return null;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    for (const img of doc.querySelectorAll('img')) {
+      const src = img.getAttribute('data-src') || img.getAttribute('src') || '';
+      if (!src || src.startsWith('data:')) continue;
+      const name = decodeURIComponent(src.split('?')[0]);
+      if (JUNK_IMAGE.test(name)) continue;
+      const width = Number(img.getAttribute('width')) || 0;
+      const height = Number(img.getAttribute('height')) || 0;
+      if (width && width < 80) continue;
+      if (height && height < 60) continue;
+      return upgradeImageUrl(src.startsWith('//') ? `https:${src}` : src, 640);
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Resolve an image for a page the hard way.
+ *
+ * Fandom pages very often have a picture that `pageimages` doesn't surface,
+ * so when it comes back empty we ask what images the page actually *uses*.
+ * That list is in page order, and the first entry is usually a nav icon,
+ * while the biggest can belong to something else entirely. So each candidate
+ * is scored: a file whose name shares words with the article wins outright,
+ * and only then does size decide.
+ */
+async function customPageImage(wiki, pageId, title = '') {
   try {
     const params = new URLSearchParams({
       action: 'query', pageids: String(pageId), generator: 'images', gimlimit: '24',
@@ -410,11 +601,12 @@ async function customPageImage(wiki, pageId) {
       format: 'json', origin: '*'
     });
     const pages = Object.values((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.pages ?? {});
+    const words = titleWords(title);
     const usable = pages
       .map((p) => ({ title: p.title ?? '', info: p.imageinfo?.[0] }))
-      .filter(({ title, info }) => info && title && !JUNK_IMAGE.test(title))
-      .filter(({ title, info }) =>
-        /^image\/(jpeg|png|webp)$/i.test(info.mime ?? '') || /\.(jpe?g|png|webp)$/i.test(title))
+      .filter(({ title: name, info }) => info && name && !JUNK_IMAGE.test(name))
+      .filter(({ title: name, info }) =>
+        /^image\/(jpeg|png|webp)$/i.test(info.mime ?? '') || /\.(jpe?g|png|webp)$/i.test(name))
       .filter(({ info }) => {
         const w = info.width ?? 0;
         const h = info.height ?? 0;
@@ -425,8 +617,14 @@ async function customPageImage(wiki, pageId) {
         if (w / h > 4 || h / w > 4) return false;
         return w * h >= MIN_IMAGE_AREA;
       })
-      // Biggest wins: on a Fandom article that is reliably the subject.
-      .sort((a, b) => (b.info.width ?? 0) * (b.info.height ?? 0) - (a.info.width ?? 0) * (a.info.height ?? 0));
+      .map((candidate) => {
+        const name = candidate.title.toLowerCase();
+        const hits = words.filter((word) => name.includes(word)).length;
+        const area = (candidate.info.width ?? 0) * (candidate.info.height ?? 0);
+        return { ...candidate, hits, area };
+      })
+      // Named after the subject first; among equals, the biggest picture.
+      .sort((a, b) => b.hits - a.hits || b.area - a.area);
 
     const best = usable[0]?.info;
     if (!best) return null;
@@ -514,7 +712,9 @@ async function bigPageCandidates(wiki, minPopularity, seen) {
 async function drawCustomCard(pack, seen) {
   const wiki = await wikiForLanguage(pack.wiki);
   const banded = pack.minPopularity != null || pack.maxPopularity != null;
-  const maxAttempts = banded ? MAX_ATTEMPTS_PER_CARD + 4 : MAX_ATTEMPTS_PER_CARD;
+  // Every card must carry a picture, so a wiki with thin pages needs room to
+  // keep looking rather than handing over a blank.
+  const maxAttempts = banded ? MAX_ATTEMPTS_PER_CARD + 8 : MAX_ATTEMPTS_PER_CARD + 4;
   const floor = pack.minPopularity ?? 0;
   let nearest = null;
   let nearestMiss = Infinity;
@@ -552,9 +752,11 @@ async function drawCustomCard(pack, seen) {
       // thumbnail and we go digging rather than stretch it across the card.
       const thumbnail = usableThumb(page, 640)
         ?? (page.original?.source ? upgradeImageUrl(page.original.source, 640) : null)
-        ?? await customPageImage(wiki, page.pageid);
-      // A pictureless page is not a card. Only the last attempt may pass one.
-      if (!thumbnail && attempt < maxAttempts - 1) { seen.add(page.title); continue; }
+        ?? await customLeadImage(wiki, page.pageid)
+        ?? await customPageImage(wiki, page.pageid, page.title);
+      // A pictureless page is not a card, ever: those are exactly the cards
+      // the collection used to sweep out again on the next launch.
+      if (!thumbnail) { seen.add(page.title); continue; }
 
       const card = toCard({
         sourceId: `wiki:${new URL(wiki.apiUrl).host}${new URL(wiki.apiUrl).pathname.replace('/api.php', '')}`,
@@ -592,6 +794,87 @@ export async function fetchArticleText(title, { limit = 7000 } = {}) {
   return String(page?.extract ?? '').slice(0, limit);
 }
 
+/* --- translating a card the player already owns --------------------------- */
+
+/** The API a stored card came from, from its own sourceId. */
+function apiForEntry(entry) {
+  const source = String(entry.sourceId ?? '');
+  if (source.startsWith('wikipedia:')) {
+    return `https://${source.slice('wikipedia:'.length) || 'en'}.wikipedia.org/w/api.php`;
+  }
+  if (source.startsWith('wiki:')) return `https://${source.slice('wiki:'.length)}/api.php`;
+  return null;
+}
+
+/**
+ * The same article, in the language the app is set to.
+ *
+ * Cards drawn before draws were language-locked are still sitting in old
+ * collections in the wrong language. Wikipedia and Fandom both publish
+ * interlanguage links, so the translated page can be found and the card
+ * rebuilt around it. Returns a fresh card, or null when this article simply
+ * does not exist in that language, which is a real answer and not a failure.
+ */
+export async function translateCard(entry, targetLang) {
+  const api = apiForEntry(entry);
+  if (!api || !entry.title) return null;
+
+  const params = new URLSearchParams({
+    action: 'query', titles: entry.title, prop: 'langlinks',
+    lllang: targetLang, llprop: 'url', lllimit: '1', format: 'json', origin: '*'
+  });
+  const page = pagesOf(await fetchJson(`${api}?${params}`))[0];
+  const link = page?.langlinks?.[0];
+  const title = link?.['*'];
+  if (!title) return null;
+
+  // A Wikipedia twin lives on the wiki the app is already pointed at.
+  if (api.includes('.wikipedia.org')) {
+    const [detail] = await pagesByTitle([title]);
+    if (!detail) return null;
+    return pageToCard(detail, await fetchMonthlyViews(title).catch(() => null));
+  }
+
+  // A Fandom twin lives on its own community; its url says where.
+  let twinApi = null;
+  try {
+    const url = new URL(link.url);
+    twinApi = `${url.origin}${url.pathname.split('/wiki/')[0]}/api.php`;
+  } catch {
+    return null;
+  }
+  const wiki = { apiUrl: twinApi, sitename: entry.sourceName ?? '', server: null, articlePath: '/wiki/$1' };
+  const params2 = new URLSearchParams({
+    action: 'query', titles: title,
+    prop: 'extracts|pageimages|info', exintro: '1', explaintext: '1', exchars: '600',
+    piprop: 'thumbnail|original', pithumbsize: '640', inprop: 'url',
+    format: 'json', origin: '*'
+  });
+  const detail = pagesOf(await fetchJson(`${twinApi}?${params2}`))[0];
+  if (!detail) return null;
+  let extract = detail.extract?.trim();
+  if (!extract || extract.length < 80) extract = await customLeadText(wiki, detail.pageid);
+  if (!isUsableText(detail.title, extract)) return null;
+  const thumbnail = usableThumb(detail, 640)
+    ?? (detail.original?.source ? upgradeImageUrl(detail.original.source, 640) : null)
+    ?? await customLeadImage(wiki, detail.pageid)
+    ?? await customPageImage(wiki, detail.pageid, detail.title);
+  if (!thumbnail) return null;
+  const host = new URL(twinApi);
+  return toCard({
+    sourceId: `wiki:${host.host}${host.pathname.replace('/api.php', '')}`,
+    sourceName: entry.sourceName ?? host.host,
+    pageId: detail.pageid,
+    title: detail.title,
+    description: entry.description ?? '',
+    extract,
+    thumbnail,
+    url: detail.fullurl ?? link.url,
+    views: null,
+    wordCount: detail.length ? Math.round(detail.length / 6) : null
+  });
+}
+
 /* --- public API ---------------------------------------------------------- */
 
 /**
@@ -599,7 +882,9 @@ export async function fetchArticleText(title, { limit = 7000 } = {}) {
  * booster; duplicates across boosters are kept and counted as copies.
  */
 export async function drawArticles(pack) {
-  const seen = new Set();
-  const draw = pack.source === 'custom' ? drawCustomCard : drawWikipediaCard;
-  return Promise.all(Array.from({ length: pack.cards }, () => draw(pack, seen)));
+  if (pack.source === 'custom') {
+    const seen = new Set();
+    return Promise.all(Array.from({ length: pack.cards }, () => drawCustomCard(pack, seen)));
+  }
+  return drawWikipediaSet(pack);
 }

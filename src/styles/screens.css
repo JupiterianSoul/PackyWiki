@@ -470,9 +470,12 @@
 .card.is-mini .card-stats { justify-content: flex-start; padding-bottom: 1cqw; }
 .card.is-mini .card-price { font-size: 8cqw; }
 .card.is-mini .rarity-badge { font-size: 5.6cqw; padding: 1.8cqw 4.6cqw; }
-/* The art soaks up whatever height the card has: on a stretched album page
-   the picture grows, and the name/price/rarity keep their strip below. */
-.card.is-mini .card-art { height: auto; flex: 1; min-height: 34%; }
+/* The picture takes a fixed share of the card and the name sits right under
+   it: letting the art flex left a dead band of empty card between the title
+   and the price on an album page. */
+.card.is-mini .card-art { height: auto; flex: 0 0 56%; min-height: 0; }
+.card.is-mini .card-body { flex: 0 0 auto; }
+.card.is-mini .card-stats { margin-top: auto; }
 .card.is-mini .fx-art { display: none; }
 
 /* --- binder -------------------------------------------------------------------- */
@@ -581,14 +584,16 @@
 .album-book {
   position: relative;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* ONE page, always. A two-page spread on a phone meant four cards across:
+     every card squeezed into a sliver, and the next page's slots peeking in
+     at the edge. */
+  grid-template-columns: 1fr;
   /* pan-y: the browser keeps vertical scrolling, we keep horizontal swipes.
      Without this the page-turn drag was cancelled mid-gesture on real
      phones, which is why turning back never seemed to work. */
   touch-action: pan-y;
   /* Fill the space between the header and the dots instead of hugging the
      top half of the screen. */
-  min-height: min(60dvh, 560px);
   border-radius: var(--radius);
   background: linear-gradient(180deg,
     color-mix(in srgb, var(--accent2, #334155) 30%, var(--surface-solid)),
@@ -597,14 +602,14 @@
   box-shadow: var(--surface-shadow);
   transform-style: preserve-3d;
 }
-/* The gutter shadow at the spine. */
+/* The binding down the left edge, where the leaf is hinged. */
 .album-book::before {
   content: '';
   position: absolute;
-  left: 50%; top: 0; bottom: 0;
-  width: 34px;
-  transform: translateX(-50%);
-  background: linear-gradient(90deg, transparent, rgba(0, 0, 0, 0.34), transparent);
+  left: 0; top: 0; bottom: 0;
+  width: 16px;
+  border-radius: var(--radius) 0 0 var(--radius);
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.36), transparent);
   pointer-events: none;
   z-index: 3;
 }
@@ -612,13 +617,13 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 10px 8px 26px;
+  padding: 12px 12px 26px 20px;
   min-height: 0;
   backface-visibility: hidden;
+  transform-origin: 0% 50%;
   transition: transform 230ms ease-in;
+  border-radius: var(--radius);
 }
-.album-page.is-left { transform-origin: 100% 50%; border-radius: var(--radius) 0 0 var(--radius); }
-.album-page.is-right { transform-origin: 0% 50%; border-radius: 0 var(--radius) var(--radius) 0; }
 /* The fold: half the spread lifts at the spine, the new spread unfolds. */
 .album-page.is-folding-r { transform: rotateY(-88deg); }
 .album-page.is-folding-l { transform: rotateY(88deg); }
@@ -636,16 +641,17 @@
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-  gap: 7px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
 }
-/* Cards stretch to the row the book gives them rather than pinning their
-   own aspect, so a taller book means bigger cards, never overflow. */
-.album-slots .card { width: 100%; height: 100%; aspect-ratio: auto; min-height: 0; }
+/* Two across, two down, every card the SAME shape as a real card. The book
+   grows to fit them instead of squashing them into whatever height is
+   left over. */
+.album-slots .card,
+.album-slots .album-slot-empty { width: 100%; height: auto; aspect-ratio: 5 / 7; min-height: 0; }
 .album-slot-empty {
   position: relative;
-  aspect-ratio: 5 / 7;
   border-radius: calc(var(--card-radius) * 0.7);
   border: 1.5px dashed color-mix(in srgb, var(--ink) 22%, transparent);
   background: color-mix(in srgb, var(--ink) 4%, transparent);
@@ -659,13 +665,13 @@
 }
 .album-pageno {
   position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
   bottom: 7px;
   font-size: 0.66rem;
   font-weight: 700;
   color: var(--ink-faint);
 }
-.album-page.is-left .album-pageno { left: 12px; }
-.album-page.is-right .album-pageno { right: 12px; }
 
 .album-dots { display: flex; justify-content: center; gap: 7px; padding: 14px 0 4px; }
 .album-dot {
@@ -1667,3 +1673,50 @@
   font-family: ui-monospace, monospace;
 }
 .key-input:focus { outline: none; border-color: var(--accent); }
+
+/* --- the classic view -----------------------------------------------------------
+   The whole collection at once, grouped by category in shelf order and sorted
+   from the rarest card down inside each group. */
+
+.binder-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 var(--gutter) 14px;
+}
+.binder-tools .muted { margin-left: auto; font-size: 0.76rem; }
+.classic-view { display: grid; gap: 22px; padding: 0 var(--gutter); }
+.classic-group { min-width: 0; }
+.classic-group-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding-bottom: 9px;
+}
+.classic-group-mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  border: var(--border) var(--border-style) color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.classic-group-head h3 { flex: 1; min-width: 0; font-size: 0.94rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.classic-group-n {
+  flex: none;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--ink-faint);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+}
+.classic-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+.classic-grid .card { width: 100%; height: auto; aspect-ratio: 5 / 7; }
+.classic-empty { text-align: center; padding: 30px 0; }
