@@ -533,11 +533,15 @@ supabase secrets set GROQ_API_KEY=gsk_your_key
 supabase functions deploy quiz
 ```
 
-A free key from console.groq.com is enough. The function keeps Supabase's JWT
-check on and the app calls it through the Supabase client, so it answers the
-signed-in players of this app and nobody else. Nothing about the key is
-committed, and if the function is not deployed the quiz simply says it is
-unreachable rather than asking anyone for anything.
+A free key from console.groq.com is enough. The function must be deployed
+under the slug **`quiz`** (that is the path the app calls) and its
+**"Verify JWT with legacy secret"** switch should be **off**: that gate only
+accepts tokens signed by the old shared secret, which a project on the newer
+publishable keys may no longer issue. The function asks the auth API who the
+caller is instead, which works either way, so it still answers only signed-in
+players of this app. Nothing about the key is committed, and if the function
+is not deployed the quiz simply says it is unreachable rather than asking
+anyone for anything.
 
 ### The shop
 

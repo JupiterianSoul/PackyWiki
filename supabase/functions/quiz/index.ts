@@ -7,11 +7,17 @@
  * runs the request server-side instead: the app sends the article, this
  * function adds the key and hands back the questions.
  *
- * Deploy once (see README): the key lives in the function's own secrets and
- * never reaches a device.
+ * Deploy once (see README): the key lives in the project's secrets and never
+ * reaches a device.
  *
  *   supabase secrets set GROQ_API_KEY=...
  *   supabase functions deploy quiz
+ *
+ * The function checks the caller ITSELF rather than leaning on the gateway's
+ * "verify JWT with legacy secret" switch. That switch only accepts tokens
+ * signed by the old shared secret, which a project on the newer publishable
+ * keys may not be issuing any more; asking the auth API who the caller is
+ * works either way. So leave that switch OFF and let this run.
  */
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const MODEL = 'llama-3.1-8b-instant';
@@ -44,6 +50,22 @@ Deno.serve(async (req: Request) => {
 
   const key = Deno.env.get('GROQ_API_KEY');
   if (!key) return json({ error: 'QUIZ_UNSET' }, 503);
+
+  // Who is asking? The app sends the player's own session, so the auth API
+  // can confirm this is a signed-in player of this project and not somebody
+  // who found the URL and fancied spending the quiz budget.
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const apikey = req.headers.get('apikey') ?? authHeader.replace(/^Bearer\s+/i, '');
+  const projectUrl = Deno.env.get('SUPABASE_URL');
+  if (!authHeader || !projectUrl) return json({ error: 'UNAUTHORISED' }, 401);
+  try {
+    const who = await fetch(`${projectUrl}/auth/v1/user`, {
+      headers: { Authorization: authHeader, apikey }
+    });
+    if (!who.ok) return json({ error: 'UNAUTHORISED' }, 401);
+  } catch {
+    return json({ error: 'UNAUTHORISED' }, 401);
+  }
 
   let body: { title?: string; text?: string; rank?: number; count?: number; lang?: string };
   try {
