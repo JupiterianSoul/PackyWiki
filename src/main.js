@@ -57,6 +57,7 @@ import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
 import { music } from './ui/music.js';
+import { canRedeem, codeByInput, codeLook, codeSpec, timesRedeemed } from './codes.js';
 import {
   quizAvailable, buildQuiz, questionCountFor, quizRewards,
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
@@ -250,6 +251,7 @@ bind({
   prefsLabel: $('#prefs-label'), settingsList: $('#settings-list'),
   accountLabel: $('#account-label'), accountList: $('#account-list'),
   dataLabel: $('#data-label'), dataList: $('#data-list'),
+  redeemLabel: $('#redeem-label'), redeemList: $('#redeem-list'),
 
   openScreen: $('#screen-open'), openBack: $('#open-back'), openTitle: $('#open-title'),
   burstLayer: $('#burst-layer'),
@@ -388,6 +390,10 @@ function showScreen(name) {
 
   setTickerJob('shop', name === 'shop' ? tickRestock : null);
   setTickerJob('timed', name === 'timed' ? tickTimed : null);
+  // The chat poll used to survive every exit but the back button, ticking
+  // every ten seconds for the rest of the session on a screen nobody is
+  // looking at. Leaving the room stops it.
+  if (name !== 'chat' && chatTimer) { clearInterval(chatTimer); chatTimer = null; }
   // #app is the scroll container now, not the document.
   document.getElementById('app')?.scrollTo({ top: 0 });
 }
@@ -896,7 +902,7 @@ function renderCreator() {
         <span class="forge-made-art"></span>
         <b></b><span class="forge-made-sub"></span>
       </button>
-      <button type="button" class="forge-made-delete" aria-label="${t('deleteBooster')}">
+      <button type="button" class="forge-made-delete" aria-label="${esc(t('deleteBoosterNamed', { name: pack.name }))}">
         ${iconSvg('trash', { size: 16 })}
       </button>`;
     tile.querySelector('.forge-made-art').appendChild(buildBooster(spec, { size: 'is-tiny' }));
@@ -3322,7 +3328,10 @@ function renderCardIndex() {
 
   if (ci.wishMode) {
     el.indexCounts.replaceChildren(Object.assign(document.createElement('span'),
-      { className: 'stat-pill', textContent: t('wishCount', { n: state.wishlist.size }) }));
+      { className: 'stat-pill',
+        textContent: state.wishlist.size === 1
+          ? t('wishCountOne')
+          : t('wishCount', { n: state.wishlist.size }) }));
     const rows = [...state.wishlist.values()].map((card) => ({
       key: card.key, title: card.title, rarity: card.rarityId,
       price: card.price, views: card.views, thumbnail: card.thumbnail, lang: card.lang
@@ -6054,6 +6063,65 @@ function renderSettings() {
   resetBtn.addEventListener('click', () => handleReset(resetBtn));
 
   el.dataList.replaceChildren(transferRow, resetRow);
+
+  // --- secret codes: a booster someone handed you ---------------------------
+  el.redeemLabel.textContent = t('redeemTitle');
+  el.redeemList.replaceChildren(redeemRow());
+}
+
+/**
+ * The redeem row: one field, one button, one line of news underneath. A code
+ * is looked up in src/codes.js, spent once per save, and what it hands over
+ * is an ordinary booster in the player's inventory, openable like any other.
+ */
+function redeemRow() {
+  const row = document.createElement('div');
+  row.className = 'row row-stack';
+  row.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <form class="redeem-form" autocomplete="off">
+      <input class="creator-input" type="text" maxlength="32" spellcheck="false" data-code>
+      <button class="btn btn-sm btn-primary" type="submit"></button>
+    </form>
+    <p class="find-status" role="status" aria-live="polite" data-status></p>`;
+  row.querySelector('h4').textContent = t('redeemTitle');
+  row.querySelector('p').textContent = t('redeemNote');
+  const form = row.querySelector('form');
+  const input = row.querySelector('[data-code]');
+  const status = row.querySelector('[data-status]');
+  const button = row.querySelector('button');
+  input.placeholder = t('redeemPlaceholder');
+  button.textContent = t('redeemGo');
+  press(button, { sound: null });
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    const entry = codeByInput(input.value);
+    if (!entry) {
+      synth.playDenied();
+      status.textContent = t('redeemUnknown');
+      status.className = 'find-status is-error';
+      return;
+    }
+    if (!canRedeem(state.profile, entry)) {
+      synth.playDenied();
+      status.textContent = t('redeemUsed');
+      status.className = 'find-status is-error';
+      return;
+    }
+    state.profile.codesRedeemed = state.profile.codesRedeemed ?? {};
+    state.profile.codesRedeemed[entry.id] = timesRedeemed(state.profile, entry.id) + 1;
+    store.saveProfile(state.profile);
+    const spec = codeSpec(entry);
+    store.addBooster(state.inventory, spec, 1);
+    synth.playPurchase();
+    input.value = '';
+    status.textContent = t('redeemDone', { name: codeLook(entry).name });
+    status.className = 'find-status is-ok';
+    toast(t('redeemDone', { name: codeLook(entry).name }), 'ok');
+    renderPacks();
+  });
+  return row;
 }
 
 /**

@@ -219,5 +219,24 @@ export const RELEASES = [
       { en: 'A held card leans and its light slides; on a phone the gyroscope leans it too', fr: 'Une carte tenue s’incline et sa lumière glisse ; sur téléphone, le gyroscope l’incline aussi' },
       { en: 'Battery saver keeps every card still', fr: 'L’économie de batterie garde chaque carte immobile' }
     ]
+  },
+  {
+    id: 'web', icon: 'wand', accent: '#38bdf8',
+    title: { en: 'Wiklodo on the web', fr: 'Wiklodo sur le web' },
+    points: [
+      { en: 'The whole game in a browser, desktop included', fr: 'Le jeu entier dans un navigateur, ordinateur compris' },
+      { en: 'Search bars that finally match the app', fr: 'Des barres de recherche enfin accordées à l’app' },
+      { en: 'A secret code box at the end of Settings', fr: 'Une case à code secret au bout des Réglages' }
+    ],
+    changelog: [
+      { en: 'Wiklodo runs as a website as well as an app, from the same build', fr: 'Wiklodo tourne en site web comme en application, depuis la même version' },
+      { en: 'On a desktop screen the game keeps its shape, centred, with the theme behind it', fr: 'Sur un écran d’ordinateur le jeu garde sa forme, centré, avec le thème derrière' },
+      { en: 'Every search bar wears the theme now instead of the browser’s white box', fr: 'Chaque barre de recherche porte le thème au lieu de la boîte blanche du navigateur' },
+      { en: 'The card index and the auction house line up with the rest of the screen', fr: 'L’index des cartes et la salle des ventes s’alignent avec le reste de l’écran' },
+      { en: 'Changing theme no longer closes the game: the launcher icon changes once you leave', fr: 'Changer de thème ne ferme plus le jeu : l’icône change quand vous quittez' },
+      { en: 'Settings ends with Redeem secret code, for the personal boosters to come', fr: 'Les Réglages se terminent par un code secret, pour les boosters personnels à venir' },
+      { en: 'The music is jazz now, and the restless tracks are gone', fr: 'La musique est du jazz, et les morceaux agités ont disparu' },
+      { en: 'The chat stopped polling in the background after you left the room', fr: 'La discussion cesse de sonder en arrière-plan une fois la salle quittée' }
+    ]
   }
 ];

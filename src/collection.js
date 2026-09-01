@@ -397,6 +397,8 @@ export function loadProfile() {
   profile.freeTaken ??= { window: null, ids: [] };
   profile.achievements ??= { redeemed: [] };
   profile.achievements.redeemed ??= [];
+  // Secret codes: id -> how many times this save has redeemed it.
+  profile.codesRedeemed ??= {};
   // The top tier was renamed: its pull counts and the redeemed marks of its
   // achievement chain move to the new name so nothing is lost or paid twice.
   for (const [id, n] of Object.entries(profile.rarityCounts)) {

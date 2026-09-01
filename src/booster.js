@@ -10,6 +10,8 @@
  *   kind     'theme'  a subject booster        (themeId set)
  *            'open'   draws from all of Wikipedia
  *            'custom' draws from a subject's own wiki (wiki set)
+ *            'code'   a personal booster unlocked by a secret code
+ *                     (codeId set; its contents live in src/codes.js)
  *   rarityId null for a normal booster, or a tier for a rarity booster
  *   cards    3–7
  *
@@ -18,6 +20,7 @@
  * the spec's contents rather than generated.
  */
 import { THEME_PACKS, themeById } from './data/packs.js';
+import { codeById, codeLook } from './codes.js';
 import { rarityById, rarityRank } from './data/rarities.js';
 import { drawCapsFor } from './economy.js';
 import { tx, t, getLanguage } from './i18n.js';
@@ -30,6 +33,7 @@ export function specId(spec) {
   const rarity = spec.rarityId ?? 'std';
   // A timed booster is defined entirely by its track level.
   if (spec.kind === 'timed') return `timed|${spec.timedLevel ?? 1}|std|${spec.cards}`;
+  if (spec.kind === 'code') return `code|${spec.codeId}|${rarity}|${spec.cards}`;
   if (spec.kind === 'custom') {
     const host = spec.wiki ? new URL(spec.wiki.apiUrl).host + new URL(spec.wiki.apiUrl).pathname.replace('/api.php', '') : spec.customId;
     return `custom|${host}|${rarity}|${spec.cards}`;
@@ -46,6 +50,10 @@ export function specName(spec) {
   const tier = spec.rarityId ? tx(rarityById(spec.rarityId).name) : null;
 
   if (spec.kind === 'timed') return t('timedBooster');
+  if (spec.kind === 'code') {
+    const base = codeLook(codeById(spec.codeId)).name || t('codeBooster');
+    return tier ? `${base} · ${tier}` : base;
+  }
   if (spec.kind === 'custom') {
     const base = spec.customName ?? spec.wiki?.sitename ?? 'Custom';
     return tier ? `${base} · ${tier}` : base;
@@ -64,6 +72,7 @@ export function specName(spec) {
  */
 export function specBaseName(spec) {
   if (spec.kind === 'timed') return t('timedBooster');
+  if (spec.kind === 'code') return codeLook(codeById(spec.codeId)).name || t('codeBooster');
   if (spec.kind === 'custom') return spec.customName ?? spec.wiki?.sitename ?? 'Custom';
   if (spec.themeId) return tx(themeById(spec.themeId)?.name);
   return spec.rarityId ? t('wildcard') : t('wildcard');
@@ -74,6 +83,7 @@ export const specTierName = (spec) =>
 
 export function specTagline(spec) {
   if (spec.kind === 'timed') return t('timedTagline');
+  if (spec.kind === 'code') return codeLook(codeById(spec.codeId)).tagline;
   if (spec.kind === 'custom') return spec.customTagline ?? '';
   if (spec.themeId) return tx(themeById(spec.themeId)?.tagline);
   return '';
@@ -89,6 +99,10 @@ export function specTagline(spec) {
  */
 export function specColours(spec) {
   if (spec.kind === 'timed') return { accent: '#38bdf8', accent2: '#0c4a6e' };
+  if (spec.kind === 'code') {
+    const look = codeLook(codeById(spec.codeId));
+    return { accent: look.accent, accent2: look.accent2 };
+  }
   if (spec.kind === 'custom') {
     const style = proceduralStyle(customSeed(spec));
     return { accent: style.accent, accent2: style.accent2 };
@@ -104,6 +118,7 @@ export function specColours(spec) {
 
 export const specIcon = (spec) =>
   spec.kind === 'timed' ? 'clock'
+    : spec.kind === 'code' ? 'gift'
     : spec.kind === 'custom' ? (spec.icon ?? 'wand')
       : themeById(spec.themeId)?.icon ?? (spec.rarityId ? 'gem' : 'packs');
 
@@ -117,6 +132,7 @@ export function specHero(spec) {
 
 /** Search queries for the current language, or [] for an open booster. */
 export function specQueries(spec) {
+  if (spec.kind === 'code') return codeById(spec.codeId)?.queries ?? [];
   const theme = themeById(spec.themeId);
   if (!theme) return [];
   const lang = getLanguage();
@@ -125,10 +141,16 @@ export function specQueries(spec) {
 
 /** Turn a spec into the shape src/wiki.js expects. */
 export function toDrawPack(spec) {
+  // A code booster with a written list of pages draws exactly those, in
+  // order, past every band and every search: that is what makes it personal.
+  const code = spec.kind === 'code' ? codeById(spec.codeId) : null;
+  const titles = code?.titles ?? [];
   return {
     name: specName(spec),
     cards: spec.cards,
-    source: spec.kind === 'custom' ? 'custom' : 'wikipedia',
+    source: titles.length ? 'titles' : spec.kind === 'custom' ? 'custom' : 'wikipedia',
+    titles,
+    lang: code?.lang ?? null,
     queries: specQueries(spec),
     wiki: spec.wiki ?? null,
     // What the pack is allowed to draw: a tier is a fame floor, the free

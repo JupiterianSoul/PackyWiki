@@ -1,9 +1,11 @@
 /**
  * BACKGROUND MUSIC
  * ============================================================================
- * Three found recordings on a shuffled loop, quiet enough to sit under the
- * synth: the lounge of a card shop, not a soundtrack. Nothing here is
- * generated - see src/assets/music/LICENSE.md for the artists and licences.
+ * Found recordings on a shuffled loop, quiet enough to sit under the synth:
+ * the lounge of a card shop after hours, not a soundtrack. Slow jazz only -
+ * anything with a beat to it fights the game. Nothing here is generated; see
+ * src/assets/music/LICENSE.md for the artists and licences, and for how to
+ * add a track (drop the file in that folder, credit the artist).
  *
  * The player is one HTMLAudio element. It starts only after a user gesture
  * (poke() is called from the app's first-interaction hook, the same one that

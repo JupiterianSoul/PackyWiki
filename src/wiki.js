@@ -890,6 +890,33 @@ export async function translateCard(entry, targetLang) {
   });
 }
 
+/**
+ * Draw the pages a booster names outright. Anything Wikipedia cannot serve
+ * (a renamed page, one with no usable picture) is skipped rather than faked,
+ * so a list of five that resolves to four opens as four.
+ */
+async function drawTitleSet(pack) {
+  const wanted = Math.max(1, pack.cards ?? 5);
+  const titles = (pack.titles ?? []).slice(0, POOL_LIMIT);
+  if (!titles.length) return [];
+  const pages = await pagesByTitle(titles);
+  // pagesByTitle answers in the API's order, not ours.
+  const byTitle = new Map(pages.map((page) => [page.title, page]));
+  const ordered = titles.map((title) => byTitle.get(title)).filter(Boolean);
+  const out = [];
+  const seen = new Set();
+  for (const page of ordered) {
+    if (out.length >= wanted) break;
+    if (seen.has(page.title)) continue;
+    const views = await fetchMonthlyViews(page.title).catch(() => null);
+    const card = pageToCard(page, views);
+    if (!card) continue;
+    seen.add(page.title);
+    out.push(card);
+  }
+  return out;
+}
+
 /* --- public API ---------------------------------------------------------- */
 
 /**
@@ -897,6 +924,9 @@ export async function translateCard(entry, targetLang) {
  * booster; duplicates across boosters are kept and counted as copies.
  */
 export async function drawArticles(pack) {
+  // A written list of pages: exactly these, in this order, no band, no
+  // search. Used by the personal boosters behind a secret code.
+  if (pack.source === 'titles') return drawTitleSet(pack);
   if (pack.source === 'custom') {
     const seen = new Set();
     return Promise.all(Array.from({ length: pack.cards }, () => drawCustomCard(pack, seen)));

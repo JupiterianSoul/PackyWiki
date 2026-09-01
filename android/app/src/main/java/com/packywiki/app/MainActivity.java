@@ -15,6 +15,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import android.content.ComponentName;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.webkit.JavascriptInterface;
 
@@ -110,6 +111,16 @@ public class MainActivity extends Activity {
         }
     }
 
+    /**
+     * The player closed the game themselves. This is the one safe moment to
+     * flip the launcher icon: there is nothing left on screen to lose.
+     */
+    @Override
+    protected void onDestroy() {
+        if (isFinishing()) applyPendingIcon();
+        super.onDestroy();
+    }
+
     @Override
     protected void onSaveInstanceState(Bundle outState) {
         super.onSaveInstanceState(outState);
@@ -127,14 +138,25 @@ public class MainActivity extends Activity {
 
     /**
      * Switches the launcher icon by flipping which activity-alias is enabled.
-     * One alias per theme exists in the manifest; DONT_KILL_APP keeps the app
-     * alive through the change. Some launchers redraw the icon only after a
-     * moment, which is the platform's way, not a bug here.
+     * One alias per theme exists in the manifest.
+     *
+     * Flipping an alias while the app is on screen can take the process down
+     * with it on some builds of Android, whatever DONT_KILL_APP asks for, and
+     * a player who changes a theme should never be thrown out of the game for
+     * it. So setIcon() only WRITES the wish down; the switch happens once the
+     * player has closed the game themselves (onDestroy while the activity is
+     * finishing). If a session is killed before that, the wish simply waits
+     * for the next clean exit: the alias the running task was launched from
+     * is never disabled underneath it.
      */
     private static final String[] ICON_THEMES = {
             "aurora", "paper", "arcade", "noir", "sunset",
             "meadow", "cartoon", "matrix", "casino", "horror"
     };
+
+    private static final String ICON_PREFS = "wiklodo.icon";
+    private static final String KEY_WANTED = "wanted";
+    private static final String KEY_APPLIED = "applied";
 
     private final class IconBridge {
         @JavascriptInterface
@@ -142,18 +164,28 @@ public class MainActivity extends Activity {
             String chosen = null;
             for (String t : ICON_THEMES) if (t.equals(themeId)) { chosen = t; break; }
             if (chosen == null) return;
-            final String pick = chosen;
-            runOnUiThread(() -> {
-                PackageManager pm = getPackageManager();
-                for (String t : ICON_THEMES) {
-                    ComponentName alias = new ComponentName(MainActivity.this, "com.packywiki.app.Icon_" + t);
-                    pm.setComponentEnabledSetting(alias,
-                            t.equals(pick)
-                                    ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
-                                    : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
-                            PackageManager.DONT_KILL_APP);
-                }
-            });
+            getSharedPreferences(ICON_PREFS, MODE_PRIVATE).edit().putString(KEY_WANTED, chosen).apply();
         }
+    }
+
+    /** Applies a pending icon wish, if there is one and it is not already on. */
+    private void applyPendingIcon() {
+        SharedPreferences prefs = getSharedPreferences(ICON_PREFS, MODE_PRIVATE);
+        String wanted = prefs.getString(KEY_WANTED, null);
+        if (wanted == null) return;
+        if (wanted.equals(prefs.getString(KEY_APPLIED, null))) return;
+        boolean known = false;
+        for (String t : ICON_THEMES) if (t.equals(wanted)) { known = true; break; }
+        if (!known) return;
+        PackageManager pm = getPackageManager();
+        for (String t : ICON_THEMES) {
+            ComponentName alias = new ComponentName(getApplicationContext(), "com.packywiki.app.Icon_" + t);
+            pm.setComponentEnabledSetting(alias,
+                    t.equals(wanted)
+                            ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                            : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                    PackageManager.DONT_KILL_APP);
+        }
+        prefs.edit().putString(KEY_APPLIED, wanted).apply();
     }
 }

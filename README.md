@@ -59,6 +59,33 @@ Chrome, Firefox, Safari or Edge.
 
 ---
 
+## The website
+
+The same build that goes inside the APK is also the website: one bundle, every
+asset referenced relative to `index.html` (`base: './'` in `vite.config.js`),
+so it runs from the app's asset origin, from a domain root, or from a project
+page under a repository path.
+
+`.github/workflows/pages.yml` builds and publishes it to GitHub Pages on every
+push to the default branch or to a `claude/**` branch, and can be started by
+hand from the Actions tab. One setting has to be flipped once in the
+repository, by hand: **Settings > Pages > Build and deployment > Source:
+GitHub Actions**. After that the site lives at
+`https://<owner>.github.io/<repo>/`.
+
+On a phone the site is the app. On a desktop browser the game keeps its phone
+shape, centred in the window with the theme's backdrop running behind it, and
+gains what a pointer allows: hover states, a scrollbar, and text you can
+select. Cards lean with the mouse exactly as they lean with a thumb; the
+gyroscope simply has nothing to report.
+
+Sign-in, cloud save, friends and the auction house work on the website exactly
+as they do in the app, against the same Supabase project. A collection kept in
+a browser lives in that browser's storage, so Transfer your save is still the
+bridge between a browser and a phone.
+
+---
+
 ## Android APK
 
 The app also ships as a sideloadable Android APK - a thin WebView wrapper
@@ -186,6 +213,22 @@ knows the list.
 The picker on the Customization screen gives each option its own `data-theme`, so **the token
 block applies to the option itself**: you are choosing between four miniatures
 of the app rather than four names and a swatch.
+
+### The launcher icon follows the theme
+
+Each theme has its own adaptive launcher icon, shipped as one `activity-alias`
+per theme in the manifest. The web side calls `WiklodoIcon.setIcon(themeId)`
+whenever the theme changes.
+
+That call does not switch anything on the spot. Disabling the alias a running
+task was launched from can take the process down with it on some builds of
+Android, whatever `DONT_KILL_APP` asks for, and a player who changes a theme
+must never be thrown out of the game for it. So `setIcon` only writes the wish
+down, and `MainActivity.onDestroy()` applies it when the activity is actually
+finishing: the player has closed the game themselves, and there is nothing
+left on screen to lose. A session killed before that leaves the wish pending
+for the next clean exit. Some launchers redraw the icon only after a moment,
+which is the platform's way, not a bug here.
 
 ---
 
@@ -846,6 +889,44 @@ snappiest theme is also the cheapest.
 Playtime is measured between visibility changes rather than by a stopwatch -
 a timer ticking once a second purely to add one to a number is exactly the sort
 of background work this should not be doing.
+
+---
+
+## Secret codes
+
+The last section of **Settings** is *Redeem secret code*: a field for a code
+handed out by hand. A valid code drops one personal booster into the player's
+inventory, openable like any other, and is spent once per save
+(`profile.codesRedeemed`, so it survives a reinstall through Transfer save and
+cannot be spent twice by relaunching).
+
+Every code is one entry in `src/codes.js`, and nothing else has to change to
+add one:
+
+```js
+export const SECRET_CODES = [
+  {
+    id: 'founders',                  // stable; stored in the save forever
+    code: 'WIKLODO-FOUNDERS',        // what the player types, any case
+    name: { en: 'Founders pack', fr: 'Pack des fondateurs' },
+    tagline: { en: 'For the first hands', fr: 'Pour les premieres mains' },
+    cards: 5,                        // 3 to 7
+    accent: '#f472b6', accent2: '#7c3aed',
+    rarityId: null,                  // or a tier, to floor the draw
+    titles: ['Ada Lovelace', 'Grace Hopper'],   // exact pages, in order
+    queries: ['jazz'],               // or subjects to search instead
+    lang: null,                      // 'en' / 'fr' to pin, null to follow
+    uses: 1                          // redemptions allowed per save
+  }
+];
+```
+
+`titles` wins over `queries`: a code booster with a title list contains
+exactly those pages, in that order, past every tier band and every search
+(`source: 'titles'` in `src/wiki.js`). A page Wikipedia cannot serve, or one
+with no usable picture, is skipped rather than faked, so a list of five that
+resolves to four opens as four. Typed codes are compared with letters and
+digits only, so dashes, spaces and case never matter.
 
 ---
 

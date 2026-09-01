@@ -87,6 +87,47 @@
 .forge h3 { font-size: 1.08rem; }
 .forge > p { font-size: 0.82rem; line-height: 1.55; color: var(--ink-dim); max-width: 36ch; }
 
+/* --- SEARCH BARS ----------------------------------------------------------
+   Every search field in the app wears the same skin as the panels around it:
+   the surface of an empty-state card, the theme's own line, and a pill that
+   goes square under Arcade and loses its fill under Paper, like every other
+   input here. Before this they fell through to the browser's white box.  */
+.creator-input,
+.filter-input[type='search'],
+input[type='search'] {
+  width: 100%;
+  padding: 11px 16px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  box-shadow: var(--surface-shadow);
+  backdrop-filter: var(--blur);
+  color: var(--ink);
+  font: inherit;
+  font-size: 0.9rem;
+}
+.creator-input::placeholder,
+input[type='search']::placeholder { color: var(--ink-faint); }
+.creator-input:focus,
+input[type='search']:focus { outline: none; border-color: var(--accent); }
+/* The clear cross Chrome draws is a dark blob on a dark panel. */
+input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0.45); cursor: pointer; }
+[data-theme='paper'] input[type='search']::-webkit-search-cancel-button { filter: none; }
+[data-theme='arcade'] .creator-input,
+[data-theme='arcade'] .filter-input[type='search'],
+[data-theme='arcade'] input[type='search'] { border-radius: var(--radius); }
+[data-theme='paper'] .creator-input,
+[data-theme='paper'] .filter-input[type='search'],
+[data-theme='paper'] input[type='search'] { background: transparent; box-shadow: none; }
+/* The number fields in the market share the skin but not the pill: a wide
+   round box around three digits looks like a mistake. */
+.creator-input[type='number'] { border-radius: var(--radius); text-align: center; }
+/* The player search is one input inside its own panel, so it stays bare and
+   the panel itself becomes the pill. */
+.find .find-input { background: none; border: 0; box-shadow: none; backdrop-filter: none; }
+.find { border-radius: var(--radius-pill); }
+[data-theme='arcade'] .find { border-radius: var(--radius); }
+
 .forge-input {
   width: 100%;
   padding: 13px 16px;
@@ -1208,6 +1249,18 @@
   min-height: 1.2em;
 }
 .find-status.is-working { color: var(--warning); }
+.find-status.is-ok { color: var(--positive); }
+
+/* --- redeeming a secret code ---------------------------------------------- */
+/* A row that stacks instead of putting its control on the right: the field
+   needs the whole width, and the answer belongs under it. */
+.row-stack { display: flex; flex-direction: column; align-items: stretch; gap: 10px; }
+.row-stack .row-copy { margin: 0; }
+.redeem-form { display: flex; gap: 8px; align-items: center; }
+.redeem-form .creator-input { flex: 1; min-width: 0; text-transform: uppercase; letter-spacing: 0.08em; }
+.redeem-form .btn { flex: none; }
+.row-stack .find-status { margin: 0; min-height: 0; }
+.row-stack .find-status:empty { display: none; }
 .find-status.is-error { color: var(--negative); }
 .find-status.is-muted { color: var(--ink-faint); font-weight: 600; }
 
@@ -1680,7 +1733,7 @@
 /* --- auction house tiles ---------------------------------------------------
    The listing is the Classic collection grid wearing price tags: two cards
    a row, each with its standing above and the live numbers below. */
-.market-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; margin-top: 12px; }
+.market-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; margin: 12px var(--gutter) 0; }
 .auction-tile { display: grid; gap: 6px; align-content: start; min-width: 0; }
 .auction-tile .card, .market-list > .card { width: 100%; }
 .auction-band {
@@ -1711,9 +1764,33 @@
 .auction-time { justify-self: end; }
 .auction-sub { font-size: 0.68rem; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .auction-sub.is-seller { justify-self: end; }
-.market-tools { display: grid; gap: 8px; margin-top: 12px; }
+/* The search field is a panel now, so it keeps the same gutter as every
+   other panel on the screen. The chip rows still bleed off the right edge
+   (that is how a scroller says "there is more"), but they START on the
+   gutter like everything else rather than against the screen edge. */
+/* The gutter lives on the row, not on its children, so the search field can
+   stay width: 100% and still line up with every panel on the screen. The chip
+   scrollers take it back with a negative margin: they still bleed off the
+   right edge, which is how a scroller says there is more, but they start on
+   the gutter like everything else. minmax(0, 1fr) keeps a scroller's content
+   from widening the column and dragging the field off-screen with it. */
+.market-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 12px;
+  padding-inline: var(--gutter);
+}
+.market-tools > * { min-width: 0; }
 .market-search { width: 100%; }
-.market-views, .market-sorts { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.market-views, .market-sorts {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin-inline: calc(var(--gutter) * -1);
+  padding: 0 var(--gutter) 2px;
+}
 .market-views::-webkit-scrollbar, .market-sorts::-webkit-scrollbar { display: none; }
 .market-view, .market-sort { flex: none; }
 /* the base .chip.is-on already paints these accent-on-ink; nothing to add */
@@ -1753,7 +1830,7 @@
 .wish-button.is-on { color: var(--accent-2); }
 .wish-giant.is-wished { color: var(--accent-2); border-color: var(--accent-2); }
 .wish-friends { font-size: 0.74rem; color: var(--accent-2); padding-top: 6px; }
-.index-counts { display: flex; flex-wrap: nowrap; gap: 6px; padding: 0 0 10px; overflow-x: auto; scrollbar-width: none; }
+.index-counts { display: flex; flex-wrap: nowrap; gap: 6px; padding: 0 var(--gutter) 10px; overflow-x: auto; scrollbar-width: none; }
 .index-counts::-webkit-scrollbar { display: none; }
 .index-counts .stat-pill { flex: none; padding: 6px 10px; font-size: 0.72rem; white-space: nowrap; }
 .glossary-list { display: grid; gap: 10px; }

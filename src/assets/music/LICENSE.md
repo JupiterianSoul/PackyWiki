@@ -1,13 +1,16 @@
 # Background music
 
-Three found recordings, played in rotation by src/ui/music.js:
+The lounge of a card shop after hours: slow, smoky, jazz. Played in rotation
+by src/ui/music.js. Nothing here is generated; these are the artists' own
+recordings, and the attributions below are the price of the ride.
 
-- `vibe-ace.ogg` - "Vibe Ace" by Kevin MacLeod (incompetech.com),
-  licensed under Creative Commons: By Attribution 3.0
-  (creativecommons.org/licenses/by/3.0/).
-- `1918.mp3` and `funky-robot.mp3` - by Antti Luode, from his release of
-  his instrumental catalogue free for any use with credit
-  (Creative Commons: By Attribution).
+- `vibe-ace.ogg` - "Vibe Ace" by Kevin MacLeod (incompetech.com), licensed
+  under Creative Commons: By Attribution 3.0
+  (creativecommons.org/licenses/by/3.0/). Vibraphone lounge jazz.
 
-Nothing here was generated; these are the artists' own recordings, and
-the attributions above are the price of the ride.
+## Adding more
+
+Drop an `.ogg` or `.mp3` in this folder and it joins the rotation on the next
+build; nothing else needs changing. Add the artist and the licence here at the
+same time. Only recordings that are public domain or licensed for reuse with
+credit belong in this folder.

@@ -1,0 +1,70 @@
+# The website version of Wiklodo: the same build the APK wraps, served from
+# GitHub Pages so anyone can play in a browser, desktop included.
+#
+# One-off setup in the repository: Settings > Pages > Build and deployment >
+# Source: GitHub Actions. After that every push to the default branch
+# publishes, and a run can be started by hand from the Actions tab.
+name: Publish the website
+
+on:
+  push:
+    branches: [main, master, 'claude/**']
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# A deploy that is already running finishes; a newer one waits rather than
+# racing it, so the live site is never half of two builds.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build the site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # As in the APK build: the Supabase URL and publishable key come from the
+      # committed .env.production and must not be passed as env vars, or Vite
+      # would let an empty process.env win and ship a site that cannot sign in.
+      - name: Build
+        run: |
+          npm ci
+          npm run build
+          grep -q "supabase.co" dist/assets/*.js \
+            || { echo "::error::Built bundle has no Supabase project in it."; exit 1; }
+
+      # Pages serves the built folder as-is. The app is a single page with no
+      # routes of its own, so a copy of index.html answers any stray deep link
+      # instead of the default 404.
+      - name: Add the fallback page
+        run: cp dist/index.html dist/404.html
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    name: Publish
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
