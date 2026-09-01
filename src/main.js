@@ -54,7 +54,7 @@ import * as account from './account.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
-import { buildAlbums, albumsCompleted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
+import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
 import { quizAvailable, buildQuiz, questionCountFor, quizRewards } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
@@ -2352,12 +2352,14 @@ function renderBinder() {
   const entries = store.allEntries(state.collection);
   const stats = store.collectionStats(entries);
   const albums = buildAlbums(entries, state.customPacks);
-  const done = albums.filter((a) => a.complete).length;
+  // Nobody completes an album against a real category, so the shelf reports
+  // how many books are open instead of how many are finished.
+  const started = albums.filter((a) => a.unlocked).length;
 
   el.binderStats.innerHTML = `
     <span class="stat-pill"><b>${stats.copies}</b> ${t('copies')}</span>
     <span class="stat-pill"><b>${money(stats.value)}</b> ${t('total')}</span>
-    <span class="stat-pill"><b>${done}</b> ${t('albumsDone')}</span>`;
+    <span class="stat-pill"><b>${started}</b> ${t('albumsStarted')}</span>`;
 
   el.binderEmpty.hidden = entries.length > 0;
   if (!entries.length) {
@@ -2747,7 +2749,7 @@ function renderProfile() {
     [t('statBoosters'), (state.profile.boostersOpened ?? 0).toLocaleString()],
     [t('statCards'), pulled.toLocaleString()],
     [t('statValue'), formatAmount(entries.reduce((sum, e) => sum + e.price * e.count, 0))],
-    [t('statAlbums'), String(albumsCompleted(entries, state.customPacks))],
+    [t('statAlbums'), String(albumsDeep(entries, state.customPacks))],
     [t('statAchievements'), String(evaluateAchievements(achFacts(),
       state.profile.achievements?.redeemed ?? []).filter((a) => a.unlocked).length)],
     ...(account.configured ? [[t('statFriends'), String(state.social.friends.length)]] : [])
@@ -2786,7 +2788,7 @@ function achFacts() {
   return measureAchievements({
     profile: state.profile,
     entries: store.allEntries(state.collection),
-    albumsDone: albumsCompleted(store.allEntries(state.collection), state.customPacks),
+    albumsDeep: albumsDeep(store.allEntries(state.collection), state.customPacks),
     customPacks: state.customPacks ?? [],
     friends: state.social.friends.length
   });

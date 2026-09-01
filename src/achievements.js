@@ -16,10 +16,10 @@ import { tx } from './i18n.js';
 /**
  * The measurable facts achievements are judged against. main.js builds one
  * of these from live state whenever the list is rendered.
- *   boosters, cards, unique, value, level, albumsDone, legendaries, artifacts,
+ *   boosters, cards, unique, value, level, albumsDeep, legendaries, artifacts,
  *   customsBuilt, friends, streakDays (total daily claims), playHours, sold
  */
-export function measure({ profile, entries, albumsDone, customPacks, friends }) {
+export function measure({ profile, entries, albumsDeep, customPacks, friends }) {
   const rc = profile.rarityCounts ?? {};
   const high = ['legendary', 'mythic', 'exotic', 'artifact']
     .reduce((sum, id) => sum + (rc[id] ?? 0), 0);
@@ -29,7 +29,7 @@ export function measure({ profile, entries, albumsDone, customPacks, friends }) 
     unique: entries.length,
     value: entries.reduce((sum, e) => sum + e.price * e.count, 0),
     level: profile.progress?.level ?? 1,
-    albumsDone,
+    albumsDeep,
     legendaries: high,
     artifacts: rc.artifact ?? 0,
     customsBuilt: customPacks.length,
@@ -81,15 +81,18 @@ export const ACHIEVEMENTS = [
     { en: 'Collection worth ฿150,000', fr: 'Collection à ฿150 000' }),
 
   // Albums
-  A('album-1', 'collection', 'albumsDone', 1, coins(2000),
+  // An album is measured against its category's real size, so "complete" is
+  // not a thing anyone will ever do. Depth is: twenty five cards in one book
+  // is a shelf that looks collected.
+  A('album-1', 'collection', 'albumsDeep', 1, coins(2000),
     { en: 'Bound and shelved', fr: 'Relié et rangé' },
-    { en: 'Complete your first album', fr: 'Complétez votre premier album' }),
-  A('album-3', 'collection', 'albumsDone', 3, pack('epic', 5),
+    { en: 'Get 25 cards into one album', fr: 'Réunissez 25 cartes dans un album' }),
+  A('album-3', 'collection', 'albumsDeep', 3, pack('epic', 5),
     { en: 'Librarian', fr: 'Bibliothécaire' },
-    { en: 'Complete 3 albums', fr: 'Complétez 3 albums' }),
-  A('album-10', 'collection', 'albumsDone', 10, pack('mythic', 5),
+    { en: 'Stock 3 albums with 25 cards each', fr: 'Garnissez 3 albums de 25 cartes chacun' }),
+  A('album-10', 'collection', 'albumsDeep', 10, pack('mythic', 5),
     { en: 'The archive', fr: 'L’archive' },
-    { en: 'Complete 10 albums', fr: 'Complétez 10 albums' }),
+    { en: 'Stock 10 albums with 25 cards each', fr: 'Garnissez 10 albums de 25 cartes chacun' }),
 
   // Big pulls
   A('legendary-1', 'spark', 'legendaries', 1, coins(1000),

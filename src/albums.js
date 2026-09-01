@@ -241,6 +241,16 @@ export function buildAlbums(entries, customPacks = []) {
   return albums;
 }
 
+/**
+ * What counts as a well-stocked album.
+ *
+ * An album is measured against the REAL size of its category now, so nobody
+ * is ever going to finish one: Wikipedia's own album runs to millions. The
+ * milestones the game rewards are therefore about depth, not completion, and
+ * this is the number they use.
+ */
+export const ALBUM_DEEP = 25;
+
 function decorate(album) {
   const style = styleForSpec(albumSpec(album));
   album.style = style;
@@ -249,10 +259,16 @@ function decorate(album) {
   album.total = known == null ? null : Math.max(known, album.owned);
   album.unlocked = album.owned > 0;
   album.complete = album.total != null && album.owned >= album.total;
+  album.deep = album.owned >= ALBUM_DEEP;
   return album;
 }
 
-/** How many albums are complete - the profile stat and achievement hook. */
-export function albumsCompleted(entries, customPacks = []) {
-  return buildAlbums(entries, customPacks).filter((a) => a.complete).length;
+/** How many albums are well stocked - the profile stat and achievement hook. */
+export function albumsDeep(entries, customPacks = []) {
+  return buildAlbums(entries, customPacks).filter((a) => a.deep).length;
+}
+
+/** How many albums have been opened at all. */
+export function albumsStarted(entries, customPacks = []) {
+  return buildAlbums(entries, customPacks).filter((a) => a.unlocked).length;
 }
