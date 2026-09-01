@@ -158,7 +158,7 @@ bind({
   drawer: $('#drawer'), drawerScrim: $('#drawer .drawer-scrim'), drawerPanel: $('#drawer .drawer-panel'),
   drawerMark: $('#drawer-mark'), drawerWho: $('#drawer-who'), drawerLinks: $('#drawer-links'),
   updatesTitle: $('#updates-title'), updatesSub: $('#updates-sub'), updatesList: $('#updates-list'),
-  quizTitle: $('#quiz-title'), quizBody: $('#quiz-body'),
+  quizTitle: $('#quiz-title'), quizBody: $('#quiz-body'), quizBack: $('#quiz-back'),
   splash: $('#splash'), splashMark: $('#splash-mark'),
 
   packsSeg: $('#packs-seg'), packsRail: $('#packs-rail'), packsCaption: $('#packs-caption'),
@@ -4285,7 +4285,7 @@ async function beginQuizQuestions() {
   q.step = 'writing';
   renderQuiz();
   try {
-    const text = await fetchArticleText(q.card.title).catch(() => '');
+    const text = await fetchArticleText(q.card.title, { limit: 3500 }).catch(() => '');
     const questions = await buildQuiz({
       title: q.card.title,
       text: text || q.card.extract,
@@ -4341,12 +4341,38 @@ function finishQuiz() {
   renderQuiz();
 }
 
+/**
+ * Out of the quiz, one step at a time.
+ *
+ * From a card or a result the way back is the category list; from the list
+ * itself it is out of the Quiz altogether. Backing out of a quiz already in
+ * progress takes two taps, because the questions do not come back.
+ */
+function leaveQuiz() {
+  const q = state.quiz;
+  if (!q || q.step === 'pick' || q.step === 'nokey') {
+    resetQuiz();
+    renderPacks();
+    showScreen('packs');
+    return;
+  }
+  if (q.step === 'ask' && !q.leaving) {
+    q.leaving = true;
+    toast(t('quizLeaveArmed'), 'ok');
+    setTimeout(() => { if (state.quiz === q) q.leaving = false; }, 3500);
+    return;
+  }
+  resetQuiz();
+  renderQuiz();
+}
+
 function renderQuiz() {
   // A finished quiz starts over on the next visit; a missing key un-blocks
   // itself the moment one is saved in Settings.
   if (!state.quiz || state.quiz.step === 'done' && state.tab !== 'quiz') resetQuiz();
   if (state.quiz.step === 'nokey' && quizAvailable()) resetQuiz();
   el.quizTitle.textContent = t('tabQuiz');
+  el.quizBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
   const q = state.quiz;
   const body = el.quizBody;
   const div = (cls, html = '') => {
@@ -5399,7 +5425,7 @@ function init() {
   [el.wallet, el.menuBtn, el.bell, el.giftBtn, el.levelBadge, el.packsOpen, el.timedOpen,
    el.filterOpen, el.openBack, el.openDone, el.sheetClose, el.starterGo,
    el.packsEmptyCta, el.creatorGo, el.findGo, el.friendBack,
-   el.friendRemove, el.gateAlt, el.oddsBtn, el.albumBack, el.chatBack].forEach((node) => press(node));
+   el.friendRemove, el.gateAlt, el.oddsBtn, el.albumBack, el.chatBack, el.quizBack].forEach((node) => press(node));
 
   el.wallet.addEventListener('click', openWallet);
   el.bell.addEventListener('click', openNotifications);
@@ -5416,6 +5442,7 @@ function init() {
   });
   el.filterOpen.addEventListener('click', openFilters);
   el.classicFilter.addEventListener('click', openFilters);
+  el.quizBack.addEventListener('click', leaveQuiz);
   // Scrolling is the one moment the backdrop must get out of the way.
   document.getElementById('app')?.addEventListener('scroll', () => backdrop.markBusy(), { passive: true });
   el.chatBack.addEventListener('click', () => {

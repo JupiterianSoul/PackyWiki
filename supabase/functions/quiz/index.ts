@@ -122,7 +122,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const title = String(body.title ?? '').slice(0, 200);
-  const text = String(body.text ?? '').slice(0, 6000);
+  const text = String(body.text ?? '').slice(0, 3500);
   const rank = Number.isFinite(body.rank) ? Number(body.rank) : 0;
   const count = Math.min(5, Math.max(3, Number(body.count) || 3));
   const language = body.lang === 'fr' ? 'French' : 'English';

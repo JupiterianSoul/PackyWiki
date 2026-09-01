@@ -45,7 +45,10 @@ export async function buildQuiz({ title, text, rarityId }) {
   const { data, error } = await supabase.functions.invoke('quiz', {
     body: {
       title,
-      text: String(text ?? '').slice(0, 6000),
+      // Trimmed on purpose: the opening of an article carries more than
+      // enough for five questions, and every character costs somebody's
+      // daily allowance.
+      text: String(text ?? '').slice(0, 3500),
       rank: rarityRank(rarityId),
       count: questionCountFor(rarityId),
       lang: getLanguage()

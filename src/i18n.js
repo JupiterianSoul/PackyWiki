@@ -158,6 +158,7 @@ const STRINGS = {
     quizYourAnswer: 'You said:',
     quizCorrectAnswer: 'Correct:',
     quizAgain: 'Play again',
+    quizLeaveArmed: 'Tap back again to abandon this quiz',
     quizFailed: 'The quiz could not be written. Try again in a moment.',
 
     // timed boosters
@@ -646,6 +647,7 @@ const STRINGS = {
     quizYourAnswer: 'Votre réponse :',
     quizCorrectAnswer: 'La bonne :',
     quizAgain: 'Rejouer',
+    quizLeaveArmed: 'Touchez retour à nouveau pour abandonner ce quiz',
     quizFailed: 'Le quiz n’a pas pu être préparé. Réessayez dans un instant.',
 
     // timed boosters
