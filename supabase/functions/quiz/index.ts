@@ -45,11 +45,18 @@ function difficultyFor(rank: number): string {
 }
 
 Deno.serve(async (req: Request) => {
+  // Every arrival is written down. A silent log is itself a diagnosis: it
+  // means the request never reached this code, so it was turned away at the
+  // gateway (the JWT switch) or went to a different name entirely.
+  console.log(`quiz: ${req.method} in, auth=${req.headers.get('Authorization') ? 'yes' : 'no'}`);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
   const key = Deno.env.get('GROQ_API_KEY');
-  if (!key) return json({ error: 'QUIZ_UNSET' }, 503);
+  if (!key) {
+    console.error('quiz: no GROQ_API_KEY secret set on this project');
+    return json({ error: 'QUIZ_UNSET' }, 503);
+  }
 
   // Who is asking? The app sends the player's own session, so the auth API
   // can confirm this is a signed-in player of this project and not somebody
@@ -64,7 +71,10 @@ Deno.serve(async (req: Request) => {
     ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
     ?? req.headers.get('apikey')
     ?? '';
-  if (!authHeader) return json({ error: 'UNAUTHORISED', detail: 'no authorization header' }, 401);
+  if (!authHeader) {
+    console.error('quiz: no authorization header on the request');
+    return json({ error: 'UNAUTHORISED', detail: 'no authorization header' }, 401);
+  }
   if (projectUrl && projectKey) {
     try {
       const who = await fetch(`${projectUrl}/auth/v1/user`, {
@@ -88,8 +98,9 @@ Deno.serve(async (req: Request) => {
   let body: { title?: string; text?: string; rank?: number; count?: number; lang?: string };
   try {
     body = await req.json();
-  } catch {
-    return json({ error: 'BAD_REQUEST' }, 400);
+  } catch (err) {
+    console.error('quiz: unreadable request body', String(err));
+    return json({ error: 'BAD_REQUEST', detail: 'unreadable body' }, 400);
   }
 
   const title = String(body.title ?? '').slice(0, 200);
@@ -97,7 +108,10 @@ Deno.serve(async (req: Request) => {
   const rank = Number.isFinite(body.rank) ? Number(body.rank) : 0;
   const count = Math.min(5, Math.max(3, Number(body.count) || 3));
   const language = body.lang === 'fr' ? 'French' : 'English';
-  if (!title || text.length < 80) return json({ error: 'BAD_REQUEST' }, 400);
+  if (!title || text.length < 80) {
+    console.error(`quiz: thin request, title=${Boolean(title)} textLength=${text.length}`);
+    return json({ error: 'BAD_REQUEST', detail: `title=${Boolean(title)} text=${text.length} chars` }, 400);
+  }
 
   const prompt = [
     `Write a ${count}-question multiple-choice quiz about "${title}", in ${language}.`,
@@ -158,6 +172,7 @@ Deno.serve(async (req: Request) => {
       answer: q.answer
     }));
 
+  console.log(`quiz: writing ${questions.length} questions about "${title}"`);
   if (questions.length < 3) {
     console.error('quiz: too few usable questions', questions.length);
     return json({ error: 'SHAPE', detail: `only ${questions.length} usable questions` }, 502);

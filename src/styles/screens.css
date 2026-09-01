@@ -1598,6 +1598,7 @@
 /* The mystery card: what it is stays the first question. */
 .quiz-mystery .card-desc, .quiz-mystery .card-extract { display: none; }
 .quiz-bigicon { color: var(--accent); opacity: 0.9; padding-top: 26px; }
+.quiz-note.is-error { color: var(--negative); font-weight: 700; }
 .quiz-note { text-align: center; font-size: 0.85rem; line-height: 1.55; color: var(--ink-dim); max-width: 38ch; margin: 0 auto; }
 .quiz-start { width: min(100%, 320px); }
 .quiz-progress {

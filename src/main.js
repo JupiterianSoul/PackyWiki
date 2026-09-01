@@ -4281,6 +4281,7 @@ async function startQuiz(themeId) {
 
 async function beginQuizQuestions() {
   const q = state.quiz;
+  q.error = null;
   q.step = 'writing';
   renderQuiz();
   try {
@@ -4299,10 +4300,12 @@ async function beginQuizQuestions() {
   } catch (err) {
     if (state.quiz !== q) return;
     // The reason travels with the error: "try again" is useless advice when
-    // the function is simply not deployed under the name the app calls.
-    toast(err?.message === 'QUIZ_UNAVAILABLE'
-      ? t('quizNoKey')
-      : `${t('quizFailed')}${err?.detail ? ` (${esc(err.detail)})` : ''}`, 'error');
+    // the function is simply not deployed under the name the app calls. It
+    // stays on the screen too, since a toast is gone before anyone can read
+    // a status code off it.
+    const detail = err?.detail ? ` (${err.detail})` : '';
+    q.error = err?.message === 'QUIZ_UNAVAILABLE' ? t('quizNoKey') : `${t('quizFailed')}${detail}`;
+    toast(q.error, 'error');
     synth.playDenied();
     q.step = 'preview';
     renderQuiz();
@@ -4398,7 +4401,8 @@ function renderQuiz() {
     const card = buildStaticCard(quizEntry(q, { bare: true }), q.rarity, null, { fav: false, lit: true });
     card.classList.add('quiz-mystery');
     const note = div('quiz-note');
-    note.textContent = t('quizNotice', { n: q.count });
+    note.textContent = q.error ?? t('quizNotice', { n: q.count });
+    if (q.error) note.classList.add('is-error');
     const start = document.createElement('button');
     start.type = 'button';
     start.className = 'btn btn-primary quiz-start';
