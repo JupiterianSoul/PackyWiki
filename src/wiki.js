@@ -200,7 +200,7 @@ async function topArticles() {
   try {
     const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/${lang}.wikipedia/all-access/${y}/${m}/all-days`;
     const rows = ((await fetchJson(url))?.items?.[0]?.articles ?? [])
-      .map((row) => ({ title: String(row.article ?? '').replace(/_/g, ' '), views: Math.round((row.views ?? 0) / 30) }))
+      .map((row) => ({ title: String(row.article ?? '').replace(/_/g, ' '), views: Math.round(row.views ?? 0) }))
       .filter((row) => row.title && !row.title.includes(':') && !BAD_TITLE.test(row.title));
     topCache = { lang, at: Date.now(), rows };
     return rows;

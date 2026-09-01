@@ -97,5 +97,27 @@ export const RELEASES = [
       { en: 'This timeline',
         fr: 'Cette chronologie' }
     ]
+  },
+  {
+    id: 'polish', icon: 'collection', accent: '#38bdf8',
+    title: { en: 'Sharper edges', fr: 'Les angles polis' },
+    points: [
+      { en: 'Album books show one page at a time, four cards at their real size',
+        fr: 'Les albums montrent une page à la fois, quatre cartes à leur vraie taille' },
+      { en: 'The collection reads as albums or as a classic sorted list',
+        fr: 'La collection se lit en albums ou en liste classique triée' },
+      { en: 'One album per custom subject, and lost custom packs come back',
+        fr: 'Un seul album par sujet personnalisé, et les packs perdus reviennent' },
+      { en: 'Boosters only draw pages that are actually about their subject',
+        fr: 'Les boosters ne tirent que des pages qui parlent vraiment de leur sujet' },
+      { en: 'Boosters open in about one request instead of three per card',
+        fr: 'Un booster s’ouvre en une requête environ, au lieu de trois par carte' },
+      { en: 'A lost connection can never eat a booster, and never hangs the app',
+        fr: 'Une connexion perdue ne peut plus avaler un booster ni bloquer l’application' },
+      { en: 'Leftover cards in the wrong language are translated on launch',
+        fr: 'Les cartes restées dans la mauvaise langue sont traduites au lancement' },
+      { en: 'The quiz needs no key from you: it is written on the server side',
+        fr: 'Le quiz ne demande aucune clé : il est rédigé côté serveur' }
+    ]
   }
 ];

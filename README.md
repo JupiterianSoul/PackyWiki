@@ -514,6 +514,26 @@ fortune.
 | Starter kit | Ᏸ1,500 and 3 boosters |
 | Subject surcharge | +25% for a booster tied to one theme |
 
+### The quiz
+
+Pick a subject, meet one card you probably do not own, and answer three to
+five multiple-choice questions written from that article's own text. The
+questions come from a language model, and the key that pays for it is **not
+in the app**: a key inside an APK is a key anyone can pull back out of it.
+Instead `supabase/functions/quiz` holds it as a server-side secret and the
+app calls the function with the publishable key it already carries, so
+players need no key, no setting and no account for it.
+
+To turn the quiz on for everyone, once:
+
+```
+supabase secrets set GROQ_API_KEY=gsk_your_key
+supabase functions deploy quiz
+```
+
+A free Groq key is enough. Nothing about it is committed, and if the function
+is not deployed the quiz simply says it is unreachable.
+
 ### The shop
 
 Stock is generated from the current two-hour window index, so it is stable

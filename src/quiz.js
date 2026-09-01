@@ -4,35 +4,24 @@
  * Pick a subject, meet one card you probably do not own, answer three to five
  * questions about its article, and walk away with money, the card itself, or
  * a booster, depending on how many you got right. The questions are written
- * on the spot by a language model (Groq, llama-3.1-8b-instant) from the
- * article's own text, and they get harder the rarer the card is.
+ * on the spot by a language model from the article's own text, and they get
+ * harder the rarer the card is.
  *
- * The API key is the PLAYER'S OWN and never ships with the app: it is pasted
- * into Settings and stored on the device only. VITE_GROQ_API_KEY can seed a
- * personal build, but nothing is ever committed.
+ * The key that pays for that is NOT in this app. A key shipped inside an APK
+ * is a key anyone can pull back out of it, so the request goes to a small
+ * Supabase Edge Function (supabase/functions/quiz) which holds the key as a
+ * server-side secret. Players need no key, no setting and no account for it:
+ * the app already carries the publishable Supabase key, and that is all the
+ * function asks for.
  */
 import { getLanguage } from './i18n.js';
 import { rarityRank } from './data/rarities.js';
 
-const KEY_STORAGE = 'packywiki.groqKey.v1';
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
 
-export function groqKey() {
-  try {
-    const stored = localStorage.getItem(KEY_STORAGE);
-    if (stored) return stored;
-  } catch { /* storage unavailable */ }
-  return import.meta.env.VITE_GROQ_API_KEY || '';
-}
-
-export function saveGroqKey(key) {
-  try {
-    const clean = (key ?? '').trim();
-    if (clean) localStorage.setItem(KEY_STORAGE, clean);
-    else localStorage.removeItem(KEY_STORAGE);
-  } catch { /* storage unavailable */ }
-}
+/** Whether this build can write quizzes at all. */
+export const quizAvailable = () => Boolean(SUPABASE_URL && SUPABASE_KEY);
 
 /** Three questions at the common end of the table, five at the top. */
 export function questionCountFor(rarityId) {
@@ -42,78 +31,55 @@ export function questionCountFor(rarityId) {
   return 3;
 }
 
-/** The tier calibrates how mean the questions are allowed to be. */
-function difficultyFor(rarityId) {
-  const rank = rarityRank(rarityId);
-  if (rank >= 6) return 'Ask expert-level questions about fine details of the text. No giveaway wording.';
-  if (rank >= 4) return 'Ask hard questions about specifics in the text. No giveaway wording.';
-  if (rank >= 3) return 'Ask moderately hard questions that need a careful read of the text.';
-  if (rank >= 2) return 'Mix easy and moderate questions; at most one needs a careful read.';
-  return 'Ask straightforward questions a casual reader could answer after skimming the text.';
-}
-
 /**
- * Ask Groq to write the quiz. Resolves to [{ question, choices[4], answer }],
- * throws 'QUIZ_KEY' when the key is refused and 'QUIZ_SHAPE' when the model
- * does not produce a usable quiz.
+ * Ask the quiz writer for a set of questions.
+ *
+ * Resolves to [{ question, choices[4], answer }]. Throws 'QUIZ_UNAVAILABLE'
+ * when this build has no backend to ask, and 'QUIZ_SHAPE' when nothing
+ * usable came back.
  */
-export async function buildQuiz({ title, text, rarityId, apiKey }) {
-  const count = questionCountFor(rarityId);
-  const lang = getLanguage() === 'fr' ? 'French' : 'English';
-  const prompt = [
-    `Write a ${count}-question multiple-choice quiz about "${title}", in ${lang}.`,
-    difficultyFor(rarityId),
-    'Use ONLY facts stated in the article text below.',
-    'Each question has exactly 4 choices and exactly one correct choice. Vary which position holds the correct one.',
-    'Respond with JSON only, shaped exactly as:',
-    '{"questions":[{"question":"...","choices":["...","...","...","..."],"answer":0}]}',
-    'where "answer" is the zero-based index of the correct choice.',
-    '',
-    'ARTICLE TEXT:',
-    String(text ?? '').slice(0, 6000)
-  ].join('\n');
-
+export async function buildQuiz({ title, text, rarityId }) {
+  if (!quizAvailable()) throw new Error('QUIZ_UNAVAILABLE');
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 25000);
   let res;
   try {
-    res = await fetch(GROQ_URL, {
+    res = await fetch(`${SUPABASE_URL}/functions/v1/quiz`, {
       method: 'POST',
       signal: controller.signal,
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`
+      },
       body: JSON.stringify({
-        model: GROQ_MODEL,
-        temperature: 0.6,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'You write quiz questions. You respond with valid JSON only.' },
-          { role: 'user', content: prompt }
-        ]
+        title,
+        text: String(text ?? '').slice(0, 6000),
+        rank: rarityRank(rarityId),
+        count: questionCountFor(rarityId),
+        lang: getLanguage()
       })
     });
+  } catch {
+    throw new Error('QUIZ_SHAPE');
   } finally {
     clearTimeout(timer);
   }
-  if (res.status === 401 || res.status === 403) throw new Error('QUIZ_KEY');
-  if (!res.ok) throw new Error(`Groq responded ${res.status}`);
 
-  const data = await res.json();
-  let parsed;
+  // 503 means the function is deployed but nobody has given it a key yet.
+  if (res.status === 503) throw new Error('QUIZ_UNAVAILABLE');
+  if (!res.ok) throw new Error('QUIZ_SHAPE');
+
+  let data;
   try {
-    parsed = JSON.parse(data?.choices?.[0]?.message?.content ?? '{}');
+    data = await res.json();
   } catch {
     throw new Error('QUIZ_SHAPE');
   }
-  const questions = (Array.isArray(parsed?.questions) ? parsed.questions : [])
+  const questions = (Array.isArray(data?.questions) ? data.questions : [])
     .filter((q) => q && typeof q.question === 'string'
       && Array.isArray(q.choices) && q.choices.length === 4
-      && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 4)
-    .slice(0, count)
-    .map((q) => ({
-      question: q.question.trim(),
-      choices: q.choices.map((c) => String(c).trim()),
-      answer: q.answer
-    }));
+      && Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 4);
   if (questions.length < 3) throw new Error('QUIZ_SHAPE');
   return questions;
 }

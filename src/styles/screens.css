@@ -1659,20 +1659,7 @@
 .quiz-recap-a.is-wrong { color: var(--negative); }
 .quiz-recap-a.is-answer { color: var(--positive); }
 
-/* --- settings extras ----------------------------------------------------------- */
 
-.row.row-stack { flex-direction: column; align-items: stretch; gap: 10px; }
-.key-input {
-  width: 100%;
-  padding: 11px 14px;
-  border-radius: var(--radius);
-  border: var(--border) var(--border-style) var(--line);
-  background: color-mix(in srgb, var(--ink) 6%, transparent);
-  color: var(--ink);
-  font-size: 0.88rem;
-  font-family: ui-monospace, monospace;
-}
-.key-input:focus { outline: none; border-color: var(--accent); }
 
 /* --- the classic view -----------------------------------------------------------
    The whole collection at once, grouped by category in shelf order and sorted

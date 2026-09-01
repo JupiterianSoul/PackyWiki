@@ -56,7 +56,7 @@ import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsCompleted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
-import { groqKey, saveGroqKey, buildQuiz, questionCountFor, quizRewards } from './quiz.js';
+import { quizAvailable, buildQuiz, questionCountFor, quizRewards } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { proceduralStyle } from './packstyle.js';
@@ -605,7 +605,8 @@ const HELP = {
   timed:   { steps: 3, tip: true },
   shop:    { steps: 3, tip: true },
   binder:  { steps: 3, tip: true },
-  friends: { steps: 3, tip: true }
+  friends: { steps: 3, tip: true },
+  quiz:    { steps: 3, tip: true }
 };
 
 function openHelp(topic) {
@@ -4229,7 +4230,7 @@ function renderUpdates() {
  */
 
 function resetQuiz() {
-  state.quiz = { step: groqKey() ? 'pick' : 'nokey' };
+  state.quiz = { step: quizAvailable() ? 'pick' : 'nokey' };
 }
 
 /** The quiz card as a collection-shaped entry (bare = no article text). */
@@ -4285,8 +4286,7 @@ async function beginQuizQuestions() {
     const questions = await buildQuiz({
       title: q.card.title,
       text: text || q.card.extract,
-      rarityId: q.rarity.id,
-      apiKey: groqKey()
+      rarityId: q.rarity.id
     });
     if (state.quiz !== q) return;
     q.questions = questions;
@@ -4296,7 +4296,7 @@ async function beginQuizQuestions() {
     renderQuiz();
   } catch (err) {
     if (state.quiz !== q) return;
-    toast(err?.message === 'QUIZ_KEY' ? t('quizKeyBad') : t('quizFailed'), 'error');
+    toast(err?.message === 'QUIZ_UNAVAILABLE' ? t('quizNoKey') : t('quizFailed'), 'error');
     synth.playDenied();
     q.step = 'preview';
     renderQuiz();
@@ -4336,7 +4336,7 @@ function renderQuiz() {
   // A finished quiz starts over on the next visit; a missing key un-blocks
   // itself the moment one is saved in Settings.
   if (!state.quiz || state.quiz.step === 'done' && state.tab !== 'quiz') resetQuiz();
-  if (state.quiz.step === 'nokey' && groqKey()) resetQuiz();
+  if (state.quiz.step === 'nokey' && quizAvailable()) resetQuiz();
   el.quizTitle.textContent = t('tabQuiz');
   const q = state.quiz;
   const body = el.quizBody;
@@ -4351,13 +4351,6 @@ function renderQuiz() {
     const box = div('quiz-stage');
     box.innerHTML = `<span class="quiz-bigicon">${iconSvg('quiz', { size: 46 })}</span><p class="quiz-note"></p>`;
     box.querySelector('.quiz-note').textContent = t('quizNoKey');
-    const go = document.createElement('button');
-    go.type = 'button';
-    go.className = 'btn btn-primary';
-    go.textContent = t('quizGoSettings');
-    press(go, { sound: null });
-    go.addEventListener('click', () => { synth.playTap(); renderSettings(); showScreen('settings'); });
-    box.appendChild(go);
     body.replaceChildren(box);
     return;
   }
@@ -4480,24 +4473,6 @@ function renderQuiz() {
   body.replaceChildren(score, rewards, recap, again);
 }
 
-/** The Settings row where the player pastes their own Groq key. */
-function quizKeyRow() {
-  const row = document.createElement('div');
-  row.className = 'row row-stack';
-  row.innerHTML = `
-    <div class="row-copy"><h4></h4><p></p></div>
-    <input class="key-input" type="password" autocomplete="off" spellcheck="false" placeholder="gsk_..." aria-label="Groq API key" />`;
-  row.querySelector('h4').textContent = t('settingsQuizKey');
-  row.querySelector('p').textContent = t('settingsQuizKeyNote');
-  const input = row.querySelector('input');
-  input.value = groqKey();
-  input.addEventListener('change', () => {
-    saveGroqKey(input.value);
-    toast(input.value.trim() ? t('quizKeySaved') : t('quizKeyCleared'), 'ok');
-  });
-  return row;
-}
-
 /* --- settings ------------------------------------------------------------------------------------------- */
 
 function settingRow(key, titleKey, noteKey) {
@@ -4604,7 +4579,7 @@ function renderSettings() {
   paintResetButton(resetBtn);
   resetBtn.addEventListener('click', () => handleReset(resetBtn));
 
-  el.dataList.replaceChildren(...accountRows(), language, quizKeyRow(), transferRow, resetRow);
+  el.dataList.replaceChildren(...accountRows(), language, transferRow, resetRow);
 }
 
 /**
