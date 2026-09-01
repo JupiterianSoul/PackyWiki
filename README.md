@@ -527,12 +527,17 @@ players need no key, no setting and no account for it.
 To turn the quiz on for everyone, once:
 
 ```
+supabase login
+supabase link --project-ref <your-project-ref>
 supabase secrets set GROQ_API_KEY=gsk_your_key
 supabase functions deploy quiz
 ```
 
-A free Groq key is enough. Nothing about it is committed, and if the function
-is not deployed the quiz simply says it is unreachable.
+A free key from console.groq.com is enough. The function keeps Supabase's JWT
+check on and the app calls it through the Supabase client, so it answers the
+signed-in players of this app and nobody else. Nothing about the key is
+committed, and if the function is not deployed the quiz simply says it is
+unreachable rather than asking anyone for anything.
 
 ### The shop
 

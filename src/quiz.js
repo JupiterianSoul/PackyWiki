@@ -16,12 +16,10 @@
  */
 import { getLanguage } from './i18n.js';
 import { rarityRank } from './data/rarities.js';
-
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL ?? '';
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY ?? '';
+import { supabase, configured } from './account.js';
 
 /** Whether this build can write quizzes at all. */
-export const quizAvailable = () => Boolean(SUPABASE_URL && SUPABASE_KEY);
+export const quizAvailable = () => configured;
 
 /** Three questions at the common end of the table, five at the top. */
 export function questionCountFor(rarityId) {
@@ -40,42 +38,24 @@ export function questionCountFor(rarityId) {
  */
 export async function buildQuiz({ title, text, rarityId }) {
   if (!quizAvailable()) throw new Error('QUIZ_UNAVAILABLE');
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 25000);
-  let res;
-  try {
-    res = await fetch(`${SUPABASE_URL}/functions/v1/quiz`, {
-      method: 'POST',
-      signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        apikey: SUPABASE_KEY,
-        Authorization: `Bearer ${SUPABASE_KEY}`
-      },
-      body: JSON.stringify({
-        title,
-        text: String(text ?? '').slice(0, 6000),
-        rank: rarityRank(rarityId),
-        count: questionCountFor(rarityId),
-        lang: getLanguage()
-      })
-    });
-  } catch {
-    throw new Error('QUIZ_SHAPE');
-  } finally {
-    clearTimeout(timer);
-  }
 
-  // 503 means the function is deployed but nobody has given it a key yet.
-  if (res.status === 503) throw new Error('QUIZ_UNAVAILABLE');
-  if (!res.ok) throw new Error('QUIZ_SHAPE');
+  // Sent through the Supabase client rather than a bare fetch: it carries the
+  // player's own session, so the function can keep its JWT check switched on
+  // and refuse anyone who is not signed into the app.
+  const { data, error } = await supabase.functions.invoke('quiz', {
+    body: {
+      title,
+      text: String(text ?? '').slice(0, 6000),
+      rank: rarityRank(rarityId),
+      count: questionCountFor(rarityId),
+      lang: getLanguage()
+    }
+  });
 
-  let data;
-  try {
-    data = await res.json();
-  } catch {
-    throw new Error('QUIZ_SHAPE');
-  }
+  // The function answers 503 until somebody gives it a key to spend.
+  if (error) throw new Error(error?.context?.status === 503 ? 'QUIZ_UNAVAILABLE' : 'QUIZ_SHAPE');
+  if (data?.error === 'QUIZ_UNSET') throw new Error('QUIZ_UNAVAILABLE');
+
   const questions = (Array.isArray(data?.questions) ? data.questions : [])
     .filter((q) => q && typeof q.question === 'string'
       && Array.isArray(q.choices) && q.choices.length === 4
