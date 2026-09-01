@@ -5220,7 +5220,9 @@ function applyStrings() {
  * exactly where it is and never asked about again.
  */
 const NO_TWIN_KEY = 'packywiki.noTranslation.v1';
-const MIGRATE_PER_LAUNCH = 12;
+/** At most this many per launch, and never longer than the budget below. */
+const MIGRATE_PER_LAUNCH = 40;
+const MIGRATE_BUDGET_MS = 20000;
 
 function loadNoTwin() {
   try {
@@ -5241,19 +5243,24 @@ async function migrateLanguages() {
   if (!navigator.onLine) return;
   const lang = getLanguage();
   const skip = loadNoTwin();
+  // Keyed by the language we were looking for: an article with no French
+  // twin may still have an English one, so switching language asks again.
+  const skipKey = (entry) => `${lang}:${entry.key}`;
   const stale = Object.values(state.collection.entries ?? {})
-    .filter((entry) => (entry.lang ?? 'en') !== lang && !skip.has(entry.key))
+    .filter((entry) => (entry.lang ?? 'en') !== lang && !skip.has(skipKey(entry)))
     .slice(0, MIGRATE_PER_LAUNCH);
   if (!stale.length) return;
 
+  const deadline = Date.now() + MIGRATE_BUDGET_MS;
   let moved = 0;
   for (let i = 0; i < stale.length; i += 3) {
+    if (Date.now() > deadline || !navigator.onLine) break;
     const batch = stale.slice(i, i + 3);
     const results = await Promise.all(batch.map((entry) =>
       translateCard(entry, lang).catch(() => null)));
     batch.forEach((entry, n) => {
       const card = results[n];
-      if (!card) { skip.add(entry.key); return; }
+      if (!card) { skip.add(skipKey(entry)); return; }
       if (store.replaceEntryWithTranslation(state.collection, entry, card, lang)) moved++;
     });
   }
