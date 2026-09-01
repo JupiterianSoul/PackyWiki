@@ -20,7 +20,7 @@
  * works either way. So leave that switch OFF and let this run.
  */
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const MODEL = 'llama-3.1-8b-instant';
+const DEFAULT_MODEL = 'llama-3.1-8b-instant';
 
 /** The player's browser calls this straight from the app. */
 const CORS = {
@@ -54,17 +54,35 @@ Deno.serve(async (req: Request) => {
   // Who is asking? The app sends the player's own session, so the auth API
   // can confirm this is a signed-in player of this project and not somebody
   // who found the URL and fancied spending the quiz budget.
+  //
+  // The apikey for that lookup has to be the PROJECT's own, which the runtime
+  // injects: the caller's bearer token is a user session, and handing that
+  // over as an apikey is rejected out of hand.
   const authHeader = req.headers.get('Authorization') ?? '';
-  const apikey = req.headers.get('apikey') ?? authHeader.replace(/^Bearer\s+/i, '');
-  const projectUrl = Deno.env.get('SUPABASE_URL');
-  if (!authHeader || !projectUrl) return json({ error: 'UNAUTHORISED' }, 401);
-  try {
-    const who = await fetch(`${projectUrl}/auth/v1/user`, {
-      headers: { Authorization: authHeader, apikey }
-    });
-    if (!who.ok) return json({ error: 'UNAUTHORISED' }, 401);
-  } catch {
-    return json({ error: 'UNAUTHORISED' }, 401);
+  const projectUrl = Deno.env.get('SUPABASE_URL') ?? '';
+  const projectKey = Deno.env.get('SUPABASE_ANON_KEY')
+    ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY')
+    ?? req.headers.get('apikey')
+    ?? '';
+  if (!authHeader) return json({ error: 'UNAUTHORISED', detail: 'no authorization header' }, 401);
+  if (projectUrl && projectKey) {
+    try {
+      const who = await fetch(`${projectUrl}/auth/v1/user`, {
+        headers: { Authorization: authHeader, apikey: projectKey }
+      });
+      if (!who.ok) {
+        const detail = (await who.text()).slice(0, 200);
+        console.error('quiz: caller rejected', who.status, detail);
+        return json({ error: 'UNAUTHORISED', status: who.status, detail }, 401);
+      }
+    } catch (err) {
+      console.error('quiz: auth lookup failed', String(err));
+      return json({ error: 'UNAUTHORISED', detail: 'auth lookup failed' }, 401);
+    }
+  } else {
+    // Nothing to check against: better to write the quiz than to lock every
+    // player out of it over a missing runtime variable.
+    console.warn('quiz: no project key available, skipping caller check');
   }
 
   let body: { title?: string; text?: string; rank?: number; count?: number; lang?: string };
@@ -100,7 +118,7 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
       body: JSON.stringify({
-        model: MODEL,
+        model: Deno.env.get('GROQ_MODEL') ?? DEFAULT_MODEL,
         temperature: 0.6,
         response_format: { type: 'json_object' },
         messages: [
@@ -109,17 +127,23 @@ Deno.serve(async (req: Request) => {
         ]
       })
     });
-  } catch {
-    return json({ error: 'UPSTREAM' }, 502);
+  } catch (err) {
+    console.error('quiz: could not reach the model', String(err));
+    return json({ error: 'UPSTREAM', detail: 'could not reach the model' }, 502);
   }
-  if (!upstream.ok) return json({ error: 'UPSTREAM', status: upstream.status }, 502);
+  if (!upstream.ok) {
+    const detail = (await upstream.text()).slice(0, 400);
+    console.error('quiz: model refused', upstream.status, detail);
+    return json({ error: 'UPSTREAM', status: upstream.status, detail }, 502);
+  }
 
   let parsed: { questions?: unknown };
   try {
     const data = await upstream.json();
     parsed = JSON.parse(data?.choices?.[0]?.message?.content ?? '{}');
-  } catch {
-    return json({ error: 'SHAPE' }, 502);
+  } catch (err) {
+    console.error('quiz: unreadable answer', String(err));
+    return json({ error: 'SHAPE', detail: 'unreadable answer' }, 502);
   }
 
   // Only questions the app can actually render leave this function.
@@ -134,6 +158,9 @@ Deno.serve(async (req: Request) => {
       answer: q.answer
     }));
 
-  if (questions.length < 3) return json({ error: 'SHAPE' }, 502);
+  if (questions.length < 3) {
+    console.error('quiz: too few usable questions', questions.length);
+    return json({ error: 'SHAPE', detail: `only ${questions.length} usable questions` }, 502);
+  }
   return json({ questions });
 });

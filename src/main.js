@@ -4298,7 +4298,11 @@ async function beginQuizQuestions() {
     renderQuiz();
   } catch (err) {
     if (state.quiz !== q) return;
-    toast(err?.message === 'QUIZ_UNAVAILABLE' ? t('quizNoKey') : t('quizFailed'), 'error');
+    // The reason travels with the error: "try again" is useless advice when
+    // the function is simply not deployed under the name the app calls.
+    toast(err?.message === 'QUIZ_UNAVAILABLE'
+      ? t('quizNoKey')
+      : `${t('quizFailed')}${err?.detail ? ` (${esc(err.detail)})` : ''}`, 'error');
     synth.playDenied();
     q.step = 'preview';
     renderQuiz();

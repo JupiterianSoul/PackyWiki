@@ -53,7 +53,18 @@ export async function buildQuiz({ title, text, rarityId }) {
   });
 
   // The function answers 503 until somebody gives it a key to spend.
-  if (error) throw new Error(error?.context?.status === 503 ? 'QUIZ_UNAVAILABLE' : 'QUIZ_SHAPE');
+  if (error) {
+    // The body carries what actually went wrong, and it is the only place it
+    // is written down on the player's side: a quiz that will not start is
+    // otherwise indistinguishable from a quiz that is merely slow.
+    const body = await error?.context?.json?.().catch(() => null);
+    const status = error?.context?.status;
+    const why = body?.detail ?? body?.error ?? error?.message ?? 'unknown';
+    console.error(`quiz failed (${status ?? 'no status'}): ${why}`);
+    if (status === 503 || body?.error === 'QUIZ_UNSET') throw new Error('QUIZ_UNAVAILABLE');
+    const short = status === 404 ? 'not deployed as "quiz"' : `${status ?? '?'} ${body?.error ?? ''}`.trim();
+    throw Object.assign(new Error('QUIZ_SHAPE'), { detail: short });
+  }
   if (data?.error === 'QUIZ_UNSET') throw new Error('QUIZ_UNAVAILABLE');
 
   const questions = (Array.isArray(data?.questions) ? data.questions : [])
