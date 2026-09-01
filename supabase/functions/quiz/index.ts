@@ -20,7 +20,23 @@
  * works either way. So leave that switch OFF and let this run.
  */
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const DEFAULT_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
+
+/**
+ * Models to try, best first. Groq retires models without much ceremony, so
+ * the list is a preference rather than a promise: if none of these answer,
+ * the function asks Groq what it actually has and uses that instead.
+ */
+const MODEL_PREFERENCE = [
+  'llama-3.1-8b-instant',
+  'llama-3.3-70b-versatile',
+  'meta-llama/llama-4-scout-17b-16e-instruct',
+  'openai/gpt-oss-20b',
+  'gemma2-9b-it'
+];
+
+/** Models that cannot hold a conversation, whatever else they are good at. */
+const NOT_CHAT = /whisper|tts|guard|embed|vision-only|distil/i;
 
 /** The player's browser calls this straight from the app. */
 const CORS = {
@@ -52,7 +68,9 @@ Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS });
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405);
 
-  const key = Deno.env.get('GROQ_API_KEY');
+  // A key pasted into a dashboard field very often arrives with a stray
+  // space or newline attached, and Groq refuses it without saying why.
+  const key = (Deno.env.get('GROQ_API_KEY') ?? '').trim();
   if (!key) {
     console.error('quiz: no GROQ_API_KEY secret set on this project');
     return json({ error: 'QUIZ_UNSET' }, 503);
@@ -126,35 +144,99 @@ Deno.serve(async (req: Request) => {
     text
   ].join('\n');
 
-  let upstream: Response;
-  try {
-    upstream = await fetch(GROQ_URL, {
+  /** One attempt at one model. `jsonMode` is the strict-JSON request. */
+  async function ask(model: string, jsonMode: boolean) {
+    const body: Record<string, unknown> = {
+      model,
+      temperature: 0.6,
+      messages: [
+        { role: 'system', content: 'You write quiz questions. You respond with valid JSON only.' },
+        { role: 'user', content: prompt }
+      ]
+    };
+    if (jsonMode) body.response_format = { type: 'json_object' };
+    const res = await fetch(GROQ_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${key}` },
-      body: JSON.stringify({
-        model: Deno.env.get('GROQ_MODEL') ?? DEFAULT_MODEL,
-        temperature: 0.6,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: 'You write quiz questions. You respond with valid JSON only.' },
-          { role: 'user', content: prompt }
-        ]
-      })
+      body: JSON.stringify(body)
     });
-  } catch (err) {
-    console.error('quiz: could not reach the model', String(err));
-    return json({ error: 'UPSTREAM', detail: 'could not reach the model' }, 502);
+    if (res.ok) return { ok: true as const, res };
+    return { ok: false as const, status: res.status, detail: (await res.text()).slice(0, 400) };
   }
-  if (!upstream.ok) {
-    const detail = (await upstream.text()).slice(0, 400);
-    console.error('quiz: model refused', upstream.status, detail);
-    return json({ error: 'UPSTREAM', status: upstream.status, detail }, 502);
+
+  /** What Groq will actually serve today, best guess first. */
+  async function liveModels(): Promise<string[]> {
+    try {
+      const res = await fetch(GROQ_MODELS_URL, { headers: { Authorization: `Bearer ${key}` } });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return (data?.data ?? [])
+        .map((m: { id?: string }) => String(m?.id ?? ''))
+        .filter((id: string) => id && !NOT_CHAT.test(id));
+    } catch {
+      return [];
+    }
   }
+
+  const configured = Deno.env.get('GROQ_MODEL');
+  const candidates = configured ? [configured, ...MODEL_PREFERENCE] : [...MODEL_PREFERENCE];
+  let upstream: Response | null = null;
+  let lastStatus = 0;
+  let lastDetail = '';
+  let usedModel = '';
+  let asked = false;
+
+  for (let round = 0; round < 2 && !upstream; round++) {
+    // Second round: stop guessing and use whatever this account can see.
+    const list = round === 0 ? candidates : (await liveModels()).slice(0, 4);
+    for (const model of list) {
+      let attempt;
+      try {
+        attempt = await ask(model, true);
+      } catch (err) {
+        console.error('quiz: could not reach the model', String(err));
+        return json({ error: 'UPSTREAM', detail: 'could not reach the model' }, 502);
+      }
+      asked = true;
+      // A key that is refused will be refused by every model: stop at once.
+      if (!attempt.ok && (attempt.status === 401 || attempt.status === 403)) {
+        console.error('quiz: the Groq key was refused', attempt.status, attempt.detail);
+        return json({ error: 'UPSTREAM', status: attempt.status, detail: 'Groq refused the key' }, 502);
+      }
+      // Some models will answer, but not under a strict JSON instruction.
+      if (!attempt.ok && /response_format|json_object/i.test(attempt.detail)) {
+        try {
+          attempt = await ask(model, false);
+        } catch {
+          /* fall through to the next model */
+        }
+      }
+      if (attempt.ok) { upstream = attempt.res; usedModel = model; break; }
+      lastStatus = attempt.status;
+      lastDetail = attempt.detail;
+      console.warn(`quiz: ${model} refused (${attempt.status})`);
+    }
+  }
+
+  if (!upstream) {
+    console.error('quiz: no model would answer', lastStatus, lastDetail);
+    return json({
+      error: 'UPSTREAM',
+      status: lastStatus || 502,
+      detail: asked ? `no model would answer: ${lastDetail}` : 'no model available'
+    }, 502);
+  }
+  console.log(`quiz: answered by ${usedModel}`);
 
   let parsed: { questions?: unknown };
   try {
     const data = await upstream.json();
-    parsed = JSON.parse(data?.choices?.[0]?.message?.content ?? '{}');
+    // Without strict JSON mode a model may wrap its answer in a code fence.
+    const content = String(data?.choices?.[0]?.message?.content ?? '{}')
+      .replace(/^[^{]*```(?:json)?/i, '')
+      .replace(/```[^}]*$/, '')
+      .trim();
+    parsed = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1) || '{}');
   } catch (err) {
     console.error('quiz: unreadable answer', String(err));
     return json({ error: 'SHAPE', detail: 'unreadable answer' }, 502);

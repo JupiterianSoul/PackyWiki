@@ -62,7 +62,11 @@ export async function buildQuiz({ title, text, rarityId }) {
     const why = body?.detail ?? body?.error ?? error?.message ?? 'unknown';
     console.error(`quiz failed (${status ?? 'no status'}): ${why}`);
     if (status === 503 || body?.error === 'QUIZ_UNSET') throw new Error('QUIZ_UNAVAILABLE');
-    const short = status === 404 ? 'not deployed as "quiz"' : `${status ?? '?'} ${body?.error ?? ''}`.trim();
+    const short = status === 404
+      ? 'not deployed as "quiz"'
+      // The detail is the half worth reading: "Groq refused the key" tells
+      // you what to do, "502 UPSTREAM" does not.
+      : (body?.detail ?? `${status ?? '?'} ${body?.error ?? ''}`.trim());
     throw Object.assign(new Error('QUIZ_SHAPE'), { detail: short });
   }
   if (data?.error === 'QUIZ_UNSET') throw new Error('QUIZ_UNAVAILABLE');
