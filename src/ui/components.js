@@ -463,10 +463,23 @@ export class NavBar {
       b.classList.toggle('is-active', on);
       b.setAttribute('aria-current', on ? 'page' : 'false');
     });
+    // Along the bottom of a phone the indicator travels sideways; standing up
+    // as a rail on a desktop it travels down. The stylesheet decides which,
+    // by laying the bar out as a column, and this follows the layout rather
+    // than guessing at a screen width of its own.
+    const vertical = getComputedStyle(this.node).flexDirection === 'column';
     this.indicator.style.transition = animate
-      ? `transform ${dur(420)}ms var(--ease-pop), width ${dur(420)}ms var(--ease-pop)` : 'none';
-    this.indicator.style.width = `${active.offsetWidth}px`;
-    this.indicator.style.transform = `translateX(${active.offsetLeft}px)`;
+      ? `transform ${dur(420)}ms var(--ease-pop), width ${dur(420)}ms var(--ease-pop),`
+        + ` height ${dur(420)}ms var(--ease-pop)` : 'none';
+    if (vertical) {
+      this.indicator.style.width = '';
+      this.indicator.style.height = `${active.offsetHeight}px`;
+      this.indicator.style.transform = `translateY(${active.offsetTop}px)`;
+    } else {
+      this.indicator.style.height = '';
+      this.indicator.style.width = `${active.offsetWidth}px`;
+      this.indicator.style.transform = `translateX(${active.offsetLeft}px)`;
+    }
   }
 }
 

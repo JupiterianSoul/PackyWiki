@@ -66,18 +66,41 @@ asset referenced relative to `index.html` (`base: './'` in `vite.config.js`),
 so it runs from the app's asset origin, from a domain root, or from a project
 page under a repository path.
 
-`.github/workflows/pages.yml` builds and publishes it to GitHub Pages on every
-push to the default branch or to a `claude/**` branch, and can be started by
-hand from the Actions tab. One setting has to be flipped once in the
-repository, by hand: **Settings > Pages > Build and deployment > Source:
-GitHub Actions**. After that the site lives at
-`https://<owner>.github.io/<repo>/`.
+There are two ways to put it online, and they can both be live at once.
 
-On a phone the site is the app. On a desktop browser the game keeps its phone
-shape, centred in the window with the theme's backdrop running behind it, and
-gains what a pointer allows: hover states, a scrollbar, and text you can
-select. Cards lean with the mouse exactly as they lean with a thumb; the
-gyroscope simply has nothing to report.
+**Cloudflare Pages**, the shorter path, needs nothing in this repository at
+all: in the Cloudflare dashboard, *Workers & Pages > Create > Pages > Connect
+to Git*, choose the repository, set the build command to `npm run build` and
+the output directory to `dist`. Cloudflare builds every push itself, gives
+every branch a preview URL, and serves the site from its own network. For the
+other way round, where GitHub Actions builds and only the finished files go
+to Cloudflare, `.github/workflows/cloudflare.yml` does that as soon as two
+repository secrets exist: `CLOUDFLARE_API_TOKEN` (with the *Cloudflare Pages:
+Edit* permission) and `CLOUDFLARE_ACCOUNT_ID`. Without them the workflow does
+nothing rather than failing.
+
+**GitHub Pages** works too, with no account anywhere else:
+`.github/workflows/pages.yml` builds and publishes on every push to the
+default branch or a `claude/**` branch. One setting has to be flipped once, by
+hand: **Settings > Pages > Build and deployment > Source: GitHub Actions**.
+After that the site lives at `https://<owner>.github.io/<repo>/`.
+
+On a phone the site is the app. Past 1024px it is laid out for a desk instead,
+in `src/styles/desktop.css`: the bottom bar stands up as a rail down the left
+with its labels beside its icons, the header spans the working area, sheets
+open as dialogues in the middle of the screen rather than climbing up from an
+edge no mouse lives near, the grids use the width they are given (five cards
+across the index, seven albums to a row), and controls, bars and prose keep
+their own measure instead of being dragged the length of a monitor. The drawer
+drops the five destinations the rail already carries.
+
+That file is imported last on purpose. A media query adds no specificity, so
+the only honest way for `.navbar` there to beat `.navbar` in `components.css`
+is to come after it.
+
+The screens, their order and the code painting them are the same either way:
+what changes is where the frame puts them. Cards lean with the mouse exactly
+as they lean with a thumb; the gyroscope simply has nothing to report.
 
 Sign-in, cloud save, friends and the auction house work on the website exactly
 as they do in the app, against the same Supabase project. A collection kept in

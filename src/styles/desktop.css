@@ -1,0 +1,192 @@
+/* ==========================================================================
+   DESKTOP
+   --------------------------------------------------------------------------
+   Loaded last on purpose. Everything here is a layout the phone build has no
+   use for, and it has to win over the rules it replaces without inflating
+   their selectors: a media query adds no specificity, so the only honest way
+   for `.navbar` here to beat `.navbar` in components.css is to come after it.
+
+   Nothing in this file is a different app. The screens, their order and the
+   code painting them are untouched; what changes is where the frame puts
+   them when there is a desk under the screen instead of a hand.
+   ========================================================================== */
+
+/* --- the frame ------------------------------------------------------------
+   A desktop is not a big phone. Past 1024px the app stops pretending: the
+   bottom bar stands up as a rail down the left with its labels beside its
+   icons, the header spans the working area rather than floating in the
+   middle of it, sheets open as dialogues in the centre of the screen instead
+   of climbing up from an edge no mouse lives near, and every grid uses the
+   width it has been given. The phone layout is untouched below that width,
+   and the game inside is the same game: same screens, same order, same code
+   painting them.
+
+   `--rail` is the width of the left rail and the left inset of everything
+   else; `--deck` is how wide a column of content is allowed to get before it
+   stops growing, so a line of text never runs the whole of a wide monitor. */
+@media (min-width: 1024px) {
+  :root {
+    --rail: 244px;
+    --deck: 1180px;
+  }
+
+  #app {
+    padding-left: var(--rail);
+    scrollbar-width: thin;
+  }
+  #app::-webkit-scrollbar { width: 10px; }
+  #app::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--ink) 20%, transparent);
+  }
+  #app::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink) 32%, transparent); }
+
+  /* Everything on a screen shares one column, centred in the space left of
+     the rail, so the header, the content and the footer of a screen line up
+     with each other rather than each finding its own centre. */
+  .appbar > *, main > .screen {
+    max-width: var(--deck);
+    margin-inline: auto;
+  }
+  main > .screen { width: 100%; }
+
+  /* The header stops being an island: it spans the working area, and the
+     name of the app sits at the top of the rail instead. */
+  .appbar {
+    padding-top: 18px;
+    padding-bottom: 14px;
+  }
+
+  /* A pointer has no thumb reach to respect, and hover is real input. */
+  .btn:hover, .icon-btn:hover, .chip:hover, .nav-item:hover, .drawer-link:hover {
+    filter: brightness(1.1);
+  }
+  .card:hover, .booster:hover { cursor: pointer; }
+  /* Text is selectable with a mouse; the game surfaces still swallow it so a
+     drag across a card never paints it blue. */
+  body { user-select: text; -webkit-user-select: text; }
+  .card, .booster, .appbar, .navbar, .rail { user-select: none; -webkit-user-select: none; }
+
+  /* --- the rail ---------------------------------------------------------- */
+  .navbar {
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: var(--rail);
+    transform: none;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+    gap: 4px;
+    padding: 18px 14px;
+    border-radius: 0;
+    border-width: 0;
+    border-right: var(--border) var(--border-style) var(--line);
+    background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
+    box-shadow: none;
+  }
+  [data-theme='arcade'] .navbar, [data-theme='paper'] .navbar { border-radius: 0; }
+
+  /* The rail wears the app's name above its destinations. */
+  .navbar::before {
+    content: 'Wiklodo';
+    font-family: var(--font-display);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--display-tracking);
+    font-size: 1.25rem;
+    color: var(--ink);
+    padding: 6px 12px 18px;
+  }
+
+  .nav-item {
+    flex: none;
+    grid-auto-flow: column;
+    grid-template-columns: 22px 1fr;
+    justify-items: start;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 12px;
+    min-height: 48px;
+    border-radius: var(--radius-pill);
+  }
+  [data-theme='arcade'] .nav-item { border-radius: var(--radius); }
+  .nav-item.is-active .nav-icon { transform: none; }
+  .nav-label { font-size: 0.86rem; letter-spacing: 0.01em; }
+  .nav-badge { top: 50%; right: 12px; transform: translateY(-50%); }
+  /* The travelling indicator runs down the rail instead of across a bar; the
+     component switches axis with it (see NavBar in src/ui/components.js). */
+  .nav-indicator {
+    top: 0;
+    left: 14px;
+    width: calc(var(--rail) - 28px);
+  }
+
+  /* --- sheets become dialogues -------------------------------------------- */
+  .sheet { align-items: center; padding-left: var(--rail); }
+  .sheet-panel {
+    width: min(640px, calc(100% - 48px));
+    max-height: 84dvh;
+    border-radius: var(--radius-lg);
+    border-width: var(--border);
+  }
+  /* The grab handle is a touch affordance; a dialogue does not need one. */
+  .sheet-handle { display: none; }
+
+  /* --- room to breathe ---------------------------------------------------- */
+  .market-list { grid-template-columns: repeat(auto-fill, minmax(215px, 1fr)); }
+  .binder-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+  .shop-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .theme-grid { grid-template-columns: repeat(5, 1fr); }
+  .stat-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
+  .people { grid-template-columns: repeat(3, 1fr); }
+  .quiz-cats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .settings-list, .glossary-list, .ach-list, .tl-list { max-width: 820px; }
+  /* The head keeps its own measure rather than the deck's: the title and the
+     line under it read as one block, and the sentence still breaks onto its
+     own row because its basis is the full width of that block. */
+  .screen-head { max-width: 900px; }
+  .forge > p { max-width: 68ch; }
+  /* A search field the width of a desk is a trough, not a field. */
+  .market-search { max-width: 520px; }
+
+  /* --- things that should not stretch ------------------------------------- */
+  /* A control, a bar or a line of prose that fills 1180px is not using the
+     width, it is being dragged across it. These keep their own measure and
+     let the space fall where it belongs. */
+  .seg-wrap { justify-content: flex-start; }
+  .btn-block, .buy { max-width: 420px; }
+  /* The deal reads as a poster: pack, then the offer, then the price to pay,
+     across one line, instead of a wall of empty panel with a button under it. */
+  .shop-feature { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+  .shop-feature > .buy { grid-column: 3; grid-row: 1; align-self: center; width: 240px; }
+  .rarity-bars, .empty-note, .find-status { max-width: 860px; }
+  .xp-line, #xp-bar, .level-bar { max-width: 860px; }
+
+  /* The Boosters screen leads with its own toolbar rather than a title, so
+     it needs the air a screen head would have given it, and its two side
+     buttons sit in a row where there is room for one. */
+  .packs-tools { padding-top: 8px; align-items: center; }
+  .packs-side { flex-direction: row; }
+
+  /* --- the drawer -------------------------------------------------------- */
+  /* The rail already carries the five destinations and the app's name, so the
+     drawer drops both and holds only what the rail has no room for. It opens
+     beside the rail rather than over it. */
+  .drawer-panel { width: min(420px, 92vw); margin-left: var(--rail); }
+  .drawer-head { display: none; }
+  .drawer-link[data-link='shop'],
+  .drawer-link[data-link='timed'],
+  .drawer-link[data-link='packs'],
+  .drawer-link[data-link='binder'],
+  .drawer-link[data-link='profile'],
+  .drawer-links > .drawer-sep:first-of-type { display: none; }
+  .drawer-panel { padding-top: 28px; }
+}
+
+/* Opening a booster is still a takeover: the rail gets out of the way with
+   the rest of the frame. */
+@media (min-width: 1024px) {
+  html.is-immersive .navbar { transform: translateX(-100%); }
+  html.is-immersive #app { padding-left: 0; }
+}
+

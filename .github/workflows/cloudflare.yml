@@ -1,0 +1,74 @@
+# Publishes the website to Cloudflare Pages.
+#
+# Two ways to host the site; pick one, or run both.
+#
+#   1. No workflow at all. In the Cloudflare dashboard: Workers & Pages >
+#      Create > Pages > Connect to Git, choose this repository, and set the
+#      build command to `npm run build` with `dist` as the output directory.
+#      Cloudflare then builds every push itself, with previews per branch.
+#      Nothing has to be added here for that, and no token is shared.
+#
+#   2. This workflow, for when the build should happen in GitHub Actions and
+#      only the finished files go to Cloudflare. It needs two repository
+#      secrets: CLOUDFLARE_API_TOKEN (a token with the "Cloudflare Pages:
+#      Edit" permission) and CLOUDFLARE_ACCOUNT_ID. Without them it does
+#      nothing rather than failing, so it is harmless until it is wanted.
+name: Publish to Cloudflare Pages
+
+on:
+  push:
+    branches: [main, master, 'claude/**']
+    paths-ignore:
+      - '**.md'
+  workflow_dispatch:
+
+concurrency:
+  group: cloudflare-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Is Cloudflare set up?
+        id: check
+        env:
+          TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -n "$TOKEN" ] && [ -n "$ACCOUNT" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::No Cloudflare secrets on this repository, so there is nothing to deploy to. See the comment at the top of this workflow."
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.check.outputs.ready == 'true'
+        with:
+          node-version: '20'
+          cache: npm
+
+      # As in the APK and Pages builds: the Supabase URL and publishable key
+      # come from the committed .env.production and must not be passed as env
+      # vars, or Vite would let an empty process.env win and ship a site that
+      # cannot sign in.
+      - name: Build
+        if: steps.check.outputs.ready == 'true'
+        run: |
+          npm ci
+          npm run build
+          grep -q "supabase.co" dist/assets/*.js \
+            || { echo "::error::Built bundle has no Supabase project in it."; exit 1; }
+          cp dist/index.html dist/404.html
+
+      - name: Deploy
+        if: steps.check.outputs.ready == 'true'
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy dist --project-name=wiklodo --branch=${{ github.ref_name }}

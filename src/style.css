@@ -9,6 +9,7 @@
      booster.css     the foil pack and the rip
      cards.css       the card, the flip, and one block per rarity tier
      screens.css     layout for each destination
+     desktop.css     the same app, laid out for a mouse and a wide screen
 
    Nothing below themes.css names a colour directly. Every rule reads tokens,
    which is what lets a theme change the app's shape, weight, texture and
@@ -21,3 +22,4 @@
 @import './styles/booster.css';
 @import './styles/cards.css';
 @import './styles/screens.css';
+@import './styles/desktop.css';

@@ -110,41 +110,6 @@ h1, h2, h3, h4 {
   overscroll-behavior: none;
 }
 
-/* --- DESKTOP -------------------------------------------------------------
-   On a phone the app fills the screen and that is the whole story. On a
-   desktop browser a full-width column would stretch every row to a metre
-   wide, so the app keeps its phone shape, centred, with the theme's own
-   backdrop running behind it and a soft edge marking where the device
-   would be. Nothing is laid out differently: it is the same app, framed. */
-@media (min-width: 720px) and (pointer: fine) {
-  #app {
-    left: 50%;
-    right: auto;
-    width: min(460px, 100vw);
-    transform: translateX(-50%);
-    border-left: 1px solid var(--line);
-    border-right: 1px solid var(--line);
-    background: color-mix(in srgb, var(--surface-solid) 78%, transparent);
-    box-shadow: 0 0 90px -10px rgba(0, 0, 0, 0.8);
-  }
-  /* A pointer has no thumb reach to respect, and hover states become real. */
-  #app { scrollbar-width: thin; }
-  #app::-webkit-scrollbar { width: 8px; }
-  #app::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 22%, transparent);
-  }
-  .btn:hover, .icon-btn:hover, .chip:hover { filter: brightness(1.08); }
-  /* Text is readable and selectable with a mouse; only the game surfaces
-     still swallow selection so a drag never highlights a card. */
-  body { user-select: text; -webkit-user-select: text; }
-  .card, .booster, .appbar, .tabbar { user-select: none; -webkit-user-select: none; }
-}
-/* A desktop window can be shorter than a phone: let the sheets breathe. */
-@media (min-height: 900px) and (pointer: fine) {
-  .sheet { max-height: 82vh; }
-}
-
 /*
  * The header is a floating island, not a browser toolbar bolted to the top
  * edge: it sits inside the safe area with air around it, and it is the same

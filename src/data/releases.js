@@ -230,12 +230,12 @@ export const RELEASES = [
     ],
     changelog: [
       { en: 'Wiklodo runs as a website as well as an app, from the same build', fr: 'Wiklodo tourne en site web comme en application, depuis la même version' },
-      { en: 'On a desktop screen the game keeps its shape, centred, with the theme behind it', fr: 'Sur un écran d’ordinateur le jeu garde sa forme, centré, avec le thème derrière' },
+      { en: 'On a desktop screen the game is laid out for a desk: a rail down the left, a header across the top, dialogues in the middle and grids that use the width', fr: 'Sur un écran d’ordinateur le jeu est disposé pour un bureau : une barre à gauche, un en-tête en haut, des boîtes de dialogue au centre et des grilles qui prennent la largeur' },
       { en: 'Every search bar wears the theme now instead of the browser’s white box', fr: 'Chaque barre de recherche porte le thème au lieu de la boîte blanche du navigateur' },
       { en: 'The card index and the auction house line up with the rest of the screen', fr: 'L’index des cartes et la salle des ventes s’alignent avec le reste de l’écran' },
       { en: 'Changing theme no longer closes the game: the launcher icon changes once you leave', fr: 'Changer de thème ne ferme plus le jeu : l’icône change quand vous quittez' },
       { en: 'Settings ends with Redeem secret code, for the personal boosters to come', fr: 'Les Réglages se terminent par un code secret, pour les boosters personnels à venir' },
-      { en: 'The music is jazz now, and the restless tracks are gone', fr: 'La musique est du jazz, et les morceaux agités ont disparu' },
+      { en: 'The music is slow jazz now: piano, blues and a modal walk, and the restless tracks are gone', fr: 'La musique est du jazz lent : piano, blues et une marche modale, et les morceaux agités ont disparu' },
       { en: 'The chat stopped polling in the background after you left the room', fr: 'La discussion cesse de sonder en arrière-plan une fois la salle quittée' }
     ]
   }
