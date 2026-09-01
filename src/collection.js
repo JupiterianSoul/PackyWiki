@@ -316,6 +316,39 @@ export function takeBooster(inventory, id) {
   return true;
 }
 
+/* --- the open ledger -----------------------------------------------------
+ *
+ * A booster leaves the inventory the moment the pack tears, and the cards
+ * only exist once the draw comes back. Anything that happens in between - a
+ * lost connection, a phone that kills the app to free memory, a player who
+ * swipes the app away mid-tear - used to take the booster with it. So the
+ * open is written down before the booster is spent and crossed off once the
+ * cards are safely in the collection; whatever is still written down on the
+ * next launch is handed straight back.
+ */
+const IN_FLIGHT_KEY = 'packywiki.openInFlight.v1';
+
+export function markOpenInFlight(spec) {
+  try { localStorage.setItem(IN_FLIGHT_KEY, JSON.stringify({ spec, at: Date.now() })); }
+  catch { /* storage unavailable */ }
+}
+
+export function clearOpenInFlight() {
+  try { localStorage.removeItem(IN_FLIGHT_KEY); }
+  catch { /* storage unavailable */ }
+}
+
+/** The booster an interrupted open still owes the player, once. */
+export function reclaimOpenInFlight(inventory) {
+  let record = null;
+  try { record = JSON.parse(localStorage.getItem(IN_FLIGHT_KEY) ?? 'null'); }
+  catch { record = null; }
+  clearOpenInFlight();
+  if (!record?.spec) return null;
+  addBooster(inventory, record.spec, 1);
+  return record.spec;
+}
+
 export const ownedBoosters = (inventory) =>
   Object.values(inventory).filter((slot) => slot.count > 0);
 

@@ -56,6 +56,9 @@ const STRINGS = {
     cardOf: 'Card {i} of {n}',
     packSummary: '{n} cards · saved to your collection',
     openFailed: '{error}. Check your connection and try again.',
+    openOffline: 'No connection. The cards come from Wikipedia, so this booster stays sealed until you are back online.',
+    openSlow: 'The connection gave out while the cards were coming. Your booster is back on the shelf, sealed.',
+    openRecovered: 'Your {name} booster came back: the last open did not finish',
 
     // collection
     unique: 'unique',
@@ -544,6 +547,9 @@ const STRINGS = {
     cardOf: 'Carte {i} sur {n}',
     packSummary: '{n} cartes · ajoutées à votre collection',
     openFailed: '{error}. Vérifiez votre connexion et réessayez.',
+    openOffline: 'Pas de connexion. Les cartes viennent de Wikipédia : ce booster reste scellé jusqu’au retour du réseau.',
+    openSlow: 'La connexion a lâché pendant l’arrivée des cartes. Votre booster est de retour sur l’étagère, scellé.',
+    openRecovered: 'Votre booster {name} vous est rendu : la dernière ouverture n’est pas allée au bout',
 
     unique: 'uniques',
     copies: 'cartes',

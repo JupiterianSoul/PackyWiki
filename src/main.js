@@ -74,6 +74,8 @@ const RIP_LOCK_SLOP = 10;
 const SWIPE_COMMIT = 78;
 const EMERGE_STAGGER = 130;
 const EMERGE_DURATION = 1060;
+/** Nothing waits on the network longer than this before the booster comes back. */
+const DRAW_HARD_LIMIT = 13000;
 const PREFETCH_DELAY = 350;
 /** How long the last card stays up before the summary takes over. */
 const LAST_CARD_HOLD = 2000;
@@ -1586,7 +1588,13 @@ function schedulePrefetch(spec) {
   const id = specId(spec);
   if (state.prefetch?.id === id) return;
   state.prefetchTimer = setTimeout(() => {
-    state.prefetch = { id, promise: drawArticles(toDrawPack(spec)).catch((error) => ({ error })) };
+    const record = { id, settled: false };
+    record.promise = drawArticles(toDrawPack(spec))
+      .catch((error) => ({ error }))
+      // Whether the cards are already in hand decides whether a booster can
+      // be opened with no connection at all.
+      .then((value) => { record.settled = true; return value; });
+    state.prefetch = record;
   }, PREFETCH_DELAY);
 }
 
@@ -1657,7 +1665,21 @@ async function openPack(booster) {
 async function runOpen(booster) {
   clearTimeout(state.prefetchTimer);
 
+  // Cards come off the network, so an offline open can only ever end in a
+  // refund. Say so before the booster is spent rather than after. Cards that
+  // were already fetched ahead of the tear are fine to hand over.
+  const inHand = state.prefetch?.id === specId(state.spec) && state.prefetch.settled;
+  if (!navigator.onLine && !inHand) {
+    el.openHint.textContent = t('openOffline');
+    el.openHint.className = 'open-hint is-error';
+    synth.playDenied();
+    return false;
+  }
+
   if (!store.takeBooster(state.inventory, specId(state.spec))) return false;
+  // Written down BEFORE it is spent: if this open never finishes, the next
+  // launch hands the booster back instead of swallowing it.
+  store.markOpenInFlight(state.spec);
   renderPacks();
 
   const drawing = drawFor(state.spec);
@@ -1694,17 +1716,30 @@ async function runOpen(booster) {
   await wait(EMERGE_STAGGER * 2);
   booster.classList.add('is-leaving');
 
-  const [articles] = await Promise.all([
+  // A draw that never comes back is worse than one that fails: the pack sits
+  // torn open forever and the booster is in limbo. Whatever happens to the
+  // network, this resolves, and an open that resolves can be refunded.
+  const guarded = Promise.race([
     drawing,
+    wait(DRAW_HARD_LIMIT).then(() => ({ error: new Error('TIMEOUT') }))
+  ]);
+  const [articles] = await Promise.all([
+    guarded,
     wait(EMERGE_DURATION + EMERGE_STAGGER * (count - 1))
   ]);
 
   if (!articles || articles.error) {
     // Refund: the booster was consumed but produced nothing.
     store.addBooster(state.inventory, state.spec, 1);
+    store.clearOpenInFlight();
     renderPacks();
     el.openScreen.className = 'screen is-active phase-idle';
-    el.openHint.textContent = t('openFailed', { error: articles?.error?.message ?? 'Network error' });
+    const why = articles?.error?.message;
+    el.openHint.textContent = why === 'OFFLINE' || navigator.onLine === false
+      ? t('openOffline')
+      : why === 'TIMEOUT'
+        ? t('openSlow')
+        : t('openFailed', { error: why ?? 'Network error' });
     el.openHint.className = 'open-hint is-error';
     el.cardStack.replaceChildren();
     const fresh = buildBooster(state.spec, { interactive: true, size: 'is-hero' });
@@ -1731,6 +1766,8 @@ async function runOpen(booster) {
 
   const recorded = store.recordPulls(state.collection, pulls, state.spec);
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
+  // The cards are in the collection now, so the booster is honestly gone.
+  store.clearOpenInFlight();
 
   store.recordOpening(state.profile, pulls);
   if (state.spec.kind === 'timed') {
@@ -5299,6 +5336,11 @@ function init() {
   // A custom pack that goes missing takes its shop shelf with it, and the
   // player rebuilds it: two packs, two albums, one subject. Put back
   // whatever the collection still remembers, and collapse the duplicates.
+  // An open that never finished (a lost connection, a phone that killed the
+  // app mid-tear) gets its booster back rather than eating it.
+  const owed = store.reclaimOpenInFlight(state.inventory);
+  if (owed) setTimeout(() => toast(t('openRecovered', { name: specName(owed) }), 'ok'), 2400);
+
   const healed = store.healCustomPacks(state.collection);
   if (healed) state.customPacks = store.loadCustomPacks();
 
@@ -5382,6 +5424,8 @@ function init() {
   });
   el.filterOpen.addEventListener('click', openFilters);
   el.classicFilter.addEventListener('click', openFilters);
+  // Scrolling is the one moment the backdrop must get out of the way.
+  document.getElementById('app')?.addEventListener('scroll', () => backdrop.markBusy(), { passive: true });
   el.chatBack.addEventListener('click', () => {
     clearInterval(chatTimer);
     state.chat = null;

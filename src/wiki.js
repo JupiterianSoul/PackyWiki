@@ -16,7 +16,18 @@
 import { popularityFromViews, popularityFromWordCount } from './pricing.js';
 import { wikiLang, getLanguage } from './i18n.js';
 
-const REQUEST_TIMEOUT_MS = 9000;
+const REQUEST_TIMEOUT_MS = 7000;
+
+/**
+ * How long a whole booster may spend drawing before it gives up.
+ *
+ * Every request already has its own timeout, but a booster is many requests,
+ * and on a bad connection those timeouts stack: the player was left staring
+ * at a torn pack for half a minute before anything happened. The draw now
+ * works to a deadline, hands over whatever it has when the clock runs out,
+ * and stops the moment the connection is gone.
+ */
+const DRAW_BUDGET_MS = 11000;
 const MAX_ATTEMPTS_PER_CARD = 8;
 const MAX_SEARCH_OFFSET = 5000;
 const SEARCH_PAGE_SIZE = 50;
@@ -319,8 +330,12 @@ async function drawWikipediaSet(pack) {
   const seen = new Set();
   const out = [];
   const nearMisses = [];
+  const deadline = Date.now() + DRAW_BUDGET_MS;
+  const outOfTime = () => Date.now() > deadline || navigator.onLine === false;
 
-  let pool = await gatherCandidates(pack);
+  if (navigator.onLine === false) throw new Error('OFFLINE');
+
+  const pool = await gatherCandidates(pack);
 
   // Views decide rarity, so they decide whether a candidate is allowed in a
   // tiered booster. Look them up several at a time instead of one by one.
@@ -334,7 +349,7 @@ async function drawWikipediaSet(pack) {
     return null;
   };
 
-  for (let i = 0; i < pool.length && out.length < wanted; i += 5) {
+  for (let i = 0; i < pool.length && out.length < wanted && !outOfTime(); i += 5) {
     const chunk = pool.slice(i, i + 5);
     const cards = await Promise.all(chunk.map((page) => consider(page).catch(() => null)));
     for (const card of cards) {
@@ -358,10 +373,10 @@ async function drawWikipediaSet(pack) {
 
   // Still short (a dead query, a thin subject): random articles, which always
   // exist, rather than an error the player cannot do anything about.
-  for (let round = 0; out.length < wanted && round < 3; round++) {
+  for (let round = 0; out.length < wanted && round < 2 && !outOfTime(); round++) {
     const extra = await randomPool().catch(() => []);
     for (const page of extra) {
-      if (out.length >= wanted || seen.has(page.title)) continue;
+      if (out.length >= wanted || seen.has(page.title) || outOfTime()) continue;
       const card = pageToCard(page, await fetchMonthlyViews(page.title).catch(() => null));
       if (!card) continue;
       seen.add(card.title);

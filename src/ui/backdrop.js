@@ -31,6 +31,8 @@ class Backdrop {
     this.running = false;
     this.paused = false;
     this.lowPower = false;
+    this.busy = false;
+    this.busyTimer = 0;
     this.width = 0;
     this.height = 0;
     this.dpr = 1;
@@ -62,6 +64,13 @@ class Backdrop {
   }
 
   /** Paused while a pack is being opened, or the app is in the background. */
+  /** Called while the player is scrolling or dragging. */
+  markBusy(ms = 420) {
+    this.busy = true;
+    clearTimeout(this.busyTimer);
+    this.busyTimer = setTimeout(() => { this.busy = false; }, ms);
+  }
+
   setPaused(paused) {
     this.paused = paused;
     if (paused) this.stop();
@@ -78,7 +87,10 @@ class Backdrop {
     const loop = (now) => {
       if (!this.running) return;
       this.raf = requestAnimationFrame(loop);
-      const budget = this.lowPower ? 31 : 15;
+      // A scroll gets the whole main thread it can: while the finger is
+      // moving the backdrop drops to half rate, which is the difference
+      // between a list that glides and one that stutters.
+      const budget = this.lowPower || this.busy ? 31 : 15;
       if (now - last < budget) return;
       last = now;
       this.#frame(now);
