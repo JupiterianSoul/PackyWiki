@@ -8,8 +8,10 @@ required; it is given here with thanks.
 
 Two kits ship, a subset of the full set:
 
-- `rubber/` - the Cartoon theme
-- `scifi/`  - the Matrix theme
+- `rubber/`     - the Cartoon theme
+- `scifi/`      - the Matrix theme
+- `mechanical/` - the Casino theme
+- `cinematic/`  - the Horror theme
 
 Every other theme's audio is synthesised at runtime by src/ui/sound.js
 and involves no recordings at all.

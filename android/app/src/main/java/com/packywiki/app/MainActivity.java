@@ -14,6 +14,10 @@ import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
+import android.content.ComponentName;
+import android.content.pm.PackageManager;
+import android.webkit.JavascriptInterface;
+
 import androidx.webkit.WebViewAssetLoader;
 
 /**
@@ -48,6 +52,9 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        // The web side calls WiklodoIcon.setIcon(themeId) when the theme
+        // changes, and the launcher icon follows it. See IconBridge below.
+        webView.addJavascriptInterface(new IconBridge(), "WiklodoIcon");
         settings.setDomStorageEnabled(true);
         // Honour <meta name="viewport" content="width=device-width">. Without
         // this the WebView lays the page out at its own default width rather
@@ -115,6 +122,38 @@ public class MainActivity extends Activity {
             webView.goBack();
         } else {
             super.onBackPressed();
+        }
+    }
+
+    /**
+     * Switches the launcher icon by flipping which activity-alias is enabled.
+     * One alias per theme exists in the manifest; DONT_KILL_APP keeps the app
+     * alive through the change. Some launchers redraw the icon only after a
+     * moment, which is the platform's way, not a bug here.
+     */
+    private static final String[] ICON_THEMES = {
+            "aurora", "paper", "arcade", "noir", "sunset",
+            "meadow", "cartoon", "matrix", "casino", "horror"
+    };
+
+    private final class IconBridge {
+        @JavascriptInterface
+        public void setIcon(String themeId) {
+            String chosen = null;
+            for (String t : ICON_THEMES) if (t.equals(themeId)) { chosen = t; break; }
+            if (chosen == null) return;
+            final String pick = chosen;
+            runOnUiThread(() -> {
+                PackageManager pm = getPackageManager();
+                for (String t : ICON_THEMES) {
+                    ComponentName alias = new ComponentName(MainActivity.this, "com.packywiki.app.Icon_" + t);
+                    pm.setComponentEnabledSetting(alias,
+                            t.equals(pick)
+                                    ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                                    : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                            PackageManager.DONT_KILL_APP);
+                }
+            });
         }
     }
 }

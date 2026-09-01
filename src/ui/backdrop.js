@@ -137,6 +137,8 @@ class Backdrop {
       case 'meadow': this.#meadow(ctx, w, h, t); break;
       case 'toon': this.#toon(ctx, w, h, t); break;
       case 'matrix': this.#matrix(ctx, w, h, t); break;
+      case 'casino': this.#casino(ctx, w, h, t); break;
+      case 'horror': this.#horror(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -558,6 +560,97 @@ class Backdrop {
         ctx.fillText(glyphs[pick % glyphs.length], i * colW + colW / 2, y);
       }
     }
+  }
+
+  /**
+   * CASINO - a felt table under one warm lamp. Card suits drift up like
+   * cigar smoke; a few gold chips sit low. All of it very slow: the table
+   * is what moves in a casino, never the room.
+   */
+  #casino(ctx, w, h, t) {
+    const sec = t / 1000;
+
+    const felt = ctx.createRadialGradient(w * 0.5, h * 0.36, 0, w * 0.5, h * 0.36, h * 0.85);
+    felt.addColorStop(0, '#124a32');
+    felt.addColorStop(0.55, '#0b2e20');
+    felt.addColorStop(1, '#061a12');
+    ctx.fillStyle = felt;
+    ctx.fillRect(0, 0, w, h);
+
+    // The suits, rising on their own lazy lanes.
+    const suits = ['\u2660', '\u2665', '\u2666', '\u2663'];
+    ctx.textAlign = 'center';
+    for (let i = 0; i < 10; i++) {
+      const suit = suits[i % 4];
+      const red = i % 4 === 1 || i % 4 === 2;
+      const speed = 0.011 + (i % 3) * 0.005;
+      const x = ((i * 173.7) % w) + Math.sin(sec * 0.3 + i * 1.9) * 16;
+      const y = h + 40 - (((sec * speed * h) + i * h * 0.29) % (h + 90));
+      const size = 15 + (i % 4) * 8;
+      ctx.font = `${size}px Georgia, serif`;
+      ctx.fillStyle = red ? 'rgba(224, 36, 94, 0.12)' : 'rgba(242, 202, 79, 0.1)';
+      ctx.fillText(suit, x, y);
+    }
+
+    // Three chips resting near the bottom edge, breathing their edge dashes.
+    for (let i = 0; i < 3; i++) {
+      const cx = w * (0.2 + i * 0.3) + Math.sin(sec * 0.2 + i * 2.4) * 6;
+      const cy = h * 0.9 + Math.cos(sec * 0.16 + i) * 4;
+      const r = 16 + i * 3;
+      ctx.strokeStyle = 'rgba(242, 202, 79, 0.14)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([6, 7]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r - 5, sec * 0.1 + i, sec * 0.1 + i + Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  /**
+   * HORROR - fog on a black field, a vignette that leans in, and every nine
+   * seconds or so the light flickers, barely. Nothing chases anyone: dread
+   * is a slow renderer.
+   */
+  #horror(ctx, w, h, t) {
+    const sec = t / 1000;
+
+    ctx.fillStyle = '#070408';
+    ctx.fillRect(0, 0, w, h);
+
+    // Two banks of fog sliding against each other.
+    for (let bank = 0; bank < 2; bank++) {
+      const drift = sec * (bank ? 6 : -4);
+      for (let i = 0; i < 4; i++) {
+        const x = (((i * 331.7) + drift * (10 + i * 3)) % (w + 400)) - 200;
+        const y = h * (0.55 + bank * 0.22) + Math.sin(sec * 0.12 + i * 2.1 + bank) * 24;
+        const r = 190 + i * 60;
+        const fog = ctx.createRadialGradient(x, y, 0, x, y, r);
+        fog.addColorStop(0, `rgba(122, 138, 153, ${bank ? 0.045 : 0.06})`);
+        fog.addColorStop(1, 'rgba(122, 138, 153, 0)');
+        ctx.fillStyle = fog;
+        ctx.fillRect(x - r, y - r, r * 2, r * 2);
+      }
+    }
+
+    // The flicker: a slow heartbeat of light with a stumble in it.
+    const beat = Math.sin(sec * 0.7) * 0.5 + 0.5;
+    const stumble = Math.sin(sec * 9.3) > 0.985 ? 0.5 : 0;
+    const lamp = ctx.createRadialGradient(w * 0.5, h * 0.3, 0, w * 0.5, h * 0.3, w * 0.7);
+    lamp.addColorStop(0, `rgba(200, 16, 46, ${0.05 + beat * 0.03 + stumble * 0.05})`);
+    lamp.addColorStop(1, 'rgba(200, 16, 46, 0)');
+    ctx.fillStyle = lamp;
+    ctx.fillRect(0, 0, w, h);
+
+    // The vignette leans closer than any other theme's.
+    const edge = ctx.createRadialGradient(w * 0.5, h * 0.5, h * 0.3, w * 0.5, h * 0.5, h * 0.85);
+    edge.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    edge.addColorStop(1, 'rgba(0, 0, 0, 0.78)');
+    ctx.fillStyle = edge;
+    ctx.fillRect(0, 0, w, h);
   }
 
   #meadow(ctx, w, h, t) {

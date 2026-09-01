@@ -188,6 +188,50 @@ export const THEMES = [
       transient: 'air',
       kit: 'scifi'            // CC0 recordings; see src/assets/sfx/LICENSE.md
     }
+  },
+  {
+    id: 'casino',
+    name: { en: 'Casino', fr: 'Casino' },
+    blurb: {
+      en: 'Green felt after midnight. Gold trim, drifting suits, chips on wood.',
+      fr: 'Tapis vert après minuit. Liseré doré, enseignes qui flottent, jetons sur bois.'
+    },
+    swatch: ['#0b2e20', '#f2ca4f', '#e0245e'],
+    backdrop: { renderer: 'casino', speed: 0.0001 },
+    motion: { scale: 0.9, ease: 'cubic-bezier(0.25, 1, 0.5, 1)', pop: 'cubic-bezier(0.3, 1.5, 0.55, 1)' },
+    sound: {
+      voice: 'keys',          // felt piano suits a felt table
+      gain: 0.9,
+      root: 246.94,           // B3
+      scale: [0, 2, 3, 7, 9],
+      reverb: { seconds: 1.6, decay: 2.6, mix: 0.24 },
+      filter: 4200,
+      drive: 0.06,
+      transient: 'brush',
+      kit: 'mechanical'       // CC0 recordings; see src/assets/sfx/LICENSE.md
+    }
+  },
+  {
+    id: 'horror',
+    name: { en: 'Horror', fr: 'Horreur' },
+    blurb: {
+      en: 'A house with one light on. Fog, grain, and a red you should not follow.',
+      fr: 'Une maison, une seule lumière. Brume, grain, et un rouge à ne pas suivre.'
+    },
+    swatch: ['#0a0508', '#c8102e', '#7a8a99'],
+    backdrop: { renderer: 'horror', speed: 0.00012 },
+    motion: { scale: 1.3, ease: 'cubic-bezier(0.3, 0, 0.2, 1)', pop: 'cubic-bezier(0.25, 1.1, 0.4, 1)' },
+    sound: {
+      voice: 'fm',            // bells, but from the wrong end of the corridor
+      gain: 0.62,
+      root: 174.61,           // F3
+      scale: [0, 1, 3, 6, 8],
+      reverb: { seconds: 3.8, decay: 3, mix: 0.42 },
+      filter: 2400,
+      drive: 0.1,
+      transient: 'air',
+      kit: 'cinematic'        // CC0 recordings; see src/assets/sfx/LICENSE.md
+    }
   }
 ];
 

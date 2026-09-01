@@ -599,3 +599,83 @@ grant execute on function public.settle_auction(uuid) to authenticated;
 do $$ begin
   alter publication supabase_realtime add table public.auctions;
 exception when others then null; end $$;
+
+-- ============================================================================
+-- V4 - the card index and wishlists
+-- ============================================================================
+-- The codex is the game's shared memory: one row per real card anyone has
+-- ever pulled (custom packs stay out). Clients add rows as they open packs;
+-- nothing ever updates or deletes one, so the worst a hostile client can do
+-- is discover a card. Wishlists are per-player and readable by friends, so
+-- a card can say who at the table wants it.
+
+create table if not exists public.codex (
+  key        text primary key,
+  title      text not null check (char_length(title) <= 300),
+  rarity     text,
+  price      integer,
+  views      bigint,
+  thumbnail  text check (char_length(thumbnail) <= 2000),
+  lang       text check (char_length(lang) <= 12),
+  found_at   timestamptz not null default now(),
+  found_by   uuid references auth.users on delete set null
+);
+
+create index if not exists codex_found_idx on public.codex (found_at desc);
+create index if not exists codex_title_idx on public.codex (lower(title) text_pattern_ops);
+
+alter table public.codex enable row level security;
+
+drop policy if exists "the codex is readable by signed-in players" on public.codex;
+create policy "the codex is readable by signed-in players"
+  on public.codex for select
+  to authenticated
+  using (true);
+
+drop policy if exists "discoveries are written by their finder" on public.codex;
+create policy "discoveries are written by their finder"
+  on public.codex for insert
+  to authenticated
+  with check (auth.uid() = found_by);
+
+-- One call for the header numbers: how much has been found, per tier.
+create or replace function public.codex_counts()
+returns jsonb
+language plpgsql stable security definer set search_path = public as $$
+declare total bigint; by_rarity jsonb;
+begin
+  select count(*) into total from codex;
+  select coalesce(jsonb_object_agg(rarity, n), '{}'::jsonb) into by_rarity
+    from (select rarity, count(*) as n from codex where rarity is not null group by rarity) t;
+  return jsonb_build_object('total', total, 'byRarity', by_rarity);
+end $$;
+
+grant execute on function public.codex_counts() to authenticated;
+
+create table if not exists public.wishlists (
+  owner      uuid not null references auth.users on delete cascade,
+  key        text not null,
+  card       jsonb not null,
+  created_at timestamptz not null default now(),
+  primary key (owner, key)
+);
+
+alter table public.wishlists enable row level security;
+
+drop policy if exists "a wishlist is readable by its owner and their friends" on public.wishlists;
+create policy "a wishlist is readable by its owner and their friends"
+  on public.wishlists for select
+  to authenticated
+  using (auth.uid() = owner or public.are_friends(owner, auth.uid()));
+
+drop policy if exists "you wish as yourself" on public.wishlists;
+create policy "you wish as yourself"
+  on public.wishlists for insert
+  to authenticated
+  with check (auth.uid() = owner);
+
+drop policy if exists "you unwish as yourself" on public.wishlists;
+create policy "you unwish as yourself"
+  on public.wishlists for delete
+  to authenticated
+  using (auth.uid() = owner);

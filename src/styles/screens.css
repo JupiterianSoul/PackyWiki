@@ -164,13 +164,19 @@
 }
 .forge-made-delete.is-armed { color: #fff; background: var(--negative); border-color: var(--negative); }
 
+/* The corner column holds "?" with the odds diamond under it; the shelf
+   segment moved up beside them, buying the screen the height it needed to
+   fit without scrolling - a page that cannot scroll is a booster that
+   cannot be dragged anywhere. */
 .packs-tools {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  align-items: flex-start;
   gap: 10px;
-  padding: 0 var(--gutter) 12px;
+  padding: 0 var(--gutter) 4px;
 }
+.packs-seg-wrap { flex: 1; min-width: 0; margin: 0; }
+.packs-side { display: flex; flex-direction: column; gap: 8px; margin-left: auto; flex: none; }
+#odds-btn svg { display: block; }
 
 /* --- free packs ---------------------------------------------------------------
    Rebuilt around one question - how many have I got, and when is the next?
@@ -480,7 +486,11 @@
 
 /* --- binder -------------------------------------------------------------------- */
 
-.binder-stats { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 var(--gutter) 14px; }
+/* Three pills, one row, always: value and albums-started share the line so
+   the shelf below starts higher. */
+.binder-stats { display: flex; flex-wrap: nowrap; gap: 6px; padding: 0 var(--gutter) 10px; overflow-x: auto; scrollbar-width: none; }
+.binder-stats::-webkit-scrollbar { display: none; }
+.binder-stats .stat-pill { padding: 6px 10px; font-size: 0.72rem; white-space: nowrap; flex: none; }
 .stat-pill {
   display: inline-flex;
   align-items: baseline;
@@ -1667,8 +1677,130 @@
 .badge-chip .badge-equipped-tag { min-height: 0; }
 .badges-manage { margin-left: auto; }
 
+/* --- auction house tiles ---------------------------------------------------
+   The listing is the Classic collection grid wearing price tags: two cards
+   a row, each with its standing above and the live numbers below. */
+.market-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 10px; margin-top: 12px; }
+.auction-tile { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.auction-tile .card, .market-list > .card { width: 100%; }
+.auction-band {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 4px 8px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auction-band.is-good { color: var(--positive); border-color: color-mix(in srgb, var(--positive) 55%, transparent); }
+.auction-band.is-bad { color: var(--negative); border-color: color-mix(in srgb, var(--negative) 55%, transparent); }
+.auction-info {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 8px;
+  padding: 0 4px;
+  align-items: baseline;
+}
+.auction-bid { font-size: 0.88rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.auction-time { justify-self: end; }
+.auction-sub { font-size: 0.68rem; color: var(--ink-dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.auction-sub.is-seller { justify-self: end; }
+.market-tools { display: grid; gap: 8px; margin-top: 12px; }
+.market-search { width: 100%; }
+.market-views, .market-sorts { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.market-views::-webkit-scrollbar, .market-sorts::-webkit-scrollbar { display: none; }
+.market-view, .market-sort { flex: none; }
+/* the base .chip.is-on already paints these accent-on-ink; nothing to add */
+
+.tl-more { margin-top: 8px; }
+.tl-points.is-full { display: grid; gap: 8px; font-size: 0.86rem; line-height: 1.5; padding-left: 18px; }
+
+/* --- card index, wishlist, glossary ---------------------------------------- */
+.owned-tag {
+  display: inline-block;
+  vertical-align: 2px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  border: 1px solid color-mix(in srgb, var(--positive) 60%, transparent);
+  color: var(--positive);
+  font-size: 0.5em;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.wish-button {
+  position: absolute;
+  top: 44px; right: 8px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 30px; height: 30px;
+  border-radius: 50%;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(4px);
+  border: none;
+}
+.wish-button.is-alone { top: 8px; }
+.wish-button.is-on { color: var(--accent-2); }
+.wish-giant.is-wished { color: var(--accent-2); border-color: var(--accent-2); }
+.wish-friends { font-size: 0.74rem; color: var(--accent-2); padding-top: 6px; }
+.index-counts { display: flex; flex-wrap: nowrap; gap: 6px; padding: 0 0 10px; overflow-x: auto; scrollbar-width: none; }
+.index-counts::-webkit-scrollbar { display: none; }
+.index-counts .stat-pill { flex: none; padding: 6px 10px; font-size: 0.72rem; white-space: nowrap; }
+.glossary-list { display: grid; gap: 10px; }
+.glossary-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+}
+.glossary-mark {
+  flex: none;
+  width: 46px; height: 46px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  color: var(--ga, var(--accent));
+  background: color-mix(in srgb, var(--ga, var(--accent)) 14%, transparent);
+}
+.glossary-copy { min-width: 0; display: grid; gap: 3px; }
+.glossary-copy b { font-size: 0.92rem; }
+.glossary-copy span { font-size: 0.76rem; color: var(--ink-dim); }
+
+/* --- settings sliders ------------------------------------------------------ */
+.row-slider {
+  flex: none;
+  width: 42%;
+  max-width: 180px;
+  accent-color: var(--accent);
+  height: 26px;
+}
+
+/* --- shared empty-state container ----------------------------------------- */
+.empty-note {
+  grid-column: 1 / -1;
+  padding: 16px 14px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: var(--ink-dim);
+  font-size: 0.82rem;
+  text-align: center;
+}
+
 /* --- the market ----------------------------------------------------------- */
-.market-list { display: grid; gap: 10px; margin-top: 12px; }
 .market-row {
   display: flex;
   align-items: center;

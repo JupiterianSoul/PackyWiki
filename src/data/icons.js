@@ -228,6 +228,11 @@ const ICONS = {
   cloud: `
     <path d="M7.4 18.4a4.4 4.4 0 0 1-.6-8.8 5.4 5.4 0 0 1 10.3 1.2 3.8 3.8 0 0 1-.5 7.6z"/>`,
   menu: `<path d="M4 7h16M4 12h16M4 17h16"/>`,
+  wish: `
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M7 3h10a1 1 0 0 1 1 1v17l-6-4.2L6 21V4a1 1 0 0 1 1-1Z"/>
+    </svg>`,
   bell: `
     <path d="M18 9.4a6 6 0 0 0-12 0c0 5-2.2 6.4-2.2 6.4h16.4S18 14.4 18 9.4z"/>
     <path d="M13.6 19.2a1.9 1.9 0 0 1-3.2 0"/>`,

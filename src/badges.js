@@ -47,7 +47,15 @@ export const BADGES = [
   { id: 'magnate',    chain: 'rich',      from: 2, motif: 'coin',
     name: { en: 'Deep Pockets', fr: 'Poches profondes' } },
   { id: 'prismatic',  ach: 'one-of-each', motif: 'prism',
-    name: { en: 'One of Each', fr: 'Un de chaque' } }
+    name: { en: 'One of Each', fr: 'Un de chaque' } },
+  { id: 'seller',     chain: 'vendor',    from: 1, motif: 'tag',
+    name: { en: 'Seller', fr: 'Vendeur' } },
+  { id: 'buyer',      chain: 'hammer',    from: 1, motif: 'gavel',
+    name: { en: 'Buyer', fr: 'Acheteur' } },
+  { id: 'encyclo',    chain: 'unique',    from: 3, motif: 'scroll',
+    name: { en: 'Encyclopedist', fr: 'Encyclopédiste' } },
+  { id: 'philanthrope', chain: 'gift',    from: 2, motif: 'heart',
+    name: { en: 'Philanthropist', fr: 'Philanthrope' } }
 ];
 
 /**
@@ -146,7 +154,21 @@ const MOTIFS = {
   prism: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
     <polygon points="0,-13 13,10 -13,10"/>
     <line x1="-18" y1="-2" x2="-6" y2="-2"/>
-    <line x1="6" y1="1" x2="17" y2="-3"/><line x1="6" y1="4" x2="18" y2="3"/><line x1="6" y1="7" x2="17" y2="9"/></g>`
+    <line x1="6" y1="1" x2="17" y2="-3"/><line x1="6" y1="4" x2="18" y2="3"/><line x1="6" y1="7" x2="17" y2="9"/></g>`,
+  tag: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M -2 -16 L 10 -16 Q 13 -16 13 -13 L 13 -1 L 1 14 Q -1 16 -3 14 L -15 0 Q -17 -2 -15 -4 Z" transform="rotate(14)"/>
+    <circle cx="6" cy="-9" r="2.4" transform="rotate(14)"/></g>`,
+  gavel: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <rect x="-4" y="-16" width="14" height="9" rx="2" transform="rotate(38)"/>
+    <line x1="-1" y1="1" x2="-11" y2="12"/>
+    <line x1="-16" y1="16" x2="2" y2="16"/></g>`,
+  scroll: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M -13 -13 Q -9 -16 -5 -13 L -5 12 Q -9 15 -13 12 Z"/>
+    <path d="M -5 -13 L 9 -13 Q 13 -13 13 -9 L 13 8 Q 13 12 9 12 L -5 12"/>
+    <line x1="0" y1="-6" x2="8" y2="-6"/><line x1="0" y1="0" x2="8" y2="0"/><line x1="0" y1="6" x2="6" y2="6"/></g>`,
+  heart: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
+    <path d="M 0 13 Q -14 3 -14 -5 Q -14 -13 -7 -13 Q -2 -13 0 -8 Q 2 -13 7 -13 Q 14 -13 14 -5 Q 14 3 0 13 Z"/>
+    <path d="M -5 -4 L -1 -4 L 1 -8 L 3 0 L 5 -4" stroke-width="1.8"/></g>`
 };
 
 /**

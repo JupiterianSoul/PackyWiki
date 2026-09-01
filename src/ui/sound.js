@@ -50,6 +50,16 @@ class Synth {
     this.nodes = null;
     this.kitName = null;                 // sample kit of the current theme
     this.kitBuffers = new Map();         // event -> decoded AudioBuffer
+    this.volume = 1;                     // the player's own master slider
+  }
+
+  /** The Settings slider: scales everything, theme trims included. */
+  setVolume(volume) {
+    this.volume = Math.min(1, Math.max(0, Number(volume) || 0));
+    if (this.nodes && !this.muted) {
+      this.nodes.master.gain.setTargetAtTime(
+        0.62 * (this.theme?.sound?.gain ?? 1) * this.volume, this.ctx.currentTime, 0.02);
+    }
   }
 
   /* --- graph ------------------------------------------------------------- */
@@ -63,7 +73,7 @@ class Synth {
     const ctx = this.ctx;
 
     const master = ctx.createGain();
-    master.gain.value = this.muted ? 0 : 0.62 * (this.theme?.sound?.gain ?? 1);
+    master.gain.value = this.muted ? 0 : 0.62 * (this.theme?.sound?.gain ?? 1) * this.volume;
 
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -18;
@@ -119,7 +129,7 @@ class Synth {
   setMuted(muted) {
     this.muted = muted;
     if (this.nodes) {
-      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.62 * (this.theme?.sound?.gain ?? 1), this.ctx.currentTime, 0.02);
+      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.62 * (this.theme?.sound?.gain ?? 1) * this.volume, this.ctx.currentTime, 0.02);
     }
   }
 
@@ -136,7 +146,7 @@ class Synth {
     // Some voices simply run hot: a chip square wave at the same master gain
     // as a felt piano is twice as loud to the ear. Themes carry their own
     // trim, applied here and in setMuted.
-    if (!this.muted) master.gain.setTargetAtTime(0.62 * (s.gain ?? 1), t, 0.05);
+    if (!this.muted) master.gain.setTargetAtTime(0.62 * (s.gain ?? 1) * this.volume, t, 0.05);
     filter.frequency.setTargetAtTime(s.filter, t, 0.05);
     send.gain.setTargetAtTime(s.reverb.mix, t, 0.05);
     reverb.buffer = this.#impulse(s.reverb.seconds, s.reverb.decay);
@@ -757,12 +767,14 @@ class Synth {
   /** Switching theme: a short signature in the theme you just switched TO. */
   playTheme() {
     if (!this.#ready()) return;
-    if (this.#kit('toggle-on', { rate: 0.9, gain: 0.7 })) return;
+    if (this.#kit('toggle-on', { rate: 0.9, gain: 0.3 })) return;
     this.resume();
+    // Deliberately small: this fires while the player is comparing themes,
+    // and the loud versions were the first thing anyone heard of each.
     [0, 2, 4].forEach((deg, i) => {
-      this.#note({ freq: this.#degree(deg, 1), at: i * 0.075, dur: 0.6, gain: 0.11 });
+      this.#note({ freq: this.#degree(deg, 1), at: i * 0.075, dur: 0.5, gain: 0.04 });
     });
-    this.#transient(0.06);
+    this.#transient(0.025);
   }
 
   /**

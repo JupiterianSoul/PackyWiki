@@ -310,11 +310,12 @@ To point a build at a **different** project:
    and ends by telling PostgREST to reload its schema cache - without that
    last step the API can answer "Could not find the table" for a while even
    though everything exists. The file is layered (V1 accounts, V2 social,
-   V3 the market) and every statement is idempotent, so when an update adds
-   a layer you run the whole file again on the same project and nothing is
-   lost. An app running against a database that is a layer behind says so
-   in the affected screen instead of breaking: the market, for instance,
-   asks for this file to be run again.
+   V3 the auction house, V4 the card index and wishlists) and every
+   statement is idempotent, so when an update adds a layer you run the
+   whole file again on the same project and nothing is lost. An app
+   running against a database that is a layer behind says so in the
+   affected screen instead of breaking: the auction house and the card
+   index, for instance, ask for this file to be run again.
    For live market updates also check **Database → Replication** includes
    the `auctions` table (the script tries to add it; the app polls anyway,
    so missing Realtime only costs immediacy).

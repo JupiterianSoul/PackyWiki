@@ -56,6 +56,7 @@ import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
+import { music } from './ui/music.js';
 import {
   quizAvailable, buildQuiz, questionCountFor, quizRewards,
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
@@ -117,8 +118,16 @@ const state = {
   badgeLoadout: store.loadBadgeLoadout(),
   market: {
     view: 'browse', auctions: [], myBids: store.loadMyBids(),
+    search: '', sort: 'ending',
     timer: null, poll: null, unsub: null, settling: new Set(), busy: false
   },
+  cardIndex: {
+    rows: [], counts: null, search: '', rarity: null, sort: 'recent',
+    page: 0, more: false, wishMode: false, busy: false
+  },
+  wishlist: new Map(store.loadWishlist().map((card) => [card.key, card])),
+  wishSeen: new Set(store.loadWishSeen()),
+  friendWishes: new Map(),
   ripDir: Number(localStorage.getItem?.(RIP_DIR_KEY)) || 0,
   prefetch: null,
   prefetchTimer: null,
@@ -159,7 +168,8 @@ bind({
     friend: $('#screen-friend'), chat: $('#screen-chat'), ach: $('#screen-ach'),
     updates: $('#screen-updates'), quiz: $('#screen-quiz'),
     customize: $('#screen-customize'), badges: $('#screen-badges'),
-    market: $('#screen-market'), open: $('#screen-open')
+    market: $('#screen-market'), cardindex: $('#screen-cardindex'),
+    glossary: $('#screen-glossary'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
@@ -197,7 +207,7 @@ bind({
   shopPurse: $('#shop-purse'), shopPurseLabel: $('#shop-purse-label'),
   shopRestockLabel: $('#shop-restock-label'),
 
-  oddsBtn: $('#odds-btn'), oddsIcon: $('#odds-icon'), oddsLabel: $('#odds-label'),
+  oddsBtn: $('#odds-btn'), oddsIcon: $('#odds-icon'),
 
   binderTitle: $('#binder-title'), binderStats: $('#binder-stats'),
   albumShelf: $('#album-shelf'), albumView: $('#album-view'), albumBack: $('#album-back'),
@@ -230,6 +240,10 @@ bind({
   framesLabel: $('#frames-label'), framesNote: $('#frames-note'), frameStyles: $('#frame-styles'),
   badgesLabel: $('#badges-label'), badgeGrid: $('#badge-grid'),
   badgesTitle: $('#badges-title'), badgesIntro: $('#badges-intro'), badgesAll: $('#badges-all'),
+  indexTitle: $('#index-title'), indexIntro: $('#index-intro'), indexCounts: $('#index-counts'),
+  indexSearch: $('#index-search'), indexRarities: $('#index-rarities'), indexSorts: $('#index-sorts'),
+  indexStatus: $('#index-status'), indexList: $('#index-list'), indexMore: $('#index-more'),
+  glossaryTitle: $('#glossary-title'), glossaryIntro: $('#glossary-intro'), glossaryList: $('#glossary-list'),
   marketTitle: $('#market-title'), marketIntro: $('#market-intro'), marketSeg: $('#market-seg'),
   marketStatus: $('#market-status'), marketList: $('#market-list'), marketSell: $('#market-sell'),
   openPrev: $('#open-prev'), openNext: $('#open-next'),
@@ -341,6 +355,9 @@ function useTheme(id, { announce = false } = {}) {
   try { localStorage.setItem(THEME_KEY, theme.id); } catch { /* session only */ }
   backdrop.setTheme(theme.id);
   synth.setTheme(theme.id);
+  // Inside the APK, the launcher icon follows the theme. In a browser the
+  // bridge simply is not there.
+  try { window.WiklodoIcon?.setIcon(theme.id); } catch { /* browser build */ }
   document.querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', theme.swatch[0]);
   if (announce) { synth.resume(); synth.playTheme(); }
@@ -381,7 +398,9 @@ function showScreen(name) {
  */
 const navTabFor = (screen) =>
   screen === 'market' ? 'shop'
-    : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
+    : screen === 'cardindex' ? 'binder'
+      : screen === 'glossary' ? 'packs'
+        : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -419,6 +438,11 @@ function paintFrameInto(node, styleId, tier) {
 function pickFrameStyle(styleId) {
   state.frameStyle = styleId;
   store.saveFrameStyle(styleId);
+  // The appbar paints the ACCOUNT's copy of the choice when there is one, so
+  // adopt it there first; the server write below then just confirms it.
+  if (state.account?.profile) {
+    state.account.profile.avatar = { ...(state.account.profile.avatar ?? {}), frame: { style: styleId } };
+  }
   refreshLevelBadge();
   if (signedIn() && account.socialSchemaReady()) {
     const merged = { ...(state.account.profile?.avatar ?? {}), frame: { style: styleId } };
@@ -440,6 +464,15 @@ function updateBadges() {
   // is a number that is always there and never means anything has happened.
   const timed = state.profile.timed.count ?? 0;
   nav.setBadge('timed', timed ? String(timed) : '');
+  const held = Object.values(state.inventory ?? {})
+    .reduce((n, slot) => n + (slot.count ?? 0), 0);
+  nav.setBadge('packs', held ? String(held) : '');
+  // A newly finished achievement rings once, when the count first rises.
+  const achReady = achRedeemableCount();
+  if (state.lastAchReady != null && achReady > state.lastAchReady) {
+    pushNote('trophy', t('notifAchReady', { n: achReady }), 'ach');
+  }
+  state.lastAchReady = achReady;
   const ready = canClaim(state.profile.daily);
   el.giftDot.hidden = !ready;
   paintBell();
@@ -462,6 +495,8 @@ function drawerItems() {
     { id: 'shop',   icon: 'gem',        key: 'tabShop',        run: go('shop', () => { payStipend(); renderShop(); }) },
     { id: 'binder', icon: 'collection', key: 'tabCollection',  run: go('binder', renderBinder) },
     { id: 'market', icon: 'trade',      key: 'tabMarket',      run: go('market', renderMarket) },
+    { id: 'cardindex', icon: 'search',  key: 'tabIndex',       run: go('cardindex', renderCardIndex) },
+    { id: 'glossary', icon: 'filter',   key: 'tabGlossary',    run: go('glossary', renderGlossary) },
     { id: 'daily',  icon: 'gift',       key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
       run: () => openDaily() },
     { id: 'ach',    icon: 'trophy',     key: 'achTitle',
@@ -475,6 +510,9 @@ function drawerItems() {
            badge: () => state.social.incoming.length,
            run: go('friends', () => { renderFriends(); loadFriends(); }) }]
       : []),
+    { id: 'bell', icon: 'bell', key: 'notifTitle',
+      badge: () => unreadCount(),
+      run: () => openNotifications() },
     { id: 'profile',  icon: 'profile',  key: 'tabProfile',  run: go('profile', renderProfile) },
     { id: 'updates',   icon: 'spark',    key: 'tabUpdates',   run: go('updates', renderUpdates) },
     { id: 'customize', icon: 'wand',     key: 'tabCustomize', run: go('customize', renderCustomize) },
@@ -563,9 +601,13 @@ function pushNote(icon, title, screen = 'friends') {
 
 function notifications() {
   const go = (screen) => () => {
-    if (screen === 'friends') { renderFriends(); showScreen('friends'); }
-    else if (screen === 'packs') { renderPacks(); showScreen('packs'); }
-    else showScreen(screen);
+    const renderers = {
+      friends: renderFriends, packs: renderPacks, binder: renderBinder,
+      shop: renderShop, timed: renderTimed, ach: renderAchievements,
+      market: renderMarket, cardindex: renderCardIndex
+    };
+    renderers[screen]?.();
+    showScreen(screen);
   };
   const rows = [];
 
@@ -671,7 +713,9 @@ const HELP = {
   shop:    { steps: 3, tip: true },
   binder:  { steps: 3, tip: true },
   friends: { steps: 3, tip: true },
-  quiz:    { steps: 3, tip: true }
+  quiz:    { steps: 3, tip: true },
+  market:  { steps: 3, tip: true },
+  index:   { steps: 3, tip: true }
 };
 
 function openHelp(topic) {
@@ -953,7 +997,12 @@ async function createCustomPack(event) {
 /* --- timed boosters -------------------------------------------------------------------- */
 
 function syncTimed() {
+  const before = state.profile.timed.count ?? 0;
   accrue(state.profile.timed);
+  const after = state.profile.timed.count ?? 0;
+  const cap = maxHeld(timedLevel(state.profile.timed.opened ?? 0));
+  // The shelf just filled: worth a bell, once per fill.
+  if (after > before && after >= cap) pushNote('clock', t('notifTimedFull'), 'timed');
   store.saveProfile(state.profile);
   return state.profile.timed;
 }
@@ -1832,6 +1881,13 @@ async function runOpen(booster) {
   }));
 
   const recorded = store.recordPulls(state.collection, pulls, state.spec);
+  // The shared codex learns every real card as it is first pulled; custom
+  // wikis stay private to their maker.
+  if (signedIn() && state.spec?.kind !== 'custom') {
+    const found = pulls.map((pull) => ({ ...pull.article, price: pull.price, rarityId: pull.rarity.id }))
+      .filter((card) => card.key && !String(card.packId ?? '').startsWith('custom'));
+    account.codexAdd(userId(), found).catch(() => { /* the next opener adds it */ });
+  }
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
   // The cards are in the collection now, so the booster is honestly gone.
   store.clearOpenInFlight();
@@ -1897,7 +1953,7 @@ function applyRarityVars(node, rarity) {
   node.style.setProperty('--rarity-glow', rarity.glow);
 }
 
-function fillFront(front, data, rarity) {
+function fillFront(front, data, rarity, { ownedTag = false } = {}) {
   const art = front.querySelector('.card-art');
   art.replaceChildren();
   const fallback = () => art.insertAdjacentHTML('afterbegin',
@@ -1918,6 +1974,15 @@ function fillFront(front, data, rarity) {
   }
 
   front.querySelector('.card-title').textContent = data.title;
+  // In the rooms where you browse cards that are not necessarily yours (the
+  // index, the auction floor, a friend's shelf), the green tag answers the
+  // only question that matters before bidding: do I already have this?
+  if (ownedTag && data.key && state.collection.entries[data.key]) {
+    const tag = document.createElement('span');
+    tag.className = 'owned-tag';
+    tag.textContent = t('ownedTag');
+    front.querySelector('.card-title').appendChild(tag);
+  }
   front.querySelector('.card-desc').textContent = data.description || data.sourceName || '';
   front.querySelector('.card-extract').textContent = data.extract;
   front.querySelector('.rarity-badge').textContent = tx(rarity.name);
@@ -2228,7 +2293,65 @@ function openSheet(title, build, { dismissible = true, onClose = null } = {}) {
 /* --- card detail ---------------------------------------------------------------------------------- */
 
 /** A face-up card with no back and no flip: summary, binder and detail. */
-function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = false } = {}) {
+/* --- the wishlist ------------------------------------------------------------------------
+ * A wish is a card you want, whoever holds it. It lives on the server (so
+ * friends can see it and the auction floor can ring a bell for it) with a
+ * local cache for instant paint. Offline builds keep the cache alone. */
+
+function wishSnapshot(data) {
+  return {
+    key: data.key, title: data.title, rarityId: data.rarityId ?? null,
+    price: data.price ?? null, views: data.views ?? null,
+    thumbnail: data.thumbnail ?? null, lang: data.lang ?? null
+  };
+}
+
+function toggleWish(data) {
+  if (!data?.key) return false;
+  const on = !state.wishlist.has(data.key);
+  if (on) state.wishlist.set(data.key, wishSnapshot(data));
+  else state.wishlist.delete(data.key);
+  store.saveWishlist([...state.wishlist.values()]);
+  synth.playFav(on);
+  if (signedIn()) {
+    account.wishlistSet(userId(), wishSnapshot(data), on).catch(() => { /* cache still holds it */ });
+  }
+  return on;
+}
+
+function wireWishButton(button, data) {
+  const paint = () => {
+    const on = state.wishlist.has(data.key);
+    button.classList.toggle('is-on', on);
+    button.setAttribute('aria-pressed', String(on));
+    button.setAttribute('aria-label', t('wishTitle'));
+    button.innerHTML = iconSvg('wish', { size: 15 });
+  };
+  paint();
+  button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const on = toggleWish(data);
+    toast(t(on ? 'wishAdded' : 'wishRemoved', { card: esc(data.title) }), 'ok');
+    paint();
+  });
+}
+
+/** Pull the server copy over the cache, and learn what friends wish for. */
+async function refreshWishes() {
+  if (!signedIn() || !account.indexSchemaReady()) return;
+  try {
+    const mine = await account.wishlistMine(userId());
+    state.wishlist = new Map(mine.map((row) => [row.key, row.card]));
+    store.saveWishlist([...state.wishlist.values()]);
+  } catch { /* the cache stands */ }
+  try {
+    const ids = state.social.friends.map((f) => f.otherId);
+    state.friendWishes = await account.friendsWishes(ids,
+      (id) => state.social.friends.find((f) => f.otherId === id)?.profile?.username ?? null);
+  } catch { /* no friend wishes today */ }
+}
+
+function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = false, ownedTag = false, wish = true } = {}) {
   // `lit` runs the tier's animations. Only the one card you are actually
   // looking at (reveal, detail) earns it - a binder page of forty lit cards
   // is forty looping animations and a hot phone.
@@ -2237,10 +2360,19 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = fals
   applyRarityVars(card, rarity);
   card.innerHTML = `<div class="card-inner"><div class="card-face card-front">${CARD_FRONT_MARKUP}</div></div>`;
   const front = card.querySelector('.card-front');
-  fillFront(front, data, rarity);
+  fillFront(front, data, rarity, { ownedTag });
   const favButton = front.querySelector('.fav-button');
   if (fav && entryKey) wireFavButton(favButton, entryKey);
   else favButton.remove();
+  // The wish bookmark sits under the star, on every card that can name
+  // itself - your own, a friend's, a stranger's at auction.
+  if (wish && data.key) {
+    const wishButton = document.createElement('button');
+    wishButton.type = 'button';
+    wishButton.className = `wish-button${fav && entryKey ? '' : ' is-alone'}`;
+    front.appendChild(wishButton);
+    wireWishButton(wishButton, data);
+  }
   if (entryKey) card.addEventListener('click', () => openCardDetail(entryKey, data, rarity));
   return card;
 }
@@ -2279,6 +2411,7 @@ function openCardDetail(entryKey, data, rarity) {
           </div>
           <div class="giant-actions">
             <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer"></a>
+            <button class="btn btn-ghost btn-sm wish-giant" type="button"></button>
             <button class="btn btn-ghost btn-sm sell" type="button" hidden></button>
           </div>
           <div class="fx fx-b" aria-hidden="true"></div>
@@ -2286,6 +2419,35 @@ function openCardDetail(entryKey, data, rarity) {
         </div>
       </div>`;
     body.appendChild(card);
+
+    // The tag that answers "do I have this?" wherever the card was met.
+    if (state.collection.entries[entryKey]) {
+      const tag = document.createElement('span');
+      tag.className = 'owned-tag';
+      tag.textContent = t('ownedTag');
+      card.querySelector('.card-title').appendChild(tag);
+    }
+
+    // The wish toggle, and who else at the table wants this card.
+    const wishBtn = card.querySelector('.wish-giant');
+    const paintWish = () => {
+      const on = state.wishlist.has(entryKey);
+      wishBtn.innerHTML = `${iconSvg('wish', { size: 14 })}<span style="margin-left:6px">${esc(t(on ? 'wishOn' : 'wishTitle'))}</span>`;
+      wishBtn.classList.toggle('is-wished', on);
+    };
+    paintWish();
+    press(wishBtn, { sound: null });
+    wishBtn.addEventListener('click', () => {
+      toggleWish({ ...data, key: entryKey });
+      paintWish();
+    });
+    const wishers = state.friendWishes.get(entryKey) ?? [];
+    if (wishers.length) {
+      const line = document.createElement('p');
+      line.className = 'wish-friends';
+      line.textContent = t('wishFriends', { names: wishers.join(', ') });
+      card.querySelector('.giant-facts').after(line);
+    }
 
     const art = card.querySelector('.card-art');
     if (data.thumbnail) {
@@ -2861,6 +3023,204 @@ function renderProfile() {
 
 }
 
+/* --- the card index: everything anyone has found ------------------------------------------
+ * The shared codex, browsable: search, tier filters, three sorts, and the
+ * wishlist view. Cards here are knowledge, not property - the Owned tag is
+ * what separates the two at a glance.
+ */
+
+const INDEX_SORTS = ['recent', 'name', 'value'];
+
+function codexCardData(row) {
+  const lang = row.lang ?? String(row.key).split(':')[0] ?? 'en';
+  const title = String(row.key).split(':').slice(1).join(':');
+  return {
+    key: row.key, title: row.title, rarityId: row.rarity, price: row.price ?? 0,
+    views: row.views ?? null, thumbnail: row.thumbnail, lang,
+    url: `https://${lang}.wikipedia.org/wiki/${encodeURIComponent(title)}`,
+    description: '', extract: ''
+  };
+}
+
+function indexTile(row) {
+  const data = codexCardData(row);
+  const rarity = rarityById(data.rarityId) ?? RARITIES[0];
+  const card = buildStaticCard(data, rarity, null, { fav: false, ownedTag: true });
+  card.addEventListener('click', () => { synth.playTap(); openCardDetail(data.key, data, rarity, { fromIndex: true }); });
+  return card;
+}
+
+function renderCardIndex() {
+  const ci = state.cardIndex;
+  el.indexTitle.textContent = t('tabIndex');
+  el.indexIntro.textContent = t('indexIntro');
+  el.indexSearch.placeholder = t('marketSearch');
+  el.indexSearch.value = ci.search;
+
+  if (!account.configured || !signedIn()) {
+    el.indexStatus.textContent = account.configured ? t('marketSignIn') : t('marketOffline');
+    el.indexStatus.className = 'find-status';
+    el.indexCounts.replaceChildren();
+    el.indexList.replaceChildren();
+    el.indexMore.hidden = true;
+    return;
+  }
+  el.indexStatus.textContent = '';
+
+  if (!el.indexSearch.dataset.bound) {
+    el.indexSearch.dataset.bound = '1';
+    let debounce = null;
+    el.indexSearch.addEventListener('input', () => {
+      ci.search = el.indexSearch.value;
+      clearTimeout(debounce);
+      debounce = setTimeout(() => loadIndexPage(true), 280);
+    });
+    el.indexMore.addEventListener('click', () => { synth.playTap(); loadIndexPage(false); });
+    press(el.indexMore, { sound: null });
+  }
+
+  // The wishlist toggle leads the tier row; the tiers follow.
+  const wishChip = document.createElement('button');
+  wishChip.type = 'button';
+  wishChip.className = `chip market-sort${ci.wishMode ? ' is-on' : ''}`;
+  wishChip.innerHTML = `${iconSvg('wish', { size: 12 })}<span style="margin-left:5px">${esc(t('wishTitle'))}</span>`;
+  press(wishChip, { sound: null });
+  wishChip.addEventListener('click', () => {
+    synth.playTap();
+    ci.wishMode = !ci.wishMode;
+    renderCardIndex();
+  });
+  el.indexRarities.replaceChildren(wishChip, ...[null, ...RARITIES.map((r) => r.id)].map((id) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `chip market-sort${!ci.wishMode && ci.rarity === id ? ' is-on' : ''}`;
+    const rarity = id ? rarityById(id) : null;
+    chip.textContent = rarity ? tx(rarity.name) : t('filterAll');
+    if (rarity && !(ci.rarity === id)) chip.style.color = rarity.color;
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => {
+      synth.playTap();
+      ci.wishMode = false;
+      ci.rarity = id;
+      renderCardIndex();
+    });
+    return chip;
+  }));
+
+  el.indexSorts.replaceChildren(...INDEX_SORTS.map((sort) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `chip market-sort${ci.sort === sort ? ' is-on' : ''}`;
+    chip.textContent = t(`indexSort_${sort}`);
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => {
+      if (ci.sort === sort) return;
+      synth.playTap();
+      ci.sort = sort;
+      renderCardIndex();
+    });
+    return chip;
+  }));
+  el.indexSorts.hidden = ci.wishMode;
+
+  if (ci.wishMode) {
+    el.indexCounts.replaceChildren(Object.assign(document.createElement('span'),
+      { className: 'stat-pill', textContent: t('wishCount', { n: state.wishlist.size }) }));
+    const rows = [...state.wishlist.values()].map((card) => ({
+      key: card.key, title: card.title, rarity: card.rarityId,
+      price: card.price, views: card.views, thumbnail: card.thumbnail, lang: card.lang
+    }));
+    el.indexMore.hidden = true;
+    if (!rows.length) {
+      el.indexList.replaceChildren(Object.assign(document.createElement('p'),
+        { className: 'empty-note', textContent: t('wishEmpty') }));
+    } else {
+      el.indexList.replaceChildren(...rows.map(indexTile));
+    }
+    refreshWishes().then(() => { if (state.tab === 'cardindex' && ci.wishMode) renderCardIndex(); });
+    return;
+  }
+
+  paintIndexCounts();
+  loadIndexPage(true);
+}
+
+async function paintIndexCounts() {
+  const ci = state.cardIndex;
+  try {
+    ci.counts = await account.codexCounts();
+  } catch (error) {
+    if (error?.message === 'INDEX_UNSET') {
+      el.indexStatus.textContent = t('indexUnset');
+      el.indexStatus.className = 'find-status is-error';
+    }
+    return;
+  }
+  if (state.tab !== 'cardindex') return;
+  const pills = [Object.assign(document.createElement('span'),
+    { className: 'stat-pill', innerHTML: `<b>${Number(ci.counts.total ?? 0).toLocaleString()}</b> ${esc(t('indexDiscovered'))}` })];
+  for (const rarity of RARITIES) {
+    const n = ci.counts.byRarity?.[rarity.id] ?? 0;
+    if (!n) continue;
+    const pill = document.createElement('span');
+    pill.className = 'stat-pill';
+    pill.innerHTML = `<b style="color:${rarity.color}">${Number(n).toLocaleString()}</b> ${esc(tx(rarity.name))}`;
+    pills.push(pill);
+  }
+  el.indexCounts.replaceChildren(...pills);
+}
+
+async function loadIndexPage(reset) {
+  const ci = state.cardIndex;
+  if (ci.busy) return;
+  ci.busy = true;
+  if (reset) { ci.page = 0; ci.rows = []; }
+  const PAGE = 40;
+  try {
+    const rows = await account.codexPage({
+      search: ci.search, rarity: ci.rarity, sort: ci.sort,
+      offset: ci.page * PAGE, limit: PAGE
+    });
+    ci.rows = reset ? rows : [...ci.rows, ...rows];
+    ci.more = rows.length === PAGE;
+    ci.page += 1;
+    if (state.tab === 'cardindex' && !ci.wishMode) {
+      el.indexStatus.textContent = '';
+      if (!ci.rows.length) {
+        el.indexList.replaceChildren(Object.assign(document.createElement('p'),
+          { className: 'empty-note', textContent: t('indexEmpty') }));
+      } else {
+        el.indexList.replaceChildren(...ci.rows.map(indexTile));
+      }
+      el.indexMore.hidden = !ci.more;
+      el.indexMore.textContent = t('indexMore');
+    }
+  } catch (error) {
+    el.indexStatus.textContent = error?.message === 'INDEX_UNSET' ? t('indexUnset') : describeError(error);
+    el.indexStatus.className = 'find-status is-error';
+  }
+  ci.busy = false;
+}
+
+/* --- the glossary: every booster category, sealed --------------------------------------- */
+
+function renderGlossary() {
+  el.glossaryTitle.textContent = t('tabGlossary');
+  el.glossaryIntro.textContent = t('glossaryIntro');
+  el.glossaryList.replaceChildren(...THEME_PACKS.map((theme) => {
+    const spec = { kind: 'theme', themeId: theme.id, rarityId: null, cards: 5 };
+    const row = document.createElement('div');
+    row.className = 'glossary-row';
+    row.style.setProperty('--ga', theme.accent);
+    row.innerHTML = `
+      <span class="glossary-mark">${emblemSvg(theme.id, { size: 34 })}</span>
+      <span class="glossary-copy"><b></b><span></span></span>`;
+    row.querySelector('b').textContent = specName(spec);
+    row.querySelector('.glossary-copy span').textContent = specTagline(spec);
+    return row;
+  }));
+}
+
 /* --- the market: every player's auction floor --------------------------------------------
  * The rules live in the database (supabase/schema.sql, V3): the 15% floor,
  * the anti-snipe clock, the no-cancel-once-bid rule and settlement are all
@@ -2950,6 +3310,16 @@ async function refreshMarket({ quiet = false } = {}) {
   if (!quiet) { el.marketStatus.textContent = t('marketLoading'); el.marketStatus.className = 'find-status is-working'; }
   try {
     m.auctions = await account.listAuctions(userId());
+    // A wished card walking onto the floor rings the bell, once per auction.
+    let rang = false;
+    for (const a of m.auctions) {
+      if (a.status !== 'open' || a.seller === userId()) continue;
+      if (!state.wishlist.has(a.card?.key) || state.wishSeen.has(a.id)) continue;
+      state.wishSeen.add(a.id);
+      rang = true;
+      pushNote('wish', t('notifWishAuction', { card: esc(a.card?.title ?? '?') }), 'market');
+    }
+    if (rang) store.saveWishSeen([...state.wishSeen]);
     el.marketStatus.textContent = '';
     renderMarketList();
   } catch (error) {
@@ -2957,6 +3327,9 @@ async function refreshMarket({ quiet = false } = {}) {
     el.marketStatus.className = 'find-status is-error';
   }
 }
+
+const MARKET_VIEWS = ['browse', 'selling', 'bidding', 'won', 'history'];
+const MARKET_SORTS = ['ending', 'newest', 'lowest', 'highest'];
 
 function renderMarket() {
   el.marketTitle.textContent = t('tabMarket');
@@ -2974,70 +3347,172 @@ function renderMarket() {
   el.marketSell.hidden = false;
   el.marketSeg.parentElement.hidden = false;
 
-  new Segmented(el.marketSeg, [
-    { id: 'browse', label: t('marketBrowse') },
-    { id: 'mine', label: t('marketMine') }
-  ], (view) => { state.market.view = view; renderMarketList(); })
-    .select(state.market.view, { silent: true });
+  // Five rooms, as a scrollable chip row: a five-way segment control does
+  // not fit a phone.
+  el.marketSeg.className = 'market-views';
+  el.marketSeg.replaceChildren(...MARKET_VIEWS.map((view) => {
+    const chip = document.createElement('button');
+    chip.type = 'button';
+    chip.className = `chip market-view${state.market.view === view ? ' is-on' : ''}`;
+    chip.textContent = t(`marketView_${view}`);
+    press(chip, { sound: null });
+    chip.addEventListener('click', () => {
+      if (state.market.view === view) return;
+      synth.playTap();
+      state.market.view = view;
+      renderMarket();
+    });
+    return chip;
+  }));
+
+  // Browse gets the finding tools; the other rooms are short lists.
+  let tools = el.marketList.parentElement.querySelector('.market-tools');
+  if (!tools) {
+    tools = document.createElement('div');
+    tools.className = 'market-tools';
+    el.marketList.before(tools);
+  }
+  if (state.market.view === 'browse') {
+    tools.hidden = false;
+    tools.innerHTML = `
+      <input class="creator-input market-search" type="search" data-search
+        autocomplete="off" spellcheck="false">
+      <div class="market-sorts" data-sorts></div>`;
+    const input = tools.querySelector('[data-search]');
+    input.placeholder = t('marketSearch');
+    input.value = state.market.search;
+    input.addEventListener('input', () => {
+      state.market.search = input.value;
+      renderMarketList();
+    });
+    tools.querySelector('[data-sorts]').replaceChildren(...MARKET_SORTS.map((sort) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `chip market-sort${state.market.sort === sort ? ' is-on' : ''}`;
+      chip.textContent = t(`marketSort_${sort}`);
+      press(chip, { sound: null });
+      chip.addEventListener('click', () => {
+        if (state.market.sort === sort) return;
+        synth.playTap();
+        state.market.sort = sort;
+        renderMarket();
+      });
+      return chip;
+    }));
+  } else {
+    tools.hidden = true;
+  }
 
   marketLoopsOn();
   refreshMarket();
 }
 
-function renderMarketList() {
+const normalise = (text) => String(text ?? '')
+  .toLowerCase()
+  .normalize('NFD')
+  .replace(/[\u0300-\u036f]/g, '');
+
+/** What each room shows, from the one fetched pool. */
+function marketRows() {
   const m = state.market;
   const me = userId();
-  let rows = m.auctions;
-  rows = state.market.view === 'mine'
-    ? rows.filter((a) => a.seller === me || m.myBids.includes(a.id))
-    : rows.filter((a) => a.status === 'open');
-  rows = [...rows].sort((a, b) =>
-    (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1)
-    || new Date(a.ends_at) - new Date(b.ends_at));
+  const open = (a) => a.status === 'open';
+  switch (m.view) {
+    case 'selling':
+      return m.auctions.filter((a) => a.seller === me && open(a))
+        .sort((a, b) => new Date(a.ends_at) - new Date(b.ends_at));
+    case 'bidding':
+      return m.auctions.filter((a) => open(a) && a.seller !== me && m.myBids.includes(a.id))
+        .sort((a, b) => new Date(a.ends_at) - new Date(b.ends_at));
+    case 'won':
+      return m.auctions.filter((a) => a.status === 'settled' && a.bidder === me)
+        .sort((a, b) => new Date(b.ends_at) - new Date(a.ends_at));
+    case 'history':
+      return m.auctions.filter((a) => a.seller === me && !open(a))
+        .sort((a, b) => new Date(b.ends_at) - new Date(a.ends_at));
+    default: {
+      let rows = m.auctions.filter(open);
+      const q = normalise(m.search.trim());
+      if (q) rows = rows.filter((a) => normalise(a.card?.title).includes(q));
+      const bid = (a) => a.current_bid ?? a.start_price;
+      const sorts = {
+        ending: (a, b) => new Date(a.ends_at) - new Date(b.ends_at),
+        newest: (a, b) => new Date(b.created_at) - new Date(a.created_at),
+        lowest: (a, b) => bid(a) - bid(b),
+        highest: (a, b) => bid(b) - bid(a)
+      };
+      return [...rows].sort(sorts[m.sort] ?? sorts.ending);
+    }
+  }
+}
 
+function auctionTile(a) {
+  const me = userId();
+  const m = state.market;
+  const rarity = rarityById(a.card?.rarityId) ?? rarityFromPopularity(a.card?.popularity ?? 0);
+
+  const tile = document.createElement('div');
+  tile.className = 'auction-tile';
+
+  // The band above the card: your standing in the fight, or the outcome.
+  let band = null;
+  if (m.view === 'bidding') {
+    const leading = a.bidder === me;
+    band = { text: t(leading ? 'marketLead' : 'marketOutbidBand'), cls: leading ? 'is-good' : 'is-bad' };
+  } else if (m.view === 'won') {
+    band = {
+      text: t('marketWonBand', {
+        amount: formatAmount(a.current_bid ?? 0),
+        date: new Date(a.ends_at).toLocaleDateString(getLanguage() === 'fr' ? 'fr-FR' : 'en-GB')
+      }),
+      cls: 'is-good'
+    };
+  } else if (m.view === 'history') {
+    const sold = a.status === 'settled' && a.bidder != null;
+    band = {
+      text: a.status === 'cancelled'
+        ? t('marketHistWithdrawn', { amount: formatAmount(a.start_price) })
+        : sold
+          ? t('marketHistSold', { amount: formatAmount(a.current_bid ?? 0) })
+          : t('marketHistUnsold', { amount: formatAmount(a.start_price) }),
+      cls: sold ? 'is-good' : ''
+    };
+  } else if (a.seller === me) {
+    band = { text: t('marketYours'), cls: '' };
+  }
+  if (band) {
+    const strip = document.createElement('span');
+    strip.className = `auction-band ${band.cls}`;
+    strip.textContent = band.text;
+    tile.appendChild(strip);
+  }
+
+  const card = buildStaticCard(a.card, rarity, null, { fav: false, ownedTag: true });
+  card.addEventListener('click', () => { synth.playTap(); openAuctionSheet(a.id); });
+  tile.appendChild(card);
+
+  const info = document.createElement('div');
+  info.className = 'auction-info';
+  const open = a.status === 'open';
+  info.innerHTML = `
+    <span class="auction-bid">${money(a.current_bid ?? a.start_price)}</span>
+    ${open ? `<span class="auction-time market-time" data-ends="${esc(a.ends_at)}">${esc(fmtLeft(auctionLeftMs(a)))}</span>` : ''}
+    <span class="auction-sub">${esc(a.bid_count > 0 ? t('marketBids', { n: a.bid_count }) : t('marketNoBids'))}</span>
+    <span class="auction-sub is-seller">${esc(a.seller === me ? t('marketYours') : (a.seller_name || '?'))}</span>`;
+  tile.appendChild(info);
+  return tile;
+}
+
+function renderMarketList() {
+  const rows = marketRows();
   if (!rows.length) {
     const note = document.createElement('p');
-    note.className = 'frames-note';
-    note.textContent = t(state.market.view === 'mine' ? 'marketEmptyMine' : 'marketEmpty');
+    note.className = 'empty-note';
+    note.textContent = t(`marketEmpty_${state.market.view}`);
     el.marketList.replaceChildren(note);
     return;
   }
-
-  el.marketList.replaceChildren(...rows.map((a) => {
-    const mine = a.seller === me;
-    const row = document.createElement('button');
-    row.type = 'button';
-    row.className = 'market-row';
-    row.innerHTML = `
-      <span class="market-art"></span>
-      <span class="market-copy">
-        <b></b>
-        <span class="market-sub"></span>
-      </span>
-      <span class="market-side">
-        <b class="market-price"></b>
-        <span class="market-time" data-ends="${esc(a.ends_at)}"></span>
-      </span>`;
-    const art = row.querySelector('.market-art');
-    if (a.card?.thumbnail) art.style.backgroundImage = `url("${String(a.card.thumbnail).replace(/"/g, '%22')}")`;
-    const rarity = rarityById(a.card?.rarityId);
-    if (rarity) art.style.borderColor = rarity.color;
-    row.querySelector('b').textContent = a.card?.title ?? '?';
-
-    const bits = [];
-    if (mine) bits.push(`<span class="market-tag">${esc(t('marketYours'))}</span>`);
-    else if (a.bidder === me) bits.push(`<span class="market-tag is-good">${esc(t('marketWinning'))}</span>`);
-    else if (m.myBids.includes(a.id) && a.status === 'open') bits.push(`<span class="market-tag is-bad">${esc(t('marketOutbid'))}</span>`);
-    bits.push(esc(a.bid_count > 0 ? t('marketBids', { n: a.bid_count }) : t('marketNoBids')));
-    if (!mine && a.seller_name) bits.push(esc(t('marketSeller', { name: a.seller_name })));
-    row.querySelector('.market-sub').innerHTML = bits.join(' · ');
-
-    row.querySelector('.market-price').innerHTML = money(a.current_bid ?? a.start_price);
-    row.querySelector('.market-time').textContent = fmtLeft(auctionLeftMs(a));
-    press(row, { sound: null });
-    row.addEventListener('click', () => { synth.playTap(); openAuctionSheet(a.id); });
-    return row;
-  }));
+  el.marketList.replaceChildren(...rows.map(auctionTile));
 }
 
 /** One auction, up close: the card, the clock, and the way to bid on it -
@@ -3065,13 +3540,19 @@ function openAuctionSheet(auctionId) {
 
     const line = (label, html) =>
       `<p class="market-line"><span>${esc(label)}</span><b>${html}</b></p>`;
+    const open = a.status === 'open';
     wrap.querySelector('.market-lines').innerHTML = [
       rarity ? line(tx(rarity.name), `<span style="color:${rarity.color}">${money(a.card?.price ?? 0)}</span>`) : '',
-      line(t('marketTimeLeft'), `<span data-ends="${esc(a.ends_at)}">${esc(fmtLeft(auctionLeftMs(a)))}</span>`),
+      open ? line(t('marketTimeLeft'), `<span data-ends="${esc(a.ends_at)}">${esc(fmtLeft(auctionLeftMs(a)))}</span>`) : '',
       a.current_bid != null
         ? line(t('marketCurrent'), `${money(a.current_bid)}${a.bidder_name ? ` · ${esc(a.bidder_name)}` : ''}`)
         : line(t('marketStartAt'), money(a.start_price)),
-      mine ? '' : line('', esc(t('marketFloorLine', { amount: formatAmount(floor) })))
+      !open && a.status === 'settled' && a.bidder
+        ? line(t('marketSoldLine'), `${money(a.current_bid)} · ${esc(a.bidder_name ?? '?')}`)
+        : '',
+      !open && a.status === 'settled' && !a.bidder ? line('', esc(t('marketHistUnsold', { amount: formatAmount(a.start_price) }))) : '',
+      !open && a.status === 'cancelled' ? line('', esc(t('marketCancelled'))) : '',
+      mine || !open ? '' : line('', esc(t('marketFloorLine', { amount: formatAmount(floor) })))
     ].filter(Boolean).join('');
 
     const actions = wrap.querySelector('.market-actions');
@@ -3343,7 +3824,7 @@ function renderBadges() {
   const worn = wornBadges(states);
   if (!worn.length) {
     const note = document.createElement('p');
-    note.className = 'frames-note';
+    note.className = 'empty-note';
     note.textContent = t('badgesNone');
     el.badgeGrid.replaceChildren(note);
     return;
@@ -4009,6 +4490,7 @@ async function loadFriends() {
   updateBadges();
   if (state.tab === 'friends') renderFriends();
   if (state.tab === 'profile') renderProfile();
+  refreshWishes();
 }
 
 /**
@@ -4054,10 +4536,20 @@ async function collectDeliveries() {
       pushNote('trade', t('notifTradeDone', { name: esc(from) }), 'binder');
     } else if (item.kind === 'auction-card' && item.payload?.key) {
       store.receiveCardEntry(state.collection, item.payload);
+      // A card from someone ELSE is a card won at auction; my own sender
+      // means my card walking home unsold or withdrawn.
+      if (item.sender !== userId()) {
+        state.profile.auctionsWon = (state.profile.auctionsWon ?? 0) + 1;
+        store.saveProfile(state.profile);
+      }
       pushNote('trade', t('notifAuctionCard', { card: esc(item.payload.title ?? '?') }), 'binder');
     } else if (item.kind === 'auction-money' && Number.isFinite(item.payload?.amount)) {
       store.saveWallet(store.loadWallet() + item.payload.amount);
       refreshWallet();
+      if (item.payload.reason === 'sale') {
+        state.profile.auctionsSold = (state.profile.auctionsSold ?? 0) + 1;
+        store.saveProfile(state.profile);
+      }
       pushNote('trade', t(item.payload.reason === 'sale' ? 'notifAuctionSold' : 'notifAuctionRefund',
         { amount: money(item.payload.amount), card: esc(item.payload.title ?? '?') }), 'shop');
     }
@@ -4772,7 +5264,8 @@ function renderFriend() {
     actionBtn('chat', 'chatOpen', () => openChat(entry), 'btn-primary'),
     actionBtn('trade', 'tradeOpen', () => openTradeSheet(entry)),
     actionBtn('gift', 'giftCardOpen', () => openGiftCard(entry)),
-    actionBtn('packs', 'giftBoosterOpen', () => openGiftBooster(entry))
+    actionBtn('packs', 'giftBoosterOpen', () => openGiftBooster(entry)),
+    actionBtn('wish', 'wishTitle', () => openFriendWishlist(entry))
   );
 
   const best = rarityById(person.best_rarity);
@@ -4793,6 +5286,53 @@ function renderFriend() {
     cell.querySelector('span').textContent = label;
     return cell;
   }));
+}
+
+/** A friend's wishlist: what they want, whether they already found it, and
+ *  whether you happen to be holding it. */
+function openFriendWishlist(entry) {
+  const person = entry.profile;
+  openSheet(t('friendWishTitle', { name: person.username ?? '?' }), async (body) => {
+    body.innerHTML = `<p class="find-status is-working">${esc(t('friendLoading'))}</p>`;
+    let wishes = [];
+    let theirs = new Set();
+    try {
+      const [rows, cards] = await Promise.all([
+        account.wishlistOf(entry.otherId),
+        account.friendCollection(entry.otherId).catch(() => null)
+      ]);
+      wishes = rows;
+      theirs = new Set((cards ?? []).map((card) => card.key));
+    } catch (error) {
+      body.innerHTML = `<p class="find-status is-error"></p>`;
+      body.querySelector('p').textContent =
+        error?.message === 'INDEX_UNSET' ? t('indexUnset') : describeError(error);
+      return;
+    }
+    if (!wishes.length) {
+      body.innerHTML = `<p class="empty-note"></p>`;
+      body.querySelector('p').textContent = t('friendWishEmpty', { name: person.username ?? '?' });
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'market-list';
+    grid.replaceChildren(...wishes.map((row) => {
+      const card = row.card ?? {};
+      const tile = document.createElement('div');
+      tile.className = 'auction-tile';
+      if (theirs.has(card.key)) {
+        const band = document.createElement('span');
+        band.className = 'auction-band is-good';
+        band.textContent = t('friendOwnsBand', { name: person.username ?? '?' });
+        tile.appendChild(band);
+      }
+      const rarity = rarityById(card.rarityId) ?? RARITIES[0];
+      tile.appendChild(buildStaticCard({ ...card, description: '', extract: '' }, rarity, null,
+        { fav: false, ownedTag: true }));
+      return tile;
+    }));
+    body.replaceChildren(grid);
+  });
 }
 
 /**
@@ -4883,9 +5423,32 @@ function renderUpdates() {
       li.textContent = tx(point);
       return li;
     }));
+    if (release.changelog?.length) {
+      const more = document.createElement('button');
+      more.type = 'button';
+      more.className = 'btn btn-ghost btn-sm tl-more';
+      more.textContent = t('updatesChangelog');
+      press(more, { sound: null });
+      more.addEventListener('click', () => { synth.playTap(); openChangelog(release); });
+      item.appendChild(more);
+    }
     return item;
   }));
   reveal(el.updatesList.children, { step: 50 });
+}
+
+/** Everything that release changed, in one sheet. */
+function openChangelog(release) {
+  openSheet(tx(release.title), (body) => {
+    const list = document.createElement('ul');
+    list.className = 'tl-points is-full';
+    list.replaceChildren(...release.changelog.map((line) => {
+      const li = document.createElement('li');
+      li.textContent = tx(line);
+      return li;
+    }));
+    body.appendChild(list);
+  });
 }
 
 /* --- the quiz ------------------------------------------------------------------------------------- */
@@ -5253,6 +5816,10 @@ function renderSettings() {
 
   el.settingsList.replaceChildren(
     settingRow('sound', 'settingsSound', 'settingsSoundNote'),
+    sliderRow('volume', 'settingsVolume', 'settingsVolumeNote',
+      { preview: () => { synth.resume(); synth.playTap(); } }),
+    settingRow('music', 'settingsMusic', 'settingsMusicNote'),
+    sliderRow('musicVolume', 'settingsMusicVolume', 'settingsMusicVolumeNote'),
     settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
     settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
     settingRow('hints', 'settingsHints', 'settingsHintsNote'),
@@ -5334,9 +5901,7 @@ function renderCustomize() {
   el.framesLabel.textContent = t('framesTitle');
   const level = state.profile.progress.level ?? 1;
   const tier = frameTier(level);
-  el.framesNote.textContent = tier >= 1
-    ? t('framesNote')
-    : `${t('framesNote')} ${t('framesLocked')}`;
+  el.framesNote.hidden = true;
   const wearing = frameStyle();
   el.frameStyles.replaceChildren(...FRAME_STYLES.map((style) => {
     const card = document.createElement('button');
@@ -5761,7 +6326,33 @@ function applySettings() {
   document.documentElement.dataset.lowpower = s.lowPower ? '1' : '0';
   document.documentElement.dataset.hints = s.hints ? '1' : '0';
   synth.setMuted(!s.sound);
+  synth.setVolume(s.volume ?? 1);
+  music.setVolume(s.musicVolume ?? 0.4);
+  music.setOn(s.music !== false);
   backdrop.setLowPower(s.lowPower);
+}
+
+/** A slider row for the Preferences list: 0..100 over a stored 0..1. */
+function sliderRow(key, titleKey, noteKey, { preview = null } = {}) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <input class="row-slider row-action" type="range" min="0" max="100" step="5">`;
+  row.querySelector('h4').textContent = t(titleKey);
+  row.querySelector('p').textContent = t(noteKey);
+  const slider = row.querySelector('input');
+  slider.value = String(Math.round((settings()[key] ?? 1) * 100));
+  slider.setAttribute('aria-label', t(titleKey));
+  slider.addEventListener('input', () => {
+    settings()[key] = Number(slider.value) / 100;
+    applySettings();
+  });
+  slider.addEventListener('change', () => {
+    store.saveProfile(state.profile);
+    preview?.();
+  });
+  return row;
 }
 
 /* --- daily gift -------------------------------------------------------------------------------------------- */
@@ -6000,7 +6591,7 @@ function applyStrings() {
   el.walletMark.innerHTML = buckSvg({ size: 12 });
   el.sheetClose.innerHTML = iconSvg('close', { size: 17 });
   el.openBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
-  el.oddsLabel.textContent = t('pullRates');
+  el.oddsBtn.setAttribute('aria-label', t('pullRates'));
   el.packsEmptyCta.textContent = t('goShop');
   el.menuBtn.setAttribute('aria-label', t('menu'));
   el.bell.setAttribute('aria-label', t('notifTitle'));
@@ -6299,12 +6890,17 @@ function init() {
 
   // Playtime is measured between visibility changes, and both the clock and
   // the backdrop are parked entirely while the app is in the background.
+  // Autoplay rules: music may only start inside a gesture, so every tap
+  // offers it the chance. A playing track makes this a no-op.
+  document.addEventListener('pointerdown', () => music.poke(), { passive: true });
+
   document.addEventListener('visibilitychange', () => {
     const visible = document.visibilityState === 'visible';
     if (visible) {
       visibleSince = Date.now();
       syncTimed();
       updateBadges();
+      music.unpark();
       // Coming back is the natural moment to retry anything that did not land,
       // and to pick up what happened while the app was away.
       resumeAccount();
@@ -6313,6 +6909,7 @@ function init() {
       flushPlaytime();
       visibleSince = null;
       synth.suspend();
+      music.park();
       // Leaving is the last chance to get the save up before the WebView is
       // frozen, so this one does not wait out the debounce.
       flushSync();
@@ -6394,7 +6991,7 @@ let binderSeg;
 init();
 
 window.__packywiki = {
-  state, store, debug, RARITIES, synth, backdrop, THEMES, THEME_PACKS,
+  state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS,
   draw: drawArticles, generateShop, syncSocial,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated: the Wiklodo booster mark in the matrix theme's colours. The
+     shapes match drawable/ic_launcher_foreground.xml; only the palette moves. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#065F2E"
+        android:pathData="M32,36 L36,32 L40,36 L44,32 L48,36 L52,32 L56,36 L60,32 L64,36 L68,32 L72,36 L76,32 L76,76 A8,8 0 0 1 68,84 L40,84 A8,8 0 0 1 32,76 Z" />
+    <path
+        android:fillColor="#00A83E"
+        android:pathData="M32,52 L76,38 L76,50 L32,64 Z" />
+    <path
+        android:fillColor="#010B04"
+        android:pathData="M35,37 L73,37 L73,42 L35,42 Z" />
+    <path
+        android:strokeColor="#7DFFB0"
+        android:strokeWidth="2.6"
+        android:strokeLineJoin="round"
+        android:strokeLineCap="round"
+        android:pathData="M32,36 L36,32 L40,36 L44,32 L48,36 L52,32 L56,36 L60,32 L64,36 L68,32 L72,36 L76,32" />
+    <path
+        android:fillColor="#00FF41"
+        android:pathData="M54,10 L58.4,21.6 L70,26 L58.4,30.4 L54,42 L49.6,30.4 L38,26 L49.6,21.6 Z" />
+    <path
+        android:fillColor="#D8FFE5"
+        android:pathData="M54,18 L56.6,23.4 L62,26 L56.6,28.6 L54,34 L51.4,28.6 L46,26 L51.4,23.4 Z" />
+    <path
+        android:fillColor="#7DFFB0"
+        android:pathData="M74,16 L75.6,20.4 L80,22 L75.6,23.6 L74,28 L72.4,23.6 L68,22 L72.4,20.4 Z" />
+    <path
+        android:fillColor="#7DFFB0"
+        android:pathData="M34,20 L35.2,23.3 L38.5,24.5 L35.2,25.7 L34,29 L32.8,25.7 L29.5,24.5 L32.8,23.3 Z" />
+    <path
+        android:strokeColor="#EAFFF1"
+        android:strokeWidth="6"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round"
+        android:pathData="M41,56 L47,76 L54,63 L61,76 L67,56" />
+</vector>

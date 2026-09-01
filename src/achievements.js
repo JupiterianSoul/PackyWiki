@@ -52,6 +52,8 @@ export function measure({ profile, entries, albumsDeep, albumsStarted = 0, custo
     giftsSent: profile.giftsSent ?? 0,
     tradesDone: profile.tradesDone ?? 0,
     timedOpened: profile.timed?.opened ?? 0,
+    auctionsSold: profile.auctionsSold ?? 0,
+    auctionsWon: profile.auctionsWon ?? 0,
     wallet,
     maxCardPrice: entries.reduce((m, e) => Math.max(m, e.price), 0),
     maxViews: entries.reduce((m, e) => Math.max(m, e.views ?? 0), 0),
@@ -349,6 +351,27 @@ export const ACHIEVEMENTS = [
       [3,  coins(150),  { en: 'Déjà vu', fr: 'Déjà-vu' }],
       [10, coins(600),  { en: 'The echo', fr: 'L’écho' }],
       [30, coins(2000), { en: 'Print run', fr: 'Tirage complet' }]
+    ]),
+
+  // --- the auction house ---
+  ...chain('vendor', 'trade', 'auctionsSold',
+    (n) => n === 1
+      ? { en: 'Sell a card at auction', fr: 'Vendez une carte aux enchères' }
+      : { en: `Sell ${en(n)} cards at auction`, fr: `Vendez ${fr(n)} cartes aux enchères` },
+    [
+      [1,  coins(200),           { en: 'Gone under the hammer', fr: 'Adjugé' }],
+      [10, coins(900),           { en: 'Auctioneer', fr: 'Commissaire-priseur' }],
+      [50, pack('legendary', 5), { en: 'House favourite', fr: 'Chouchou de la salle' }]
+    ]),
+
+  ...chain('hammer', 'burst', 'auctionsWon',
+    (n) => n === 1
+      ? { en: 'Win a card at auction', fr: 'Remportez une carte aux enchères' }
+      : { en: `Win ${en(n)} cards at auction`, fr: `Remportez ${fr(n)} cartes aux enchères` },
+    [
+      [1,  coins(200),           { en: 'Winning bid', fr: 'Mise gagnante' }],
+      [10, coins(900),           { en: 'The last word', fr: 'Le dernier mot' }],
+      [50, pack('legendary', 5), { en: 'King of the floor', fr: 'Roi de la salle' }]
     ]),
 
   // --- one-offs ---

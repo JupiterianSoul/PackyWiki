@@ -386,3 +386,89 @@
   --press-shift: 1px;
   --texture: scanlines;
 }
+
+/* --- CASINO: green felt after midnight ------------------------------------ */
+[data-theme='casino'] {
+  --ink: #f3ead2;
+  --ink-dim: #a9a184;
+  --ink-faint: #6e6a55;
+
+  --surface: rgba(16, 58, 41, 0.72);
+  --surface-2: rgba(22, 70, 50, 0.85);
+  --surface-solid: #0b2416;
+  --line: rgba(242, 202, 79, 0.3);
+  --line-strong: rgba(242, 202, 79, 0.6);
+
+  --accent: #f2ca4f;
+  --accent-2: #e0245e;
+  --accent-ink: #241a04;
+  --positive: #7ddc9a;
+  --negative: #ff6b81;
+  --warning: #ffce54;
+
+  --radius-sm: 10px;
+  --radius: 14px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 0 0 1px rgba(242, 202, 79, 0.12), 0 18px 40px -24px rgba(0, 0, 0, 0.9);
+  --raise-shadow: 0 0 0 1px rgba(242, 202, 79, 0.25), 0 24px 54px -26px rgba(0, 0, 0, 0.95);
+  --glow: 0 0 22px -6px color-mix(in srgb, var(--accent) 60%, transparent);
+  --blur: blur(10px) saturate(1.1);
+
+  --font: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-display: var(--font);
+  --display-weight: 700;
+  --display-tracking: 0.02em;
+  --display-transform: none;
+  --label-tracking: 0.14em;
+
+  --press-scale: 0.965;
+  --press-shift: 0px;
+  --texture: none;
+}
+
+/* --- HORROR: a house with one light on ------------------------------------- */
+[data-theme='horror'] {
+  --ink: #d8d3cb;
+  --ink-dim: #837d74;
+  --ink-faint: #4e4a44;
+
+  --surface: rgba(22, 14, 16, 0.82);
+  --surface-2: rgba(32, 20, 22, 0.9);
+  --surface-solid: #0c0709;
+  --line: rgba(200, 16, 46, 0.26);
+  --line-strong: rgba(200, 16, 46, 0.55);
+
+  --accent: #c8102e;
+  --accent-2: #7a8a99;
+  --accent-ink: #f5e9e9;
+  --positive: #6faf7d;
+  --negative: #ff4d4d;
+  --warning: #d9a326;
+
+  --radius-sm: 3px;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 6px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 16px 40px -20px rgba(0, 0, 0, 0.95);
+  --raise-shadow: 0 0 0 1px rgba(200, 16, 46, 0.2), 0 26px 60px -24px rgba(0, 0, 0, 1);
+  --glow: 0 0 18px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+  --blur: none;
+
+  --font: 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --font-display: var(--font);
+  --display-weight: 700;
+  --display-tracking: 0.12em;
+  --display-transform: uppercase;
+  --label-tracking: 0.24em;
+
+  --press-scale: 0.985;
+  --press-shift: 1px;
+  --texture: grain;
+}

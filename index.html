@@ -45,12 +45,14 @@
         <!-- PACKS: what you own, and the custom builder ------------------- -->
         <section id="screen-packs" class="screen is-active">
           <div class="packs-tools">
-            <button id="odds-btn" class="pill-btn" type="button">
-              <span id="odds-icon" aria-hidden="true"></span><span id="odds-label"></span>
-            </button>
-            <button class="help-btn" data-help="packs" type="button" aria-label="What is this?">?</button>
+            <div class="seg-wrap packs-seg-wrap"><div id="packs-seg"></div></div>
+            <div class="packs-side">
+              <button class="help-btn" data-help="packs" type="button" aria-label="What is this?">?</button>
+              <button id="odds-btn" class="help-btn" type="button">
+                <span id="odds-icon" aria-hidden="true"></span>
+              </button>
+            </div>
           </div>
-          <div class="seg-wrap"><div id="packs-seg"></div></div>
           <div id="packs-rail" class="rail"></div>
           <div class="hero-caption" id="packs-caption">
             <h3 id="packs-name"></h3>
@@ -339,11 +341,40 @@
           <div class="quiz-body pad" id="quiz-body"></div>
         </section>
 
+        <!-- CARD INDEX: everything anyone has ever found ----------------------- -->
+        <section id="screen-cardindex" class="screen">
+          <div class="screen-head">
+            <h2 id="index-title"></h2>
+            <p id="index-intro"></p>
+            <button class="help-btn" data-help="index" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="index-counts" id="index-counts"></div>
+          <div class="market-tools">
+            <input class="creator-input market-search" id="index-search" type="search"
+              autocomplete="off" spellcheck="false">
+            <div class="market-sorts" id="index-rarities"></div>
+            <div class="market-sorts" id="index-sorts"></div>
+          </div>
+          <p id="index-status" class="find-status" role="status" aria-live="polite"></p>
+          <div class="market-list" id="index-list"></div>
+          <button id="index-more" class="btn btn-ghost btn-block" type="button" style="margin-top:12px" hidden></button>
+        </section>
+
+        <!-- GLOSSARY: every booster category, look but do not open ------------- -->
+        <section id="screen-glossary" class="screen">
+          <div class="screen-head">
+            <h2 id="glossary-title"></h2>
+            <p id="glossary-intro"></p>
+          </div>
+          <div class="glossary-list" id="glossary-list"></div>
+        </section>
+
         <!-- MARKET: every player's auction floor ------------------------------- -->
         <section id="screen-market" class="screen">
           <div class="screen-head">
             <h2 id="market-title"></h2>
             <p id="market-intro"></p>
+            <button class="help-btn" data-help="market" type="button" aria-label="What is this?">?</button>
           </div>
           <div class="seg-wrap"><div id="market-seg"></div></div>
           <p id="market-status" class="find-status" role="status" aria-live="polite"></p>

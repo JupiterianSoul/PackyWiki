@@ -390,6 +390,9 @@ export function loadProfile() {
   profile.settings.lowPower ??= false;
   profile.settings.flash ??= true;
   profile.settings.hints ??= true;
+  profile.settings.volume ??= 1;
+  profile.settings.music ??= true;
+  profile.settings.musicVolume ??= 0.4;
   accrue(profile.timed);
   return profile;
 }
@@ -472,6 +475,33 @@ export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
 /* --- custom boosters ----------------------------------------------------- */
 
 /** Which way the collection was last read: as albums, or as one long list. */
+/* --- the wishlist, cached --------------------------------------------------
+ * The server copy is the truth (it is what friends can see); this cache is
+ * what paints instantly on launch and what an offline build falls back to. */
+const WISH_KEY = 'packywiki.wishlist.v1';
+export function loadWishlist() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WISH_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((c) => c && typeof c.key === 'string') : [];
+  } catch { return []; }
+}
+export function saveWishlist(cards) {
+  try { localStorage.setItem(WISH_KEY, JSON.stringify(cards.slice(0, 200))); } catch { /* storage unavailable */ }
+}
+
+/* Auctions already flagged as carrying a wished card, so the bell rings once
+ * per auction rather than once per refresh. */
+const WISH_SEEN_KEY = 'packywiki.wishSeen.v1';
+export function loadWishSeen() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(WISH_SEEN_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw : [];
+  } catch { return []; }
+}
+export function saveWishSeen(ids) {
+  try { localStorage.setItem(WISH_SEEN_KEY, JSON.stringify(ids.slice(-200))); } catch { /* storage unavailable */ }
+}
+
 /* --- auctions I have bid on ------------------------------------------------
  * Ids only, so the Mine tab can show fights I am in even after being outbid.
  * Capped: an id is worthless once its auction is gone from the listing. */
