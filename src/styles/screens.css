@@ -1601,6 +1601,13 @@
 .quiz-note.is-error { color: var(--negative); font-weight: 700; }
 .quiz-note { text-align: center; font-size: 0.85rem; line-height: 1.55; color: var(--ink-dim); max-width: 38ch; margin: 0 auto; }
 .quiz-start { width: min(100%, 320px); }
+.quiz-allowance {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--ink-faint);
+  text-align: center;
+}
+.quiz-money { color: var(--positive); font-weight: 800; }
 .quiz-progress {
   font-size: 0.72rem;
   font-weight: 800;

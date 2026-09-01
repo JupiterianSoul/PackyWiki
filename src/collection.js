@@ -378,6 +378,12 @@ export function loadProfile() {
   profile.freeTaken ??= { window: null, ids: [] };
   profile.achievements ??= { redeemed: [] };
   profile.achievements.redeemed ??= [];
+  // The achievements rework renamed the very first one; the feat is
+  // identical, so its redeemed mark carries over instead of paying twice.
+  if (profile.achievements.redeemed.includes('first-pack')
+    && !profile.achievements.redeemed.includes('pack-1')) {
+    profile.achievements.redeemed.push('pack-1');
+  }
   profile.cardsSold ??= 0;
   profile.settings ??= {};
   profile.settings.sound ??= true;

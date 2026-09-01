@@ -139,6 +139,8 @@ const STRINGS = {
     tabProfile: 'Profile',
     tabSettings: 'Settings',
     tabUpdates: 'Updates',
+    tabCustomize: 'Customization',
+    identityTitle: 'Identity',
     updatesIntro: 'Everything that has shipped, in order. The newest sits on top.',
     updatesLatest: 'Latest',
     tabQuiz: 'Quiz',
@@ -160,6 +162,8 @@ const STRINGS = {
     quizAgain: 'Play again',
     quizLeaveArmed: 'Tap back again to abandon this quiz',
     quizFailed: 'The quiz could not be written. Try again in a moment.',
+    quizLeftToday: '{n} of {max} quizzes left today',
+    quizNoneLeft: 'No quizzes left today. They come back tomorrow.',
 
     // timed boosters
     timedBooster: 'Timed Booster',
@@ -514,7 +518,7 @@ const STRINGS = {
     help_quiz_1: '*Pick a category*. You are shown one card, usually one you do not own yet.',
     help_quiz_2: 'Answer *three to five questions*. Nothing is corrected until the end.',
     help_quiz_3: 'The *more you get right*, the better the payout: money, then the card, then a booster.',
-    help_quiz_tip: 'Rarer cards ask harder questions. Two right already wins you the card.',
+    help_quiz_tip: 'Rarer cards ask harder questions. Two right already wins you the card. Five quizzes a day, so make them count.',
 
   },
 
@@ -628,6 +632,8 @@ const STRINGS = {
     tabProfile: 'Profil',
     tabSettings: 'Réglages',
     tabUpdates: 'Nouveautés',
+    tabCustomize: 'Personnalisation',
+    identityTitle: 'Identité',
     updatesIntro: 'Tout ce qui est sorti, dans l’ordre. Le plus récent est en haut.',
     updatesLatest: 'Dernière',
     tabQuiz: 'Quiz',
@@ -649,6 +655,8 @@ const STRINGS = {
     quizAgain: 'Rejouer',
     quizLeaveArmed: 'Touchez retour à nouveau pour abandonner ce quiz',
     quizFailed: 'Le quiz n’a pas pu être préparé. Réessayez dans un instant.',
+    quizLeftToday: '{n} quiz sur {max} restants aujourd’hui',
+    quizNoneLeft: 'Plus de quiz aujourd’hui. Ils reviennent demain.',
 
     // timed boosters
     timedBooster: 'Booster minuté',
@@ -994,7 +1002,7 @@ const STRINGS = {
     help_quiz_1: '*Choisissez une catégorie*. Une carte vous est présentée, en général une que vous n’avez pas.',
     help_quiz_2: 'Répondez à *trois à cinq questions*. Rien n’est corrigé avant la fin.',
     help_quiz_3: 'Plus vous avez *de bonnes réponses*, plus la récompense monte : argent, puis la carte, puis un booster.',
-    help_quiz_tip: 'Les cartes rares posent des questions plus dures. Deux bonnes réponses suffisent pour gagner la carte.',
+    help_quiz_tip: 'Les cartes rares posent des questions plus dures. Deux bonnes réponses suffisent pour gagner la carte. Cinq quiz par jour : choisissez bien.',
 
   }
 };

@@ -84,7 +84,49 @@ export async function buildQuiz({ title, text, rarityId }) {
 
 /* --- rewards --------------------------------------------------------------- */
 
-export const QUIZ_MONEY = { small: 150, medium: 600, large: 1500 };
+/**
+ * Cut hard on purpose. The quiz's real prizes are the card and the boosters;
+ * money on top was quietly out-earning the shop stipend, and free money that
+ * beats the economy's income is how the economy stops meaning anything.
+ */
+export const QUIZ_MONEY = { small: 40, medium: 120, large: 350 };
+
+/* --- the daily allowance --------------------------------------------------
+ * Five quizzes a day, each. The cap is what keeps the quiz an appointment
+ * rather than a farm: without it, twenty good runs a day out-earn every
+ * other faucet in the game combined, and the shared question budget belongs
+ * to whoever taps fastest. Counted per account, so a reinstall or a second
+ * device does not start the day over.
+ */
+export const QUIZ_PER_DAY = 5;
+const PLAYS_KEY = 'packywiki.quizPlays.v1';
+
+const today = () => Math.floor(Date.now() / 86400000);
+
+function readPlays(userKey) {
+  try {
+    const all = JSON.parse(localStorage.getItem(PLAYS_KEY) ?? '{}');
+    const mine = all?.[userKey];
+    return mine && mine.day === today() ? mine.count : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export function quizPlaysLeft(userKey = 'local') {
+  return Math.max(0, QUIZ_PER_DAY - readPlays(userKey));
+}
+
+/** One quiz spent, at the moment its questions actually exist. */
+export function recordQuizPlay(userKey = 'local') {
+  try {
+    const all = JSON.parse(localStorage.getItem(PLAYS_KEY) ?? '{}');
+    const mine = all?.[userKey];
+    const count = (mine && mine.day === today() ? mine.count : 0) + 1;
+    all[userKey] = { day: today(), count };
+    localStorage.setItem(PLAYS_KEY, JSON.stringify(all));
+  } catch { /* storage unavailable */ }
+}
 
 /**
  * What a finished quiz pays, by how many answers were right:

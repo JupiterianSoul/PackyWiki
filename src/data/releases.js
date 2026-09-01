@@ -119,5 +119,23 @@ export const RELEASES = [
       { en: 'The quiz needs no key from you: it is written on the server side',
         fr: 'Le quiz ne demande aucune clé : il est rédigé côté serveur' }
     ]
-  }
+  },
+  {
+    id: 'hundred', icon: 'trophy', accent: '#e0a33e',
+    title: { en: 'The hundred goals', fr: 'Les cent objectifs' },
+    points: [
+      { en: 'One hundred achievements, in chains that climb all the way to level 500',
+        fr: 'Cent succès, en chaînes qui grimpent jusqu’au niveau 500' },
+      { en: 'Rewards rebalanced: pocket change for the easy ones, rare boosters for the feats',
+        fr: 'Récompenses rééquilibrées : petite monnaie pour les faciles, boosters rares pour les exploits' },
+      { en: 'The quiz shows its winnings, pays less money, and allows five runs a day',
+        fr: 'Le quiz affiche ses gains, paie moins d’argent et se limite à cinq parties par jour' },
+      { en: 'A Customization screen: theme, picture and name in one place',
+        fr: 'Un écran Personnalisation : thème, photo et pseudo au même endroit' },
+      { en: 'Settings sorted into Preferences, Account and Data',
+        fr: 'Des réglages triés en Préférences, Compte et Données' },
+      { en: 'Aurora, Paper, Arcade and Sunset turned down: they played louder than the rest',
+        fr: 'Aurore, Papier, Arcade et Sunset moins forts : ils sonnaient plus fort que les autres' }
+    ]
+  },
 ];

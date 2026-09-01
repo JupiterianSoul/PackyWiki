@@ -32,6 +32,7 @@ export const THEMES = [
     motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
     sound: {
       voice: 'fm',            // bell-like FM pair
+      gain: 0.62,             // this voice runs hot; trim the whole instrument
       root: 261.63,           // C4
       scale: [0, 3, 5, 7, 10],
       reverb: { seconds: 3.2, decay: 2.6, mix: 0.34 },
@@ -52,6 +53,7 @@ export const THEMES = [
     motion: { scale: 0.6, ease: 'cubic-bezier(0.2, 0.9, 0.3, 1)', pop: 'cubic-bezier(0.3, 1.5, 0.5, 1)' },
     sound: {
       voice: 'marimba',       // sine body, fast decay, wooden knock
+      gain: 0.66,             // this voice runs hot; trim the whole instrument
       root: 349.23,           // F4
       scale: [0, 2, 4, 7, 9],
       reverb: { seconds: 0.9, decay: 3.6, mix: 0.1 },
@@ -72,6 +74,7 @@ export const THEMES = [
     motion: { scale: 0.42, ease: 'cubic-bezier(0.16, 0.9, 0.2, 1)', pop: 'cubic-bezier(0.2, 2.2, 0.4, 1)' },
     sound: {
       voice: 'chip',          // stacked square/saw, no reverb, pitch bend
+      gain: 0.55,             // this voice runs hot; trim the whole instrument
       root: 220,              // A3
       scale: [0, 4, 7, 11, 12],
       reverb: { seconds: 0.35, decay: 6, mix: 0.04 },
@@ -113,6 +116,7 @@ export const THEMES = [
     motion: { scale: 0.85, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.3, 1.7, 0.5, 1)' },
     sound: {
       voice: 'synthwave',     // detuned saw stack with a sub
+      gain: 0.6,              // this voice runs hot; trim the whole instrument
       root: 233.08,           // Bb3
       scale: [0, 3, 5, 7, 10],
       reverb: { seconds: 2.2, decay: 2.2, mix: 0.3 },

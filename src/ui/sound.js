@@ -42,7 +42,7 @@ class Synth {
     const ctx = this.ctx;
 
     const master = ctx.createGain();
-    master.gain.value = this.muted ? 0 : 0.62;
+    master.gain.value = this.muted ? 0 : 0.62 * (this.theme?.sound?.gain ?? 1);
 
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -18;
@@ -98,7 +98,7 @@ class Synth {
   setMuted(muted) {
     this.muted = muted;
     if (this.nodes) {
-      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.62, this.ctx.currentTime, 0.02);
+      this.nodes.master.gain.setTargetAtTime(muted ? 0 : 0.62 * (this.theme?.sound?.gain ?? 1), this.ctx.currentTime, 0.02);
     }
   }
 
@@ -109,9 +109,13 @@ class Synth {
   }
 
   #applyThemeToGraph() {
-    const { filter, send, reverb } = this.nodes;
+    const { filter, send, reverb, master } = this.nodes;
     const s = this.theme.sound;
     const t = this.ctx.currentTime;
+    // Some voices simply run hot: a chip square wave at the same master gain
+    // as a felt piano is twice as loud to the ear. Themes carry their own
+    // trim, applied here and in setMuted.
+    if (!this.muted) master.gain.setTargetAtTime(0.62 * (s.gain ?? 1), t, 0.05);
     filter.frequency.setTargetAtTime(s.filter, t, 0.05);
     send.gain.setTargetAtTime(s.reverb.mix, t, 0.05);
     reverb.buffer = this.#impulse(s.reverb.seconds, s.reverb.decay);

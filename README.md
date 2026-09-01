@@ -183,7 +183,7 @@ and synth parameters live in `ui/themes.js` under the same ids. Adding a theme
 is a row in one, a block in the other, and a renderer - nothing else in the app
 knows the list.
 
-The picker in Settings gives each option its own `data-theme`, so **the token
+The picker on the Customization screen gives each option its own `data-theme`, so **the token
 block applies to the option itself**: you are choosing between four miniatures
 of the app rather than four names and a swatch.
 
@@ -270,9 +270,9 @@ Five, in the bottom bar: **Boosters** (owned, and the custom builder behind a
 segmented control) · **Free Packs** · **Shop** · **Collection** · **Profile**.
 
 Everything the bar has no room for lives in the **drawer** behind the menu
-button - the same five, plus Friends, the daily gift and Settings. That
-replaces a "More" list that used to sit at the bottom of the Profile, which is
-a strange place to keep the way to Settings.
+button - the same five, plus Friends, the daily gift, Customization and
+Settings. That replaces a "More" list that used to sit at the bottom of the
+Profile, which is a strange place to keep the way to Settings.
 
 The app bar is the menu, the app name, your balance, notifications and your
 level ring, in that order. The name is the first thing dropped when the row is

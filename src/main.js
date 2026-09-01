@@ -56,7 +56,10 @@ import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
-import { quizAvailable, buildQuiz, questionCountFor, quizRewards } from './quiz.js';
+import {
+  quizAvailable, buildQuiz, questionCountFor, quizRewards,
+  quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
+} from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { proceduralStyle } from './packstyle.js';
@@ -146,7 +149,8 @@ bind({
     binder: $('#screen-binder'), profile: $('#screen-profile'),
     settings: $('#screen-settings'), friends: $('#screen-friends'),
     friend: $('#screen-friend'), chat: $('#screen-chat'), ach: $('#screen-ach'),
-    updates: $('#screen-updates'), quiz: $('#screen-quiz'), open: $('#screen-open')
+    updates: $('#screen-updates'), quiz: $('#screen-quiz'),
+    customize: $('#screen-customize'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
@@ -213,7 +217,9 @@ bind({
   rarityLabel: $('#rarity-label'), rarityBars: $('#rarity-bars'),
 
   settingsTitle: $('#settings-title'), themeLabel: $('#theme-label'), themeGrid: $('#theme-grid'),
+  customizeTitle: $('#customize-title'), identityLabel: $('#identity-label'), identityList: $('#identity-list'),
   prefsLabel: $('#prefs-label'), settingsList: $('#settings-list'),
+  accountLabel: $('#account-label'), accountList: $('#account-list'),
   dataLabel: $('#data-label'), dataList: $('#data-list'),
 
   openScreen: $('#screen-open'), openBack: $('#open-back'), openTitle: $('#open-title'),
@@ -359,7 +365,7 @@ function showScreen(name) {
  * Profile, so the bottom bar stays at five.
  */
 const navTabFor = (screen) =>
-  (['settings', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
+  (['settings', 'customize', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -412,8 +418,9 @@ function drawerItems() {
            run: go('friends', () => { renderFriends(); loadFriends(); }) }]
       : []),
     { id: 'profile',  icon: 'profile',  key: 'tabProfile',  run: go('profile', renderProfile) },
-    { id: 'updates',  icon: 'spark',    key: 'tabUpdates',  run: go('updates', renderUpdates) },
-    { id: 'settings', icon: 'settings', key: 'tabSettings', run: go('settings', renderSettings) }
+    { id: 'updates',   icon: 'spark',    key: 'tabUpdates',   run: go('updates', renderUpdates) },
+    { id: 'customize', icon: 'wand',     key: 'tabCustomize', run: go('customize', renderCustomize) },
+    { id: 'settings',  icon: 'settings', key: 'tabSettings',  run: go('settings', renderSettings) }
   ];
 }
 
@@ -865,6 +872,7 @@ async function createCustomPack(event) {
       wiki
     };
     state.customPacks = store.saveCustomPack(pack);
+    state.profile.packsBuilt = (state.profile.packsBuilt ?? 0) + 1;
 
     // Building a pack does NOT hand over a booster: it goes on sale in the
     // Shop, on its own shelf. It used to be free, which was a free openable
@@ -2293,6 +2301,8 @@ function handleSell() {
 
   const amount = sellPriceFor(entry.price);
   store.sellCopy(state.collection, detail.key);
+  state.profile.cardsSold = (state.profile.cardsSold ?? 0) + 1;
+  store.saveProfile(state.profile);
   store.saveWallet(store.loadWallet() + amount);
   refreshWallet();
   updateBadges();
@@ -2785,12 +2795,15 @@ function renderProfile() {
 /* --- achievements ------------------------------------------------------------------------ */
 
 function achFacts() {
+  const entries = store.allEntries(state.collection);
   return measureAchievements({
     profile: state.profile,
-    entries: store.allEntries(state.collection),
-    albumsDeep: albumsDeep(store.allEntries(state.collection), state.customPacks),
+    entries,
+    albumsDeep: albumsDeep(entries, state.customPacks),
+    albumsStarted: albumsStarted(entries, state.customPacks),
     customPacks: state.customPacks ?? [],
-    friends: state.social.friends.length
+    friends: state.social.friends.length,
+    wallet: state.wallet
   });
 }
 
@@ -2835,9 +2848,11 @@ function renderAchievements() {
       btn.addEventListener('click', () => redeemAchievement(a, btn));
       side.appendChild(btn);
     } else {
-      side.innerHTML = `<span class="ach-progress tabular">${
-        a.stat === 'value' ? money(a.have) : Math.floor(a.have)
-      }/<b>${a.stat === 'value' ? money(a.need) : a.need}</b></span>`;
+      // Money-shaped stats read as money, fame reads compact; a raw
+      // 10000000 in a 60px column helps nobody.
+      const inMoney = a.stat === 'value' || a.stat === 'wallet' || a.stat === 'maxCardPrice';
+      const fmt = (v) => inMoney ? money(v) : a.stat === 'maxViews' ? formatViews(v) : String(Math.floor(v));
+      side.innerHTML = `<span class="ach-progress tabular">${fmt(a.have)}/<b>${fmt(a.need)}</b></span>`;
     }
 
     const label = document.createElement('span');
@@ -2848,7 +2863,8 @@ function renderAchievements() {
     row.querySelector('.ach-copy').appendChild(label);
     return row;
   }));
-  reveal(el.achList.children, { step: 18, from: 8 });
+  // A hundred rows now: a tighter stagger, or the tail waits two seconds.
+  reveal(el.achList.children, { step: 6, from: 8 });
 }
 
 function redeemAchievement(a, btn) {
@@ -3434,6 +3450,9 @@ async function reconcileTrades() {
       syncSoon();
     } else if (trade.status === 'accepted') {
       await account.setTradeStatus(trade.id, 'closed');
+      // Closing is what makes this run once, so the counter is safe here.
+      state.profile.tradesDone = (state.profile.tradesDone ?? 0) + 1;
+      store.saveProfile(state.profile);
       // The cards arrive as a delivery; the note for that is written there.
     }
   }
@@ -3484,6 +3503,8 @@ function openGiftCard(entry) {
         if (!snapshot) return;
         try {
           await account.sendDelivery(userId(), entry.otherId, 'card', snapshot);
+          state.profile.giftsSent = (state.profile.giftsSent ?? 0) + 1;
+          store.saveProfile(state.profile);
           toast(t('giftSent', { name: esc(entry.profile.username) }));
           synth.playTrade();
           sheet.hide();
@@ -3529,6 +3550,8 @@ function openGiftBooster(entry) {
         if (!store.takeBooster(state.inventory, specId(slot.spec))) return;
         try {
           await account.sendDelivery(userId(), entry.otherId, 'booster', { spec: slot.spec });
+          state.profile.giftsSent = (state.profile.giftsSent ?? 0) + 1;
+          store.saveProfile(state.profile);
           toast(t('giftSent', { name: esc(entry.profile.username) }));
           synth.playTrade();
           sheet.hide();
@@ -3673,6 +3696,7 @@ function openTradeAnswer(trade) {
         await account.sendDelivery(userId(), trade.proposer, 'trade-return', { cards: paid });
         for (const card of trade.offer ?? []) store.receiveCardEntry(state.collection, card);
         await account.setTradeStatus(trade.id, 'accepted');
+        state.profile.tradesDone = (state.profile.tradesDone ?? 0) + 1;
         toast(t('tradeDone', { name: esc(name) }));
         synth.playTrade();
         sheet.hide();
@@ -3896,6 +3920,7 @@ function openAvatarCrop(card) {
         synth.playResolved();
         sheet.hide();
         if (state.tab === 'profile') renderProfile();
+        if (state.tab === 'customize') renderCustomize();
       } catch (error) {
         toast(esc(describeError(error)), 'error');
         saveBtn.disabled = false;
@@ -4235,6 +4260,9 @@ function resetQuiz() {
   state.quiz = { step: quizAvailable() ? 'pick' : 'nokey' };
 }
 
+/** Whose daily allowance is being spent: the account's, or this device's. */
+const quizUserKey = () => userId() ?? 'device';
+
 /** The quiz card as a collection-shaped entry (bare = no article text). */
 function quizEntry(q, { bare = false } = {}) {
   const spec = { kind: 'theme', themeId: q.themeId, rarityId: null, cards: 1 };
@@ -4253,6 +4281,11 @@ function quizEntry(q, { bare = false } = {}) {
 }
 
 async function startQuiz(themeId) {
+  if (quizPlaysLeft(quizUserKey()) <= 0) {
+    toast(t('quizNoneLeft'), 'error');
+    synth.playDenied();
+    return;
+  }
   const q = state.quiz = { step: 'draw', themeId };
   renderQuiz();
   try {
@@ -4281,6 +4314,12 @@ async function startQuiz(themeId) {
 
 async function beginQuizQuestions() {
   const q = state.quiz;
+  if (quizPlaysLeft(quizUserKey()) <= 0) {
+    q.error = t('quizNoneLeft');
+    q.step = 'preview';
+    renderQuiz();
+    return;
+  }
   q.error = null;
   q.step = 'writing';
   renderQuiz();
@@ -4292,6 +4331,7 @@ async function beginQuizQuestions() {
       rarityId: q.rarity.id
     });
     if (state.quiz !== q) return;
+    recordQuizPlay(quizUserKey());
     q.questions = questions;
     q.index = 0;
     q.answers = [];
@@ -4325,6 +4365,9 @@ function answerQuiz(choice) {
 function finishQuiz() {
   const q = state.quiz;
   q.correct = q.answers.filter((a, i) => a === q.questions[i].answer).length;
+  state.profile.quizPlayed = (state.profile.quizPlayed ?? 0) + 1;
+  if (q.correct >= 3) state.profile.quizWins = (state.profile.quizWins ?? 0) + 1;
+  if (q.correct === q.questions.length) state.profile.quizPerfect = (state.profile.quizPerfect ?? 0) + 1;
   q.rewards = quizRewards(q.correct, q.themeId);
   if (q.rewards.money > 0) {
     store.saveWallet(store.loadWallet() + q.rewards.money);
@@ -4391,8 +4434,18 @@ function renderQuiz() {
   }
 
   if (q.step === 'pick') {
+    const left = quizPlaysLeft(quizUserKey());
+    if (left <= 0) {
+      const box = div('quiz-stage');
+      box.innerHTML = `<span class="quiz-bigicon">${iconSvg('clock', { size: 46 })}</span><p class="quiz-note"></p>`;
+      box.querySelector('.quiz-note').textContent = t('quizNoneLeft');
+      body.replaceChildren(box);
+      return;
+    }
     const sub = div('quiz-sub');
     sub.textContent = t('quizIntro');
+    const counter = div('quiz-allowance');
+    counter.textContent = t('quizLeftToday', { n: left, max: QUIZ_PER_DAY });
     const grid = div('quiz-cats');
     grid.replaceChildren(...THEME_PACKS.map((theme) => {
       const tile = document.createElement('button');
@@ -4406,7 +4459,7 @@ function renderQuiz() {
       tile.addEventListener('click', () => { synth.playTap(); startQuiz(theme.id); });
       return tile;
     }));
-    body.replaceChildren(sub, grid);
+    body.replaceChildren(sub, counter, grid);
     reveal(grid.children, { step: 14, from: 8 });
     return;
   }
@@ -4472,7 +4525,7 @@ function renderQuiz() {
     row.querySelector('span:last-child').innerHTML = html;
     return row;
   };
-  if (q.rewards.money > 0) rewards.appendChild(rewardRow('gift', `${esc(t('quizRewardMoney'))} ${money(q.rewards.money)}`));
+  if (q.rewards.money > 0) rewards.appendChild(rewardRow('gift', `${esc(t('quizRewardMoney'))} <b class="quiz-money">${money(q.rewards.money)}</b>`));
   if (q.rewards.card) rewards.appendChild(rewardRow('collection', esc(t('quizRewardCard'))));
   if (q.rewards.booster) rewards.appendChild(rewardRow('packs', esc(t('quizRewardBooster', { name: specName(q.rewards.booster) }))));
   if (!rewards.children.length) {
@@ -4542,43 +4595,11 @@ function settingRow(key, titleKey, noteKey) {
 
 function renderSettings() {
   el.settingsTitle.textContent = t('tabSettings');
-  el.themeLabel.textContent = t('themeTitle');
   el.prefsLabel.textContent = t('prefsTitle');
+  el.accountLabel.textContent = t('settingsAccount');
   el.dataLabel.textContent = t('settingsData');
 
-  // The theme picker previews each theme rather than naming it.
-  const current = storedTheme();
-  el.themeGrid.replaceChildren(...THEMES.map((theme) => {
-    const card = document.createElement('button');
-    card.type = 'button';
-    card.className = `theme-card${theme.id === current ? ' is-on' : ''}`;
-    card.dataset.theme = theme.id;
-    card.innerHTML = `
-      <span class="theme-swatch">${theme.swatch.map((c) => `<span style="background:${c}"></span>`).join('')}</span>
-      <h4></h4><p></p>
-      <span class="theme-check">${iconSvg('check', { size: 14 })}</span>`;
-    card.querySelector('h4').textContent = tx(theme.name);
-    card.querySelector('p').textContent = tx(theme.blurb);
-    press(card, { sound: null });
-    card.addEventListener('click', () => {
-      if (theme.id === storedTheme()) return;
-      useTheme(theme.id, { announce: true });
-      renderSettings();
-      // Everything already on screen has to be rebuilt in the new shape.
-      renderPacks();
-      renderShop();
-      renderBinder();
-    });
-    return card;
-  }));
-
-  el.settingsList.replaceChildren(
-    settingRow('sound', 'settingsSound', 'settingsSoundNote'),
-    settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
-    settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
-    settingRow('hints', 'settingsHints', 'settingsHintsNote')
-  );
-
+  // --- preferences: how the app behaves -----------------------------------
   const language = document.createElement('div');
   language.className = 'row';
   language.innerHTML = `
@@ -4589,6 +4610,18 @@ function renderSettings() {
   language.querySelector('.chip').innerHTML =
     `${iconSvg('lock', { size: 13 })}<span>${LANGUAGES.find((l) => l.id === getLanguage())?.label ?? ''}</span>`;
 
+  el.settingsList.replaceChildren(
+    settingRow('sound', 'settingsSound', 'settingsSoundNote'),
+    settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
+    settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
+    settingRow('hints', 'settingsHints', 'settingsHintsNote'),
+    language
+  );
+
+  // --- account: who you are to the server ---------------------------------
+  el.accountList.replaceChildren(...accountRows());
+
+  // --- data: the save itself ----------------------------------------------
   // Transferring a save is the only bridge across a reinstall or a new phone,
   // so it sits above the button that destroys one.
   const transferRow = document.createElement('div');
@@ -4615,27 +4648,131 @@ function renderSettings() {
   paintResetButton(resetBtn);
   resetBtn.addEventListener('click', () => handleReset(resetBtn));
 
-  el.dataList.replaceChildren(...accountRows(), language, transferRow, resetRow);
+  el.dataList.replaceChildren(transferRow, resetRow);
 }
 
 /**
- * The account block at the top of Data: who you are, whether the last change
- * reached the server, and the way out.
- *
+ * CUSTOMIZATION - everything about how things look, pulled out of Settings:
+ * the theme, your picture, your name, and one day the frame around your
+ * level. Settings keeps the switches; this screen keeps the mirror.
+ */
+function renderCustomize() {
+  el.customizeTitle.textContent = t('tabCustomize');
+  el.themeLabel.textContent = t('themeTitle');
+  el.identityLabel.textContent = t('identityTitle');
+
+  // The theme picker previews each theme rather than naming it.
+  const current = storedTheme();
+  el.themeGrid.replaceChildren(...THEMES.map((theme) => {
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = `theme-card${theme.id === current ? ' is-on' : ''}`;
+    card.dataset.theme = theme.id;
+    card.innerHTML = `
+      <span class="theme-swatch">${theme.swatch.map((c) => `<span style="background:${c}"></span>`).join('')}</span>
+      <h4></h4><p></p>
+      <span class="theme-check">${iconSvg('check', { size: 14 })}</span>`;
+    card.querySelector('h4').textContent = tx(theme.name);
+    card.querySelector('p').textContent = tx(theme.blurb);
+    press(card, { sound: null });
+    card.addEventListener('click', () => {
+      if (theme.id === storedTheme()) return;
+      useTheme(theme.id, { announce: true });
+      renderCustomize();
+      // Everything already on screen has to be rebuilt in the new shape.
+      renderPacks();
+      renderShop();
+      renderBinder();
+    });
+    return card;
+  }));
+
+  el.identityList.replaceChildren(...identityRows());
+}
+
+/* --- settings & customization rows ---------------------------------------- */
+
+function settingsRowShell(titleKey, noteKey) {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>`;
+  row.querySelector('h4').textContent = t(titleKey);
+  row.querySelector('p').textContent = t(noteKey);
+  return row;
+}
+
+function settingsRowButton(row, label, run) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'btn btn-sm btn-ghost row-action';
+  btn.textContent = label;
+  press(btn, { sound: null });
+  btn.addEventListener('click', () => { synth.playTap(); run(btn); });
+  row.appendChild(btn);
+  return btn;
+}
+
+/**
  * A build with no backend says so plainly instead of pretending to have one:
  * there is nothing the player can do about it, but knowing their collection is
- * device-only is what tells them to use the save transfer below.
+ * device-only is what tells them to use the save transfer in Settings.
+ */
+function offlineAccountRow() {
+  const row = document.createElement('div');
+  row.className = 'row';
+  row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>
+    <span class="chip row-action">${iconSvg('cloud', { size: 13 })}</span>`;
+  row.querySelector('h4').textContent = t('accountOfflineTitle');
+  row.querySelector('p').textContent = t('accountOfflineNote');
+  return row;
+}
+
+/** The old-schema warning: the server cannot store what this row would edit. */
+function staleSchemaRow() {
+  const row = document.createElement('div');
+  row.className = 'row is-warning';
+  row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>
+    <span class="chip row-action">${iconSvg('cloud', { size: 13 })}</span>`;
+  row.querySelector('h4').textContent = t('schemaOldTitle');
+  row.querySelector('p').textContent = t('schemaOldNote');
+  return row;
+}
+
+/**
+ * Who you look like: picture and name, on the Customization screen. A
+ * project still on the older schema cannot store a picture, so rather than
+ * offering a control that fails on tap, say plainly what is missing.
+ * Changing your name works on every schema, so that row always stays.
+ */
+function identityRows() {
+  if (!account.configured) return [offlineAccountRow()];
+
+  const rows = [];
+  if (account.socialSchemaReady()) {
+    const avatarRow = settingsRowShell('avatarTitle', 'avatarNote');
+    const face = document.createElement('span');
+    face.className = 'person-mark row-action';
+    paintAvatarInto(face, state.account.profile);
+    face.style.cursor = 'pointer';
+    face.addEventListener('click', () => { synth.playTap(); openAvatarPicker(); });
+    avatarRow.appendChild(face);
+    rows.push(avatarRow);
+  } else {
+    rows.push(staleSchemaRow());
+  }
+
+  const nameRow = settingsRowShell('usernameTitle', 'usernameNote');
+  settingsRowButton(nameRow, t('usernameChange'), () => openUsernameChange());
+  rows.push(nameRow);
+  return rows;
+}
+
+/**
+ * The account block in Settings: who you are, whether the last change
+ * reached the server, who can see you, and the way out.
  */
 function accountRows() {
-  if (!account.configured) {
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>
-      <span class="chip row-action">${iconSvg('cloud', { size: 13 })}</span>`;
-    row.querySelector('h4').textContent = t('accountOfflineTitle');
-    row.querySelector('p').textContent = t('accountOfflineNote');
-    return [row];
-  }
+  if (!account.configured) return [offlineAccountRow()];
 
   const who = document.createElement('div');
   who.className = 'row';
@@ -4664,41 +4801,13 @@ function accountRows() {
 
   paintSyncLine(who);
 
-  // --- identity: avatar, username, who can see you, whether you look online.
-  const rowShell = (titleKey, noteKey) => {
-    const row = document.createElement('div');
-    row.className = 'row';
-    row.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>`;
-    row.querySelector('h4').textContent = t(titleKey);
-    row.querySelector('p').textContent = t(noteKey);
-    return row;
-  };
-  const rowButton = (row, label, run) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'btn btn-sm btn-ghost row-action';
-    btn.textContent = label;
-    press(btn, { sound: null });
-    btn.addEventListener('click', () => { synth.playTap(); run(btn); });
-    row.appendChild(btn);
-    return btn;
-  };
+  // Visibility and presence live on the newer schema only.
+  if (!account.socialSchemaReady()) return [who, out];
 
-  const avatarRow = rowShell('avatarTitle', 'avatarNote');
-  const face = document.createElement('span');
-  face.className = 'person-mark row-action';
-  paintAvatarInto(face, state.account.profile);
-  face.style.cursor = 'pointer';
-  face.addEventListener('click', () => { synth.playTap(); openAvatarPicker(); });
-  avatarRow.appendChild(face);
-
-  const nameRow = rowShell('usernameTitle', 'usernameNote');
-  rowButton(nameRow, t('usernameChange'), () => openUsernameChange());
-
-  const visRow = rowShell('visibilityTitle', 'visibilityNote');
+  const visRow = settingsRowShell('visibilityTitle', 'visibilityNote');
   const visOrder = ['public', 'friends', 'private'];
   const visLabel = (v) => t(`visibility_${v}`);
-  rowButton(visRow, visLabel(state.account.profile?.visibility ?? 'public'), async (btn) => {
+  settingsRowButton(visRow, visLabel(state.account.profile?.visibility ?? 'public'), async (btn) => {
     const current = state.account.profile?.visibility ?? 'public';
     const next = visOrder[(visOrder.indexOf(current) + 1) % visOrder.length];
     btn.disabled = true;
@@ -4710,9 +4819,9 @@ function accountRows() {
     btn.disabled = false;
   });
 
-  const presRow = rowShell('presenceTitle', 'presenceNote');
+  const presRow = settingsRowShell('presenceTitle', 'presenceNote');
   const presLabel = (v) => (v === 'hidden' ? t('presence_hidden') : t('presence_online'));
-  rowButton(presRow, presLabel(state.account.profile?.presence ?? 'online'), async (btn) => {
+  settingsRowButton(presRow, presLabel(state.account.profile?.presence ?? 'online'), async (btn) => {
     const next = (state.account.profile?.presence ?? 'online') === 'online' ? 'hidden' : 'online';
     btn.disabled = true;
     try {
@@ -4723,21 +4832,7 @@ function accountRows() {
     btn.disabled = false;
   });
 
-  // A project still on the older schema cannot store a picture, a visibility
-  // or a presence - so rather than offering controls that fail on tap, say
-  // plainly what is missing and what fixes it. Changing your name works on
-  // every schema, so that row always stays.
-  if (!account.socialSchemaReady()) {
-    const stale = document.createElement('div');
-    stale.className = 'row is-warning';
-    stale.innerHTML = `<div class="row-copy"><h4></h4><p></p></div>
-      <span class="chip row-action">${iconSvg('cloud', { size: 13 })}</span>`;
-    stale.querySelector('h4').textContent = t('schemaOldTitle');
-    stale.querySelector('p').textContent = t('schemaOldNote');
-    return [who, stale, nameRow, out];
-  }
-
-  return [who, avatarRow, nameRow, visRow, presRow, out];
+  return [who, visRow, presRow, out];
 }
 
 /** A new name, checked and claimed. */
@@ -4778,7 +4873,7 @@ function openUsernameChange() {
         toast(t('usernameChanged', { name: esc(name) }));
         synth.playResolved();
         sheet.hide();
-        renderSettings();
+        renderCustomize();
       } catch (error) {
         status.textContent = describeError(error);
         status.className = 'find-status is-error';
@@ -5625,7 +5720,7 @@ init();
 window.__packywiki = {
   state, store, debug, RARITIES, synth, backdrop, THEMES, THEME_PACKS,
   draw: drawArticles, generateShop, syncSocial,
-  setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderSettings(); },
+  setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {
     const forced = rarityById(id);
     document.querySelectorAll('.card').forEach((card) => {
