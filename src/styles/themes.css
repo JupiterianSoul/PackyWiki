@@ -283,3 +283,106 @@
   --press-shift: 0px;
   --texture: none;
 }
+
+/* Comic Neue rides in the bundle: no platform ships a comic face, and the
+   Cartoon theme is nothing without one. OFL 1.1 - see src/assets/fonts/. */
+@font-face {
+  font-family: 'Comic Neue';
+  src: url('../assets/fonts/comic-neue-latin-400-normal.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Comic Neue';
+  src: url('../assets/fonts/comic-neue-latin-700-normal.woff2') format('woff2');
+  font-weight: 700 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* --- CARTOON: Saturday-morning ink ---------------------------------------- */
+[data-theme='cartoon'] {
+  --ink: #1c1710;
+  --ink-dim: #5f5645;
+  --ink-faint: #948a74;
+
+  --surface: #fffdf4;
+  --surface-2: #fff3d6;
+  --surface-solid: #fffdf4;
+  --line: #1c1710;
+  --line-strong: #1c1710;
+
+  --accent: #ff4757;
+  --accent-2: #3aa0ff;
+  --accent-ink: #fffdf4;
+  --positive: #21ba45;
+  --negative: #e0245e;
+  --warning: #f2a30f;
+
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 26px;
+  --radius-pill: 999px;
+  --border: 3px;
+  --border-style: solid;
+
+  --surface-shadow: 4px 4px 0 rgba(28, 23, 16, 0.9);
+  --raise-shadow: 6px 6px 0 rgba(28, 23, 16, 0.9);
+  --glow: none;
+  --blur: none;
+
+  --font: 'Comic Neue', 'Comic Sans MS', 'Chalkboard SE', ui-rounded, sans-serif;
+  --font-display: var(--font);
+  --display-weight: 800;
+  --display-tracking: 0.01em;
+  --display-transform: none;
+  --label-tracking: 0.1em;
+
+  --press-scale: 0.9;
+  --press-shift: 2px;
+  --texture: none;
+}
+
+/* --- MATRIX: green rain on black glass ------------------------------------ */
+[data-theme='matrix'] {
+  --ink: #b8ffc9;
+  --ink-dim: #4f9c63;
+  --ink-faint: #2c5e3a;
+
+  --surface: rgba(0, 24, 8, 0.78);
+  --surface-2: rgba(0, 34, 12, 0.88);
+  --surface-solid: #010c04;
+  --line: rgba(0, 255, 65, 0.28);
+  --line-strong: rgba(0, 255, 65, 0.55);
+
+  --accent: #00ff41;
+  --accent-2: #7dffb0;
+  --accent-ink: #01180a;
+  --positive: #7dffb0;
+  --negative: #ff5f5f;
+  --warning: #e8ff5f;
+
+  --radius-sm: 0px;
+  --radius: 2px;
+  --radius-lg: 3px;
+  --radius-pill: 3px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 0 0 1px rgba(0, 255, 65, 0.14), 0 0 24px -8px rgba(0, 255, 65, 0.5);
+  --raise-shadow: 0 0 0 1px rgba(0, 255, 65, 0.26), 0 0 36px -6px rgba(0, 255, 65, 0.65);
+  --glow: 0 0 16px -2px var(--accent);
+  --blur: none;
+
+  --font: ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+  --font-display: var(--font);
+  --display-weight: 700;
+  --display-tracking: 0.04em;
+  --display-transform: uppercase;
+  --label-tracking: 0.22em;
+
+  --press-scale: 1;
+  --press-shift: 1px;
+  --texture: scanlines;
+}

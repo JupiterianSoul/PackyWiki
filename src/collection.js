@@ -472,6 +472,34 @@ export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
 /* --- custom boosters ----------------------------------------------------- */
 
 /** Which way the collection was last read: as albums, or as one long list. */
+/* --- auctions I have bid on ------------------------------------------------
+ * Ids only, so the Mine tab can show fights I am in even after being outbid.
+ * Capped: an id is worthless once its auction is gone from the listing. */
+const BIDS_KEY = 'packywiki.myBids.v1';
+export function loadMyBids() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(BIDS_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(-100) : [];
+  } catch { return []; }
+}
+export function saveMyBids(ids) {
+  try { localStorage.setItem(BIDS_KEY, JSON.stringify(ids.slice(-100))); } catch { /* storage unavailable */ }
+}
+
+/* --- the badges worn on the profile ---------------------------------------
+ * Up to four badge ids, chosen on the Badges screen. Empty means "let the
+ * app pick": the best-ranked earned chips fill the shelf by default. */
+const LOADOUT_KEY = 'packywiki.badgeLoadout.v1';
+export function loadBadgeLoadout() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LOADOUT_KEY) ?? '[]');
+    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(0, 4) : [];
+  } catch { return []; }
+}
+export function saveBadgeLoadout(ids) {
+  try { localStorage.setItem(LOADOUT_KEY, JSON.stringify(ids.slice(0, 4))); } catch { /* storage unavailable */ }
+}
+
 /* --- the equipped level-frame style ---------------------------------------
  * Which of the five frame designs wraps your level and your picture. The
  * frame's tier is never stored: it is always derived from the level. */

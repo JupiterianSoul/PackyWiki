@@ -726,7 +726,8 @@
   display: grid;
   gap: 18px;
 }
-.hero-id { display: flex; align-items: center; gap: 14px; }
+/* The gap clears the widest frame tiers: wings must not reach the words. */
+.hero-id { display: flex; align-items: center; gap: 30px; padding-left: 4px; }
 .hero-id .ring { flex: none; }
 .hero-id h2 { font-size: clamp(1.3rem, 5.4vw, 1.7rem); }
 .hero-rank { font-size: 0.72rem; font-weight: 800; letter-spacing: var(--label-tracking); text-transform: uppercase; color: var(--accent); }
@@ -1647,6 +1648,82 @@
 .badge-rung-copy { display: grid; gap: 2px; min-width: 0; }
 .badge-rung-copy b { font-size: 0.82rem; }
 .badge-rung-copy span { font-size: 0.74rem; color: var(--ink-dim); }
+
+.open-nav { display: none; justify-content: center; gap: 30px; padding: 4px 0 2px; }
+#screen-open.phase-reveal .open-nav { display: flex; }
+.open-nav .icon-btn svg { display: block; }
+
+.badge-grid.is-all { grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.badge-equipped-tag {
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+}
+.badge-chip .badge-equipped-tag { min-height: 0; }
+.badges-manage { margin-left: auto; }
+
+/* --- the market ----------------------------------------------------------- */
+.market-list { display: grid; gap: 10px; margin-top: 12px; }
+.market-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: inherit;
+  text-align: left;
+}
+.market-art {
+  flex: none;
+  width: 44px;
+  height: 58px;
+  border-radius: 8px;
+  border: 2px solid var(--line-strong);
+  background: var(--surface-2) center / cover no-repeat;
+}
+.market-art.is-big { width: 74px; height: 98px; }
+.market-copy { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.market-copy b { font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.market-sub { font-size: 0.72rem; color: var(--ink-dim); }
+.market-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.market-tag.is-good { color: var(--positive); }
+.market-tag.is-bad { color: var(--negative); }
+.market-side { flex: none; display: grid; gap: 3px; justify-items: end; }
+.market-price { font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+.market-time { font-size: 0.72rem; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.market-time.is-closing { color: var(--negative); font-weight: 800; }
+.market-sheet { display: grid; gap: 14px; }
+.market-head { display: flex; gap: 14px; align-items: flex-start; }
+.market-lines { flex: 1; min-width: 0; display: grid; gap: 6px; }
+.market-line { display: flex; justify-content: space-between; gap: 10px; font-size: 0.84rem; }
+.market-line span { color: var(--ink-dim); }
+.market-line b { font-variant-numeric: tabular-nums; }
+.market-durations { display: flex; flex-wrap: wrap; gap: 6px; }
+.market-duration.is-on { border-color: var(--accent); color: var(--accent); }
+.market-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.market-cell { display: grid; gap: 4px; justify-items: center; background: none; border: none; padding: 2px; color: inherit; }
+.market-cell-art {
+  width: 56px;
+  height: 74px;
+  border-radius: 8px;
+  border: 2px solid var(--line-strong);
+  background: var(--surface-2) center / cover no-repeat;
+}
+.market-cell b { font-size: 0.62rem; font-weight: 700; color: var(--ink-dim); max-width: 70px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .frames-note { font-size: 0.8rem; color: var(--ink-dim); margin: 4px 0 12px; }
 .frame-styles { display: grid; grid-template-columns: 1fr; gap: 12px; }

@@ -306,10 +306,18 @@ To point a build at a **different** project:
 
 1. Create one at supabase.com (the free tier is plenty).
 2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
-   and run it. That creates the tables, the policies and the three functions,
+   and run it. That creates the tables, the policies and the functions,
    and ends by telling PostgREST to reload its schema cache - without that
    last step the API can answer "Could not find the table" for a while even
-   though everything exists.
+   though everything exists. The file is layered (V1 accounts, V2 social,
+   V3 the market) and every statement is idempotent, so when an update adds
+   a layer you run the whole file again on the same project and nothing is
+   lost. An app running against a database that is a layer behind says so
+   in the affected screen instead of breaking: the market, for instance,
+   asks for this file to be run again.
+   For live market updates also check **Database → Replication** includes
+   the `auctions` table (the script tries to add it; the app polls anyway,
+   so missing Realtime only costs immediacy).
 3. Take the **Project URL** and the **publishable** key (`sb_publishable_...`)
    from **Project Settings → API** and put them in `.env.production`, which is
    what this repo does. To override it for one machine without committing, use
@@ -916,6 +924,15 @@ is its own dialog.
   is finding categories with deep direct membership.
 
 ---
+
+## Third-party material
+
+Two theme sample kits (Cartoon, Matrix) use recordings from the `uisfx`
+project, dedicated to the public domain (CC0 1.0) - see
+`src/assets/sfx/LICENSE.md`. The Cartoon theme bundles the Comic Neue
+typeface (SIL OFL 1.1) - see `src/assets/fonts/`. Every other sound in the
+app is synthesised at runtime and every other typeface is a system stack,
+so nothing else in the repo carries third-party rights.
 
 ## Notes
 

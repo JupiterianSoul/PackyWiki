@@ -153,5 +153,23 @@ export const RELEASES = [
       { en: 'Friends see the frame you wear, on your picture and your profile',
         fr: 'Vos amis voient le cadre que vous portez, sur votre photo et votre profil' }
     ]
+  },
+  {
+    id: 'bazaar', icon: 'trade', accent: '#4ade80',
+    title: { en: 'The market opens', fr: 'Le marché ouvre' },
+    points: [
+      { en: 'Auctions between all players: put a card up, highest bid takes it',
+        fr: 'Des enchères entre tous les joueurs : proposez une carte, la meilleure mise l’emporte' },
+      { en: 'Bids must rise by 15%; a bid in the last 10 seconds winds the clock back up',
+        fr: 'Chaque mise doit monter de 15 % ; une mise dans les 10 dernières secondes relance le temps' },
+      { en: 'Two new themes: Cartoon, all ink and rubber, and Matrix, green rain on black',
+        fr: 'Deux nouveaux thèmes : Cartoon, tout en encre et caoutchouc, et Matrix, pluie verte sur noir' },
+      { en: 'Both speak in real recordings, dedicated to the public domain',
+        fr: 'Tous deux parlent en vrais enregistrements, dédiés au domaine public' },
+      { en: 'A Badges screen: wear the four you are proudest of',
+        fr: 'Un écran Insignes : portez les quatre dont vous êtes le plus fier' },
+      { en: 'Arrows under the cards when opening a booster, for thumbs that do not swipe',
+        fr: 'Des flèches sous les cartes à l’ouverture d’un booster, pour les pouces qui ne glissent pas' }
+    ]
   }
 ];

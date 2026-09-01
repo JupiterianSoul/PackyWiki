@@ -135,6 +135,8 @@ class Backdrop {
       case 'noir': this.#noir(ctx, w, h, t); break;
       case 'sunset': this.#sunset(ctx, w, h, t); break;
       case 'meadow': this.#meadow(ctx, w, h, t); break;
+      case 'toon': this.#toon(ctx, w, h, t); break;
+      case 'matrix': this.#matrix(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -472,6 +474,92 @@ class Backdrop {
    * that move are fireflies wandering on slow loops, seeds climbing over
    * half a minute, and stars breathing over ten seconds.
    */
+  /**
+   * TOON - a Saturday-morning page: warm cream, a drifting halftone screen in
+   * the corners, and a few fat ink bubbles floating up like something is
+   * about to be very funny. All ink, no gradients doing anything moody.
+   */
+  #toon(ctx, w, h, t) {
+    const sec = t / 1000;
+
+    ctx.fillStyle = '#fff8e7';
+    ctx.fillRect(0, 0, w, h);
+
+    // Two halftone screens, top-right and bottom-left, breathing very slowly.
+    const dots = (cx, cy, reach, phase) => {
+      const drift = Math.sin(sec * 0.12 + phase) * 6;
+      ctx.fillStyle = 'rgba(28, 23, 16, 0.10)';
+      for (let gx = -reach; gx <= reach; gx += 18) {
+        for (let gy = -reach; gy <= reach; gy += 18) {
+          const d = Math.hypot(gx, gy);
+          if (d > reach) continue;
+          const r = 3.4 * (1 - d / reach);
+          if (r < 0.5) continue;
+          ctx.beginPath();
+          ctx.arc(cx + gx + drift, cy + gy, r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    };
+    dots(w + 20, -20, Math.min(w, h) * 0.55, 0);
+    dots(-20, h + 20, Math.min(w, h) * 0.6, 2.1);
+
+    // Ink bubbles on a lazy ride up; each pops back to the bottom unseen.
+    for (let i = 0; i < 7; i++) {
+      const speed = 0.014 + (i % 3) * 0.006;
+      const x = ((i * 197.3) % w) + Math.sin(sec * 0.4 + i * 2.2) * 14;
+      const y = h + 60 - (((sec * speed * h) + i * h * 0.31) % (h + 120));
+      const r = 10 + (i % 4) * 7;
+      ctx.strokeStyle = 'rgba(28, 23, 16, 0.14)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.stroke();
+      // The comic highlight: one short arc inside, upper left.
+      ctx.beginPath();
+      ctx.arc(x, y, r * 0.55, Math.PI * 1.1, Math.PI * 1.5);
+      ctx.stroke();
+    }
+  }
+
+  /**
+   * MATRIX - the rain. Columns of green glyphs fall at their own speeds with
+   * a bright head and a fading tail, drawn dim enough to sit behind text.
+   * Column state is derived from index and time, so there is nothing to
+   * store and a resize simply grows more rain.
+   */
+  #matrix(ctx, w, h, t) {
+    const sec = t / 1000;
+
+    ctx.fillStyle = '#010b04';
+    ctx.fillRect(0, 0, w, h);
+
+    const colW = 18;
+    const cell = 20;
+    const cols = Math.ceil(w / colW);
+    const glyphs = '01アイウエオカキクケコサシスセソタチツテト<>+*';
+    ctx.font = '14px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+
+    for (let i = 0; i < cols; i++) {
+      const speed = 2.4 + ((i * 7) % 5) * 1.3;              // cells per second
+      const length = 9 + ((i * 13) % 8);                    // tail cells
+      const lane = ((i * 37) % 11) / 11;                    // phase offset
+      const headCell = (sec * speed + lane * 80) % ((h / cell) + length + 6) - length;
+      for (let seg = 0; seg < length; seg++) {
+        const y = (headCell - seg) * cell;
+        if (y < -cell || y > h + cell) continue;
+        // The glyph at a spot mutates every few frames, keyed by time+place.
+        const pick = Math.floor(Math.abs(Math.sin(i * 131 + seg * 17 + Math.floor(sec * 6))) * glyphs.length);
+        const fade = 1 - seg / length;
+        ctx.fillStyle = seg === 0
+          ? 'rgba(190, 255, 210, 0.8)'
+          : `rgba(0, 255, 65, ${(0.34 * fade * fade).toFixed(3)})`;
+        ctx.fillText(glyphs[pick % glyphs.length], i * colW + colW / 2, y);
+      }
+    }
+  }
+
   #meadow(ctx, w, h, t) {
     // Seconds, not milliseconds: every rate below reads as "per second".
     const sec = t / 1000;

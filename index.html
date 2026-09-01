@@ -339,6 +339,27 @@
           <div class="quiz-body pad" id="quiz-body"></div>
         </section>
 
+        <!-- MARKET: every player's auction floor ------------------------------- -->
+        <section id="screen-market" class="screen">
+          <div class="screen-head">
+            <h2 id="market-title"></h2>
+            <p id="market-intro"></p>
+          </div>
+          <div class="seg-wrap"><div id="market-seg"></div></div>
+          <p id="market-status" class="find-status" role="status" aria-live="polite"></p>
+          <div class="market-list" id="market-list"></div>
+          <button id="market-sell" class="btn btn-primary btn-block" type="button" style="margin-top:14px"></button>
+        </section>
+
+        <!-- BADGES: every chip, and the four you wear -------------------------- -->
+        <section id="screen-badges" class="screen">
+          <div class="screen-head">
+            <h2 id="badges-title"></h2>
+            <p id="badges-intro"></p>
+          </div>
+          <div class="badge-grid is-all" id="badges-all"></div>
+        </section>
+
         <!-- CUSTOMIZATION: how the app, and you, look ------------------------ -->
         <section id="screen-customize" class="screen">
           <div class="screen-head"><h2 id="customize-title"></h2></div>
@@ -381,6 +402,10 @@
             <div class="burst-layer" id="burst-layer" aria-hidden="true"></div>
           </div>
           <div class="summary" id="summary"></div>
+          <div class="open-nav">
+            <button id="open-prev" class="icon-btn" type="button" aria-label="Previous card"></button>
+            <button id="open-next" class="icon-btn" type="button" aria-label="Next card"></button>
+          </div>
           <div class="open-foot">
             <p class="open-hint" id="open-hint"></p>
             <button id="open-done" class="btn btn-primary" type="button" hidden></button>

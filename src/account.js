@@ -632,3 +632,91 @@ export async function setTradeStatus(id, status) {
     if (error) throw error;
   });
 }
+
+/* --- the market (V3: auctions) ------------------------------------------------
+ * Every rule that matters is enforced by the definer functions in
+ * supabase/schema.sql; the calls here just carry the request. A project
+ * that has not run the V3 schema yet answers with a missing-table error,
+ * which `marketReady` turns into one honest flag for the UI.
+ */
+
+let marketTables = null;              // null unknown, then true/false
+export const marketSchemaReady = () => marketTables !== false;
+
+async function marketCall(run) {
+  try {
+    const value = await run();
+    marketTables = true;
+    return value;
+  } catch (error) {
+    if (isSchemaGap(error)) { marketTables = false; throw new Error('MARKET_UNSET'); }
+    throw error;
+  }
+}
+
+/** Open auctions, ending soonest first, plus my own recent ones. */
+export async function listAuctions(selfId) {
+  return marketCall(async () => {
+    const { data, error } = await supabase
+      .from('auctions')
+      .select('*')
+      .or(`status.eq.open,and(seller.eq.${selfId},status.neq.open)`)
+      .order('ends_at', { ascending: true })
+      .limit(120);
+    if (error) throw error;
+    return data ?? [];
+  });
+}
+
+export async function createAuction(card, price, minutes) {
+  return marketCall(async () => {
+    const { data, error } = await supabase.rpc('create_auction',
+      { card, price, minutes });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function placeBid(auctionId, amount) {
+  return marketCall(async () => {
+    const { data, error } = await supabase.rpc('place_bid',
+      { auction: auctionId, amount });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function cancelAuction(auctionId) {
+  return marketCall(async () => {
+    const { data, error } = await supabase.rpc('cancel_auction', { auction: auctionId });
+    if (error) throw error;
+    return data;
+  });
+}
+
+export async function settleAuction(auctionId) {
+  return marketCall(async () => {
+    const { data, error } = await supabase.rpc('settle_auction', { auction: auctionId });
+    if (error) throw error;
+    return data;
+  });
+}
+
+/**
+ * Live changes to the auctions table, when the project has Realtime on.
+ * Returns an unsubscribe. The market screen still polls at a slow beat, so
+ * a project without Realtime only loses immediacy, never correctness.
+ */
+export function subscribeAuctions(onChange) {
+  if (!configured) return () => {};
+  try {
+    const channel = supabase
+      .channel('market')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'auctions' },
+        (payload) => onChange(payload?.new ?? null))
+      .subscribe();
+    return () => { try { supabase.removeChannel(channel); } catch { /* gone */ } };
+  } catch {
+    return () => {};
+  }
+}

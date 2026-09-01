@@ -113,6 +113,12 @@ const state = {
   inventory: store.loadInventory(),
   profile: store.loadProfile(),
   wallet: store.loadWallet(),
+  frameStyle: store.loadFrameStyle() ?? DEFAULT_FRAME_STYLE,
+  badgeLoadout: store.loadBadgeLoadout(),
+  market: {
+    view: 'browse', auctions: [], myBids: store.loadMyBids(),
+    timer: null, poll: null, unsub: null, settling: new Set(), busy: false
+  },
   ripDir: Number(localStorage.getItem?.(RIP_DIR_KEY)) || 0,
   prefetch: null,
   prefetchTimer: null,
@@ -152,7 +158,8 @@ bind({
     settings: $('#screen-settings'), friends: $('#screen-friends'),
     friend: $('#screen-friend'), chat: $('#screen-chat'), ach: $('#screen-ach'),
     updates: $('#screen-updates'), quiz: $('#screen-quiz'),
-    customize: $('#screen-customize'), open: $('#screen-open')
+    customize: $('#screen-customize'), badges: $('#screen-badges'),
+    market: $('#screen-market'), open: $('#screen-open')
   },
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
@@ -222,6 +229,10 @@ bind({
   customizeTitle: $('#customize-title'), identityLabel: $('#identity-label'), identityList: $('#identity-list'),
   framesLabel: $('#frames-label'), framesNote: $('#frames-note'), frameStyles: $('#frame-styles'),
   badgesLabel: $('#badges-label'), badgeGrid: $('#badge-grid'),
+  badgesTitle: $('#badges-title'), badgesIntro: $('#badges-intro'), badgesAll: $('#badges-all'),
+  marketTitle: $('#market-title'), marketIntro: $('#market-intro'), marketSeg: $('#market-seg'),
+  marketStatus: $('#market-status'), marketList: $('#market-list'), marketSell: $('#market-sell'),
+  openPrev: $('#open-prev'), openNext: $('#open-next'),
   prefsLabel: $('#prefs-label'), settingsList: $('#settings-list'),
   accountLabel: $('#account-label'), accountList: $('#account-list'),
   dataLabel: $('#data-label'), dataList: $('#data-list'),
@@ -369,7 +380,8 @@ function showScreen(name) {
  * Profile, so the bottom bar stays at five.
  */
 const navTabFor = (screen) =>
-  (['settings', 'customize', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
+  screen === 'market' ? 'shop'
+    : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -449,11 +461,13 @@ function drawerItems() {
     { id: 'timed',  icon: 'hourglass',  key: 'tabTimed',       run: go('timed', renderTimed) },
     { id: 'shop',   icon: 'gem',        key: 'tabShop',        run: go('shop', () => { payStipend(); renderShop(); }) },
     { id: 'binder', icon: 'collection', key: 'tabCollection',  run: go('binder', renderBinder) },
+    { id: 'market', icon: 'trade',      key: 'tabMarket',      run: go('market', renderMarket) },
     { id: 'daily',  icon: 'gift',       key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
       run: () => openDaily() },
     { id: 'ach',    icon: 'trophy',     key: 'achTitle',
       badge: () => achRedeemableCount(),
       run: go('ach', renderAchievements) },
+    { id: 'badges', icon: 'star',       key: 'badgesTitle',    run: go('badges', renderBadgesScreen) },
     { id: 'quiz',   icon: 'quiz',       key: 'tabQuiz',        run: go('quiz', renderQuiz) },
     { sep: true },
     ...(account.configured
@@ -2045,6 +2059,14 @@ function showSummary() {
 }
 
 function initSwipe() {
+  // The arrows under the deck do exactly what a swipe does; some thumbs
+  // simply prefer a button.
+  el.openPrev.innerHTML = iconSvg('chevronLeft', { size: 20 });
+  el.openNext.innerHTML = `<span style="display:inline-block;transform:scaleX(-1)">${iconSvg('chevronLeft', { size: 20 })}</span>`;
+  [el.openPrev, el.openNext].forEach((btn) => press(btn, { sound: null }));
+  el.openPrev.addEventListener('click', () => { synth.resume(); goTo(state.index - 1); });
+  el.openNext.addEventListener('click', () => { synth.resume(); goTo(state.index + 1); });
+
   el.cardStack.addEventListener('pointerdown', (event) => {
     if (!el.openScreen.classList.contains('phase-reveal') || !state.cards.length) return;
     const card = state.cards[state.index];
@@ -2839,29 +2861,523 @@ function renderProfile() {
 
 }
 
+/* --- the market: every player's auction floor --------------------------------------------
+ * The rules live in the database (supabase/schema.sql, V3): the 15% floor,
+ * the anti-snipe clock, the no-cancel-once-bid rule and settlement are all
+ * server-side, so this file only ASKS. Money moves the way it always has:
+ * a bid debits the local wallet before the call; refunds and payouts come
+ * back as deliveries, like gifts. While the screen is open it listens on
+ * Realtime and polls at a slow beat as well, so a project without Realtime
+ * loses immediacy, never correctness.
+ */
+
+const AUCTION_MINUTES = [10, 30, 60, 180, 360, 720, 1440];
+const minutesLabel = (m) => (m < 60 ? `${m} min` : `${m / 60} h`);
+const auctionFloor = (a) =>
+  (a.current_bid == null ? a.start_price : Math.ceil(a.current_bid * 1.15));
+const auctionLeftMs = (a) => new Date(a.ends_at).getTime() - Date.now();
+
+function fmtLeft(ms) {
+  if (ms <= 0) return t('marketEnded');
+  const sec = Math.ceil(ms / 1000);
+  if (sec < 100) return `${sec}s`;
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ${String(sec % 60).padStart(2, '0')}s`;
+  const h = Math.floor(min / 60);
+  return `${h}h ${String(min % 60).padStart(2, '0')}m`;
+}
+
+const rememberBid = (id) => {
+  const mine = state.market.myBids;
+  if (!mine.includes(id)) { mine.push(id); store.saveMyBids(mine); }
+};
+
+/* One second of housekeeping: countdowns tick, and whichever app first sees
+ * a timer at zero rings the settlement bell for everyone. The loops shut
+ * themselves down one tick after the player leaves the screen. */
+function marketLoopsOn() {
+  const m = state.market;
+  if (m.timer) return;
+  m.timer = setInterval(marketTick, 1000);
+  m.poll = setInterval(() => {
+    if (state.tab === 'market') refreshMarket({ quiet: true });
+  }, 5000);
+  m.unsub = account.subscribeAuctions((row) => {
+    if (state.tab !== 'market') return;
+    if (row?.id) {
+      const i = m.auctions.findIndex((a) => a.id === row.id);
+      if (i >= 0) m.auctions[i] = row; else m.auctions.unshift(row);
+      renderMarketList();
+    } else {
+      refreshMarket({ quiet: true });
+    }
+  });
+}
+
+function marketLoopsOff() {
+  const m = state.market;
+  clearInterval(m.timer); clearInterval(m.poll);
+  m.timer = m.poll = null;
+  m.unsub?.(); m.unsub = null;
+}
+
+function marketTick() {
+  if (state.tab !== 'market') { marketLoopsOff(); return; }
+  for (const cell of el.marketList.querySelectorAll('[data-ends]')) {
+    const left = new Date(cell.dataset.ends).getTime() - Date.now();
+    cell.textContent = fmtLeft(left);
+    cell.classList.toggle('is-closing', left > 0 && left < 60000);
+  }
+  for (const a of state.market.auctions) {
+    if (a.status === 'open' && auctionLeftMs(a) <= 0) maybeSettle(a);
+  }
+}
+
+function maybeSettle(a) {
+  const m = state.market;
+  if (m.settling.has(a.id)) return;
+  m.settling.add(a.id);
+  account.settleAuction(a.id)
+    .catch(() => { /* someone else rang the bell first, or it is not over on the server clock */ })
+    .then(async () => {
+      await collectDeliveries().catch(() => {});
+      if (state.tab === 'market') refreshMarket({ quiet: true });
+    });
+}
+
+async function refreshMarket({ quiet = false } = {}) {
+  const m = state.market;
+  if (!quiet) { el.marketStatus.textContent = t('marketLoading'); el.marketStatus.className = 'find-status is-working'; }
+  try {
+    m.auctions = await account.listAuctions(userId());
+    el.marketStatus.textContent = '';
+    renderMarketList();
+  } catch (error) {
+    el.marketStatus.textContent = error?.message === 'MARKET_UNSET' ? t('marketUnset') : describeError(error);
+    el.marketStatus.className = 'find-status is-error';
+  }
+}
+
+function renderMarket() {
+  el.marketTitle.textContent = t('tabMarket');
+  el.marketIntro.textContent = t('marketIntro');
+  el.marketSell.textContent = t('marketSell');
+
+  if (!account.configured || !signedIn()) {
+    el.marketStatus.textContent = account.configured ? t('marketSignIn') : t('marketOffline');
+    el.marketStatus.className = 'find-status';
+    el.marketList.replaceChildren();
+    el.marketSell.hidden = true;
+    el.marketSeg.parentElement.hidden = true;
+    return;
+  }
+  el.marketSell.hidden = false;
+  el.marketSeg.parentElement.hidden = false;
+
+  new Segmented(el.marketSeg, [
+    { id: 'browse', label: t('marketBrowse') },
+    { id: 'mine', label: t('marketMine') }
+  ], (view) => { state.market.view = view; renderMarketList(); })
+    .select(state.market.view, { silent: true });
+
+  marketLoopsOn();
+  refreshMarket();
+}
+
+function renderMarketList() {
+  const m = state.market;
+  const me = userId();
+  let rows = m.auctions;
+  rows = state.market.view === 'mine'
+    ? rows.filter((a) => a.seller === me || m.myBids.includes(a.id))
+    : rows.filter((a) => a.status === 'open');
+  rows = [...rows].sort((a, b) =>
+    (a.status === 'open' ? 0 : 1) - (b.status === 'open' ? 0 : 1)
+    || new Date(a.ends_at) - new Date(b.ends_at));
+
+  if (!rows.length) {
+    const note = document.createElement('p');
+    note.className = 'frames-note';
+    note.textContent = t(state.market.view === 'mine' ? 'marketEmptyMine' : 'marketEmpty');
+    el.marketList.replaceChildren(note);
+    return;
+  }
+
+  el.marketList.replaceChildren(...rows.map((a) => {
+    const mine = a.seller === me;
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'market-row';
+    row.innerHTML = `
+      <span class="market-art"></span>
+      <span class="market-copy">
+        <b></b>
+        <span class="market-sub"></span>
+      </span>
+      <span class="market-side">
+        <b class="market-price"></b>
+        <span class="market-time" data-ends="${esc(a.ends_at)}"></span>
+      </span>`;
+    const art = row.querySelector('.market-art');
+    if (a.card?.thumbnail) art.style.backgroundImage = `url("${String(a.card.thumbnail).replace(/"/g, '%22')}")`;
+    const rarity = rarityById(a.card?.rarityId);
+    if (rarity) art.style.borderColor = rarity.color;
+    row.querySelector('b').textContent = a.card?.title ?? '?';
+
+    const bits = [];
+    if (mine) bits.push(`<span class="market-tag">${esc(t('marketYours'))}</span>`);
+    else if (a.bidder === me) bits.push(`<span class="market-tag is-good">${esc(t('marketWinning'))}</span>`);
+    else if (m.myBids.includes(a.id) && a.status === 'open') bits.push(`<span class="market-tag is-bad">${esc(t('marketOutbid'))}</span>`);
+    bits.push(esc(a.bid_count > 0 ? t('marketBids', { n: a.bid_count }) : t('marketNoBids')));
+    if (!mine && a.seller_name) bits.push(esc(t('marketSeller', { name: a.seller_name })));
+    row.querySelector('.market-sub').innerHTML = bits.join(' · ');
+
+    row.querySelector('.market-price').innerHTML = money(a.current_bid ?? a.start_price);
+    row.querySelector('.market-time').textContent = fmtLeft(auctionLeftMs(a));
+    press(row, { sound: null });
+    row.addEventListener('click', () => { synth.playTap(); openAuctionSheet(a.id); });
+    return row;
+  }));
+}
+
+/** One auction, up close: the card, the clock, and the way to bid on it -
+ *  or, for the seller, the way out while nobody has bid yet. */
+function openAuctionSheet(auctionId) {
+  const a = state.market.auctions.find((x) => x.id === auctionId);
+  if (!a) return;
+  const me = userId();
+  const mine = a.seller === me;
+  const floor = auctionFloor(a);
+
+  openSheet(a.card?.title ?? '?', (body) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'market-sheet';
+    wrap.innerHTML = `
+      <div class="market-head">
+        <span class="market-art is-big"></span>
+        <div class="market-lines"></div>
+      </div>
+      <div class="market-actions"></div>`;
+    const art = wrap.querySelector('.market-art');
+    if (a.card?.thumbnail) art.style.backgroundImage = `url("${String(a.card.thumbnail).replace(/"/g, '%22')}")`;
+    const rarity = rarityById(a.card?.rarityId);
+    if (rarity) art.style.borderColor = rarity.color;
+
+    const line = (label, html) =>
+      `<p class="market-line"><span>${esc(label)}</span><b>${html}</b></p>`;
+    wrap.querySelector('.market-lines').innerHTML = [
+      rarity ? line(tx(rarity.name), `<span style="color:${rarity.color}">${money(a.card?.price ?? 0)}</span>`) : '',
+      line(t('marketTimeLeft'), `<span data-ends="${esc(a.ends_at)}">${esc(fmtLeft(auctionLeftMs(a)))}</span>`),
+      a.current_bid != null
+        ? line(t('marketCurrent'), `${money(a.current_bid)}${a.bidder_name ? ` · ${esc(a.bidder_name)}` : ''}`)
+        : line(t('marketStartAt'), money(a.start_price)),
+      mine ? '' : line('', esc(t('marketFloorLine', { amount: formatAmount(floor) })))
+    ].filter(Boolean).join('');
+
+    const actions = wrap.querySelector('.market-actions');
+    if (mine) {
+      if (a.bid_count === 0 && a.status === 'open') {
+        const cancel = document.createElement('button');
+        cancel.type = 'button';
+        cancel.className = 'btn btn-danger btn-block';
+        cancel.textContent = t('marketCancel');
+        press(cancel, { sound: null });
+        cancel.addEventListener('click', async () => {
+          if (state.market.busy) return;
+          state.market.busy = true;
+          cancel.disabled = true;
+          try {
+            await account.cancelAuction(a.id);
+            toast(t('marketCancelled'), 'ok');
+            synth.playResolved();
+            sheet.hide();
+            await collectDeliveries().catch(() => {});
+            refreshMarket({ quiet: true });
+          } catch (error) {
+            toast(esc(marketError(error)), 'error');
+            cancel.disabled = false;
+          }
+          state.market.busy = false;
+        });
+        actions.appendChild(cancel);
+      } else if (a.status === 'open') {
+        actions.innerHTML = `<p class="frames-note">${esc(t('marketCancelLocked'))}</p>`;
+      }
+    } else if (a.status === 'open') {
+      actions.innerHTML = `
+        <label class="label" style="display:block;margin-bottom:6px">${esc(t('marketBidLabel'))}</label>
+        <input class="creator-input" type="number" inputmode="numeric" min="${floor}" step="1" value="${floor}" data-bid>
+        <button class="btn btn-primary btn-block" type="button" style="margin-top:10px" data-go></button>
+        <p class="frames-note" style="margin-top:10px">${esc(t('marketSnipeNote'))}</p>`;
+      const input = actions.querySelector('[data-bid]');
+      const go = actions.querySelector('[data-go]');
+      const paint = () => {
+        const amount = Math.floor(Number(input.value) || 0);
+        go.innerHTML = t('marketBidGo', { amount: money(Math.max(amount, floor)) });
+      };
+      paint();
+      input.addEventListener('input', paint);
+      press(go, { sound: null });
+      go.addEventListener('click', () => placeBidFlow(a, Math.floor(Number(input.value) || 0), go));
+    }
+    body.appendChild(wrap);
+  });
+}
+
+const marketError = (error, auction = null) => {
+  const code = String(error?.message ?? '');
+  if (code.includes('TOO_LOW')) {
+    const fresh = auction && state.market.auctions.find((x) => x.id === auction.id);
+    return t('marketTooLow', { amount: formatAmount(auctionFloor(fresh ?? auction ?? { start_price: 0 })) });
+  }
+  if (code.includes('ENDED') || code.includes('NOT_OVER')) return t('marketEndedToast');
+  if (code.includes('HAS_BIDS')) return t('marketCancelLocked');
+  if (code.includes('TOO_MANY')) return t('marketTooMany');
+  if (code.includes('OWN_AUCTION')) return t('marketOwn');
+  if (code.includes('MARKET_UNSET')) return t('marketUnset');
+  return describeError(error);
+};
+
+async function placeBidFlow(a, amount, btn) {
+  const m = state.market;
+  if (m.busy) return;
+  const floor = auctionFloor(a);
+  if (!Number.isFinite(amount) || amount < floor) {
+    toast(t('marketTooLow', { amount: formatAmount(floor) }), 'error');
+    synth.playDenied();
+    return;
+  }
+  if (amount > store.loadWallet()) {
+    toast(t('marketNoFunds'), 'error');
+    synth.playDenied();
+    return;
+  }
+  m.busy = true;
+  btn.disabled = true;
+  // The money leaves first; a failed call puts it straight back. Winning
+  // means it is already paid; being outbid brings it home as a delivery.
+  store.saveWallet(store.loadWallet() - amount);
+  refreshWallet();
+  syncSoon();
+  try {
+    const updated = await account.placeBid(a.id, amount);
+    rememberBid(a.id);
+    const i = m.auctions.findIndex((x) => x.id === a.id);
+    if (i >= 0 && updated?.id) m.auctions[i] = updated;
+    toast(t('marketBidPlaced', { amount: money(amount) }), 'ok');
+    synth.playPurchase();
+    sheet.hide();
+    renderMarketList();
+  } catch (error) {
+    store.saveWallet(store.loadWallet() + amount);
+    refreshWallet();
+    toast(esc(marketError(error, a)), 'error');
+    synth.playDenied();
+    btn.disabled = false;
+    refreshMarket({ quiet: true });
+  }
+  m.busy = false;
+}
+
+/** Sell: pick a card, price it, pick a clock, and it leaves your binder. */
+function openSellSheet() {
+  const me = userId();
+  const myOpen = state.market.auctions.filter((a) => a.seller === me && a.status === 'open').length;
+  if (myOpen >= 10) {
+    toast(t('marketTooMany'), 'error');
+    synth.playDenied();
+    return;
+  }
+  const mine = store.allEntries(state.collection).filter((c) => c.count > 0);
+  openSheet(t('marketPickCard'), (body) => {
+    if (!mine.length) {
+      body.innerHTML = `<p class="muted">${esc(t('marketNoCards'))}</p>`;
+      return;
+    }
+    const grid = document.createElement('div');
+    grid.className = 'market-pick';
+    grid.replaceChildren(...mine.slice(0, 200).map((entry) => {
+      const cell = document.createElement('button');
+      cell.type = 'button';
+      cell.className = 'market-cell';
+      cell.innerHTML = `<span class="market-cell-art"></span><b></b>`;
+      const art = cell.querySelector('.market-cell-art');
+      if (entry.thumbnail) art.style.backgroundImage = `url("${String(entry.thumbnail).replace(/"/g, '%22')}")`;
+      art.style.borderColor = rarityById(entry.rarityId)?.color ?? 'transparent';
+      cell.querySelector('b').textContent = entry.title;
+      press(cell, { sound: null });
+      cell.addEventListener('click', () => { synth.playTap(); openListSheet(entry); });
+      return cell;
+    }));
+    body.appendChild(grid);
+  });
+}
+
+function openListSheet(entry) {
+  openSheet(entry.title, (body) => {
+    let minutes = 60;
+    body.innerHTML = `
+      <div class="market-sheet">
+        <div class="market-head">
+          <span class="market-art is-big" style="border-color:${rarityById(entry.rarityId)?.color ?? 'transparent'}"></span>
+          <div class="market-lines">
+            <p class="market-line"><span>${esc(t('marketStartPrice'))}</span></p>
+            <input class="creator-input" type="number" inputmode="numeric" min="1" step="1" value="${entry.price}" data-price>
+            <p class="market-line" style="margin-top:10px"><span>${esc(t('marketDuration'))}</span></p>
+            <div class="market-durations" data-durations></div>
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" type="button" data-go></button>
+        <p class="frames-note" style="margin-top:10px">${esc(t('marketSnipeNote'))}</p>
+      </div>`;
+    const art = body.querySelector('.market-art');
+    if (entry.thumbnail) art.style.backgroundImage = `url("${String(entry.thumbnail).replace(/"/g, '%22')}")`;
+    const durations = body.querySelector('[data-durations]');
+    durations.replaceChildren(...AUCTION_MINUTES.map((m) => {
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `chip market-duration${m === minutes ? ' is-on' : ''}`;
+      chip.textContent = minutesLabel(m);
+      press(chip, { sound: null });
+      chip.addEventListener('click', () => {
+        minutes = m;
+        synth.playTap();
+        durations.querySelectorAll('.market-duration').forEach((c) => c.classList.toggle('is-on', c === chip));
+      });
+      return chip;
+    }));
+    const go = body.querySelector('[data-go]');
+    go.textContent = t('marketListGo');
+    press(go, { sound: null });
+    go.addEventListener('click', async () => {
+      if (state.market.busy) return;
+      const price = Math.floor(Number(body.querySelector('[data-price]').value) || 0);
+      if (price < 1) { synth.playDenied(); return; }
+      state.market.busy = true;
+      go.disabled = true;
+      // Escrow first: the card leaves the binder, and comes back by delivery
+      // if the call fails, the sale is withdrawn, or nobody bids.
+      const snapshot = { ...entry, count: 1, favorite: false };
+      store.sellCopy(state.collection, entry.key);
+      syncSoon();
+      try {
+        await account.createAuction(snapshot, price, minutes);
+        toast(t('marketListed', { card: esc(entry.title) }), 'ok');
+        synth.playResolved();
+        sheet.hide();
+        renderBinder();
+        refreshMarket({ quiet: true });
+      } catch (error) {
+        store.receiveCardEntry(state.collection, snapshot);
+        syncSoon();
+        toast(esc(marketError(error)), 'error');
+        synth.playDenied();
+        go.disabled = false;
+      }
+      state.market.busy = false;
+    });
+  });
+}
+
 /* --- badges ------------------------------------------------------------------------------
  * Holographic chips for the hard end of the achievement chains, between the
  * level card and the statistics. Locked chips stay visible in grey: a shelf
  * of things to want is worth more than a blank space. */
 
-function renderBadges() {
+function allBadgeStates() {
   const evaluated = evaluateAchievements(achFacts(), state.profile.achievements?.redeemed ?? []);
-  const states = badgeStates(evaluated);
+  return badgeStates(evaluated);
+}
+
+/** The chips actually on the profile: the chosen four, or, before anyone has
+ *  chosen, the best-ranked earned ones. */
+function wornBadges(states) {
+  const earned = states.filter((st) => st.rank > 0);
+  const chosen = state.badgeLoadout
+    .map((id) => earned.find((st) => st.badge.id === id))
+    .filter(Boolean);
+  if (chosen.length) return chosen.slice(0, 4);
+  return [...earned]
+    .sort((a, b) => (b.rank / b.max) - (a.rank / a.max) || b.rank - a.rank)
+    .slice(0, 4);
+}
+
+function badgeChip(st, { worn = false } = {}) {
+  const chip = document.createElement('button');
+  chip.type = 'button';
+  chip.className = `badge-chip${st.rank > 0 ? '' : ' is-locked'}`;
+  chip.innerHTML = `${badgeSvg(st.badge, st.rank, st.max, { size: 62 })}<b></b><span class="badge-rank"></span>`;
+  chip.querySelector('b').textContent = st.name;
+  const sub = chip.querySelector('.badge-rank');
+  if (worn) {
+    sub.replaceWith(Object.assign(document.createElement('span'),
+      { className: 'badge-equipped-tag', textContent: `${st.max > 1 && st.rank > 0 ? romanRank(st.rank) + ' · ' : ''}${t('badgeWornTag')}` }));
+  } else {
+    sub.textContent = st.max > 1 && st.rank > 0 ? romanRank(st.rank) : '';
+  }
+  press(chip, { sound: null });
+  chip.addEventListener('click', () => { synth.playTap(); openBadgeSheet(st); });
+  return chip;
+}
+
+function renderBadges() {
+  const states = allBadgeStates();
   const earned = states.filter((st) => st.rank > 0).length;
   el.badgesLabel.textContent = `${t('badgesTitle')} · ${earned}/${states.length}`;
 
-  el.badgeGrid.replaceChildren(...states.map((st) => {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = `badge-chip${st.rank > 0 ? '' : ' is-locked'}`;
-    chip.innerHTML = `${badgeSvg(st.badge, st.rank, st.max, { size: 62 })}<b></b><span class="badge-rank"></span>`;
-    chip.querySelector('b').textContent = st.name;
-    chip.querySelector('.badge-rank').textContent =
-      st.max > 1 && st.rank > 0 ? romanRank(st.rank) : '';
-    press(chip, { sound: null });
-    chip.addEventListener('click', () => { synth.playTap(); openBadgeSheet(st); });
-    return chip;
-  }));
+  // The way to the full shelf lives in the section head.
+  const head = el.badgesLabel.parentElement;
+  head.style.display = 'flex';
+  head.style.alignItems = 'center';
+  let manage = head.querySelector('.badges-manage');
+  if (!manage) {
+    manage = document.createElement('button');
+    manage.type = 'button';
+    manage.className = 'btn btn-sm btn-ghost badges-manage';
+    press(manage, { sound: null });
+    manage.addEventListener('click', () => { synth.playTap(); renderBadgesScreen(); showScreen('badges'); });
+    head.appendChild(manage);
+  }
+  manage.textContent = t('badgesAll');
+
+  const worn = wornBadges(states);
+  if (!worn.length) {
+    const note = document.createElement('p');
+    note.className = 'frames-note';
+    note.textContent = t('badgesNone');
+    el.badgeGrid.replaceChildren(note);
+    return;
+  }
+  el.badgeGrid.replaceChildren(...worn.map((st) => badgeChip(st)));
+}
+
+/** The Badges screen: every chip, with what is worn marked, four at most. */
+function renderBadgesScreen() {
+  const states = allBadgeStates();
+  el.badgesTitle.textContent = t('badgesTitle');
+  el.badgesIntro.textContent = t('badgesIntro');
+  const wornIds = new Set(wornBadges(states).map((st) => st.badge.id));
+  el.badgesAll.replaceChildren(...states.map((st) => badgeChip(st, { worn: wornIds.has(st.badge.id) })));
+}
+
+/** Put a chip on the profile, or take it off. A first explicit choice adopts
+ *  the automatic shelf as its starting point, so the tag and the button never
+ *  disagree about what "worn" means. */
+function toggleBadgeEquip(st) {
+  const states = allBadgeStates();
+  if (state.badgeLoadout.length === 0) {
+    state.badgeLoadout = wornBadges(states).map((w) => w.badge.id);
+  }
+  const worn = state.badgeLoadout;
+  const i = worn.indexOf(st.badge.id);
+  if (i >= 0) worn.splice(i, 1);
+  else {
+    if (worn.length >= 4) { toast(t('badgeLoadoutFull'), 'error'); synth.playDenied(); return false; }
+    worn.push(st.badge.id);
+  }
+  store.saveBadgeLoadout(worn);
+  synth.playResolved();
+  return true;
 }
 
 function openBadgeSheet(st) {
@@ -2869,6 +3385,21 @@ function openBadgeSheet(st) {
     const wrap = document.createElement('div');
     wrap.className = 'badge-sheet';
     wrap.innerHTML = `<div class="badge-sheet-chip"></div><p class="badge-sheet-line"></p><div class="badge-rungs"></div>`;
+    if (st.rank > 0) {
+      const wornNow = wornBadges(allBadgeStates()).some((w) => w.badge.id === st.badge.id);
+      const equip = document.createElement('button');
+      equip.type = 'button';
+      equip.className = `btn ${wornNow ? 'btn-ghost' : 'btn-primary'}`;
+      equip.textContent = wornNow ? t('badgeUnequip') : t('badgeEquip');
+      press(equip, { sound: null });
+      equip.addEventListener('click', () => {
+        if (!toggleBadgeEquip(st)) return;
+        sheet.hide();
+        if (state.tab === 'badges') renderBadgesScreen();
+        if (state.tab === 'profile') renderProfile();
+      });
+      wrap.insertBefore(equip, wrap.querySelector('.badge-rungs'));
+    }
     wrap.querySelector('.badge-sheet-chip').innerHTML = badgeSvg(st.badge, st.rank, st.max, { size: 120 });
     wrap.querySelector('.badge-sheet-line').textContent = st.rank > 0
       ? (st.max > 1 ? t('badgeRank', { n: romanRank(st.rank), max: romanRank(st.max) }) : t('badgeEarned'))
@@ -3316,6 +3847,7 @@ function reloadFromStorage() {
   state.inventory = store.loadInventory();
   state.profile = store.loadProfile();
   state.frameStyle = store.loadFrameStyle() ?? DEFAULT_FRAME_STYLE;
+  state.badgeLoadout = store.loadBadgeLoadout();
   state.customPacks = store.loadCustomPacks();
   state.wallet = store.loadWallet();
   applySettings();
@@ -3520,6 +4052,14 @@ async function collectDeliveries() {
     } else if (item.kind === 'trade-return' && Array.isArray(item.payload?.cards)) {
       for (const card of item.payload.cards) store.receiveCardEntry(state.collection, card);
       pushNote('trade', t('notifTradeDone', { name: esc(from) }), 'binder');
+    } else if (item.kind === 'auction-card' && item.payload?.key) {
+      store.receiveCardEntry(state.collection, item.payload);
+      pushNote('trade', t('notifAuctionCard', { card: esc(item.payload.title ?? '?') }), 'binder');
+    } else if (item.kind === 'auction-money' && Number.isFinite(item.payload?.amount)) {
+      store.saveWallet(store.loadWallet() + item.payload.amount);
+      refreshWallet();
+      pushNote('trade', t(item.payload.reason === 'sale' ? 'notifAuctionSold' : 'notifAuctionRefund',
+        { amount: money(item.payload.amount), card: esc(item.payload.title ?? '?') }), 'shop');
     }
     await account.claimDelivery(item.id);
   }
@@ -5665,6 +6205,8 @@ function init() {
 
   el.oddsIcon.innerHTML = iconSvg('gem', { size: 15 });
   el.oddsBtn.addEventListener('click', openOdds);
+  el.marketSell.addEventListener('click', () => { synth.playTap(); openSellSheet(); });
+  press(el.marketSell, { sound: null });
   document.querySelectorAll('.help-btn').forEach((button) => {
     press(button, { sound: null });
     button.addEventListener('click', () => { synth.playTap(); openHelp(button.dataset.help); });

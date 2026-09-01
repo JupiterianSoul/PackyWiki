@@ -18,6 +18,25 @@
  */
 import { themeById, DEFAULT_THEME } from './themes.js';
 
+/* Two themes speak in recordings instead of synthesis: short CC0 one-shots
+ * (from the uisfx project, dedicated to the public domain - see
+ * src/assets/sfx/LICENSE.md) bundled as data URIs so they play with the app,
+ * offline included. Everything else in this file still applies to them: the
+ * samples run through the same bus, room, tilt and trim as the synth. */
+const KIT_URIS = import.meta.glob('../assets/sfx/*/*.ogg', { eager: true, query: '?inline', import: 'default' });
+
+const kitBytes = async (uri) => {
+  const text = String(uri);
+  if (!text.startsWith('data:')) {
+    // A file that outgrew the inline limit: fall back to fetching it.
+    return (await fetch(text)).arrayBuffer();
+  }
+  const raw = atob(text.slice(text.indexOf(',') + 1));
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+  return bytes.buffer;
+};
+
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 
 /** Equal temperament from a root, in semitones. */
@@ -29,6 +48,8 @@ class Synth {
     this.muted = false;
     this.theme = themeById(DEFAULT_THEME);
     this.nodes = null;
+    this.kitName = null;                 // sample kit of the current theme
+    this.kitBuffers = new Map();         // event -> decoded AudioBuffer
   }
 
   /* --- graph ------------------------------------------------------------- */
@@ -119,6 +140,45 @@ class Synth {
     filter.frequency.setTargetAtTime(s.filter, t, 0.05);
     send.gain.setTargetAtTime(s.reverb.mix, t, 0.05);
     reverb.buffer = this.#impulse(s.reverb.seconds, s.reverb.decay);
+    this.#loadKit(s.kit ?? null);
+  }
+
+  /* --- sample kits -------------------------------------------------------- */
+
+  /** Decode the theme's kit, if it has one. Decoding is async; until an
+   *  event's buffer lands, the synth keeps covering that event. */
+  #loadKit(name) {
+    if (name === this.kitName) return;
+    this.kitName = name;
+    this.kitBuffers = new Map();
+    if (!name) return;
+    const prefix = `../assets/sfx/${name}/`;
+    for (const [path, uri] of Object.entries(KIT_URIS)) {
+      if (!path.startsWith(prefix)) continue;
+      const event = path.slice(prefix.length).replace(/\.ogg$/, '');
+      kitBytes(uri)
+        .then((bytes) => this.ctx.decodeAudioData(bytes))
+        .then((buffer) => { if (this.kitName === name) this.kitBuffers.set(event, buffer); })
+        .catch(() => { /* an undecodable file just stays on the synth */ });
+    }
+  }
+
+  /** Play one kit sample through the theme's graph. True when it played;
+   *  false hands the moment back to the synth. `vary` adds a whisper of
+   *  random pitch so the most frequent sounds never repeat exactly. */
+  #kit(event, { rate = 1, gain = 1, vary = 0, at = 0 } = {}) {
+    if (!this.kitName) return false;
+    const buffer = this.kitBuffers.get(event);
+    if (!buffer) return false;
+    const src = this.ctx.createBufferSource();
+    src.buffer = buffer;
+    src.playbackRate.value = rate * (1 + (Math.random() - 0.5) * vary);
+    const out = this.ctx.createGain();
+    out.gain.value = 0.34 * gain;
+    src.connect(out);
+    out.connect(this.nodes.bus);
+    src.start(this.ctx.currentTime + at);
+    return true;
   }
 
   /** A generated room. Cheaper and smaller than shipping an impulse file. */
@@ -438,6 +498,7 @@ class Synth {
    *  three chord tones and the gain breathes a little. */
   playTap() {
     if (!this.#ready()) return;
+    if (this.#kit('press', { gain: 0.55, vary: 0.08 })) return;
     this.#transient(0.06 + Math.random() * 0.02);
     const deg = [1, 2, 4][Math.floor(Math.random() * 3)];
     this.#note({ freq: this.#degree(deg, 1), dur: 0.08, gain: 0.042 + Math.random() * 0.016 });
@@ -446,6 +507,7 @@ class Synth {
   /** The side drawer sliding in or away: felt, not glass. */
   playDrawer(open = true) {
     if (!this.#ready()) return;
+    if (this.#kit(open ? 'expand' : 'collapse', { gain: 0.7 })) return;
     this.#noise({
       dur: 0.22, gain: 0.05, type: 'lowpass',
       from: open ? 300 : 900, to: open ? 900 : 300, q: 0.7
@@ -456,6 +518,7 @@ class Synth {
   /** A favourite star turning on (a bright doublet) or off (a soft step down). */
   playFav(on = true) {
     if (!this.#ready()) return;
+    if (this.#kit(on ? 'check' : 'uncheck', { gain: 0.75 })) return;
     if (on) {
       this.#note({ freq: this.#degree(5, 1), dur: 0.1, gain: 0.06 });
       this.#note({ freq: this.#degree(7, 1), at: 0.06, dur: 0.16, gain: 0.055 });
@@ -468,6 +531,7 @@ class Synth {
   /** An album page turning: paper, then the soft landing of the spread. */
   playPageTurn() {
     if (!this.#ready()) return;
+    if (this.#kit('swipe', { rate: 0.92, gain: 0.7 })) return;
     this.#noise({ dur: 0.16, gain: 0.1, type: 'bandpass', from: 1600, to: 3400, q: 0.7 });
     this.#noise({ at: 0.1, dur: 0.1, gain: 0.08, type: 'bandpass', from: 2800, to: 600, q: 1 });
     this.#note({ freq: this.#degree(2, 0), at: 0.16, dur: 0.12, gain: 0.035 });
@@ -477,6 +541,7 @@ class Synth {
   playAchievement() {
     if (!this.#ready()) return;
     this.resume();
+    if (this.#kit('achievement')) return;
     [0, 4, 7, 9].forEach((deg, i) => {
       this.#note({ freq: this.#degree(deg, 1), at: i * 0.09, dur: 0.55, gain: 0.11 });
     });
@@ -487,6 +552,7 @@ class Synth {
   /** A message arriving in a chat. Small, bright, unmistakable. */
   playMessage() {
     if (!this.#ready()) return;
+    if (this.#kit('notification', { gain: 0.8 })) return;
     this.#note({ freq: this.#degree(4, 1), dur: 0.12, gain: 0.07 });
     this.#note({ freq: this.#degree(6, 1), at: 0.07, dur: 0.18, gain: 0.06 });
   }
@@ -495,6 +561,7 @@ class Synth {
   playTrade() {
     if (!this.#ready()) return;
     this.resume();
+    if (this.#kit('checkout')) return;
     this.#note({ freq: this.#degree(0, 1), dur: 0.2, gain: 0.09 });
     this.#note({ freq: this.#degree(3, 1), at: 0.09, dur: 0.24, gain: 0.09 });
     this.#note({ freq: this.#degree(5, 1), at: 0.18, dur: 0.4, gain: 0.1 });
@@ -504,6 +571,7 @@ class Synth {
   /** Moving between destinations. Direction is audible. */
   playNav(forward = true) {
     if (!this.#ready()) return;
+    if (this.#kit('select', { rate: forward ? 1 : 0.94, gain: 0.6, vary: 0.04 })) return;
     this.#transient(0.05);
     this.#note({ freq: this.#degree(forward ? 1 : 3, 1), dur: 0.12, gain: 0.06, bend: forward ? 0.04 : -0.03 });
     this.#note({ freq: this.#degree(forward ? 3 : 1, 1), at: 0.045, dur: 0.16, gain: 0.05 });
@@ -512,6 +580,7 @@ class Synth {
   /** A switch. On and off are different sounds, not the same one twice. */
   playToggle(on) {
     if (!this.#ready()) return;
+    if (this.#kit(on ? 'toggle-on' : 'toggle-off', { gain: 0.7 })) return;
     this.#transient(0.06);
     this.#note({ freq: this.#degree(on ? 4 : 0, on ? 1 : 0), dur: 0.12, gain: 0.07 });
   }
@@ -519,6 +588,7 @@ class Synth {
   /** A sheet or dialog arriving or leaving. */
   playSheet(open = true) {
     if (!this.#ready()) return;
+    if (this.#kit(open ? 'open' : 'close', { gain: 0.7 })) return;
     this.#noise({
       dur: 0.3, gain: 0.06, type: 'bandpass',
       from: open ? 400 : 2200, to: open ? 2200 : 400, q: 0.8
@@ -529,6 +599,7 @@ class Synth {
   /** The shelf settling onto a booster. */
   playSnap() {
     if (!this.#ready()) return;
+    if (this.#kit('snap', { gain: 0.5, vary: 0.05 })) return;
     this.#transient(0.05);
     this.#note({ freq: this.#degree(4, 1), dur: 0.06, gain: 0.04 });
   }
@@ -571,12 +642,14 @@ class Synth {
   /** A card turning over. */
   playFlip() {
     if (!this.#ready()) return;
+    if (this.#kit('swipe', { gain: 0.65, vary: 0.06 })) return;
     this.#noise({ dur: 0.15, gain: 0.12, type: 'bandpass', from: 2400, to: 700, q: 1.3 });
   }
 
   /** A card opening to full size. */
   playCardOpen() {
     if (!this.#ready()) return;
+    if (this.#kit('open', { rate: 1.12, gain: 0.75 })) return;
     this.#noise({ dur: 0.13, gain: 0.09, type: 'bandpass', from: 1700, to: 900, q: 1.4 });
     this.#note({ freq: this.#degree(3, 1), at: 0.02, dur: 0.26, gain: 0.06 });
   }
@@ -584,6 +657,7 @@ class Synth {
   /** Money arriving. */
   playCoins() {
     if (!this.#ready()) return;
+    if (this.#kit('bonus')) return;
     this.resume();
     [4, 5, 7].forEach((deg, i) => {
       this.#note({ freq: this.#degree(deg, 1), at: i * 0.05, dur: 0.3, gain: 0.1 });
@@ -599,6 +673,7 @@ class Synth {
   /** Money leaving, and something arriving in its place. */
   playPurchase() {
     if (!this.#ready()) return;
+    if (this.#kit('purchase')) return;
     this.resume();
     this.#note({ freq: this.#degree(0), dur: 0.3, gain: 0.13 });
     this.#note({ freq: this.#degree(2), at: 0.08, dur: 0.32, gain: 0.12 });
@@ -609,6 +684,7 @@ class Synth {
   /** Refused. */
   playDenied() {
     if (!this.#ready()) return;
+    if (this.#kit('blocked', { gain: 0.8 })) return;
     this.#note({ freq: this.#degree(0, -1), dur: 0.14, gain: 0.1, bend: -0.12 });
     this.#note({ freq: this.#degree(0, -1) * 0.94, at: 0.1, dur: 0.22, gain: 0.09 });
   }
@@ -616,6 +692,7 @@ class Synth {
   /** Arming something destructive. Unsettled on purpose. */
   playArm() {
     if (!this.#ready()) return;
+    if (this.#kit('warning', { gain: 0.75 })) return;
     this.#note({ freq: this.#degree(1), dur: 0.1, gain: 0.08, bend: 0.06 });
     this.#note({ freq: this.#degree(2, 1), at: 0.06, dur: 0.14, gain: 0.05 });
   }
@@ -623,6 +700,7 @@ class Synth {
   /** A gift being taken. */
   playGift() {
     if (!this.#ready()) return;
+    if (this.#kit('reward')) return;
     this.resume();
     [2, 4, 6].forEach((deg, i) => {
       this.#note({ freq: this.#degree(deg, 1), at: i * 0.07, dur: 0.44, gain: 0.11 });
@@ -633,6 +711,7 @@ class Synth {
   /** Crossing a level. */
   playLevelUp() {
     if (!this.#ready()) return;
+    if (this.#kit('level-up')) return;
     this.resume();
     [0, 2, 4, 6, 8].forEach((deg, i) => {
       this.#note({ freq: this.#degree(deg, 1), at: i * 0.085, dur: 0.8, gain: 0.12 });
@@ -644,12 +723,14 @@ class Synth {
   /** XP landing. Tiny: it fires on every pack. */
   playXp() {
     if (!this.#ready()) return;
+    if (this.#kit('progress-step', { gain: 0.45, vary: 0.05 })) return;
     this.#note({ freq: this.#degree(5, 1), dur: 0.13, gain: 0.05, bend: 0.08 });
   }
 
   /** A timed booster becoming available. */
   playReady() {
     if (!this.#ready()) return;
+    if (this.#kit('wake', { gain: 0.8 })) return;
     this.#note({ freq: this.#degree(4, 1), dur: 0.2, gain: 0.07 });
     this.#note({ freq: this.#degree(6, 1), at: 0.09, dur: 0.3, gain: 0.06 });
   }
@@ -657,6 +738,7 @@ class Synth {
   /** A custom wiki resolved. */
   playResolved() {
     if (!this.#ready()) return;
+    if (this.#kit('success', { gain: 0.85 })) return;
     this.#note({ freq: this.#degree(0, 1), dur: 0.26, gain: 0.09 });
     this.#note({ freq: this.#degree(4, 1), at: 0.09, dur: 0.36, gain: 0.09 });
   }
@@ -664,6 +746,7 @@ class Synth {
   /** The starter kit and the restock bonus. */
   playFanfare() {
     if (!this.#ready()) return;
+    if (this.#kit('streak')) return;
     this.resume();
     [0, 2, 4, 7].forEach((deg, i) => {
       this.#note({ freq: this.#degree(deg, 1), at: i * 0.1, dur: 0.75, gain: 0.12 });
@@ -674,6 +757,7 @@ class Synth {
   /** Switching theme: a short signature in the theme you just switched TO. */
   playTheme() {
     if (!this.#ready()) return;
+    if (this.#kit('toggle-on', { rate: 0.9, gain: 0.7 })) return;
     this.resume();
     [0, 2, 4].forEach((deg, i) => {
       this.#note({ freq: this.#degree(deg, 1), at: i * 0.075, dur: 0.6, gain: 0.11 });
@@ -687,6 +771,7 @@ class Synth {
    */
   playReveal(rank = 0) {
     if (!this.#ready()) return;
+    if (this.#kit('drop', { rate: 1 + rank * 0.05, gain: 0.6 + rank * 0.07 })) return;
     this.resume();
     const tier = clamp(rank, 0, 7);
     const voices = 2 + Math.floor(tier * 0.7);

@@ -144,6 +144,50 @@ export const THEMES = [
       drive: 0,
       transient: 'brush'
     }
+  },
+  {
+    id: 'cartoon',
+    name: { en: 'Cartoon', fr: 'Cartoon' },
+    blurb: {
+      en: 'Saturday morning. Thick ink, bouncy everything, rubber sounds.',
+      fr: 'Dessin animé du samedi matin. Encre épaisse, rebonds partout, sons en caoutchouc.'
+    },
+    swatch: ['#fff8e7', '#ff4757', '#3aa0ff'],
+    backdrop: { renderer: 'toon', speed: 0.00012 },
+    motion: { scale: 1.05, ease: 'cubic-bezier(0.25, 1, 0.5, 1)', pop: 'cubic-bezier(0.28, 2.1, 0.5, 1)' },
+    sound: {
+      voice: 'marimba',       // woody and toony under the samples
+      gain: 0.68,
+      root: 329.63,           // E4
+      scale: [0, 2, 4, 7, 9],
+      reverb: { seconds: 1.1, decay: 2.6, mix: 0.16 },
+      filter: 5600,
+      drive: 0.05,
+      transient: 'brush',
+      kit: 'rubber'           // CC0 recordings; see src/assets/sfx/LICENSE.md
+    }
+  },
+  {
+    id: 'matrix',
+    name: { en: 'Matrix', fr: 'Matrix' },
+    blurb: {
+      en: 'Green rain on black glass. Terminal type, digital sounds.',
+      fr: 'Pluie verte sur verre noir. Police de terminal, sons numériques.'
+    },
+    swatch: ['#020a04', '#00ff41', '#0f5c2e'],
+    backdrop: { renderer: 'matrix', speed: 0.00018 },
+    motion: { scale: 0.5, ease: 'cubic-bezier(0.3, 0, 0.2, 1)', pop: 'cubic-bezier(0.3, 1.2, 0.4, 1)' },
+    sound: {
+      voice: 'chip',          // square-wave blips read as terminal
+      gain: 0.5,
+      root: 220,              // A3
+      scale: [0, 3, 5, 7, 10],
+      reverb: { seconds: 1.4, decay: 2.4, mix: 0.2 },
+      filter: 3400,
+      drive: 0.18,
+      transient: 'air',
+      kit: 'scifi'            // CC0 recordings; see src/assets/sfx/LICENSE.md
+    }
   }
 ];
 

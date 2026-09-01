@@ -436,3 +436,166 @@ as $$
 $$;
 
 notify pgrst, 'reload schema';
+
+-- ============================================================================
+-- V3 - the market: auctions
+-- ============================================================================
+-- Any player can put a card up; everyone can bid. The rules that make it
+-- fair live HERE, not in the app: the 15% minimum raise, the anti-snipe
+-- clock, the no-cancel-once-bid rule and settlement are all enforced by
+-- definer functions, so no client - however modified - can bend them.
+--
+-- Money and cards move by the same postbox as gifts and trades: the bidder's
+-- app deducts its own wallet when it bids; refunds, payouts and the card
+-- itself arrive as deliveries that each app applies to its own save.
+
+-- The postbox learns the two auction parcels.
+alter table public.deliveries drop constraint if exists deliveries_kind_check;
+alter table public.deliveries add constraint deliveries_kind_check
+  check (kind in ('card', 'booster', 'trade-return', 'auction-card', 'auction-money'));
+
+create table if not exists public.auctions (
+  id           uuid primary key default gen_random_uuid(),
+  seller       uuid not null references auth.users on delete cascade,
+  seller_name  text not null default '',
+  card         jsonb not null,
+  start_price  integer not null check (start_price between 1 and 1000000),
+  current_bid  integer,
+  bidder       uuid references auth.users on delete set null,
+  bidder_name  text,
+  bid_count    integer not null default 0,
+  ends_at      timestamptz not null,
+  status       text not null default 'open'
+                 check (status in ('open', 'settled', 'cancelled')),
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists auctions_open_idx on public.auctions (status, ends_at);
+create index if not exists auctions_seller_idx on public.auctions (seller);
+
+alter table public.auctions enable row level security;
+
+-- Reading is open to every signed-in player; every WRITE goes through the
+-- functions below, so there are deliberately no insert/update policies.
+drop policy if exists "auctions are readable by signed-in players" on public.auctions;
+create policy "auctions are readable by signed-in players"
+  on public.auctions for select
+  to authenticated
+  using (true);
+
+-- The next acceptable bid: the asking price untouched, then +15%, rounded up.
+create or replace function public.auction_floor(a public.auctions)
+returns integer
+language sql immutable as $$
+  select case when a.current_bid is null then a.start_price
+              else ceil(a.current_bid * 1.15)::integer end;
+$$;
+
+-- List a card. At most ten open per seller; the durations are the seven the
+-- app offers, nothing else.
+create or replace function public.create_auction(card jsonb, price integer, minutes integer)
+returns public.auctions
+language plpgsql security definer set search_path = public as $$
+declare mine integer; row_out public.auctions;
+begin
+  if auth.uid() is null then raise exception 'AUTH'; end if;
+  if minutes not in (10, 30, 60, 180, 360, 720, 1440) then raise exception 'BAD_DURATION'; end if;
+  if price is null or price < 1 or price > 1000000 then raise exception 'BAD_PRICE'; end if;
+  select count(*) into mine from auctions where seller = auth.uid() and status = 'open';
+  if mine >= 10 then raise exception 'TOO_MANY'; end if;
+  insert into auctions (seller, seller_name, card, start_price, ends_at)
+  values (auth.uid(),
+          coalesce((select username from profiles where id = auth.uid()), ''),
+          card, price, now() + make_interval(mins => minutes))
+  returning * into row_out;
+  return row_out;
+end $$;
+
+-- Bid. The floor is enforced here; a bid inside the last ten seconds winds
+-- the clock back up to 65, so sniping the final second buys nothing. The
+-- outbid player's money goes straight back out as a delivery.
+create or replace function public.place_bid(auction uuid, amount integer)
+returns public.auctions
+language plpgsql security definer set search_path = public as $$
+declare a public.auctions; row_out public.auctions;
+begin
+  if auth.uid() is null then raise exception 'AUTH'; end if;
+  select * into a from auctions where id = auction for update;
+  if a.id is null then raise exception 'NOT_FOUND'; end if;
+  if a.status <> 'open' or now() >= a.ends_at then raise exception 'ENDED'; end if;
+  if a.seller = auth.uid() then raise exception 'OWN_AUCTION'; end if;
+  if amount is null or amount < auction_floor(a) then raise exception 'TOO_LOW'; end if;
+  if a.bidder is not null then
+    insert into deliveries (sender, recipient, kind, payload)
+    values (a.seller, a.bidder, 'auction-money',
+            jsonb_build_object('amount', a.current_bid, 'reason', 'refund',
+                               'title', a.card->>'title'));
+  end if;
+  update auctions set
+    current_bid = amount,
+    bidder = auth.uid(),
+    bidder_name = coalesce((select username from profiles where id = auth.uid()), ''),
+    bid_count = bid_count + 1,
+    ends_at = case when ends_at - now() < interval '10 seconds'
+                   then now() + interval '65 seconds' else ends_at end
+  where id = auction
+  returning * into row_out;
+  return row_out;
+end $$;
+
+-- Withdraw a listing. Only the seller, and only while nobody has bid.
+create or replace function public.cancel_auction(auction uuid)
+returns public.auctions
+language plpgsql security definer set search_path = public as $$
+declare a public.auctions; row_out public.auctions;
+begin
+  if auth.uid() is null then raise exception 'AUTH'; end if;
+  select * into a from auctions where id = auction for update;
+  if a.id is null then raise exception 'NOT_FOUND'; end if;
+  if a.seller <> auth.uid() then raise exception 'NOT_YOURS'; end if;
+  if a.status <> 'open' then raise exception 'ENDED'; end if;
+  if a.bid_count > 0 then raise exception 'HAS_BIDS'; end if;
+  update auctions set status = 'cancelled' where id = auction returning * into row_out;
+  insert into deliveries (sender, recipient, kind, payload)
+  values (a.seller, a.seller, 'auction-card', a.card);
+  return row_out;
+end $$;
+
+-- Close a finished auction. Anyone may ring the bell - the checks make it
+-- run exactly once - so the market needs no clock of its own: whichever app
+-- first notices the timer at zero settles it for everyone.
+create or replace function public.settle_auction(auction uuid)
+returns public.auctions
+language plpgsql security definer set search_path = public as $$
+declare a public.auctions; row_out public.auctions;
+begin
+  if auth.uid() is null then raise exception 'AUTH'; end if;
+  select * into a from auctions where id = auction for update;
+  if a.id is null then raise exception 'NOT_FOUND'; end if;
+  if a.status <> 'open' then return a; end if;
+  if now() < a.ends_at then raise exception 'NOT_OVER'; end if;
+  update auctions set status = 'settled' where id = auction returning * into row_out;
+  if a.bidder is null then
+    insert into deliveries (sender, recipient, kind, payload)
+    values (a.seller, a.seller, 'auction-card', a.card);
+  else
+    insert into deliveries (sender, recipient, kind, payload)
+    values (a.seller, a.bidder, 'auction-card', a.card);
+    insert into deliveries (sender, recipient, kind, payload)
+    values (a.bidder, a.seller, 'auction-money',
+            jsonb_build_object('amount', a.current_bid, 'reason', 'sale',
+                               'title', a.card->>'title'));
+  end if;
+  return row_out;
+end $$;
+
+grant execute on function public.create_auction(jsonb, integer, integer) to authenticated;
+grant execute on function public.place_bid(uuid, integer) to authenticated;
+grant execute on function public.cancel_auction(uuid) to authenticated;
+grant execute on function public.settle_auction(uuid) to authenticated;
+
+-- Live updates for every open market screen. If the publication does not
+-- exist on this project the two lines can be skipped; the app also polls.
+do $$ begin
+  alter publication supabase_realtime add table public.auctions;
+exception when others then null; end $$;
