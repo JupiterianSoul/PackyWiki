@@ -40,7 +40,7 @@ export function specId(spec) {
 /**
  * Display name. A booster tied to a subject leads with the subject and adds
  * the tier; one that isn't is named for its tier alone, because "All boosters
- * · Artifact" reads like a filter rather than a product.
+ * · Prismatic" reads like a filter rather than a product.
  */
 export function specName(spec) {
   const tier = spec.rarityId ? tx(rarityById(spec.rarityId).name) : null;

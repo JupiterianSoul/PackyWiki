@@ -14,7 +14,7 @@
  *
  * Rewards scale with difficulty, deliberately stingy at the bottom: the first
  * rung of anything pays pocket change, the middle pays real coins, and only
- * the rungs that take weeks pay in boosters - up to an Artifact pack for the
+ * the rungs that take weeks pay in boosters - up to a Prismatic pack for the
  * level cap. Easy money here was quietly out-earning the shop.
  */
 import { tx } from './i18n.js';
@@ -25,7 +25,7 @@ import { tx } from './i18n.js';
  */
 export function measure({ profile, entries, albumsDeep, albumsStarted = 0, customPacks, friends, wallet = 0 }) {
   const rc = profile.rarityCounts ?? {};
-  const high = ['legendary', 'mythic', 'exotic', 'artifact']
+  const high = ['legendary', 'mythic', 'exotic', 'prismatic']
     .reduce((sum, id) => sum + (rc[id] ?? 0), 0);
   return {
     boosters: profile.boostersOpened ?? 0,
@@ -36,7 +36,7 @@ export function measure({ profile, entries, albumsDeep, albumsStarted = 0, custo
     albumsDeep,
     albumsStarted,
     legendaries: high,
-    artifacts: rc.artifact ?? 0,
+    prismatics: rc.prismatic ?? 0,
     // Builds ever, not packs currently on the shelf: deleting one must not
     // take an achievement back. The max() keeps old saves whole, since the
     // counter only started existing after their packs did.
@@ -143,7 +143,7 @@ export const ACHIEVEMENTS = [
       [100, pack('legendary', 6), { en: 'The third digit', fr: 'Le troisième chiffre' }],
       [200, pack('mythic', 6),    { en: 'Beyond the clouds', fr: 'Au-dessus des nuages' }],
       [350, pack('exotic', 6),    { en: 'Stratosphere', fr: 'Stratosphère' }],
-      [500, pack('artifact', 6),  { en: 'The summit', fr: 'Le sommet' }]
+      [500, pack('prismatic', 6), { en: 'The summit', fr: 'Le sommet' }]
     ]),
 
   // --- albums with real depth --------------------------------------------
@@ -183,14 +183,14 @@ export const ACHIEVEMENTS = [
       [120, pack('exotic', 5),    { en: 'Walking supernova', fr: 'Supernova ambulante' }]
     ]),
 
-  ...chain('artifact', 'gem', 'artifacts',
+  ...chain('prismatic', 'gem', 'prismatics',
     (n) => n === 1
-      ? { en: 'Pull an Artifact', fr: 'Tirez un Artefact' }
-      : { en: `Pull ${en(n)} Artifacts`, fr: `Tirez ${fr(n)} Artefacts` },
+      ? { en: 'Pull a Prismatic', fr: 'Tirez une Prismatique' }
+      : { en: `Pull ${en(n)} Prismatics`, fr: `Tirez ${fr(n)} Prismatiques` },
     [
-      [1,  pack('epic', 5),     { en: 'The relic', fr: 'La relique' }],
-      [5,  pack('mythic', 5),   { en: 'Reliquary', fr: 'Reliquaire' }],
-      [15, pack('artifact', 5), { en: 'Museum piece', fr: 'Pièce de musée' }]
+      [1,  pack('epic', 5),      { en: 'First light', fr: 'Première lumière' }],
+      [5,  pack('mythic', 5),    { en: 'Spectrum', fr: 'Spectre' }],
+      [15, pack('prismatic', 5), { en: 'Full spectrum', fr: 'Spectre complet' }]
     ]),
 
   // --- the forge ---

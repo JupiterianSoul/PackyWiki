@@ -85,7 +85,7 @@ const DRAW_HARD_LIMIT = 13000;
 const PREFETCH_DELAY = 350;
 /** How long the last card stays up before the summary takes over. */
 const LAST_CARD_HOLD = 2000;
-const TILT_MAX = 16;
+const TILT_REACH = 110; // pixels of drag for a full lean
 
 const $ = (sel) => document.querySelector(sel);
 const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
@@ -1913,7 +1913,7 @@ async function runOpen(booster) {
 
 const CARD_FRONT_MARKUP = `
   <div class="fx fx-a" aria-hidden="true"></div>
-  <div class="fx-c" aria-hidden="true"></div>
+  <div class="fx-code" aria-hidden="true"></div>
   <div class="fx-art" aria-hidden="true"></div>
   <div class="card-art"></div>
   <button class="fav-button" type="button" aria-pressed="false"></button>
@@ -1924,6 +1924,7 @@ const CARD_FRONT_MARKUP = `
   </div>
   <div class="card-stats"><span class="card-price"></span><span class="card-views"></span></div>
   <div class="card-footer"><span class="rarity-badge"></span></div>
+  <div class="fx-p" aria-hidden="true"></div>
   <div class="fx fx-b" aria-hidden="true"></div>
   <div class="fx-ring" aria-hidden="true"></div>`;
 
@@ -1956,8 +1957,12 @@ function applyRarityVars(node, rarity) {
 function fillFront(front, data, rarity, { ownedTag = false } = {}) {
   const art = front.querySelector('.card-art');
   art.replaceChildren();
-  const fallback = () => art.insertAdjacentHTML('afterbegin',
-    `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 38 })}</div>`);
+  art.classList.remove('is-small-art', 'is-no-art');
+  const fallback = () => {
+    art.classList.add('is-no-art');
+    art.insertAdjacentHTML('afterbegin',
+      `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 38 })}</div>`);
+  };
 
   if (data.thumbnail) {
     const img = document.createElement('img');
@@ -1972,6 +1977,7 @@ function fillFront(front, data, rarity, { ownedTag = false } = {}) {
   } else {
     fallback();
   }
+  dressFront(front, data, rarity);
 
   front.querySelector('.card-title').textContent = data.title;
   // In the rooms where you browse cards that are not necessarily yours (the
@@ -1989,6 +1995,68 @@ function fillFront(front, data, rarity, { ownedTag = false } = {}) {
   front.querySelector('.card-price').innerHTML = money(data.price);
   front.querySelector('.card-views').textContent =
     data.views ? t('viewsPerMonth', { views: formatViews(data.views) }) : bandFor(data.popularity ?? 0).name;
+}
+
+/*
+ * The pieces a treatment cannot draw in CSS alone: the sparks and embers
+ * (one element each, so they can rise on their own clocks), the hologram's
+ * scrolling wikitext, written from the card's own article, and the picture
+ * as a custom property so the mythic glitch can tear a copy of it.
+ */
+function dressFront(front, data, rarity) {
+  const particles = front.querySelector('.fx-p');
+  const code = front.querySelector('.fx-code');
+  particles?.replaceChildren();
+  code?.replaceChildren();
+  front.style.setProperty('--art',
+    data.thumbnail ? `url("${String(data.thumbnail).replace(/["\\]/g, '\\$&')}")` : 'none');
+  if (rarity.id === 'legendary' && particles) {
+    particles.replaceChildren(...sparks(6, { d: [4.5, 7.5] }));
+  } else if (rarity.id === 'mythic' && particles) {
+    particles.replaceChildren(...sparks(8, { d: [3, 5.5], s: [2, 3], c: ['#ffb347', '#ff5a1f'] }));
+  } else if (rarity.id === 'exotic' && code) {
+    const lines = wikitextLines(data);
+    code.replaceChildren(...[['6%', '14s'], ['38%', '19s'], ['70%', '11s']].map(([x, d], i) => {
+      const col = document.createElement('span');
+      col.className = 'col';
+      col.style.setProperty('--x', x);
+      col.style.setProperty('--d', d);
+      const text = Array.from({ length: 14 }, (_, k) => lines[(k * 5 + i * 3) % lines.length]).join('\n');
+      // The text twice over: the loop scrolls exactly half its height.
+      col.textContent = `${text}\n${text}`;
+      return col;
+    }));
+  }
+}
+
+function sparks(n, { d, s = null, c = null }) {
+  const between = (a, b, dp = 1) => (a + Math.random() * (b - a)).toFixed(dp);
+  return Array.from({ length: n }, (_, i) => {
+    const spark = document.createElement('i');
+    spark.style.setProperty('--x', `${between(6, 94, 0)}%`);
+    spark.style.setProperty('--d', `${between(d[0], d[1])}s`);
+    spark.style.setProperty('--delay', `-${between(0, 8)}s`);
+    spark.style.setProperty('--sx', `${between(-6, 6, 0)}px`);
+    if (s) spark.style.setProperty('--s', `${between(s[0], s[1])}px`);
+    if (c) spark.style.setProperty('--c', c[i % c.length]);
+    return spark;
+  });
+}
+
+/** The article as its editors see it: the source of the hologram's code. */
+function wikitextLines(data) {
+  const title = String(data.title ?? '');
+  const desc = String(data.description || data.sourceName || '');
+  const words = String(data.extract ?? '').split(/\s+/).filter(Boolean);
+  const run = (i, n = 3) => words.slice(i, i + n).join(' ') || title;
+  const cut = (line) => (line.length > 22 ? `${line.slice(0, 21)}\u2026` : line);
+  return [
+    '{{Infobox', `| name = ${title}`, `| type = ${desc}`, `| views = ${data.views ?? '?'}`, '}}',
+    `'''${title}''' is`, run(3), `<ref name="${title.toLowerCase().replace(/\s+/g, '')}">`,
+    `{{cite web|url=${data.url ?? ''}}}`, '</ref>', '== History ==', run(8),
+    `[[Category:${desc}]]`, `{{Main|${title}}}`, `[[File:${title}.jpg|thumb]]`, run(13),
+    '== See also ==', `* [[${run(18, 2)}]]`
+  ].map(cut);
 }
 
 function wireFavButton(button, entryKey) {
@@ -2029,8 +2097,9 @@ function bindCards(pulls) {
 
 /* --- reveal ---------------------------------------------------------------------------------- */
 
-/** A held card only leans: it turns on its own axes rather than travelling. */
-function layoutDeck(tiltX = 0, tiltY = 0) {
+/* The fan of the deck. The held card's lean is not here: it is the tilt
+   engine's, written as custom properties the front face reads. */
+function layoutDeck() {
   state.cards.forEach((card, i) => {
     const offset = i - state.index;
     if (offset < 0) {
@@ -2042,10 +2111,9 @@ function layoutDeck(tiltX = 0, tiltY = 0) {
     const depth = Math.min(3, offset);
     card.style.zIndex = String(50 - offset);
     card.style.opacity = '1';
-    const lean = offset === 0 ? `rotateY(${tiltX}deg) rotateX(${tiltY}deg)` : '';
     card.style.transform =
       `translate(${depth * 5}px, ${depth * 9}px) rotate(${depth * 1.3}deg) ` +
-      `scale(${(1 - depth * 0.04).toFixed(3)}) ${lean}`;
+      `scale(${(1 - depth * 0.04).toFixed(3)})`;
   });
 }
 
@@ -2059,6 +2127,7 @@ async function revealCurrent() {
   });
   const isNew = !state.seen.has(state.index);
   card.classList.add('is-revealed', 'is-lit');
+  tilt.watch(card);
 
   if (isNew) {
     state.seen.add(state.index);
@@ -2139,12 +2208,10 @@ function initSwipe() {
     synth.resume();
 
     trackDrag(event, {
-      onMove: (dx, dy) => layoutDeck(
-        clamp(dx * 0.14, -TILT_MAX, TILT_MAX),
-        clamp(-dy * 0.14, -TILT_MAX, TILT_MAX)
-      ),
+      onMove: (dx, dy) => { if (card) tilt.hold(card, dx / TILT_REACH, dy / TILT_REACH); },
       onEnd: (dx) => {
         card?.classList.remove('is-dragging');
+        if (card) tilt.release(card);
         if (dx <= -SWIPE_COMMIT) goTo(state.index + 1);
         else if (dx >= SWIPE_COMMIT) goTo(state.index - 1);
         else layoutDeck();
@@ -2374,6 +2441,7 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = fals
     wireWishButton(wishButton, data);
   }
   if (entryKey) card.addEventListener('click', () => openCardDetail(entryKey, data, rarity));
+  if (lit) { attachTilt(card); queueMicrotask(() => tilt.watch(card)); }
   return card;
 }
 
@@ -2397,7 +2465,7 @@ function openCardDetail(entryKey, data, rarity) {
       <div class="card-inner">
         <div class="card-face card-front">
           <div class="fx fx-a" aria-hidden="true"></div>
-          <div class="fx-c" aria-hidden="true"></div>
+          <div class="fx-code" aria-hidden="true"></div>
           <div class="fx-art" aria-hidden="true"></div>
           <div class="card-art"></div>
           <div class="card-body">
@@ -2414,6 +2482,7 @@ function openCardDetail(entryKey, data, rarity) {
             <button class="btn btn-ghost btn-sm wish-giant" type="button"></button>
             <button class="btn btn-ghost btn-sm sell" type="button" hidden></button>
           </div>
+          <div class="fx-p" aria-hidden="true"></div>
           <div class="fx fx-b" aria-hidden="true"></div>
           <div class="fx-ring" aria-hidden="true"></div>
         </div>
@@ -2454,16 +2523,24 @@ function openCardDetail(entryKey, data, rarity) {
       const img = document.createElement('img');
       img.src = data.thumbnail;
       img.alt = '';
-      img.addEventListener('error', () => { img.remove(); art.insertAdjacentHTML('afterbegin',
-        `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 54 })}</div>`); });
+      img.addEventListener('error', () => {
+        img.remove();
+        art.classList.add('is-no-art');
+        art.insertAdjacentHTML('afterbegin', `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 54 })}</div>`);
+      });
       art.appendChild(img);
     } else {
+      art.classList.add('is-no-art');
       art.innerHTML = `<div class="card-art-fallback">${iconSvg(data.packIcon ?? 'packs', { size: 54 })}</div>`;
     }
 
     card.querySelector('.card-title').textContent = data.title;
     card.querySelector('.card-desc').textContent = data.description || data.sourceName || '';
     card.querySelector('.giant-extract').textContent = data.extract;
+    dressFront(card.querySelector('.card-front'), data, rarity);
+    attachTilt(card);
+    tilt.watch(card);
+    if (rarity.id === 'rare') setTimeout(() => flare(card), 350);
     card.querySelector('.card-price').innerHTML = money(data.price);
     // How read the article is decides its tier now, so the number that earned
     // the card its rarity belongs on the card, not just on the small face.
@@ -2540,22 +2617,142 @@ function handleSell() {
   renderBinder();
 }
 
-/** Hold and move to lean the card: it turns on its axes, it does not travel. */
+/* --- tilt and light ---------------------------------------------------------------------------- */
+
+/*
+ * Every lit card carries --tx/--ty (how it leans, -1..1) and --lx/--ly (where
+ * the light sits, the opposite way). The treatments read them: the foil
+ * sheens slide, the gold ring catches the light, the aurora parallaxes. One
+ * small loop writes them, from whichever source is loudest - a held finger,
+ * then the phone's gyroscope, then a slow idle sway so a card on a desk still
+ * looks alive. Values ease toward their target, so a released finger or a
+ * jittery sensor never snaps the card. The loop sleeps as soon as every card
+ * has settled and nothing is pushing it.
+ */
+const tilt = {
+  cards: new Map(),
+  gyro: null,
+  raf: 0,
+  asked: false,
+  listening: false,
+  reduce: matchMedia('(prefers-reduced-motion: reduce)'),
+
+  watch(card) {
+    if (this.cards.has(card)) return;
+    this.cards.set(card, { tx: 0, ty: 0, drag: null, phase: Math.random() * Math.PI * 2 });
+    this.wake();
+  },
+  hold(card, tx, ty) {
+    const c = this.cards.get(card);
+    if (!c) return;
+    c.drag = { tx: clamp(tx, -1, 1), ty: clamp(ty, -1, 1) };
+    this.wake();
+  },
+  release(card) {
+    const c = this.cards.get(card);
+    if (c) c.drag = null;
+    this.wake();
+  },
+  wake() {
+    if (!this.raf && !document.hidden && this.cards.size) {
+      this.raf = requestAnimationFrame((now) => this.frame(now));
+    }
+  },
+  frame(now) {
+    this.raf = 0;
+    const lowPower = document.documentElement.dataset.lowpower === '1';
+    const sway = !lowPower && !this.reduce.matches;
+    const t = now / 1000;
+    let busy = false;
+    for (const [card, c] of this.cards) {
+      if (!card.isConnected || !card.classList.contains('is-lit')) {
+        this.cards.delete(card);
+        continue;
+      }
+      let tx = 0;
+      let ty = 0;
+      if (c.drag) ({ tx, ty } = c.drag);
+      else if (this.gyro && !lowPower) ({ tx, ty } = this.gyro);
+      else if (sway) {
+        tx = Math.sin(t * 0.9 + c.phase) * 0.45;
+        ty = Math.sin(t * 1.3 + c.phase) * 0.3;
+      }
+      c.tx += (tx - c.tx) * 0.16;
+      c.ty += (ty - c.ty) * 0.16;
+      if (!tx && !ty && Math.abs(c.tx) < 0.002 && Math.abs(c.ty) < 0.002) { c.tx = 0; c.ty = 0; }
+      else busy = true;
+      card.style.setProperty('--tx', c.tx.toFixed(3));
+      card.style.setProperty('--ty', c.ty.toFixed(3));
+      card.style.setProperty('--lx', (-c.tx).toFixed(3));
+      card.style.setProperty('--ly', (-c.ty).toFixed(3));
+    }
+    if (busy) this.wake();
+  },
+
+  /* The gyroscope. Android hands it over freely; iOS wants to be asked from a
+     tap, so the first touch on a lit card asks. A slowly following baseline
+     makes the card answer movement and settle flat however the phone is held. */
+  listen() {
+    if (this.listening) return;
+    this.listening = true;
+    let base = null;
+    window.addEventListener('deviceorientation', (event) => {
+      if (event.gamma == null || event.beta == null) return;
+      if (!base) base = { beta: event.beta, gamma: event.gamma };
+      base.beta += (event.beta - base.beta) * 0.012;
+      base.gamma += (event.gamma - base.gamma) * 0.012;
+      this.gyro = {
+        tx: clamp((event.gamma - base.gamma) / 22, -1, 1),
+        ty: clamp((event.beta - base.beta) / 22, -1, 1)
+      };
+      this.wake();
+    });
+  },
+  async arm() {
+    if (this.asked || !('DeviceOrientationEvent' in window)) return;
+    this.asked = true;
+    try {
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        if (await DeviceOrientationEvent.requestPermission() !== 'granted') return;
+      } else if (!matchMedia('(pointer: coarse)').matches) {
+        return;
+      }
+      this.listen();
+    } catch { /* no gyroscope: the sway stands in */ }
+  },
+  init() {
+    if ('DeviceOrientationEvent' in window && typeof DeviceOrientationEvent.requestPermission !== 'function'
+      && matchMedia('(pointer: coarse)').matches) {
+      this.asked = true;
+      this.listen();
+    }
+    document.addEventListener('visibilitychange', () => this.wake());
+    // The first touch on a lit card wakes the gyroscope where it needs
+    // asking, and a tap on a rare card lights its title.
+    document.addEventListener('pointerdown', (event) => {
+      const card = event.target.closest?.('.card.is-lit');
+      if (!card) return;
+      this.arm();
+      if (card.dataset.rarity === 'rare') flare(card);
+    }, { passive: true });
+  }
+};
+
+/** The rare card's title lights up electric blue for a moment. */
+const flareTimers = new WeakMap();
+function flare(card) {
+  card.classList.add('is-hot');
+  clearTimeout(flareTimers.get(card));
+  flareTimers.set(card, setTimeout(() => card.classList.remove('is-hot'), 900));
+}
+
+/** Hold and move to lean the card and slide its light. It does not travel. */
 function attachTilt(card) {
   card.addEventListener('pointerdown', (event) => {
-    event.preventDefault();
-    event.stopPropagation();
-    card.classList.add('is-tilting');
+    if (event.target.closest('button, a')) return;
     trackDrag(event, {
-      onMove: (dx, dy) => {
-        card.style.transform =
-          `rotateY(${clamp(dx * 0.16, -TILT_MAX, TILT_MAX)}deg) ` +
-          `rotateX(${clamp(-dy * 0.16, -TILT_MAX, TILT_MAX)}deg)`;
-      },
-      onEnd: () => {
-        card.classList.remove('is-tilting');
-        card.style.transform = '';
-      }
+      onMove: (dx, dy) => tilt.hold(card, dx / TILT_REACH, dy / TILT_REACH),
+      onEnd: () => tilt.release(card)
     });
   });
 }
@@ -6776,6 +6973,7 @@ function init() {
   refreshLevelBadge();
   updateBadges();
   initSwipe();
+  tilt.init();
 
   renderPacks();
   renderShop();

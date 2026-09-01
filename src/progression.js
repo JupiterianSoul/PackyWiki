@@ -4,7 +4,7 @@
  * XP comes from CARDS, never from money or from buying things, so the only
  * way to level is to actually open boosters and see what is inside. A card is
  * worth XP by its tier, on roughly the same curve as its price, which means a
- * lucky Artifact is a genuine jump without being the only thing that matters.
+ * lucky Prismatic is a genuine jump without being the only thing that matters.
  *
  * The curve is deliberately long. Level 500 is an endgame number: at the
  * average of ~33 XP per card it takes on the order of eighteen thousand

@@ -130,7 +130,7 @@ export const RELEASES = [
     ],
     changelog: [
       { en: 'The achievements table grew to one hundred, organised as chains', fr: 'La table des succès est passée à cent, organisée en chaînes' },
-      { en: 'Rewards rescaled by difficulty, up to an Artifact pack at the level cap', fr: 'Récompenses recalibrées par difficulté, jusqu’à un pack Artefact au niveau maximal' },
+      { en: 'Rewards rescaled by difficulty, up to a top-tier pack at the level cap', fr: 'Récompenses recalibrées par difficulté, jusqu’à un pack du plus haut rang au niveau maximal' },
       { en: 'The quiz shows its winnings and allows five runs a day', fr: 'Le quiz affiche ses gains et permet cinq parties par jour' },
       { en: 'Four themes turned down: they played louder than the rest', fr: 'Quatre thèmes baissés : ils sonnaient plus fort que les autres' },
       { en: 'Themes, picture and name moved to a Customization screen', fr: 'Thèmes, photo et pseudo déplacés vers un écran Personnalisation' },
@@ -196,6 +196,28 @@ export const RELEASES = [
       { en: 'The Horror theme: fog, grain, one red light', fr: 'Le thème Horreur : brume, grain, une lumière rouge' },
       { en: 'Boosters counted on the bottom bar; the packs screen fits without scrolling', fr: 'Les boosters comptés sur la barre du bas ; l’écran des boosters tient sans défiler' },
       { en: 'Notifications in the side menu, and new bells: full shelf, ready achievements', fr: 'Les notifications dans le menu latéral, et de nouvelles cloches : étagère pleine, succès prêts' }
+    ]
+  },
+  {
+    id: 'prism', icon: 'gem', accent: '#f472b6',
+    title: { en: 'The rarity update', fr: 'La mise à jour des raretés' },
+    points: [
+      { en: 'Every rarity with a look of its own', fr: 'Chaque rareté avec un style bien à elle' },
+      { en: 'Cards that lean with your hand and with the phone', fr: 'Des cartes qui s’inclinent avec la main et avec le téléphone' },
+      { en: 'Prismatic, the new top tier', fr: 'Prismatique, le nouveau rang suprême' }
+    ],
+    changelog: [
+      { en: 'Artifact became Prismatic; every old card, count and badge carries over', fr: 'Artefact est devenu Prismatique ; anciennes cartes, compteurs et insignes suivent' },
+      { en: 'Common cards print flat, with a halftone; uncommon cards breathe green', fr: 'Les communes s’impriment à plat, avec une trame ; les peu communes respirent en vert' },
+      { en: 'Rare cards wear a foil sheen and their title lights up when tapped', fr: 'Les rares portent un reflet métallisé et leur titre s’allume au toucher' },
+      { en: 'Epic cards carry an aurora that drifts behind the art as the card leans', fr: 'Les épiques portent une aurore qui dérive derrière l’image quand la carte s’incline' },
+      { en: 'Legendary cards in brushed gold, with sparks rising', fr: 'Les légendaires en or brossé, avec des étincelles qui montent' },
+      { en: 'Mythic cards burn: embers, a molten ring, a picture that glitches', fr: 'Les mythiques brûlent : braises, anneau en fusion, image qui saute' },
+      { en: 'Exotic cards as holograms, with scrolling wikitext and scanlines', fr: 'Les exotiques en hologrammes, avec du wikitexte qui défile et des lignes de balayage' },
+      { en: 'Prismatic cards pour a rainbow ribbon across the face as you tilt them, over a liquid prism that never stops moving', fr: 'Les prismatiques font couler un ruban arc-en-ciel sur la carte quand on l’incline, au-dessus d’un prisme liquide qui ne s’arrête jamais' },
+      { en: 'Prismatic corners shift from teal to magenta to gold, and the lettering is silver foil split red and cyan by the light', fr: 'Les bords prismatiques passent du turquoise au magenta puis à l’or, et le lettrage est un métal argenté que la lumière sépare en rouge et cyan' },
+      { en: 'A held card leans and its light slides; on a phone the gyroscope leans it too', fr: 'Une carte tenue s’incline et sa lumière glisse ; sur téléphone, le gyroscope l’incline aussi' },
+      { en: 'Battery saver keeps every card still', fr: 'L’économie de batterie garde chaque carte immobile' }
     ]
   }
 ];

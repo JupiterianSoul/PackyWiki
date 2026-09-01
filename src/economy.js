@@ -5,7 +5,7 @@
  * churning boosters.** Selling a booster's entire contents returns a fixed
  * fraction of what the booster cost, whatever tier it was, so the
  * sell-buy-bigger-sell loop always leaks value instead of compounding. A lucky
- * Artifact can still pay for several packs - that's the thrill - but it is
+ * Prismatic can still pay for several packs - that's the thrill - but it is
  * variance around a losing mean, not a strategy.
  *
  * Concretely:

@@ -26,11 +26,22 @@ export const RARITIES = [
   { id: 'legendary', name: { en: 'Legendary', fr: 'Légendaire' },  minPop: 0.83,  bonusPct: 320,  color: '#fbbf24', glow: 'rgba(251, 191, 36, 0.75)',  flash: 0.55 }, // ~160k/mo
   { id: 'mythic',    name: { en: 'Mythic', fr: 'Mythique' },       minPop: 0.885, bonusPct: 700,  color: '#e02134', glow: 'rgba(224, 33, 52, 0.8)',    flash: 0.72 }, // ~360k/mo
   { id: 'exotic',    name: { en: 'Exotic', fr: 'Exotique' },       minPop: 0.93,  bonusPct: 1500, color: '#22d3ee', glow: 'rgba(34, 211, 238, 0.85)',  flash: 0.88 }, // ~700k/mo
-  { id: 'artifact',  name: { en: 'Artifact', fr: 'Artefact' },     minPop: 0.97,  bonusPct: 3200, color: '#fef08a', glow: 'rgba(254, 240, 138, 0.95)', flash: 1 }     // ~1.3M/mo
+  { id: 'prismatic', name: { en: 'Prismatic', fr: 'Prismatique' }, minPop: 0.97,  bonusPct: 3200, color: '#f472b6', glow: 'rgba(244, 114, 182, 0.95)', flash: 1 }     // ~1.3M/mo
 ];
 
-export const rarityRank = (id) => RARITIES.findIndex((r) => r.id === id);
-export const rarityById = (id) => RARITIES.find((r) => r.id === id) ?? RARITIES[0];
+/**
+ * The top tier was called Artifact before it became Prismatic. Saves, the
+ * codex, wishlists and auctions written under the old name still carry it,
+ * so every lookup by id accepts the old name and answers with the new tier.
+ */
+const LEGACY_IDS = { artifact: 'prismatic' };
+export const normalizeRarityId = (id) => LEGACY_IDS[id] ?? id;
+/** Every name a tier has gone by, newest first: for queries against old rows. */
+export const rarityIdAliases = (id) =>
+  [id, ...Object.keys(LEGACY_IDS).filter((old) => LEGACY_IDS[old] === id)];
+
+export const rarityRank = (id) => RARITIES.findIndex((r) => r.id === normalizeRarityId(id));
+export const rarityById = (id) => RARITIES.find((r) => r.id === normalizeRarityId(id)) ?? RARITIES[0];
 
 /** The tier a popularity earns: the highest threshold it clears. */
 export function rarityFromPopularity(popularity) {

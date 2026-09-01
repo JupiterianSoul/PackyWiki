@@ -10,7 +10,7 @@
  * stored rarity is always the BEST pull of that article - pulling Tardigrade
  * again as a Legendary upgrades the entry.
  */
-import { rarityRank } from './data/rarities.js';
+import { rarityRank, normalizeRarityId } from './data/rarities.js';
 import { albumKeyOf, customSlug } from './albums.js';
 import { bandFor } from './pricing.js';
 import { specId } from './booster.js';
@@ -62,6 +62,11 @@ function writeJson(key, value) {
 export function loadCollection() {
   const data = readJson(CARDS_KEY, null);
   if (!data || typeof data !== 'object' || !data.entries) return { entries: {} };
+  // A tier that was renamed is renamed in the save on the way in, so every
+  // filter and count downstream only ever meets the current name.
+  for (const entry of Object.values(data.entries)) {
+    if (entry?.rarityId) entry.rarityId = normalizeRarityId(entry.rarityId);
+  }
   return data;
 }
 
@@ -292,7 +297,20 @@ export const saveWallet = (amount) => writeJson(WALLET_KEY, Math.max(0, Math.rou
 /** { [specId]: { spec, count } } */
 export function loadInventory() {
   const data = readJson(INVENTORY_KEY, null);
-  return data && typeof data === 'object' ? data : {};
+  const inventory = data && typeof data === 'object' ? data : {};
+  // Boosters of a renamed tier are re-filed under the tier's current name;
+  // the slot key is derived from the spec, so it moves with it.
+  for (const [id, slot] of Object.entries(inventory)) {
+    const rarityId = slot?.spec?.rarityId;
+    if (!rarityId || rarityId === normalizeRarityId(rarityId)) continue;
+    slot.spec.rarityId = normalizeRarityId(rarityId);
+    delete inventory[id];
+    const fresh = specId(slot.spec);
+    inventory[fresh] = inventory[fresh]
+      ? { spec: slot.spec, count: inventory[fresh].count + slot.count }
+      : slot;
+  }
+  return inventory;
 }
 
 export const saveInventory = (inventory) => writeJson(INVENTORY_KEY, inventory);
@@ -345,6 +363,7 @@ export function reclaimOpenInFlight(inventory) {
   catch { record = null; }
   clearOpenInFlight();
   if (!record?.spec) return null;
+  if (record.spec.rarityId) record.spec.rarityId = normalizeRarityId(record.spec.rarityId);
   addBooster(inventory, record.spec, 1);
   return record.spec;
 }
@@ -378,6 +397,16 @@ export function loadProfile() {
   profile.freeTaken ??= { window: null, ids: [] };
   profile.achievements ??= { redeemed: [] };
   profile.achievements.redeemed ??= [];
+  // The top tier was renamed: its pull counts and the redeemed marks of its
+  // achievement chain move to the new name so nothing is lost or paid twice.
+  for (const [id, n] of Object.entries(profile.rarityCounts)) {
+    const fresh = normalizeRarityId(id);
+    if (fresh === id) continue;
+    profile.rarityCounts[fresh] = (profile.rarityCounts[fresh] ?? 0) + n;
+    delete profile.rarityCounts[id];
+  }
+  profile.achievements.redeemed = profile.achievements.redeemed
+    .map((id) => id.replace(/^artifact-/, 'prismatic-'));
   // The achievements rework renamed the very first one; the feat is
   // identical, so its redeemed mark carries over instead of paying twice.
   if (profile.achievements.redeemed.includes('first-pack')

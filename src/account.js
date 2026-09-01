@@ -15,6 +15,7 @@
  *      a copy: writes are debounced and best-effort, so a dropped connection
  *      costs a sync, never a card. Reads happen at sign-in.
  */
+import { normalizeRarityId, rarityIdAliases } from './data/rarities.js';
 import { createClient } from '@supabase/supabase-js';
 import { exportSave, importSave, parseSave } from './save.js';
 
@@ -758,7 +759,14 @@ export async function codexCounts() {
   return indexCall(async () => {
     const { data, error } = await supabase.rpc('codex_counts');
     if (error) throw error;
-    return data ?? { total: 0, byRarity: {} };
+    const counts = data ?? { total: 0, byRarity: {} };
+    // Rows written under a tier's old name count for the tier they are now.
+    const byRarity = {};
+    for (const [id, n] of Object.entries(counts.byRarity ?? {})) {
+      const fresh = normalizeRarityId(id);
+      byRarity[fresh] = (byRarity[fresh] ?? 0) + Number(n);
+    }
+    return { ...counts, byRarity };
   });
 }
 
@@ -767,7 +775,7 @@ export async function codexPage({ search = '', rarity = null, sort = 'recent', o
   return indexCall(async () => {
     let query = supabase.from('codex')
       .select('key, title, rarity, price, views, thumbnail, lang, found_at');
-    if (rarity) query = query.eq('rarity', rarity);
+    if (rarity) query = query.in('rarity', rarityIdAliases(rarity));
     if (search.trim()) query = query.ilike('title', `%${search.trim().replace(/[%_]/g, '')}%`);
     if (sort === 'name') query = query.order('title', { ascending: true });
     else if (sort === 'value') query = query.order('price', { ascending: false, nullsFirst: false });

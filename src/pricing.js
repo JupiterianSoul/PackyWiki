@@ -7,7 +7,7 @@
  *
  *     price = base(popularity) × (1 + rarity.bonusPct / 100)
  *
- * A Common and an Artifact of the same article share a base; the Artifact is
+ * A Common and a Prismatic of the same article share a base; the Prismatic is
  * simply worth 3200% more of it.
  *
  * Popularity now also DECIDES the rarity (see src/data/rarities.js), so a

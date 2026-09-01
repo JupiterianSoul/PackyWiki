@@ -12,7 +12,7 @@
  * identical on every device with no server. Pricing comes from economy.js and
  * already guarantees that opening and selling loses money on average; the
  * vault's availability odds are the second brake on the top of the game: an
- * Artifact booster you cannot buy is one you cannot farm.
+ * Prismatic booster you cannot buy is one you cannot farm.
  */
 import { THEME_PACKS } from './data/packs.js';
 import { RARITIES, rarityRank, tierBand, viewsAtPopularity } from './data/rarities.js';
@@ -41,7 +41,7 @@ const between = (rng, lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
  */
 const VAULT_ODDS = {
   uncommon: 1, rare: 1, epic: 0.7, legendary: 0.45,
-  mythic: 0.22, exotic: 0.12, artifact: 0.06
+  mythic: 0.22, exotic: 0.12, prismatic: 0.06
 };
 
 /** A random tier for the featured slot, weighted towards the affordable end. */

@@ -679,3 +679,30 @@ create policy "you unwish as yourself"
   on public.wishlists for delete
   to authenticated
   using (auth.uid() = owner);
+
+-- ============================================================================
+-- V5 - the top tier was renamed: Artifact became Prismatic. Rows written
+-- under the old name are renamed here, in every place a tier is stored, and
+-- each statement is a no-op once it has run. Clients accept the old name too,
+-- so the order the app and the schema are updated in does not matter.
+
+update public.codex set rarity = 'prismatic' where rarity = 'artifact';
+update public.profiles set best_rarity = 'prismatic' where best_rarity = 'artifact';
+update public.wishlists
+  set card = jsonb_set(card, '{rarityId}', '"prismatic"')
+  where card->>'rarityId' = 'artifact';
+update public.auctions
+  set card = jsonb_set(card, '{rarityId}', '"prismatic"')
+  where card->>'rarityId' = 'artifact';
+update public.trades
+  set offer = (
+    select coalesce(jsonb_agg(
+      case when c->>'rarityId' = 'artifact' then jsonb_set(c, '{rarityId}', '"prismatic"') else c end
+    ), '[]'::jsonb) from jsonb_array_elements(offer) c),
+      ask = (
+    select coalesce(jsonb_agg(
+      case when c->>'rarityId' = 'artifact' then jsonb_set(c, '{rarityId}', '"prismatic"') else c end
+    ), '[]'::jsonb) from jsonb_array_elements(ask) c)
+  where status = 'pending'
+    and jsonb_typeof(offer) = 'array' and jsonb_typeof(ask) = 'array'
+    and (offer::text like '%"artifact"%' or ask::text like '%"artifact"%');

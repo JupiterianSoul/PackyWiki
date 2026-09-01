@@ -310,9 +310,12 @@ To point a build at a **different** project:
    and ends by telling PostgREST to reload its schema cache - without that
    last step the API can answer "Could not find the table" for a while even
    though everything exists. The file is layered (V1 accounts, V2 social,
-   V3 the auction house, V4 the card index and wishlists) and every
-   statement is idempotent, so when an update adds a layer you run the
-   whole file again on the same project and nothing is lost. An app
+   V3 the auction house, V4 the card index and wishlists, V5 the rename of
+   the top tier to Prismatic) and every statement is idempotent, so when
+   an update adds a layer you run the whole file again on the same project
+   and nothing is lost: V5, for instance, renames the rows the codex, the
+   wishlists, the auction house and the trade table wrote under the old
+   name, and does nothing the second time. An app
    running against a database that is a layer behind says so in the
    affected screen instead of breaking: the auction house and the card
    index, for instance, ask for this file to be run again.
@@ -452,7 +455,7 @@ a weekend.
 XP comes from **cards**, never from money or from buying things, so the only
 way to level is to open boosters and see what is inside. A card is worth XP by
 its tier, on roughly the same curve as its price: 12 for a Common up to 1,300
-for an Artifact, averaging about 33 a card under the standard table.
+for a Prismatic, averaging about 33 a card under the standard table.
 
 The requirement per level is mostly linear with a gentle curve on top
 (180 XP for level 1, ~2,400 at level 100, ~12,400 at level 499). Reaching the
@@ -504,12 +507,12 @@ price of a booster    = its expected sell value ÷ 0.72
 A simulation of the obvious exploit (start with the starter kit, always buy the
 most expensive booster you can afford, open it, sell everything, repeat) goes
 broke in **100% of runs**, averaging 3.9 boosters before the money is gone. The
-measured return is ~0.80 at every tier - Common through Artifact - so no rung
+measured return is ~0.80 at every tier - Common through Prismatic - so no rung
 of the ladder is a better deal than any other.
 
-A lucky Artifact can still pay for several packs. That is variance around a
+A lucky Prismatic can still pay for several packs. That is variance around a
 losing mean, not a strategy, and it is where the excitement lives: about 5% of
-those runs hit an Artifact booster at some point on the way down.
+those runs hit a Prismatic booster at some point on the way down.
 
 Progression therefore comes from **time**, not grinding. Each shop restock pays
 a stipend, capped at four missed restocks so a long absence doesn't hand over a
@@ -582,7 +585,7 @@ Selling everything out of both is worth around 230 Buckarooz, well under a
 single stipend, so it is a floor rather than a faucet.
 
 Scarcity is the other brake. Pricing alone would let a lucky player buy
-Artifact boosters back to back, so high tiers are also **rare on the shelves**:
+Prismatic boosters back to back, so high tiers are also **rare on the shelves**:
 
 | Tier | Windows it appears in |
 | --- | --- |
@@ -592,7 +595,7 @@ Artifact boosters back to back, so high tiers are also **rare on the shelves**:
 | Legendary | 40% |
 | Mythic | 9% |
 | Exotic | 3% |
-| Artifact | 2% |
+| Prismatic | 2% |
 
 Custom boosters can turn up on any shelf too.
 
@@ -696,14 +699,14 @@ month has exactly the same chance at every tier as one with 100k.
 
 | Tier | Chance | Price bonus | Visual treatment |
 | --- | --- | --- | --- |
-| Common | 42% | +0% | matte stock, no motion |
-| Uncommon | 27% | +25% | single sheen sweep |
-| Rare | 17% | +60% | breathing border + slow scan bar |
-| Epic | 9% | +140% | drifting colour blobs |
-| Legendary | 3.6% | +320% | rotating light rays |
-| Mythic | 0.9% | +700% | flames climbing the card |
-| Exotic | 0.35% | +1500% | holographic prismatic banding |
-| Artifact | 0.15% | +3200% | full iridescent burst |
+| Common | 42% | +0% | flat halftone print stock, no light |
+| Uncommon | 27% | +25% | a green pulse breathing along the border |
+| Rare | 17% | +60% | foil sheen that follows the tilt; the title glows blue when tapped |
+| Epic | 9% | +140% | violet aurora background; the artwork floats in parallax |
+| Legendary | 3.6% | +320% | gold foil border that catches the light as the phone tilts; sparks rising |
+| Mythic | 0.9% | +700% | unstable border, embers, glitch bursts with an RGB split |
+| Exotic | 0.35% | +1500% | translucent hologram plate with wikitext scrolling underneath |
+| Prismatic | 0.15% | +3200% | rainbow foil with chromatic aberration; a light streak sweeps with the tilt |
 
 Two rules hold for every treatment, and both are enforced by tests:
 
@@ -724,7 +727,7 @@ price = base(popularity) × (1 + rarity.bonusPct / 100)
 ```
 
 `base` runs from Ᏸ20 for an unread article to Ᏸ500 for a front-page-famous one.
-A Common and an Artifact of the same article share a base - the Artifact is
+A Common and a Prismatic of the same article share a base - the Prismatic is
 simply worth 33× more of it.
 
 The **balance button in the top bar** is also the explainer: tap it and a panel
@@ -903,7 +906,7 @@ is its own dialog.
 - **Two languages**, English and French, chosen once and then locked.
 - **No trading, no accounts, no sync.** Everything is one browser.
 - **Rarity is not tied to the article.** It's an independent roll, so a stub
-  can come out Artifact and a featured article can come out Common. Only the
+  can come out Prismatic and a featured article can come out Common. Only the
   price knows how popular a page is.
 - **Timers trust the device clock.** Timed boosters and the daily gift are
   measured against local time, so moving the clock forward moves them forward.

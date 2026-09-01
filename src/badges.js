@@ -36,8 +36,9 @@ export const BADGES = [
     name: { en: 'Ascendant', fr: 'Ascendant' } },
   { id: 'starcatcher', chain: 'legendary', from: 2, motif: 'star',
     name: { en: 'Starcatcher', fr: 'Attrapeur d’étoiles' } },
-  { id: 'relichunter', chain: 'artifact',  from: 1, motif: 'relic',
-    name: { en: 'Relic Hunter', fr: 'Chasseur de reliques' } },
+  // The id predates the tier's rename; it stays so equipped loadouts hold.
+  { id: 'relichunter', chain: 'prismatic', from: 1, motif: 'crystal',
+    name: { en: 'Prism Hunter', fr: 'Chasseur de prismes' } },
   { id: 'scholar',    chain: 'perfect',   from: 2, motif: 'quiz',
     name: { en: 'Scholar', fr: 'Érudit' } },
   { id: 'timekeeper', chain: 'timed',     from: 3, motif: 'hourglass',
@@ -139,6 +140,10 @@ const MOTIFS = {
   relic: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
     <polygon points="0,-15 13,-4 8,14 -8,14 -13,-4"/>
     <circle cx="0" cy="1" r="5.5"/><circle cx="0" cy="1" r="1.6" fill="${s}" stroke="none"/></g>`,
+  crystal: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <polygon points="0,-16 9,-7 5,15 -5,15 -9,-7"/>
+    <polyline points="-9,-7 0,-3 9,-7"/><line x1="0" y1="-3" x2="0" y2="15"/>
+    <path d="M 15 -14 L 15 -8 M 12 -11 L 18 -11" stroke-width="2"/></g>`,
   quiz: (s) => `<g fill="none" stroke="${s}" stroke-width="2.8" stroke-linecap="round">
     <path d="M -7 -7 Q -7 -15 0 -15 Q 8 -15 8 -8 Q 8 -3 2 -1 Q 0 0 0 4"/>
     <circle cx="0" cy="13" r="1.8" fill="${s}" stroke="none"/></g>`,
