@@ -533,7 +533,13 @@ supabase secrets set GROQ_API_KEY=gsk_your_key
 supabase functions deploy quiz
 ```
 
-A free key from console.groq.com is enough. The function must be deployed
+A free key from console.groq.com is enough. Which model writes the questions
+is decided at request time: the function walks a preference list, skips
+anything this account does not carry, and asks Groq for the live list if none
+of them answer. Running out of one model's daily tokens reads as a refusal
+like any other, so the walk continues into the next model's allowance and the
+free tier stacks up to several hundred quizzes a day. `GROQ_MODEL` pins a
+first choice if you want one. The function must be deployed
 under the slug **`quiz`** (that is the path the app calls) and its
 **"Verify JWT with legacy secret"** switch should be **off**: that gate only
 accepts tokens signed by the old shared secret, which a project on the newer

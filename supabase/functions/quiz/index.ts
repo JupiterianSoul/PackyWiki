@@ -23,20 +23,38 @@ const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODELS_URL = 'https://api.groq.com/openai/v1/models';
 
 /**
- * Models to try, best first. Groq retires models without much ceremony, so
- * the list is a preference rather than a promise: if none of these answer,
- * the function asks Groq what it actually has and uses that instead.
+ * Models to try, best first.
+ *
+ * This is a preference rather than a promise: Groq retires models without
+ * much ceremony, and a free account does not carry all of them, so if none
+ * of these answer the function asks Groq what it actually has.
+ *
+ * The order also doubles as a daily budget. Each model brings its own token
+ * allowance, and running out of one reads as a refusal like any other, so
+ * the walk simply continues into the next model's allowance. Stacked, the
+ * free tier is worth several hundred quizzes a day rather than one model's
+ * two hundred thousand tokens.
  */
 const MODEL_PREFERENCE = [
-  'llama-3.1-8b-instant',
+  'openai/gpt-oss-20b',          // 200k tokens/day, good at holding a JSON shape
+  'qwen/qwen3.8-27b',            // 200k more, and strong in French
+  'qwen/qwen3.6-27b',            // 200k more
+  'openai/gpt-oss-120b',         // 200k more, slower but sharper questions
+  'llama-3.1-8b-instant',        // accounts that have it, cheapest of all
   'llama-3.3-70b-versatile',
-  'meta-llama/llama-4-scout-17b-16e-instruct',
-  'openai/gpt-oss-20b',
-  'gemma2-9b-it'
+  'allam-2-7b',                  // 500k/day on its own
+  'groq/compound-mini'           // no daily token ceiling, 250 requests
 ];
 
 /** Models that cannot hold a conversation, whatever else they are good at. */
-const NOT_CHAT = /whisper|tts|guard|embed|vision-only|distil/i;
+const NOT_CHAT = /whisper|tts|guard|embed|vision-only|distil|safeguard|orpheus/i;
+
+/**
+ * The model that answered last, remembered for as long as this instance
+ * lives. Without it every quiz re-walks the models this account does not
+ * have, paying two failed round trips before reaching the one that works.
+ */
+let warmModel = '';
 
 /** The player's browser calls this straight from the app. */
 const CORS = {
@@ -179,7 +197,9 @@ Deno.serve(async (req: Request) => {
   }
 
   const configured = Deno.env.get('GROQ_MODEL');
-  const candidates = configured ? [configured, ...MODEL_PREFERENCE] : [...MODEL_PREFERENCE];
+  // Whatever worked last goes first, then anything explicitly configured,
+  // then the preference list; duplicates drop out.
+  const candidates = [...new Set([warmModel, configured, ...MODEL_PREFERENCE].filter(Boolean))] as string[];
   let upstream: Response | null = null;
   let lastStatus = 0;
   let lastDetail = '';
@@ -211,9 +231,12 @@ Deno.serve(async (req: Request) => {
           /* fall through to the next model */
         }
       }
-      if (attempt.ok) { upstream = attempt.res; usedModel = model; break; }
+      if (attempt.ok) { upstream = attempt.res; usedModel = model; warmModel = model; break; }
       lastStatus = attempt.status;
       lastDetail = attempt.detail;
+      // 429 is this model's allowance for the day, not a broken model: drop
+      // it as the warm choice so the next quiz starts at the next one along.
+      if (attempt.status === 429 && warmModel === model) warmModel = '';
       console.warn(`quiz: ${model} refused (${attempt.status})`);
     }
   }
