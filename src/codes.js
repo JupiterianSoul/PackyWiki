@@ -184,6 +184,29 @@ export const SECRET_CODES = [
       { en: 'Travel', fr: 'Voyage' }
     ]
   },
+  {
+    id: 'mathilde',
+    code: 'M4TH1LD3',
+    person: 'Mathilde',
+    accent: '#a78bfa', accent2: '#3b1f6b', light: '#ede9fe',
+    theme: 'yaourt',
+    emblem: 'pot', foil: 'linen', family: 'roundel', shapes: ['orb', 'square'],
+    name: { en: 'Mathilde’s Special Booster', fr: 'Booster spécial de Mathilde' },
+    tagline: { en: 'Violet, and a spoon already in it', fr: 'Violet, et la cuillère déjà dedans' },
+    album: { en: 'Mathilde’s Special Album', fr: 'Album spécial de Mathilde' },
+    badge: { en: 'Mathilde’s Special Badge', fr: 'Badge spécial de Mathilde' },
+    message: {
+      en: 'Mathilde. Violet all the way through, an episode already running, and five cards waiting with the spoon. Nobody else gets this one. Made for you.',
+      fr: 'Mathilde. Du violet de bout en bout, un épisode déjà lancé, et cinq cartes qui attendent avec la cuillère. Personne d’autre n’aura celui-ci. Fait pour toi.'
+    },
+    cards: [
+      { en: 'Cat', fr: 'Chat', name: { en: 'Cats', fr: 'Les chats' } },
+      { en: 'Desperate Housewives', fr: 'Desperate Housewives' },
+      { en: 'Gilmore Girls', fr: 'Gilmore Girls' },
+      { en: 'Skiing', fr: 'Ski' },
+      { en: 'Book', fr: 'Livre', name: { en: 'Books', fr: 'Les livres' } }
+    ]
+  },
   /*
    * THE CREATOR. Not a person's booster: a set of regalia.
    *

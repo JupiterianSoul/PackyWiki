@@ -1659,3 +1659,41 @@ html[data-lowpower='1'] [data-rarity="special"] .fx-a::after { animation: none !
 }
 [data-special="catherine"] .fx-b { box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.5); }
 [data-special="catherine"] .card-desc { color: var(--sp-ink); }
+
+/* --- MATHILDE: the swirl ---------------------------------------------------
+   Violet and cream folded together and stopped halfway, the way a pot looks
+   after one turn of the spoon. The card's corners are rounder than any other
+   special, because nothing about this one is meant to have an edge. */
+[data-special="mathilde"] {
+  --sp-violet: #a78bfa;
+  --sp-cream: #ede9fe;
+}
+[data-special="mathilde"] .card-front {
+  background:
+    radial-gradient(80% 60% at 68% 14%, rgba(237, 233, 254, 0.24), transparent 62%),
+    linear-gradient(162deg, #2a1550 0%, #1c0f33 58%, #120920 100%);
+}
+[data-special="mathilde"] .fx-a::before {
+  content: '';
+  position: absolute;
+  inset: -26%;
+  background:
+    conic-gradient(from 0deg at 42% 46%,
+      transparent 0deg,
+      rgba(167, 139, 250, 0.34) 42deg,
+      transparent 96deg,
+      rgba(237, 233, 254, 0.26) 158deg,
+      transparent 214deg,
+      rgba(167, 139, 250, 0.3) 288deg,
+      transparent 348deg);
+  filter: blur(6px);
+  transform: rotate(calc(var(--lx, 0) * 6deg));
+  will-change: transform;
+}
+.card.is-lit[data-special="mathilde"] .fx-a::before { animation: sp-fold 22s linear infinite; }
+@keyframes sp-fold { to { transform: rotate(360deg); } }
+[data-special="mathilde"] .fx-b {
+  box-shadow: inset 0 0 0 1px rgba(196, 181, 253, 0.5),
+    inset 0 -30px 46px -34px rgba(237, 233, 254, 0.7);
+}
+[data-special="mathilde"] .card-desc { color: var(--sp-violet); }

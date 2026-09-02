@@ -155,7 +155,7 @@ public class MainActivity extends Activity {
             "meadow", "cartoon", "matrix", "casino", "horror",
             // Behind secret codes. The aliases exist whatever happens, since a
             // theme the web layer can ask for must have somewhere to land.
-            "apotheosis", "raclette", "lecture"
+            "apotheosis", "raclette", "lecture", "yaourt"
     };
 
     private static final String ICON_PREFS = "wiklodo.icon";

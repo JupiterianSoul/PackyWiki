@@ -778,3 +778,46 @@
   --press-shift: 1px;
   --texture: grain;
 }
+
+/* --- YOGHURT: violet folded through cream, behind Mathilde's code --------- */
+[data-theme='yaourt'] {
+  --ink: #f3f0ff;
+  --ink-dim: #b9a8e6;
+  --ink-faint: #7d6bab;
+
+  --surface: rgba(167, 139, 250, 0.1);
+  --surface-2: rgba(167, 139, 250, 0.17);
+  --surface-solid: #241540;
+  --line: rgba(196, 181, 253, 0.28);
+  --line-strong: rgba(237, 233, 254, 0.55);
+
+  --accent: #a78bfa;
+  --accent-2: #ede9fe;
+  --accent-ink: #1c0f33;
+  --positive: #86efac;
+  --negative: #fb7185;
+  --warning: #fbbf24;
+
+  --radius-sm: 12px;
+  --radius: 18px;
+  --radius-lg: 26px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.8), inset 0 1px 0 rgba(237, 233, 254, 0.1);
+  --raise-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.9);
+  --glow: 0 0 30px -8px rgba(167, 139, 250, 0.65);
+  --blur: blur(10px);
+
+  --font: 'Avenir Next', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Quicksand', 'Avenir Next', ui-rounded, system-ui, sans-serif;
+  --display-weight: 700;
+  --display-tracking: 0;
+  --display-transform: none;
+  --label-tracking: 0.16em;
+
+  --press-scale: 0.97;
+  --press-shift: 1px;
+  --texture: grain;
+}

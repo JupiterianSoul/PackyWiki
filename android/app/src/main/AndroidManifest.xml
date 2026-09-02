@@ -83,6 +83,20 @@
         </activity-alias>
 
         <activity-alias
+            android:name=".Icon_yaourt"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_yaourt"
+            android:roundIcon="@mipmap/ic_launcher_yaourt"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
             android:name=".Icon_lecture"
             android:enabled="false"
             android:exported="true"

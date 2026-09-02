@@ -146,6 +146,7 @@ class Backdrop {
       case 'apotheosis': this.#apotheosis(ctx, w, h, t); break;
       case 'raclette': this.#raclette(ctx, w, h, t); break;
       case 'lecture': this.#lecture(ctx, w, h, t); break;
+      case 'yaourt': this.#yaourt(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -884,6 +885,52 @@ class Backdrop {
     ctx.quadraticCurveTo(w - 40, h - 50 - lift * 30, w, h - 110 - lift * 40);
     ctx.closePath();
     ctx.fill();
+  }
+
+  /*
+   * YOGHURT: violet folded through cream.
+   *
+   * Two colours being stirred rather than mixed: broad ribbons that turn
+   * slowly around an off-centre point, never quite blending. Drawn as a
+   * handful of wide arcs with long shadows rather than as fluid, which is
+   * what keeps it cheap while still reading as a swirl.
+   */
+  #yaourt(ctx, w, h, t) {
+    const sec = t / 1000;
+    const pot = ctx.createLinearGradient(0, 0, w, h);
+    pot.addColorStop(0, '#2a1550');
+    pot.addColorStop(0.5, '#1c0f33');
+    pot.addColorStop(1, '#120920');
+    ctx.fillStyle = pot;
+    ctx.fillRect(0, 0, w, h);
+
+    const cx = w * 0.42;
+    const cy = h * 0.46;
+    ctx.save();
+    ctx.translate(cx, cy);
+    for (let i = 0; i < 5; i++) {
+      const turn = sec * (0.05 + i * 0.012) + i * 1.26;
+      const r = h * (0.2 + i * 0.14);
+      ctx.save();
+      ctx.rotate(turn);
+      ctx.strokeStyle = i % 2
+        ? `rgba(237, 233, 254, ${(0.09 - i * 0.012).toFixed(3)})`
+        : `rgba(167, 139, 250, ${(0.14 - i * 0.016).toFixed(3)})`;
+      ctx.lineWidth = h * (0.1 - i * 0.012);
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 1.15);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // The cream still sitting on top, catching the light.
+    const skin = ctx.createRadialGradient(w * 0.62, h * 0.2, 0, w * 0.62, h * 0.2, h * 0.55);
+    skin.addColorStop(0, 'rgba(237, 233, 254, 0.12)');
+    skin.addColorStop(1, 'rgba(237, 233, 254, 0)');
+    ctx.fillStyle = skin;
+    ctx.fillRect(0, 0, w, h);
   }
 
   #apotheosis(ctx, w, h, t) {

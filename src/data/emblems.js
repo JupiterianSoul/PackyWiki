@@ -465,6 +465,18 @@ export const EMBLEMS = {
 
   /* Two dice mid-tumble and a meeple standing between them. */
   /* A half wheel of cheese on its board, cut face to the front. */
+  /* A yoghurt pot with the foil peeled back and a spoon standing in it. */
+  pot: `
+    <ellipse cx="60" cy="104" rx="34" ry="6" fill="${INK}" opacity="0.3"/>
+    <path d="M36 52 L84 52 L78 100 L42 100 Z" fill="${E1}"/>
+    <path d="M36 52 L84 52 L82 66 L38 66 Z" fill="${E2}" opacity="0.8"/>
+    <ellipse cx="60" cy="52" rx="24" ry="7" fill="${E2}"/>
+    <path d="M40 50 C48 40 76 38 82 48 L80 52 L38 52 Z" fill="${INK}" opacity="0.35"/>
+    <rect x="63" y="24" width="5" height="40" rx="2.5" fill="${INK}" opacity="0.55"
+      transform="rotate(12 65 44)"/>
+    <ellipse cx="70" cy="26" rx="8" ry="5.5" fill="${INK}" opacity="0.55"
+      transform="rotate(12 70 26)"/>`,
+
   wheel: `
     <ellipse cx="60" cy="104" rx="42" ry="6" fill="${INK}" opacity="0.3"/>
     <rect x="16" y="88" width="88" height="10" rx="4" fill="${INK}" opacity="0.55"/>

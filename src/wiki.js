@@ -974,6 +974,13 @@ async function drawTitleSet(pack) {
       card = page ? await namedCard(page, want, pack) : placeholderCard(want, pack);
     }
     card.special = pack.special ?? null;
+    // A special card is keyed by its CODE as well as its article. Two people
+    // are allowed to love the same thing, and without this the second code to
+    // be redeemed would merge its card into the first one's entry: a single
+    // card cannot belong to two albums, so one of them would sit at five out
+    // of six forever. The Creator has always been keyed this way; every
+    // special card is now.
+    if (card.special && card.key) card.key = `special:${card.special}:${card.key}`;
     out.push(card);
   }
   for (const extra of pack.extra ?? []) out.push({ ...extra });

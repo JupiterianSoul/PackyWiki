@@ -366,6 +366,27 @@ export const THEMES = [
     }
   },
   {
+    id: 'yaourt', code: 'mathilde',
+    name: { en: 'Yoghurt', fr: 'Yaourt' },
+    blurb: {
+      en: 'Mathilde’s. Violet folded through cream, a spoon already in it, an episode already running.',
+      fr: 'Celui de Mathilde. Du violet mêlé à la crème, la cuillère déjà dedans, un épisode déjà lancé.'
+    },
+    swatch: ['#1c0f33', '#a78bfa', '#ede9fe'],
+    backdrop: { renderer: 'yaourt', speed: 0.00011 },
+    motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    sound: {
+      voice: 'marimba',
+      gain: 0.62,
+      root: 261.63,           // C4
+      scale: [0, 2, 5, 7, 9],
+      reverb: { seconds: 2.0, decay: 2.4, mix: 0.22 },
+      filter: 3600,
+      drive: 0.04,
+      transient: 'brush'
+    }
+  },
+  {
     id: 'apotheosis', code: 'creator',
     name: { en: 'Apotheosis', fr: 'Apothéose' },
     blurb: {
