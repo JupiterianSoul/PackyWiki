@@ -1971,9 +1971,13 @@ async function runOpen(booster) {
     drawing,
     wait(DRAW_HARD_LIMIT).then(() => ({ error: new Error('TIMEOUT') }))
   ]);
+  // The reveal waits for the draw and for the FIRST cards to have flown in,
+  // not for the whole fountain: the last card of a big pack is still
+  // landing when the first one turns, which reads as eagerness rather than
+  // a wait.
   const [articles] = await Promise.all([
     guarded,
-    wait(EMERGE_DURATION + EMERGE_STAGGER * (count - 1))
+    wait(EMERGE_DURATION + EMERGE_STAGGER * Math.min(count - 1, 2))
   ]);
 
   if (!articles || articles.error) {

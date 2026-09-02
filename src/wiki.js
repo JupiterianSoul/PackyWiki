@@ -389,7 +389,7 @@ function pagesToCards(pages, seen) {
 }
 
 /** How long the draw waits for readership before pricing on size instead. */
-const VIEWS_PATIENCE_MS = 2500;
+const VIEWS_PATIENCE_MS = 1500;
 
 /**
  * The readership of the cards the draw settled on: ONE request, for a
@@ -851,23 +851,31 @@ async function drawCustomSet(pack) {
   const wiki = await wikiForLanguage(pack.wiki);
   const wishes = cappedWishes(pack, rollWishes(pack, wanted));
 
-  // A listing of random pages, then their details twenty a request; the
-  // pages the draw settles on pay for their text and picture, all at once.
-  // A page without a picture is not a card, so a round can come up short and
-  // the next round asks for more.
+  // A listing of random pages, then their details twenty a request, then
+  // the text and picture of every candidate at once, ten at a time, until
+  // the pack is full. A page without a picture is not a card, and on a wiki
+  // of short pages most are not, so every candidate a round brought back is
+  // tried rather than a chosen few. Each round says what it found, so a
+  // pack that comes back empty can be read in the console.
   const out = [];
   const seen = new Set();
-  for (let round = 0; out.length < wanted && round < 4 && !outOfTime(); round++) {
-    const ids = (await randomIds(wiki, 20).catch(() => []));
-    const details = (await customPagesDetail(wiki, ids).catch(() => []))
-      .map(protoCard).filter((proto) => proto && !seen.has(proto.page.title));
-    for (const proto of details) seen.add(proto.page.title);
-    // Only as many as are still needed, plus a couple of spares for the
-    // pictureless.
-    const picks = details.slice(0, wanted - out.length + 2);
-    const built = await Promise.all(picks.map((proto) => finishCustomCard(wiki, proto, pack).catch(() => null)));
-    for (const card of built) { if (card && out.length < wanted) out.push(card); }
-    if (!details.length) break;
+  for (let round = 0; out.length < wanted && round < 5 && !outOfTime(); round++) {
+    const ids = await randomIds(wiki, 20).catch(() => []);
+    let details = ids.length ? await customPagesDetail(wiki, ids).catch(() => []) : [];
+    // A wiki that will not answer for twenty pages at once is asked one
+    // page at a time, in parallel, for the first ten.
+    if (!details.length && ids.length) {
+      details = (await Promise.all(ids.slice(0, 10).map((id) => customPageDetail(wiki, id).catch(() => null)))).filter(Boolean);
+    }
+    const protos = details.map(protoCard).filter((proto) => proto && !seen.has(proto.page.title));
+    for (const proto of protos) seen.add(proto.page.title);
+    let built = 0;
+    for (let i = 0; i < protos.length && out.length < wanted && !outOfTime(); i += 10) {
+      const cards = await Promise.all(protos.slice(i, i + 10).map((proto) => finishCustomCard(wiki, proto, pack).catch(() => null)));
+      for (const card of cards) { if (card && out.length < wanted) { out.push(card); built++; } }
+    }
+    console.info(`Wikster custom draw "${pack.name}" round ${round + 1}: ${ids.length} random, ${details.length} detailed, ${protos.length} candidates, ${built} cards`);
+    if (!ids.length) break;
   }
 
   if (!out.length) throw new Error(`No usable page found on ${wiki.sitename}`);
