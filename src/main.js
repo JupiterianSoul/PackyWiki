@@ -667,6 +667,10 @@ function paintBell() {
 
 function openNotifications() {
   const list = notifications();
+  // Opening the list reads it, at the end of this function. The sweep has to
+  // work off what was already read BEFORE that, or the button would count
+  // four and quietly take away six.
+  const readBefore = new Set(state.profile.notifRead ?? []);
   openSheet(t('notifTitle'), (body) => {
     if (!list.length) {
       body.innerHTML = `<p class="muted" style="font-size:.88rem;line-height:1.6"></p>`;
@@ -677,7 +681,7 @@ function openNotifications() {
     wrap.className = 'notes';
     // Read notes from the stored feed can be swept away; live rows (a
     // request, a trade, unread chat) are not notes and stay until answered.
-    const sweepable = (state.profile.notifFeed ?? []).filter((note) => isRead(note.id)).length;
+    const sweepable = (state.profile.notifFeed ?? []).filter((note) => readBefore.has(note.id)).length;
     if (sweepable) {
       const clear = document.createElement('button');
       clear.type = 'button';
@@ -685,7 +689,7 @@ function openNotifications() {
       clear.textContent = t('notifClearRead', { n: sweepable });
       press(clear, { sound: null });
       clear.addEventListener('click', () => {
-        state.profile.notifFeed = (state.profile.notifFeed ?? []).filter((note) => !isRead(note.id));
+        state.profile.notifFeed = (state.profile.notifFeed ?? []).filter((note) => !readBefore.has(note.id));
         store.saveProfile(state.profile);
         synth.playTap();
         paintBell();
