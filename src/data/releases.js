@@ -240,27 +240,24 @@ export const RELEASES = [
     ]
   },
   {
-    id: 'special', icon: 'gift', accent: '#f7d488',
-    title: { en: 'The special boosters', fr: 'Les boosters spéciaux' },
+    id: 'darwin', icon: 'darwin', accent: '#a3a3a3',
+    title: { en: 'The Darwin Awards, and boosters that keep their word', fr: 'Les Darwin Awards, et des boosters qui tiennent parole' },
     points: [
-      { en: 'Secret codes that unlock a booster made for one person', fr: 'Des codes secrets qui débloquent un booster fait pour une seule personne' },
-      { en: 'A Special tier above Prismatic, with a look of its own per person', fr: 'Un rang Spécial au-dessus de Prismatique, avec un style propre à chacun' },
-      { en: 'Their own album, theme and badge, all at once', fr: 'Leur album, leur thème et leur badge, d’un coup' }
+      { en: 'A new subject: the famous cases of spectacularly bad judgement', fr: 'Un nouveau sujet : les cas célèbres de jugement spectaculairement mauvais' },
+      { en: 'A tier booster now always contains a card of its tier', fr: 'Un booster à palier contient désormais toujours une carte de son palier' },
+      { en: 'A pack tells you about a bad connection before you tear it', fr: 'Un paquet vous prévient d’une mauvaise connexion avant que vous l’ouvriez' }
     ],
     changelog: [
-      { en: 'A secret code typed into Settings hands over a whole gift: a booster in the person’s colour on the Custom shelf, six cards, an album, a theme and a badge', fr: 'Un code secret saisi dans les Réglages remet tout un cadeau : un booster à la couleur de la personne sur l’étagère Personnalisés, six cartes, un album, un thème et un badge' },
-      { en: 'The six cards are the five things that person loves, drawn from Wikipedia by name, and The Creator, the same sixth card in every pack', fr: 'Les six cartes sont les cinq choses que cette personne aime, tirées de Wikipédia par leur nom, et Le Créateur, la même sixième carte dans chaque paquet' },
-      { en: 'Special cards wear the Special tier for good: they are never re-graded, and cannot be sold, auctioned, given or traded', fr: 'Les cartes spéciales gardent le rang Spécial pour de bon : jamais réévaluées, elles ne peuvent être ni vendues, ni mises aux enchères, ni offertes, ni échangées' },
-      { en: 'Each person’s cards have their own treatment: Simon’s laugh in blue, Céleste’s rose glaze on Assyrian brick, Samuel’s dodger-blue HUD, Noah’s violet felt table', fr: 'Les cartes de chacun ont leur propre traitement : le rire bleu de Simon, l’émail rose de Céleste sur brique assyrienne, le HUD bleu dodger de Samuel, la table de feutre violet de Noah' },
-      { en: 'The Creator card is ink, cream and gold: a portrait under film grain, a pen stroke of light, a wax seal', fr: 'La carte du Créateur est encre, crème et or : un portrait sous grain de film, un trait de plume lumineux, un sceau de cire' },
-      { en: 'Four new themes, one per code, on the moment the code is redeemed and in the picker after: Rire, Assur, Pixel and Tabletop', fr: 'Quatre nouveaux thèmes, un par code, appliqués à l’instant où le code est utilisé et dans le sélecteur ensuite : Rire, Assur, Pixel et Plateau' },
-      { en: 'Four badges, worn the moment the code is redeemed', fr: 'Quatre badges, portés à l’instant où le code est utilisé' },
-      { en: 'A special album per code, the one album that can be finished: six of six', fr: 'Un album spécial par code, le seul album qui puisse être terminé : six sur six' },
-      { en: 'The reveal lays out the whole gift: the message, the booster, the six names, the theme, the badge', fr: 'La révélation expose tout le cadeau : le message, le booster, les six noms, le thème, le badge' },
-      { en: 'A code works for anyone who has it, once per save', fr: 'Un code fonctionne pour quiconque le possède, une fois par sauvegarde' },
-      { en: 'What is inside stays a surprise until the pack is torn open; special cards count for no achievement, level or album milestone; a special theme or badge is invisible until its code is redeemed', fr: 'Ce qu’il y a dedans reste une surprise jusqu’à l’ouverture ; les cartes spéciales ne comptent pour aucun succès, niveau ou palier d’album ; un thème ou badge spécial reste invisible tant que son code n’est pas utilisé' },
       { en: 'The Darwin Awards, a new subject: the famous cases, five at random per booster, told by their own articles', fr: 'Les Darwin Awards, un nouveau sujet : les cas célèbres, cinq au hasard par booster, racontés par leurs propres articles' },
-      { en: 'Notifications can be cleared once read; the launcher icon changes safely when the game is put away', fr: 'Les notifications lues peuvent être effacées ; l’icône change sans risque quand le jeu est mis de côté' }
+      { en: 'A booster with a tier printed on it always holds at least one card of that tier, and fills the rest from one tier below it and up, instead of topping itself up from wherever when its subject ran thin', fr: 'Un booster portant un palier contient toujours au moins une carte de ce palier, et complète le reste à partir du palier juste en dessous, au lieu de se remplir n’importe comment quand son sujet s’épuisait' },
+      { en: 'The open screen warns about a dead or unreachable connection while the pack is still sealed, rather than after it is spent', fr: 'L’écran d’ouverture signale une connexion morte ou injoignable tant que le paquet est scellé, plutôt qu’une fois dépensé' },
+      { en: 'A booster that fails to open comes back exactly once, through the same path the next launch uses, so it can never be handed back twice', fr: 'Un booster qui échoue à s’ouvrir revient exactement une fois, par le même chemin que le lancement suivant, sans jamais être rendu deux fois' },
+      { en: 'Two separate buttons where there was one: Remove all cards keeps your level and your achievements, Reset all progress ends the save', fr: 'Deux boutons distincts là où il n’y en avait qu’un : Retirer toutes les cartes conserve votre niveau et vos succès, Réinitialiser toute la progression met fin à la sauvegarde' },
+      { en: 'Reset all progress now really does clear everything, including the wishlist, the badge shelf, the frame and your saved bids, which used to survive it', fr: 'Réinitialiser toute la progression efface vraiment tout, y compris la liste de souhaits, l’étagère à badges, le cadre et vos enchères, qui y survivaient' },
+      { en: 'The mark is painted in the theme’s own colours, so the drawer, the splash and the gate follow a theme change', fr: 'Le logo est peint aux couleurs du thème, si bien que le tiroir, l’écran de démarrage et la porte suivent un changement de thème' },
+      { en: 'One Gift button on a friend’s profile, which then asks whether you meant a card or a booster', fr: 'Un seul bouton Offrir sur le profil d’un ami, qui demande ensuite s’il s’agit d’une carte ou d’un booster' },
+      { en: 'Notifications can be cleared once read; the launcher icon changes safely when the game is put away', fr: 'Les notifications lues peuvent être effacées ; l’icône change sans risque quand le jeu est mis de côté' },
+      { en: 'The Android app ships as a release build rather than a debug one, which is the version Android words its install warnings least harshly about. Same signing key, so it still installs over your copy and keeps your collection', fr: 'L’application Android est désormais une version release plutôt qu’une version debug, celle sur laquelle Android formule ses avertissements le moins durement. Même clé de signature : elle s’installe toujours par-dessus votre copie et conserve votre collection' }
     ]
   }
 ];

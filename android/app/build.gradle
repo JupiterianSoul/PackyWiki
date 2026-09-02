@@ -10,24 +10,26 @@ android {
     compileSdk 35
 
     /*
-     * A FIXED signing key, committed to the repo.
+     * A FIXED signing key, committed to the repo, used by BOTH build types.
      *
-     * Without this, `assembleDebug` falls back to ~/.android/debug.keystore -
-     * and a CI runner is a fresh machine every time, so Gradle generated a
-     * brand new random key on every single build. Android identifies an app by
-     * its signature, so every build looked like a different app: no update
-     * would install over the last one, and uninstalling to make room took the
-     * player's whole collection with it.
+     * Without this, Gradle falls back to ~/.android/debug.keystore - and a CI
+     * runner is a fresh machine every time, so it generated a brand new random
+     * key on every single build. Android identifies an app by its signature,
+     * so every build looked like a different app: no update would install over
+     * the last one, and uninstalling to make room took the player's whole
+     * collection with it.
      *
-     * The key lives in the repo on purpose. It is a debug key for a
-     * sideloaded app, the password is right here, and it protects nothing: a
-     * debug-signed APK is not trustworthy to begin with. What it buys is the
-     * one thing that actually matters here - every build updates in place and
-     * keeps your save. If this ever ships properly, generate a real key and
-     * pass it in through CI secrets instead.
+     * The key lives in the repo on purpose. It is the key for a sideloaded
+     * app, the password is right here, and it protects nothing against a
+     * determined party. What it buys is the one thing that actually matters
+     * here - every build updates in place and keeps your save. Release and
+     * debug share it deliberately: the signature must not change between them,
+     * or the release build would refuse to install over an existing debug one.
+     * If this ever ships properly, generate a real key and pass it in through
+     * CI secrets instead.
      */
     signingConfigs {
-        debug {
+        shared {
             storeFile file('../keystore/wiklodo-debug.keystore')
             storePassword 'wiklodo'
             keyAlias 'wiklodo'
@@ -55,12 +57,21 @@ android {
         versionName '0.1.0'
     }
 
+    /*
+     * What ships is the RELEASE build. Play Protect scans every sideloaded
+     * APK and no app can switch that off - it belongs to the device, not to
+     * us - but a debug-signed build is the version Android is harshest about,
+     * because `debuggable` is set and the installer says so in as many words.
+     * A release build drops that flag and is signed with the same key, so it
+     * still installs straight over an existing copy and keeps the save.
+     */
     buildTypes {
         debug {
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.shared
         }
         release {
             minifyEnabled false
+            signingConfig signingConfigs.shared
         }
     }
 

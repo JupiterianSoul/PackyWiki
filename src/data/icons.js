@@ -253,13 +253,20 @@ const ICONS = {
  * The Wiklodo mark: a foil booster torn open, a star bursting out of the
  * mouth, the W stamped on the face. The same drawing ships as the Android
  * launcher icon (ic_launcher_foreground.xml) - one identity everywhere.
+ *
+ * The wrapper is painted in the theme's own two accents, so the mark changes
+ * with the theme exactly as the launcher icon does: the drawer's mark, the
+ * splash and the gate all follow a theme switch with no repaint, because a
+ * custom property recolours them where they stand. `var()` only resolves in a
+ * style property, never in a presentation attribute, which is why the stops
+ * are written as inline styles. The star stays gold in every theme - it is the
+ * part of the mark that has to stay recognisable.
  */
 export const LOGO_MARK = `
   <defs>
     <linearGradient id="lg-bag" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#4f46e5"/>
-      <stop offset="0.55" stop-color="#312e81"/>
-      <stop offset="1" stop-color="#1e1b4b"/>
+      <stop offset="0" style="stop-color: var(--accent, #4f46e5)"/>
+      <stop offset="1" style="stop-color: var(--accent-2, #1e1b4b)"/>
     </linearGradient>
     <linearGradient id="lg-star" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#fde68a"/>
@@ -268,9 +275,9 @@ export const LOGO_MARK = `
   </defs>
   <path fill="url(#lg-bag)"
     d="M15 21 L18 18 L21 21 L24 18 L27 21 L30 18 L33 21 L36 18 L39 21 L42 18 L45 21 L48 18 L48 51 A6 6 0 0 1 42 57 L21 57 A6 6 0 0 1 15 51 Z"/>
-  <path fill="rgba(165,180,252,0.35)" d="M15 33 L48 23 L48 31 L15 41 Z"/>
-  <path fill="#0b0d1c" d="M17 21.8 L46 21.8 L46 25.4 L17 25.4 Z"/>
-  <path fill="none" stroke="#a5b4fc" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"
+  <path fill="rgba(255,255,255,0.28)" d="M15 33 L48 23 L48 31 L15 41 Z"/>
+  <path fill="rgba(8,10,24,0.85)" d="M17 21.8 L46 21.8 L46 25.4 L17 25.4 Z"/>
+  <path fill="none" stroke="rgba(255,255,255,0.8)" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"
     d="M15 21 L18 18 L21 21 L24 18 L27 21 L30 18 L33 21 L36 18 L39 21 L42 18 L45 21 L48 18"/>
   <path fill="url(#lg-star)"
     d="M31.5 2 L34.6 10.4 L43 13.5 L34.6 16.6 L31.5 25 L28.4 16.6 L20 13.5 L28.4 10.4 Z"/>

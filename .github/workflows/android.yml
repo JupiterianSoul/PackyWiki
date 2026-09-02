@@ -57,24 +57,29 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Assemble debug APK
+      - name: Assemble release APK
         working-directory: android
         # BUILD_NUMBER feeds versionCode, so each build is newer than the last.
         # The signing key is committed (see android/app/build.gradle), which is
         # what makes every build update in place instead of demanding an
         # uninstall and taking the player's collection with it.
+        #
+        # Release rather than debug: Play Protect scans every sideloaded APK
+        # whatever we do, but a debuggable build is the one Android warns
+        # hardest about. Same key either way, so this still installs over an
+        # existing copy.
         env:
           BUILD_NUMBER: ${{ github.run_number }}
-        run: ./gradlew --no-daemon assembleDebug
+        run: ./gradlew --no-daemon assembleRelease
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/debug/app-debug.apk wiklodo-debug.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk wiklodo.apk
 
       - name: Upload APK as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
           name: wiklodo-apk
-          path: wiklodo-debug.apk
+          path: wiklodo.apk
           if-no-files-found: error
 
       # A release asset gives a direct, tappable .apk link - an artifact only
@@ -84,14 +89,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest wiklodo-debug.apk \
+          gh release create apk-latest wiklodo.apk \
             --target "$GITHUB_SHA" \
-            --title "Wiklodo - latest debug APK" \
-            --notes "Sideloadable debug build of \`$GITHUB_SHA\`.
+            --title "Wiklodo - latest APK" \
+            --notes "Sideloadable release build of \`$GITHUB_SHA\`.
 
-          **Install:** download \`wiklodo-debug.apk\` below, tap it, and allow
+          **Install:** download \`wiklodo.apk\` below, tap it, and allow
           your browser to install unknown apps when prompted.
 
-          Debug-signed, so if an existing Wiklodo install refuses to update,
-          uninstall it first. Needs a network connection - cards are fetched
-          live from Wikipedia."
+          Android still offers to scan a sideloaded app with Play Protect;
+          that check belongs to the device and no app can turn it off. You can
+          decline the scan, or switch it off in Play Store, Play Protect,
+          Settings.
+
+          Signed with the project's own key, so this installs over an existing
+          Wiklodo and keeps your collection. Needs a network connection - cards
+          are fetched live from Wikipedia."

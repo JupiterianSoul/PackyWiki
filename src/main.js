@@ -27,7 +27,7 @@ import {
   popularityFromViews, popularityFromWordCount
 } from './pricing.js';
 import {
-  boosterPrice, sellPriceFor, nextRefreshAt, windowIndexAt,
+  boosterPrice, sellPriceFor, nextRefreshAt, windowIndexAt, drawCapsFor,
   nextFreeAt, freeWindowAt, STARTER_PACKS, STARTER_PACK_CARDS, STARTER_COINS
 } from './economy.js';
 import { generateShop, formatCountdown } from './shop.js';
@@ -1733,14 +1733,54 @@ function schedulePrefetch(spec) {
   const id = specId(spec);
   if (state.prefetch?.id === id) return;
   state.prefetchTimer = setTimeout(() => {
-    const record = { id, settled: false };
+    const record = { id, settled: false, failed: false };
     record.promise = drawArticles(toDrawPack(spec))
       .catch((error) => ({ error }))
       // Whether the cards are already in hand decides whether a booster can
-      // be opened with no connection at all.
-      .then((value) => { record.settled = true; return value; });
+      // be opened with no connection at all, and whether they came back at
+      // all decides what the idle screen is allowed to promise.
+      .then((value) => {
+        record.settled = true;
+        record.failed = Boolean(value?.error);
+        paintOpenHint();
+        return value;
+      });
     state.prefetch = record;
   }, PREFETCH_DELAY);
+}
+
+/**
+ * What the open screen may promise while the pack is still whole. Cards come
+ * off the network, so tearing a pack with a dead connection buys the player an
+ * animation and a refund. The prefetch already ran the exact request the open
+ * will run, so if it came back broken, so will the open: say so on the idle
+ * screen instead of after the booster is spent.
+ */
+function openReadiness() {
+  // The open screen carries `phase-idle` in the markup, so this can be asked
+  // before any booster has been chosen: at startup, and again after the screen
+  // is left. There is nothing to promise about a booster that does not exist.
+  if (!state.spec) return 'ready';
+  const pre = state.prefetch?.id === specId(state.spec) ? state.prefetch : null;
+  // Cards already in hand open fine with no connection at all.
+  if (pre?.settled && !pre.failed) return 'ready';
+  if (navigator.onLine === false) return 'offline';
+  if (pre?.settled && pre.failed) return 'unreachable';
+  return 'ready';
+}
+
+/** Paint the idle screen's line, warning included. Safe to call any time. */
+function paintOpenHint() {
+  if (!state.spec) return;
+  if (!el.openScreen?.classList.contains('phase-idle')) return;
+  const readiness = openReadiness();
+  if (readiness === 'ready') {
+    el.openHint.textContent = t('slideToRip');
+    el.openHint.className = 'open-hint';
+    return;
+  }
+  el.openHint.textContent = readiness === 'offline' ? t('openWarnOffline') : t('openWarnUnreachable');
+  el.openHint.className = 'open-hint is-warn';
 }
 
 function drawFor(spec) {
@@ -1778,6 +1818,7 @@ function openScreenFor(spec) {
   initRip(booster);
 
   schedulePrefetch(spec);
+  paintOpenHint();
   showScreen('open');
 }
 
@@ -1874,9 +1915,14 @@ async function runOpen(booster) {
   ]);
 
   if (!articles || articles.error) {
-    // Refund: the booster was consumed but produced nothing.
-    store.addBooster(state.inventory, state.spec, 1);
-    store.clearOpenInFlight();
+    // Refund: the booster was consumed but produced nothing. It goes back
+    // through the same path the next launch would use, so the record is spent
+    // in the act of refunding and the booster can never be handed back twice.
+    // If the record did not survive (storage refused it), hand it back
+    // directly rather than swallow it.
+    if (!store.reclaimOpenInFlight(state.inventory)) {
+      store.addBooster(state.inventory, state.spec, 1);
+    }
     renderPacks();
     el.openScreen.className = 'screen is-active phase-idle';
     const why = articles?.error?.message;
@@ -4883,6 +4929,35 @@ function toggleFavFriend(id) {
 /* --- gifting ------------------------------------------------------------------ */
 
 /** Pick one of my cards; hand it over. The card leaves my save first. */
+/**
+ * One Gift button, asked what kind. Two buttons sitting side by side made the
+ * row long and the choice look like two different features, when it is one
+ * thing with two shapes.
+ */
+function openGiftChooser(entry) {
+  openSheet(t('giftChooseTitle', { name: entry.profile.username }), (body) => {
+    const note = document.createElement('p');
+    note.textContent = t('giftChooseNote');
+
+    const choices = document.createElement('div');
+    choices.className = 'gift-choices';
+    const choice = (icon, labelKey, run) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-ghost gift-choice';
+      btn.innerHTML = `${iconSvg(icon, { size: 20 })}<span>${esc(t(labelKey))}</span>`;
+      press(btn, { sound: null });
+      btn.addEventListener('click', () => { synth.playTap(); sheet.hide(); run(); });
+      return btn;
+    };
+    choices.append(
+      choice('gift', 'giftCardOpen', () => openGiftCard(entry)),
+      choice('packs', 'giftBoosterOpen', () => openGiftBooster(entry))
+    );
+    body.append(note, choices);
+  });
+}
+
 function openGiftCard(entry) {
   const mine = store.allEntries(state.collection)
     .filter((c) => !store.isLocked(c))
@@ -5552,8 +5627,7 @@ function renderFriend() {
   el.friendActions.replaceChildren(
     actionBtn('chat', 'chatOpen', () => openChat(entry), 'btn-primary'),
     actionBtn('trade', 'tradeOpen', () => openTradeSheet(entry)),
-    actionBtn('gift', 'giftCardOpen', () => openGiftCard(entry)),
-    actionBtn('packs', 'giftBoosterOpen', () => openGiftBooster(entry)),
+    actionBtn('gift', 'giftOpen', () => openGiftChooser(entry)),
     actionBtn('wish', 'wishTitle', () => openFriendWishlist(entry))
   );
 
@@ -6133,6 +6207,21 @@ function renderSettings() {
   press(transferBtn, { sound: null });
   transferBtn.addEventListener('click', openTransfer);
 
+  // Two destructive buttons, mild first: one empties the collection, the other
+  // ends the save. They are deliberately worded so the difference between them
+  // is readable before either is armed.
+  const wipeRow = document.createElement('div');
+  wipeRow.className = 'row';
+  wipeRow.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="btn btn-sm btn-danger row-action" type="button"></button>`;
+  wipeRow.querySelector('h4').textContent = t('settingsCardWipe');
+  wipeRow.querySelector('p').textContent = t('settingsCardWipeNote');
+  const wipeBtn = wipeRow.querySelector('button');
+  press(wipeBtn, { sound: null });
+  paintResetButton(wipeBtn, 'cards');
+  wipeBtn.addEventListener('click', () => handleReset(wipeBtn, 'cards'));
+
   const resetRow = document.createElement('div');
   resetRow.className = 'row';
   resetRow.innerHTML = `
@@ -6142,10 +6231,10 @@ function renderSettings() {
   resetRow.querySelector('p').textContent = t('settingsResetNote');
   const resetBtn = resetRow.querySelector('button');
   press(resetBtn, { sound: null });
-  paintResetButton(resetBtn);
-  resetBtn.addEventListener('click', () => handleReset(resetBtn));
+  paintResetButton(resetBtn, 'all');
+  resetBtn.addEventListener('click', () => handleReset(resetBtn, 'all'));
 
-  el.dataList.replaceChildren(transferRow, resetRow);
+  el.dataList.replaceChildren(transferRow, wipeRow, resetRow);
 
   // --- secret codes: a booster someone handed you ---------------------------
   el.redeemLabel.textContent = t('redeemTitle');
@@ -6711,25 +6800,72 @@ function openTransfer() {
   });
 }
 
-let resetArmed = false;
-let resetTimer = null;
+/**
+ * Two different destructive buttons, so two arming states. Sharing one would
+ * let a tap that armed the mild button confirm the ruinous one.
+ */
+const resetArm = { cards: false, all: false };
+const resetTimers = { cards: null, all: null };
 
-function paintResetButton(button) {
-  button.textContent = resetArmed ? t('settingsResetConfirm') : t('settingsReset');
-  button.classList.toggle('is-armed', resetArmed);
+function paintResetButton(button, which) {
+  const armed = resetArm[which];
+  const label = which === 'cards' ? 'settingsCardWipe' : 'settingsReset';
+  button.textContent = armed ? t('settingsResetConfirm') : t(label);
+  button.classList.toggle('is-armed', armed);
 }
 
 /** Same arm-then-confirm shape as selling a card: the button is the dialog. */
-function handleReset(button) {
-  if (!resetArmed) {
-    resetArmed = true;
-    paintResetButton(button);
+function handleReset(button, which) {
+  if (!resetArm[which]) {
+    resetArm[which] = true;
+    paintResetButton(button, which);
     synth.playArm();
-    clearTimeout(resetTimer);
-    resetTimer = setTimeout(() => { resetArmed = false; paintResetButton(button); }, 5000);
+    clearTimeout(resetTimers[which]);
+    resetTimers[which] = setTimeout(() => {
+      resetArm[which] = false;
+      paintResetButton(button, which);
+    }, 5000);
     return;
   }
-  wipeEverything();
+  if (which === 'cards') removeAllCards(); else wipeEverything();
+}
+
+/**
+ * Empty the collection without touching who the player is.
+ *
+ * The mild reset: cards, money, boosters, worn badges and the chosen theme go
+ * back to the start, while level, experience, achievements and the codes this
+ * save has redeemed stay exactly where they were. A special booster's cards
+ * are the one thing here that belongs to the account rather than the run, so
+ * they survive too, along with the unopened special boosters and the albums
+ * built from them. Wiping those would take away something a code can only
+ * hand over once.
+ */
+function removeAllCards() {
+  const kept = {};
+  for (const [key, entry] of Object.entries(state.collection.entries ?? {})) {
+    if (entry?.special) kept[key] = entry;
+  }
+  state.collection.entries = kept;
+  store.saveCollection(state.collection);
+
+  // Unopened special boosters stay; everything else on the shelf goes.
+  for (const [id, slot] of Object.entries(state.inventory)) {
+    if (slot?.spec?.kind !== 'code') delete state.inventory[id];
+  }
+  store.saveInventory(state.inventory);
+
+  store.saveWallet(STARTER_COINS);
+  store.saveBadgeLoadout([]);
+  state.badgeLoadout = [];
+  store.saveWishlist([]);
+  try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); } catch { /* session only */ }
+
+  // The server holds the same save, so it has to hear about this or the next
+  // launch pulls the cards straight back down.
+  syncSoon();
+  toast(esc(t('settingsCardWipeDone')), 'ok');
+  location.reload();
 }
 
 /**
@@ -6739,6 +6875,12 @@ function handleReset(button) {
  * pulled straight back down on the next launch. The server goes first, so a
  * failure there leaves the player exactly where they were rather than
  * half-erased.
+ *
+ * Every packywiki key goes, not a hand-written list of them: the list had
+ * already fallen behind the wishlist, the badge shelf, the frame and the
+ * saved bids, all of which outlived an erase that claimed to remove
+ * everything. Redeemed codes live in the profile, so they go too, and a
+ * secret code can be redeemed again on the save that comes after this.
  */
 async function wipeEverything() {
   if (signedIn() && state.account.profile) {
@@ -6751,11 +6893,14 @@ async function wipeEverything() {
       return;
     }
   }
-  ['packywiki.collection.v3', 'packywiki.wallet.v1', 'packywiki.inventory.v1',
-   'packywiki.profile.v1', 'packywiki.customPacks.v2', 'packywiki.language',
-   'packywiki.ripDirection', THEME_KEY].forEach((key) => {
-    try { localStorage.removeItem(key); } catch { /* nothing to remove */ }
-  });
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('packywiki.')) doomed.push(key);
+    }
+    for (const key of doomed) localStorage.removeItem(key);
+  } catch { /* storage unavailable: nothing to remove */ }
   location.reload();
 }
 
@@ -7145,6 +7290,11 @@ function regradeCollection() {
 }
 
 function init() {
+  // The idle open screen carries a live connection warning, so it follows the
+  // connection rather than whatever was true when the screen was built.
+  window.addEventListener('online', paintOpenHint);
+  window.addEventListener('offline', paintOpenHint);
+
   // A special theme belongs to whoever redeemed its code. A save that lost
   // the code (an erased save, a transfer that went the other way) wakes up
   // in the default theme rather than one it has no right to.
@@ -7440,7 +7590,7 @@ init();
 
 window.__packywiki = {
   state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
-  draw: drawArticles, generateShop, syncSocial,
+  draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {
     const forced = rarityById(id);

@@ -329,6 +329,35 @@ async function gatherCandidates(pack) {
     .map((c) => c.page);
 }
 
+/**
+ * Cards from the most-read list, filtered to a popularity floor. This is the
+ * only place pages famous enough for the upper tiers reliably live: a random
+ * article is Common almost by definition, so topping a tiered booster up from
+ * the random pool is precisely what made its tier look like it did nothing.
+ */
+async function drawFamous(pack, seen, floor, wanted) {
+  if (wanted <= 0) return [];
+  const rows = await topArticles().catch(() => []);
+  const fresh = shuffled(rows.filter((row) => !seen.has(row.title)));
+  const views = new Map();
+  const out = [];
+
+  for (let i = 0; i < fresh.length && out.length < wanted; i += 12) {
+    const chunk = fresh.slice(i, i + 12);
+    for (const row of chunk) views.set(row.title, row.views);
+    const pages = await pagesByTitle(chunk.map((row) => row.title)).catch(() => []);
+    for (const page of pages) {
+      if (out.length >= wanted || seen.has(page.title)) continue;
+      if (!bestImage(page) || !isUsableText(page.title, page.extract)) continue;
+      const card = pageToCard(page, views.get(page.title) ?? null);
+      if (!card || card.popularity < floor) continue;
+      seen.add(card.title);
+      out.push(card);
+    }
+  }
+  return out;
+}
+
 async function drawWikipediaSet(pack) {
   const wanted = Math.max(1, pack.cards ?? 5);
   const seen = new Set();
@@ -363,14 +392,36 @@ async function drawWikipediaSet(pack) {
     }
   }
 
+  // THE TIER'S PROMISE: a booster that names a tier hands over at least one
+  // card of that tier. Nothing reaches `out` above unless it already fits the
+  // band, so an empty `out` is exactly the case that used to produce a pack
+  // with no trace of the tier printed on it. The most-read list is asked for
+  // one card the subject could not supply.
+  if (!out.length && pack.minPopularity != null && !outOfTime()) {
+    for (const card of await drawFamous(pack, seen, pack.minPopularity, 1).catch(() => [])) {
+      out.push(card);
+    }
+  }
+
   // A booster ALWAYS opens. Anything that was merely outside the tier's band
-  // fills the rest, closest first, before we go looking any further.
+  // fills the rest, closest first, before we go looking any further. With only
+  // a floor to miss, closest is also most-read, so the pack fills downward
+  // from its own tier rather than from wherever.
   if (out.length < wanted) {
     nearMisses.sort((a, b) => a.miss - b.miss);
     for (const { card } of nearMisses) {
       if (out.length >= wanted) break;
       if (seen.has(card.title)) continue;
       seen.add(card.title);
+      out.push(card);
+    }
+  }
+
+  // Still short, and the pack has a tier to live up to: the most-read list
+  // again, at the floor one tier below the pack's own, so the rest of an Epic
+  // booster is Rare and up rather than whatever the random pool coughs up.
+  if (out.length < wanted && pack.fillPopularity != null && !outOfTime()) {
+    for (const card of await drawFamous(pack, seen, pack.fillPopularity, wanted - out.length).catch(() => [])) {
       out.push(card);
     }
   }

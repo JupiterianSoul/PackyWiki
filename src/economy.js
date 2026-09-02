@@ -15,7 +15,7 @@
  * so E[sell everything] = RETURN_RATE × price, for every booster in the game.
  * Progression therefore comes from time (the shop stipend), not from grinding.
  */
-import { rarityRank, rarityFromPopularity, tierMidPopularity, tierBand } from './data/rarities.js';
+import { RARITIES, rarityRank, rarityFromPopularity, tierMidPopularity, tierBand } from './data/rarities.js';
 import { basePrice, priceFor } from './pricing.js';
 import { timedDrawCaps } from './timed.js';
 
@@ -52,8 +52,29 @@ export const CARD_COUNT_RANGE = [3, 7];
  */
 export function drawCapsFor(spec) {
   if (spec?.kind === 'timed') return timedDrawCaps(spec.timedLevel ?? 1);
-  if (!spec?.rarityId) return { minPopularity: null, maxPopularity: null };
-  return { minPopularity: tierBand(spec.rarityId).min, maxPopularity: null };
+  if (!spec?.rarityId) return { minPopularity: null, maxPopularity: null, fillPopularity: null };
+  return {
+    minPopularity: tierBand(spec.rarityId).min,
+    maxPopularity: null,
+    fillPopularity: fillFloorFor(spec.rarityId)
+  };
+}
+
+/**
+ * The floor for the cards that are NOT the guaranteed one. A tiered booster
+ * used to top itself up from the open pool whenever its subject ran thin,
+ * which is how an Epic pack ended up holding five Commons and why the tier
+ * looked like it did nothing. The rest of the pack now starts one tier below
+ * the pack's own instead: an Epic booster fills with Rare and up, a Rare
+ * booster with Uncommon and up, so every step up the ladder is a step up in
+ * what the whole pack is made of, not just its guaranteed card.
+ *
+ * Common has nothing below it, so it stays unconstrained.
+ */
+export function fillFloorFor(rarityId) {
+  const rank = rarityRank(rarityId);
+  if (rank <= 0) return null;
+  return RARITIES[rank - 1]?.minPop ?? null;
 }
 
 /** Mean value of a single card out of this booster, from what it may draw. */

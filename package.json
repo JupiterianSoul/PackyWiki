@@ -1,9 +1,9 @@
 {
-  "name": "packywiki",
+  "name": "wiklodo",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "A WikiMaster-style Wikipedia trading card pack opener.",
+  "description": "A trading card game built out of Wikipedia.",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

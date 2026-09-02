@@ -1,1089 +1,339 @@
 # Wiklodo
 
-A WikiMaster-style booster pack opener where the cards are **real Wikipedia
-articles**. Buy boosters from a shop that restocks every two hours, slide the rip line to
-tear one open, watch the cards fly out of it, then swipe through them - each
-graded on an eight-tier rarity table by how many people actually read its
-article (the same article is the same rarity for everyone), with its own visual
-treatment and its own synthesised chime, priced in Buckarooz from that same
-popularity, and saved to a collection you can filter, favourite and sell from.
+A trading card game built out of Wikipedia. You buy booster packs, tear them
+open with your thumb, and the cards inside are real Wikipedia articles: a
+photograph, a title, the opening lines, and a rarity decided by how many
+people actually read that page last month.
 
-Four themes, and a theme here is not a palette: each carries its own shapes,
-typeface, pace, texture, live backdrop and musical instrument.
+It runs as a website and as an Android app, from one codebase and one build.
 
-Available in English and French, including the articles themselves.
+- **Play in a browser:** https://jupiteriansoul.github.io/PackyWiki/
+- **Android:** the newest APK is always the `apk-latest` release of this
+  repository.
 
-No backend, no API key, no build-time data, and no UI framework or component
-library. Everything is fetched live from Wikipedia's public API, every control
-is built from scratch, and every sound is synthesised at runtime with the Web
-Audio API.
+The whole app is vanilla JavaScript with no framework. Vite bundles it, the
+Android app is a WebView around the same `dist/`, and Supabase holds accounts
+and the social features. If you want to read the source, `src/main.js` is the
+application and everything else is a module it pulls in.
 
-> The app was called PackyWiki until the rename. Two things deliberately kept
-> the old name: the Android `applicationId` (`com.packywiki.app`) and the
-> `packywiki.` localStorage prefix. Both are identity rather than branding -
-> changing the first installs a second, empty app alongside the first, and
-> changing the second wipes every existing collection on the next launch.
+## Contents
 
----
+- [Running it](#running-it)
+- [How a card is made](#how-a-card-is-made)
+- [Boosters](#boosters)
+- [Rarity](#rarity)
+- [Money](#money)
+- [The collection](#the-collection)
+- [Progression](#progression)
+- [Accounts and the social side](#accounts-and-the-social-side)
+- [Themes, sound and motion](#themes-sound-and-motion)
+- [Secret codes](#secret-codes)
+- [The Android app](#the-android-app)
+- [The website](#the-website)
+- [Project layout](#project-layout)
+- [Names that cannot change](#names-that-cannot-change)
+- [Credits](#credits)
 
 ## Running it
 
-```bash
+Node 20 or newer.
+
+```sh
 npm install
-npm run dev
+npm run dev        # development server on :5173
+npm run build      # production build into dist/
+npm run preview    # serve the built dist/ on :4173
 ```
 
-Then open the URL Vite prints (default <http://localhost:5173>).
+`npm run build` is the whole product. `dist/` is what the website serves and
+what the Android app wraps, byte for byte.
 
-On first launch you pick a language and get a starter kit. Buy boosters in the
-**Shop**, open them from **Boosters**, and your pulls land in the
-**Collection**, where you can sell duplicates back for Buckarooz.
+The app works with no backend at all: without Supabase credentials it runs
+fully offline-capable and local, and only the account features are missing.
+To turn those on, see [Accounts](#accounts-and-the-social-side).
 
-Accounts, cloud save and friends need a Supabase project; see
-[Accounts, cloud save and friends](#accounts-cloud-save-and-friends). Without
-one, everything else works and the collection simply stays on the device.
+## How a card is made
 
-Other scripts:
+A card is one Wikipedia article. Drawing one means:
 
-```bash
-npm run build     # production bundle into dist/
-npm run preview   # serve the built bundle
+1. **Find candidates.** A booster's subject is a set of search queries. The
+   draw runs two of them and pools the results, so a whole pack costs about
+   one search rather than one per card.
+2. **Insist on a picture.** A card with no image is not a card. The draw takes
+   the lead image, and if there is none it goes looking for the first real
+   photograph on the page. An article that cannot produce one is skipped, not
+   shown blank.
+3. **Insist on real text.** Disambiguation pages, list articles and stubs
+   whose opening lines say nothing are rejected.
+4. **Ask how many people read it.** Monthly pageviews come from the Wikimedia
+   REST API, and that number alone decides the card's rarity.
+
+The same article is therefore the same rarity for every player in the world,
+which is the property the whole economy rests on.
+
+Cards are drawn in the language the app is set to. A French card that has no
+French article falls back to the English one rather than vanishing.
+
+## Boosters
+
+A booster has a **subject**, a **size** (3 to 7 cards) and sometimes a
+**tier**.
+
+There are 27 subjects, from Animals and Space to Cinema, Football and the
+Darwin Awards. Two of them are curated rolls rather than searches: their
+articles are named outright in `src/data/packs.js` and the booster deals a
+random hand from that list.
+
+### Tier boosters
+
+A booster can carry a rarity on its face, and that is a promise about what is
+inside it:
+
+- It **always contains at least one card of that tier**. If the subject
+  cannot supply one, the draw goes to the most-read list and finds one.
+- The **rest of the pack starts one tier below**. An Epic booster fills with
+  Rare and up, a Rare booster with Uncommon and up.
+
+Both halves of that matter. Before, a tier booster that ran out of famous
+pages on its subject quietly topped itself up from the open pool, and an Epic
+pack could contain five Commons, which made the tier look decorative.
+
+### Custom boosters
+
+You can build a booster out of any Fandom wiki: type a subject, the app probes
+for a matching wiki, and if it finds one with real content the booster draws
+from it. Getting a usable picture out of Fandom is the hard part, so the draw
+tries the page image, the original upload, the lead image and finally any
+image on the page, rejecting thumbnails too small to fill a card.
+
+Custom boosters are private to whoever built them and never enter the shared
+card index.
+
+## Rarity
+
+Eight tiers, decided entirely by monthly readership:
+
+| Tier | Reads per month, roughly |
+| --- | --- |
+| Common | anything |
+| Uncommon | 2,000 |
+| Rare | 13,000 |
+| Epic | 57,000 |
+| Legendary | 160,000 |
+| Mythic | 360,000 |
+| Exotic | 700,000 |
+| Prismatic | 1,300,000 |
+
+Each tier has its own treatment on the card: foils, refraction, glare that
+follows the phone's gyroscope, and for the top tiers an animated surface. The
+odds sheet in the app explains the whole scale to players.
+
+There is a ninth rarity, **Special**, which sits outside this table and cannot
+be drawn. See [Secret codes](#secret-codes).
+
+## Money
+
+The currency is Buckarooz. A card's price comes from its readership and its
+tier, selling returns a fraction of that price, and boosters are priced from
+what they can be expected to contain, so opening and selling always loses
+money on average. That is deliberate: the collection is the point, not the
+arbitrage.
+
+Income comes from a stipend paid on every shop restock (two hours), a daily
+gift, timed boosters that build up whether the app is open or not, levelling
+up, and a five-a-day quiz.
+
+The shop restocks every two hours with a spotlight discount, a free shelf that
+is always stocked so an empty wallet is never a dead end, six subjects, a
+vault of tier boosters, and everything you have built yourself.
+
+## The collection
+
+Cards are filed into **albums**, one per subject, plus albums for custom wikis
+and for each secret code. An album knows its real total: for a searched
+subject it is the number of matching articles on Wikipedia, so most albums
+cannot be finished, and that is the joke.
+
+Duplicates stack as `×2`. The binder has a grid view and a classic two-page
+book view you turn by swiping.
+
+Alongside it, the **Card Index** is the shared record of every card anyone has
+pulled, and a **wishlist** marks cards you want, which friends and the auction
+floor can both see.
+
+## Progression
+
+- **Levels** to 500, earned by opening boosters, with a frame for your avatar
+  every 10 levels across 5 styles.
+- **100 achievements** in chains, from your first booster to genuinely absurd
+  collection milestones.
+- **Badges** in 10 styles, worn four at a time on your profile.
+
+## Accounts and the social side
+
+Accounts are optional. Signed in, you get cloud save across devices, plus
+friends, chat, trading, gifting, an auction house where cards go to real
+bidders, and presence.
+
+The backend is Supabase. To run your own:
+
+1. Create a project.
+2. Run `supabase/schema.sql` in the SQL editor. It creates the tables and,
+   more importantly, the row level security policies.
+3. Put the project URL and the **publishable** key in `.env.production`:
+
+   ```
+   VITE_SUPABASE_URL=https://yourproject.supabase.co
+   VITE_SUPABASE_ANON_KEY=sb_publishable_...
+   ```
+
+The publishable key is meant to ship inside the client and is committed here
+on purpose. It grants nothing on its own: row level security is the boundary,
+and every policy in `schema.sql` is written on the assumption that anyone can
+see this key. The **secret** key must never appear in this repository or in a
+build.
+
+Syncing is last-writer-wins on a debounce, with the local save always
+authoritative for the session you are in, so a dropped connection never costs
+you cards.
+
+## Themes, sound and motion
+
+14 themes, each a full palette with its own animated backdrop, its own
+synthesised sound kit, and its own launcher icon on Android. The app's mark is
+painted in the current theme's accents, so the drawer, the splash and the sign
+in gate all follow a theme change.
+
+Every sound effect is synthesised at runtime from oscillators, so the app
+ships no sound files for its own interface. Music is a shuffle of found jazz
+recordings, credited in `src/assets/music/LICENSE.md`.
+
+A low power mode cuts the backdrop and the card effects for phones that get
+hot, and everything respects `prefers-reduced-motion`.
+
+## Secret codes
+
+Settings has a field for a secret code. A valid one hands over a whole gift at
+once: a booster made for one specific person, an album of its own, a theme, a
+badge, and cards wearing the **Special** tier that can never be sold,
+auctioned, gifted or traded, and are never re-graded.
+
+The codes themselves are not written down here, which is the point of them.
+The machinery is in `src/codes.js` if you need to add one.
+
+Special content is deliberately outside the game's accounting: it counts for
+no achievement, no level and no album milestone, and its themes and badges
+stay invisible until the code that grants them is redeemed.
+
+## The Android app
+
+A WebView around the built `dist/`, served over a real `https://` origin by
+`WebViewAssetLoader` so that `fetch()` to Wikipedia obeys ordinary CORS rules
+instead of the restrictions a `file://` page would face.
+
+```sh
+npm run build
+cd android && ./gradlew assembleRelease
+# -> android/app/build/outputs/apk/release/app-release.apk
 ```
 
-Requires Node 18+ (for `fetch`) and a browser with Web Audio - any current
-Chrome, Firefox, Safari or Edge.
-
-> **Sound:** browsers refuse to start audio before a user gesture, so the
-> AudioContext is created on your first click. The 🔊 button in the top bar
-> mutes everything.
-
----
-
-## The website
-
-The same build that goes inside the APK is also the website: one bundle, every
-asset referenced relative to `index.html` (`base: './'` in `vite.config.js`),
-so it runs from the app's asset origin, from a domain root, or from a project
-page under a repository path.
-
-There are two ways to put it online, and they can both be live at once.
-
-**Cloudflare Pages**, the shorter path, needs nothing in this repository at
-all: in the Cloudflare dashboard, *Workers & Pages > Create > Pages > Connect
-to Git*, choose the repository, set the build command to `npm run build` and
-the output directory to `dist`. Cloudflare builds every push itself, gives
-every branch a preview URL, and serves the site from its own network. For the
-other way round, where GitHub Actions builds and only the finished files go
-to Cloudflare, `.github/workflows/cloudflare.yml` does that as soon as two
-repository secrets exist: `CLOUDFLARE_API_TOKEN` (with the *Cloudflare Pages:
-Edit* permission) and `CLOUDFLARE_ACCOUNT_ID`. Without them the workflow does
-nothing rather than failing.
-
-**GitHub Pages** works too, with no account anywhere else:
-`.github/workflows/pages.yml` builds and publishes on every push to the
-default branch or a `claude/**` branch. One setting has to be flipped once, by
-hand: **Settings > Pages > Build and deployment > Source: GitHub Actions**.
-After that the site lives at `https://<owner>.github.io/<repo>/`.
-
-On a phone the site is the app. Past 1024px it is laid out for a desk instead,
-in `src/styles/desktop.css`: the bottom bar stands up as a rail down the left
-with its labels beside its icons, the header spans the working area, sheets
-open as dialogues in the middle of the screen rather than climbing up from an
-edge no mouse lives near, the grids use the width they are given (five cards
-across the index, seven albums to a row), and controls, bars and prose keep
-their own measure instead of being dragged the length of a monitor. The drawer
-drops the five destinations the rail already carries.
-
-That file is imported last on purpose. A media query adds no specificity, so
-the only honest way for `.navbar` there to beat `.navbar` in `components.css`
-is to come after it.
-
-The screens, their order and the code painting them are the same either way:
-what changes is where the frame puts them. Cards lean with the mouse exactly
-as they lean with a thumb; the gyroscope simply has nothing to report.
-
-Sign-in, cloud save, friends and the auction house work on the website exactly
-as they do in the app, against the same Supabase project. A collection kept in
-a browser lives in that browser's storage, so Transfer your save is still the
-bridge between a browser and a phone.
-
----
-
-## Android APK
-
-The app also ships as a sideloadable Android APK - a thin WebView wrapper
-around the same web build, so there is no second codebase to maintain.
-
-**Getting it:** every push builds one in CI and publishes it to the rolling
-[`apk-latest`](../../releases/tag/apk-latest) release. Download
-`wiklodo-debug.apk` on your phone, tap it, and allow your browser to install
-unknown apps when prompted.
-
-It's debug-signed, so if an existing install refuses to update, uninstall it
-first. The app needs a network connection - only the shell is bundled; cards
-are still fetched live from Wikipedia.
-
-**Building it yourself** (needs the Android SDK, which CI provides):
-
-```bash
-npm run build                       # produces dist/
-cd android && ./gradlew assembleDebug
-# -> android/app/build/outputs/apk/debug/app-debug.apk
-```
-
-Gradle's `copyWebAssets` task copies `dist/` into the APK's assets, so
-`npm run build` has to run first.
-
-### One implementation note worth knowing
-
-`MainActivity` serves the bundled build through `WebViewAssetLoader` on
-`https://appassets.androidplatform.net/` rather than loading it over `file://`.
-That isn't decoration: WebView blocks cross-origin `fetch()` from `file://`
-pages, which would break every call to the Wikipedia API. Serving from a real
-origin makes the app behave exactly as it does in a desktop browser.
-
-Links to Wikipedia (`Read →`) are intercepted and handed to the system browser
-instead of navigating away from the app.
-
-Config: `minSdk 26` (Android 8.0), `targetSdk 35`. minSdk 26 also means the
-vector adaptive icon is the only launcher icon needed, so the repo carries no
-binary image assets.
+CI builds it on every push and publishes it as the rolling `apk-latest`
+release.
 
 ### Signing, and why the key is in the repo
 
-`android/keystore/wiklodo-debug.keystore` is committed, and every build is
-signed with it.
+`android/keystore/` holds a signing key, committed deliberately, used by both
+build types.
 
-It has to be. Android identifies an app by its signing certificate. There was
-no `signingConfig` at first, so `assembleDebug` fell back to
-`~/.android/debug.keystore` - and a CI runner is a fresh machine every time, so
-Gradle **generated a new random key on every build**. Every APK looked like a
-different app: none would install over the last, and uninstalling to make room
-took the WebView's localStorage, and with it the player's whole collection.
+Android identifies an app by its signature. Without a fixed key, every CI
+build is signed by a freshly generated one, so every build looks like a
+different app: updates refuse to install, and uninstalling to make room takes
+the player's whole collection with it. The committed key buys the one thing
+that matters for a sideloaded hobby app, which is that every build installs
+over the last one and keeps the save. It protects nothing else, and the
+password is in `build.gradle` next to it. Anything shipping for real should
+generate a proper key and pass it through CI secrets.
 
-The key is a debug key for a sideloaded app, the password is in the Gradle file
-next to it, and it protects nothing - a debug-signed APK is not trustworthy to
-begin with. What it buys is the only thing that matters here: **every build
-updates in place and keeps the save.** If this ever ships properly, generate a
-real key and pass it through CI secrets instead of committing it.
+### Play Protect
 
-`versionCode` comes from `BUILD_NUMBER` (the CI run number), so each build is
-newer than the last, and `allowBackup` is on so Android's own backup carries a
-save to a new phone.
+Android offers to scan any sideloaded APK with Play Protect. **No application
+can switch that off**; it belongs to the device. You can decline the scan when
+prompted, or turn it off in Play Store → Play Protect → Settings.
 
-Installs made before this was fixed cannot be updated in place - the key that
-signed them is gone. **`RESCUE.md`** has the one-time procedure for getting
-that collection out through `chrome://inspect` and back in through the new
-save transfer.
+What the app can do is not make it worse, so what ships is a release build.
+A debug build sets the `debuggable` flag, which is the thing Android words its
+warnings most strongly about.
 
----
+## The website
 
-## The interface
+The site is the same `dist/`, published to GitHub Pages from the `gh-pages`
+branch. That branch holds build output only and is replaced wholesale on each
+publish. `.nojekyll` stops Pages filtering the build's filenames, and
+`404.html` is a copy of `index.html` so deep links land in the app.
 
-The app is not a web page with an app-shaped stylesheet on it. Its parts are
-built here rather than borrowed, and none of it is a component library.
+Cloudflare is supported as an alternative, either through its dashboard Git
+integration or through `.github/workflows/cloudflare.yml`, which deploys
+`wrangler.jsonc` as a Worker serving static assets once
+`CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` exist as repository
+secrets, and does nothing at all until then.
 
-**The frame.** A live canvas backdrop, a floating app bar carrying the menu,
-the app name, the wallet, notifications and the level ring, five destinations
-in a floating bottom bar, a drawer holding everything the bar has no room for,
-and one sheet that every panel in the app uses. Opening a pack is a
-**takeover**: the frame gets out of the way and the backdrop stops, so the
-whole frame budget goes to the cards. A launch is covered by the opening
-animation, which also hides the moment the account gate spends deciding
-whether there is a stored session - without it a sign-in card flashed up on
-every single launch.
-
-**The controls**, all in `src/ui/components.js`:
-
-| | |
-|---|---|
-| `press` | takes the press on the way *down*, with the sound |
-| `Odometer` | digits that roll, so a balance change reads before you can |
-| `Ring` | the level badge, sweeping to its value |
-| `Bar` | a fill that animates from wherever it already was |
-| `Segmented` | one indicator that *travels* between segments |
-| `Sheet` | rubber-bands upward, dismisses on distance **or** velocity |
-| `NavBar` | one indicator that travels; the active icon lifts |
-| `Rail` | a depth carousel with a magnetic centre |
-
-The pairing that matters most is the sheet's: dismissing on velocity as well
-as distance is most of what separates a sheet that feels native from a div
-someone animated.
-
----
-
-## Themes
-
-A theme is not a palette. Each of the four carries its own **shape language,
-typeface, pace, texture, backdrop and instrument**:
-
-| | Aurora | Paper | Arcade | Noir |
-|---|---|---|---|---|
-| Surface | glass, blurred | cream, hard ink border | neon on black | one light on black |
-| Corners | 18px | 8px | 2px | 2px |
-| Type | sans | serif | monospace, uppercase | display serif |
-| Shadow | soft, blurred | hard offset block | outer glow | deep, soft |
-| Press | scales down | sinks into its shadow | shifts and flares | barely moves |
-| Pace | 1.0x | 0.6x, snappy | 0.42x, immediate | 1.5x, cinematic |
-| Backdrop | drifting aurora ribbons | paper fibre and ruled lines | CRT grid horizon | light leak, blinds, grain |
-| Instrument | FM bell | marimba | square and saw | plucked string |
-
-Colour and shape live in `styles/themes.css`, one block per theme; the canvas
-and synth parameters live in `ui/themes.js` under the same ids. Adding a theme
-is a row in one, a block in the other, and a renderer - nothing else in the app
-knows the list.
-
-The picker on the Customization screen gives each option its own `data-theme`, so **the token
-block applies to the option itself**: you are choosing between four miniatures
-of the app rather than four names and a swatch.
-
-### The launcher icon follows the theme
-
-Each theme has its own adaptive launcher icon, shipped as one `activity-alias`
-per theme in the manifest. The web side calls `WiklodoIcon.setIcon(themeId)`
-whenever the theme changes.
-
-That call does not switch anything on the spot. Disabling the alias a running
-task was launched from can take the process down with it on some builds of
-Android, whatever `DONT_KILL_APP` asks for, and a player who changes a theme
-must never be thrown out of the game for it. So `setIcon` only writes the wish
-down, and `MainActivity.onDestroy()` applies it when the activity is actually
-finishing: the player has closed the game themselves, and there is nothing
-left on screen to lose. A session killed before that leaves the wish pending
-for the next clean exit. Some launchers redraw the icon only after a moment,
-which is the platform's way, not a bug here.
-
----
-
-## Sound
-
-Every sound is synthesised at runtime. The repo ships no audio files, and the
-theme decides the instrument, so switching theme changes what the app *sounds*
-like as much as what it looks like. One chain serves everything:
-
-```
-voice -> [ soft clip ] -> bus -> filter -> compressor -> master -> out
-                           \-> send -> convolver (generated room) -> master
-```
-
-Four voices, written from first principles: an **FM bell** (a modulator at
-3.01x, decaying faster than its carrier), a **marimba** (three inharmonic
-partials plus a mallet knock), a **chiptune** stack (square plus detuned saw,
-gated rather than faded), and a **plucked string** (Karplus-Strong: a noise
-burst through a tuned delay that damps a little each pass).
-
-Twenty-odd sounds cover the whole app rather than just the opening: taps,
-navigation with a sense of direction, toggles that differ on and off, sheets,
-a card turning face up, the shelf snapping, buying, selling, refusal, arming
-something destructive, gifts, level-ups, XP, and a chime when a timed booster
-becomes ready.
-
----
+Above 1024px the app stops being a phone in the middle of a monitor:
+`src/styles/desktop.css` stands the bottom bar up as a rail down the left,
+opens sheets as centred dialogues, and lets the grids use the width.
 
 ## Project layout
 
 ```
-index.html            the app shell: frame, screens, one sheet
 src/
-  main.js             app controller: screens, opening flow, wiring
-  style.css           imports the six stylesheets below
-  styles/
-    themes.css        ONE BLOCK PER THEME - the only place colour lives
-    base.css          reset, typography, frame, backdrop, texture
-    components.css    the app's own controls and their per-theme variants
-    booster.css       the foil pack and the rip
-    cards.css         the card, the flip, one block per rarity tier
-    screens.css       layout for each destination
-  ui/
-    themes.js         THEME TABLE - canvas and synth parameters
-    sound.js          the synthesiser: four voices, one signal chain
-    backdrop.js       one live canvas renderer per theme
-    components.js     press, Odometer, Ring, Bar, Segmented, Sheet, NavBar, Rail
-  account.js          the only file that talks to a server: auth, sync, friends
-  save.js             export/import of the whole save, as inspectable text
-  wiki.js             Wikipedia + custom-wiki fetching, filtering, de-duplication
-  pricing.js          popularity model and card prices
-  economy.js          booster prices, sell rate, the house edge, the stipend
-  shop.js             the two-hourly shop, generated from the window index
-  booster.js          booster specs: identity, naming, colours, art
-  progression.js      XP, the 500-level curve, ranks and level rewards
-  daily.js            the 30-slot daily gift board and its claim rules
-  timed.js            timed boosters: accrual, the ten-level track, odds
-  collection.js       localStorage: cards, wallet, inventory, profile
-  i18n.js             English/French strings and the language lock
-  data/
-    packs.js          PACK TABLE    - themes and custom-pack kinds
-    rarities.js       RARITY TABLE  - one row per tier, with its popularity floor
-    icons.js          ICON SET      - fallback art, logo, Buckarooz glyph
-vite.config.js
-supabase/schema.sql   the three tables, and the row-level rules that guard them
-android/              WebView wrapper that packages the web build as an APK
-  app/src/main/
-    java/.../MainActivity.java   hosts the WebView, serves assets over https
-    AndroidManifest.xml
-    res/                          theme + vector launcher icon
-.github/workflows/android.yml     builds and publishes the APK
+  main.js          the application: screens, rendering, every interaction
+  wiki.js          all Wikipedia and Fandom access, and the draw itself
+  collection.js    saved state and every localStorage key
+  account.js       Supabase: auth, sync, friends, trades, auctions
+  booster.js       a booster spec, and what it is allowed to draw
+  economy.js       prices, tiers, the shop cadence, what a pack guarantees
+  shop.js          the shelves, seeded so everyone sees the same shop
+  albums.js        filing cards, and how big an album really is
+  codes.js         secret codes and the cards they hand over
+  achievements.js  badges.js  frames.js  progression.js  daily.js  quiz.js
+  timed.js  pricing.js  packstyle.js  packview.js  save.js  i18n.js
+  data/            rarities, subjects, icons, emblems, release notes
+  ui/              themes, animated backdrops, the synth, the music player
+  styles/          base, components, screens, cards, themes, desktop
+  assets/          fonts, music, sound kits, the images a code hands over
+android/           the WebView wrapper and its Gradle build
+supabase/          schema.sql: tables, policies, the edge function
 ```
 
-The tables in `src/data/` and `src/ui/themes.js` are the extension points. Everything else reads
-from them: the pack picker, the accent colours, the odds modal and the card
-effects are all generated, so neither table has a hard-coded counterpart
-anywhere in the UI code.
-
-### Destinations
-
-Five, in the bottom bar: **Boosters** (owned, and the custom builder behind a
-segmented control) · **Free Packs** · **Shop** · **Collection** · **Profile**.
-
-Everything the bar has no room for lives in the **drawer** behind the menu
-button - the same five, plus Friends, the daily gift, Customization and
-Settings. That replaces a "More" list that used to sit at the bottom of the
-Profile, which is a strange place to keep the way to Settings.
-
-The app bar is the menu, the app name, your balance, notifications and your
-level ring, in that order. The name is the first thing dropped when the row is
-tight, because it is the only item that tells you nothing you did not know.
-The odds moved onto the Boosters tab as a button, and the explanation of
-Buckarooz opens from the balance itself - both were entries in a list of links
-before, one tap further from the thing they describe.
-
-Each screen carries a **?** that explains what it is for in three numbered
-steps. **Free Packs** was called "Timed", which described the mechanism rather
-than the offer.
-
----
-
-## Accounts, cloud save and friends
-
-A collection lives on an account, not on a phone. Sign in on a new build or a
-new device and everything comes back: cards, coins, level, boosters, settings.
-
-The backend is [Supabase](https://supabase.com) - Postgres with row-level
-security and email/password auth. Rolling my own authentication would have
-meant storing passwords, which is not a thing to do casually or at all.
-
-### Setting it up
-
-This repository is already pointed at a project: `.env.production` carries its
-URL and publishable key, and Vite reads that file at build time, so a clone
-builds an app that can sign in without any further setup.
-
-To point a build at a **different** project:
-
-1. Create one at supabase.com (the free tier is plenty).
-2. Open **SQL Editor → New query**, paste the whole of `supabase/schema.sql`,
-   and run it. That creates the tables, the policies and the functions,
-   and ends by telling PostgREST to reload its schema cache - without that
-   last step the API can answer "Could not find the table" for a while even
-   though everything exists. The file is layered (V1 accounts, V2 social,
-   V3 the auction house, V4 the card index and wishlists, V5 the rename of
-   the top tier to Prismatic) and every statement is idempotent, so when
-   an update adds a layer you run the whole file again on the same project
-   and nothing is lost: V5, for instance, renames the rows the codex, the
-   wishlists, the auction house and the trade table wrote under the old
-   name, and does nothing the second time. An app
-   running against a database that is a layer behind says so in the
-   affected screen instead of breaking: the auction house and the card
-   index, for instance, ask for this file to be run again.
-   For live market updates also check **Database → Replication** includes
-   the `auctions` table (the script tries to add it; the app polls anyway,
-   so missing Realtime only costs immediacy).
-3. Take the **Project URL** and the **publishable** key (`sb_publishable_...`)
-   from **Project Settings → API** and put them in `.env.production`, which is
-   what this repo does. To override it for one machine without committing, use
-   `.env.production.local` - Vite loads `.env`, `.env.local`, `.env.production`,
-   `.env.production.local` in that order and the last one wins, so a plain
-   `.env.local` will NOT override `.env.production`. `.env.example` is the
-   template for either.
-
-Never use the `sb_secret_...` key anywhere in this app. It bypasses every
-policy below, and the app has no need of it.
-
-Do not also pass these in as CI environment variables: Vite gives `process.env`
-precedence over `.env` files, so a variable set from an unset repository secret
-arrives as an empty string and silently blanks them out - which ships an APK
-whose sign-in screen cannot work. The workflow greps the built bundle for the
-project URL and fails the build rather than publishing one of those.
-
-### Email links, and why you probably want confirmation off
-
-The app is a WebView with no address bar and no website behind it, so any email
-Supabase sends that works by *link* has nowhere to land. Two settings follow
-from that:
-
-- **Turn off "Confirm email"** under **Authentication → Providers → Email**.
-  Sign-up then hands you straight in. Leave it on and the app still behaves
-  correctly - it tells you to go and confirm, and creates the profile on your
-  first sign-in instead - but you have to open the link on the same device and
-  then come back, which is a poor first minute.
-- **Password reset is a link too.** It goes to the project's **Site URL**
-  (Authentication → URL Configuration), which by default is `localhost`. Set it
-  to somewhere real if you deploy the web build; otherwise the reset email
-  arrives and the link goes nowhere, and the way back into an account is to
-  make a new one and paste the save in from Settings → Transfer save.
-
-The app never claims more than it can do here: the reset screen says a link is
-on its way and nothing about it working.
-
-**A build with no keys still works.** It skips the gate entirely, plays
-offline, hides Friends, and says so in Settings. Shipping an APK whose sign-in
-screen no key can open would be shipping a brick.
-
-### What is stored, and who can read it
-
-Three tables:
-
-| table | what | who can read it |
-| --- | --- | --- |
-| `profiles` | username and the stats a friend sees | any signed-in player - this is what username search *is* |
-| `saves` | the whole save blob | **only its owner** |
-| `friendships` | one row per request | the two people in it |
-
-A friend's cards do **not** come from reading their save row: nobody can read
-anyone else's. They come from `friend_cards()`, a `security definer` function
-that checks the friendship itself and returns the one key holding the
-collection. The wallet, the settings, the daily-gift record and the language
-are in the same blob and stay unreadable - which is the difference between
-"a friend can see your cards" and "a friend can see everything".
-
-Both functions pin `search_path` and are revoked from `public` before being
-granted to `authenticated`, so neither can be reached anonymously or hijacked
-by a schema the caller controls.
-
-The publishable key ships inside the APK, and is committed to this repository
-for the same reason: it identifies the project, not the player, and grants
-nothing on its own. Anyone who could read it here could already unzip it out of
-a published APK. The policies are the security boundary. The secret key
-(`sb_secret_...`, formerly `service_role`), which bypasses them, is never used
-by this app and must never be committed, pasted into a chat, or put in `.env`.
-If one is ever exposed, rotate it in **Project Settings → API Keys**.
-
-### How syncing works
-
-The local save stays authoritative while you play; the server is a copy.
-
-- **On sign-in**, the account's save replaces the device's. That is what makes
-  a fresh install come up with the collection already in it. The one exception
-  is an account with nothing stored yet, where the device's save is uploaded
-  instead of being thrown away - which is how a pre-account collection is
-  carried in.
-- **While playing**, every write to game state is noticed in one place
-  (`writeJson` in `collection.js`, which every save goes through) and a push is
-  debounced by four seconds. Opening a booster writes storage half a dozen
-  times in a second; that is one upload, not six.
-- **Leaving the app** flushes immediately rather than waiting out the
-  debounce, because the WebView is about to be frozen.
-- **A failed push is not fatal.** It is recorded, shown in Settings, and
-  retried on the next change or the next time the app comes to the
-  foreground. Losing a sync is survivable; blocking the game on one is not.
-
-Public stats go up alongside every push, so a friend list is one read rather
-than one save download per friend.
-
-### What this does not do
-
-The client is authoritative. There is no server-side validation of what a card
-is worth or how a booster was obtained, so a determined player can edit their
-own save and their friends will see the result. For a single-player collecting
-game played among people who know each other, that is the right trade; it
-would be the wrong one for anything with a leaderboard.
-
----
-
-## Timed boosters
-
-A three-card booster accrues on a timer whether the app is open or not, up to a
-cap. This is the floor of the game: a player with no cards and no money still
-has something to open in ten minutes.
-
-They must not become the whole game, so the track gates FAME instead of odds:
-rarity belongs to the article itself now, and a low-level free pack is simply
-not allowed to draw very famous pages. Level 1 caps pulls at the Rare band;
-each level raises the ceiling, and level 10 lifts it entirely.
-
-Levelling the track improves all three axes at once:
-
-| Level | Every | Holds | Fame ceiling |
-|---|---|---|---|
-| 1 | 10 min | 7 | up to Rare |
-| 5 | 7 min | 13 | up to Legendary |
-| 10 | 3 min | 20 | none |
-
-Level 10 needs **2,100 opened boosters**, and the steps grow the whole way
-(20, 55, 110, 200, 340, 560, 900, 1,400, 2,100). At a realistic thirty to fifty
-a day that is a couple of months, which is the intent: it is a long track, not
-a weekend.
-
----
-
-## Levels and XP
-
-XP comes from **cards**, never from money or from buying things, so the only
-way to level is to open boosters and see what is inside. A card is worth XP by
-its tier, on roughly the same curve as its price: 12 for a Common up to 1,300
-for a Prismatic, averaging about 33 a card under the standard table.
-
-The requirement per level is mostly linear with a gentle curve on top
-(180 XP for level 1, ~2,400 at level 100, ~12,400 at level 499). Reaching the
-cap of **level 500** is around three million XP, or eighteen thousand boosters.
-
-Every level pays something: coins on most, a booster every fifth, a rarity
-booster every tenth, and coins plus a booster every twenty-fifth. The values
-are small next to the shop stipend on purpose - levelling sets a pace, it is
-not an income stream. Ten ranks (Newcomer through Encyclopedist) name where you
-are.
-
-Gaining XP shows a small rising number. A level-up waits for the pack to finish
-revealing, then walks the bar from the old level to the new one with the reward
-to claim.
-
----
-
-## The daily gift
-
-Thirty slots to a board, one claim per calendar day, and you always claim **the
-next unclaimed slot** rather than the slot matching today's date. Miss Tuesday
-and Wednesday still hands you slot 2. Finish a board and the next one is
-generated, so the ladder never ends; later boards pay a little more, capped
-after ten of them.
-
-Boards come from a seeded PRNG keyed to the board number, so the whole month is
-visible in advance and the eleventh gift is the same gift whenever you get to
-it. Claimed days are replaced by a tick, so the board doubles as a record.
-
-A month of gifts is worth roughly two days of stipend. The feature exists so a
-player with nothing left can always get moving again, not so that logging in is
-the way to get rich.
-
----
-
-## The economy
-
-This is the part that had to be right, so it is worth stating plainly.
-
-**You cannot get rich by churning boosters.** Selling a booster's entire
-contents returns a fixed fraction of what the booster cost - the same fraction
-at every tier - so sell-and-reinvest always leaks value instead of compounding:
-
-```
-sell value of a card  = 30% of its price
-price of a booster    = its expected sell value ÷ 0.72
-```
-
-A simulation of the obvious exploit (start with the starter kit, always buy the
-most expensive booster you can afford, open it, sell everything, repeat) goes
-broke in **100% of runs**, averaging 3.9 boosters before the money is gone. The
-measured return is ~0.80 at every tier - Common through Prismatic - so no rung
-of the ladder is a better deal than any other.
-
-A lucky Prismatic can still pay for several packs. That is variance around a
-losing mean, not a strategy, and it is where the excitement lives: about 5% of
-those runs hit a Prismatic booster at some point on the way down.
-
-Progression therefore comes from **time**, not grinding. Each shop restock pays
-a stipend, capped at four missed restocks so a long absence doesn't hand over a
-fortune.
-
-| | |
-| --- | --- |
-| Sell rate | 30% of card price |
-| Booster return if you sell it all | 72% of its price |
-| Restock / stipend | every 2 hours, Ᏸ500, max 4 banked |
-| Starter kit | Ᏸ1,500 and 3 boosters |
-| Subject surcharge | +25% for a booster tied to one theme |
-
-### The quiz
-
-Pick a subject, meet one card you probably do not own, and answer three to
-five multiple-choice questions written from that article's own text. The
-questions come from a language model, and the key that pays for it is **not
-in the app**: a key inside an APK is a key anyone can pull back out of it.
-Instead `supabase/functions/quiz` holds it as a server-side secret and the
-app calls the function with the publishable key it already carries, so
-players need no key, no setting and no account for it.
-
-To turn the quiz on for everyone, once:
-
-```
-supabase login
-supabase link --project-ref <your-project-ref>
-supabase secrets set GROQ_API_KEY=gsk_your_key
-supabase functions deploy quiz
-```
-
-A free key from console.groq.com is enough. Which model writes the questions
-is decided at request time: the function walks a preference list, skips
-anything this account does not carry, and asks Groq for the live list if none
-of them answer. Running out of one model's daily tokens reads as a refusal
-like any other, so the walk continues into the next model's allowance and the
-free tier stacks up to several hundred quizzes a day. `GROQ_MODEL` pins a
-first choice if you want one. The function must be deployed
-under the slug **`quiz`** (that is the path the app calls) and its
-**"Verify JWT with legacy secret"** switch should be **off**: that gate only
-accepts tokens signed by the old shared secret, which a project on the newer
-publishable keys may no longer issue. The function asks the auth API who the
-caller is instead, which works either way, so it still answers only signed-in
-players of this app. Nothing about the key is committed, and if the function
-is not deployed the quiz simply says it is unreachable rather than asking
-anyone for anything.
-
-### The shop
-
-Stock is generated from the current two-hour window index, so it is stable
-across reloads and restocks on its own - no server involved. Each booster's
-size is rolled between 3 and 7 cards, and price scales with both size and tier
-automatically, because it is derived from the booster's own expected contents.
-A tier booster is a FAME FLOOR on the draw: it only pulls pages famous enough
-to be at least its tier.
-
-The shop is a market of fixed stalls: a **spotlight deal** at a real discount
-(safe by construction - even at 25% off, opening and selling still loses
-money), the **free shelf**, a two-column grid of six **subject boosters**, the
-**tier vault**, and **boosters you built** if you have made any custom packs.
-
-The free shelf is the anti-lockout guarantee: two three-card boosters,
-occasionally upgraded to a low tier. It runs on its own **four-hour** clock
-rather than the shop's two-hour one, so its contents sit still through a
-restock and the shop turning over does not hand out another pair. Both the
-shelf's seed and the record of what you have taken key off that four-hour
-window; using the shop's window for either would quietly halve the cooldown.
-Selling everything out of both is worth around 230 Buckarooz, well under a
-single stipend, so it is a floor rather than a faucet.
-
-Scarcity is the other brake. Pricing alone would let a lucky player buy
-Prismatic boosters back to back, so high tiers are also **rare on the shelves**:
-
-| Tier | Windows it appears in |
-| --- | --- |
-| Uncommon | 95% |
-| Rare | 90% |
-| Epic | 68% |
-| Legendary | 40% |
-| Mythic | 9% |
-| Exotic | 3% |
-| Prismatic | 2% |
-
-Custom boosters can turn up on any shelf too.
-
----
-
-## Boosters
-
-**27 subjects**, from Cars, Formula One and Planes to Video Games, Books,
-Movies & Shows, Space, Physics, Nature, Animals, Plants, History, Philosophy,
-Celebrities, Quotes, Art, Cactus, Sport and Darwin Awards.
-
-The **Boosters** tab shows only the ones you own, with a count. Each carries a
-real photograph - its `hero` field names a Wikipedia article, and every lead
-image is fetched in a single batched `pageimages` request. The drawn icon in
-`src/data/icons.js` is only the fallback for when that image is missing.
-
-A **rarity booster** keeps its subject's colours and photo and wears the tier
-as an effect on top; one with no subject falls back to the tier's own colour.
-
-### How a booster draws
-
-Each subject owns a list of `queries`, per language, used verbatim as the
-search API's `srsearch`, so a row can mix two strategies:
-
-```js
-'incategory:"Sports cars"'   // only DIRECT members of that category
-'sports car model'           // ordinary full-text search
-```
-
-`incategory:` doesn't descend into subcategories, so a broad category alone
-gives a shallow pool; the free-text queries fill it back out. They also travel
-between languages far better than category names do, which is why the French
-lists lean on them.
-
-Draws are filtered before they become cards: non-standard page types, extracts
-under 80 characters, disambiguation pages and `List of` / `Liste de` style
-pages are all rejected, with up to 8 retries per card slot and a random-article
-fallback so a renamed category can never leave a booster unopenable.
-
-### Curated subjects
-
-Most subjects search Wikipedia live. A few are curated instead: the row
-carries a `titles` list per language and the booster draws its cards from
-that list by exact title, so the subject is exactly as large as the list and
-its album total is the list's length rather than a search count.
-
-**Darwin Awards** is the curated one. It is a roll of 40 real articles about
-famously unusual and self-inflicted deaths, from Franz Reichelt off the
-Eiffel Tower to Tycho Brahe's bladder, in both languages. The award itself is
-not a Wikipedia thing and its site cannot be read from the browser, so the
-booster tells the same stories the encyclopedia already holds.
-
-### Adding a subject
-
-Append a row to `THEME_PACKS` in `src/data/packs.js` with both languages
-filled in, `queries` for a live subject or `titles` for a curated one. The
-shop will start stocking it on the next restock.
-
----
-
-## Custom boosters
-
-Name a game, book, film or show and Wiklodo builds a booster entirely out of
-that subject's **own wiki**. Searching Wikipedia for "Terraria" yields a
-handful of pages; the Terraria wiki has thousands.
-
-1. Normalise the input - `Terraria`, `terraria` and `TERRARIA` all collapse to
-   the same candidates, as do `The Legend of Zelda` → `legendofzelda`.
-2. Probe each guessed Fandom subdomain's `api.php`. In a non-English session
-   the **language path** (`terraria.fandom.com/fr/api.php`) is tried first, so
-   a French booster holds French cards. A wiki only counts if MediaWiki answers
-   **and** it has more than 40 articles, which rules out abandoned stubs.
-3. If no slug matches, fall back to Fandom's cross-wiki search.
-4. If nothing resolves: **"Booster cannot be created, try something else."**
-
-Building one does **not** give you a booster. It used to, which was a free
-openable pack out of thin air for anyone who typed a name, and the cards inside
-could be sold. Creating a pack now puts it on sale in the Shop, on its own
-shelf, where it is bought like anything else.
-
-### Getting a picture out of Fandom
-
-Three separate things made custom cards come out blurry, wrong, or blank, and
-all three are handled:
-
-- **`pageimages` returns a fifty-pixel thumbnail.** Blown up to fill a card
-  slot that is the blurry, over-zoomed mess it looked like. A thumbnail under
-  180px wide is now treated as no thumbnail, and the URL is asked for a bigger
-  version before it is believed.
-- **The picture list is led by chrome.** When `pageimages` is empty the app
-  asks what images the page actually *uses* - but that list is in page order,
-  and the first image on a Fandom article is usually a nav icon or an infobox
-  glyph. It now asks for each image's real dimensions, throws away anything
-  too small, too thin or named like furniture, and takes the largest, which on
-  a Fandom article is reliably the subject.
-- **The CDN URL says what size you get.** Fandom serves images through a
-  resizing CDN, so `/scale-to-width-down/50` really is fifty pixels and
-  `/smart/width/80/height/80` really is a hard square crop. Both are rewritten
-  to ask for 640px of the uncropped image.
-
-If a picture still arrives smaller than its frame, the card fits it inside
-rather than magnifying it.
-
-> Custom boosters depend on the target wiki allowing anonymous CORS
-> (`origin=*`), which standard MediaWiki does.
-
----
-
-## Rarity and money
-
-### Rarity
-
-Eight tiers. **Odds do not depend on the article** - a page with 100 views a
-month has exactly the same chance at every tier as one with 100k.
-
-| Tier | Chance | Price bonus | Visual treatment |
-| --- | --- | --- | --- |
-| Common | 42% | +0% | flat halftone print stock, no light |
-| Uncommon | 27% | +25% | a green pulse breathing along the border |
-| Rare | 17% | +60% | foil sheen that follows the tilt; the title glows blue when tapped |
-| Epic | 9% | +140% | violet aurora background; the artwork floats in parallax |
-| Legendary | 3.6% | +320% | gold foil border that catches the light as the phone tilts; sparks rising |
-| Mythic | 0.9% | +700% | unstable border, embers, glitch bursts with an RGB split |
-| Exotic | 0.35% | +1500% | translucent hologram plate with wikitext scrolling underneath |
-| Prismatic | 0.15% | +3200% | rainbow foil with chromatic aberration; a light streak sweeps with the tilt |
-
-Two rules hold for every treatment, and both are enforced by tests:
-
-- **Nothing leaves the card.** Every effect lives inside `.card-front`, which
-  `.card-face` clips, and no card carries an outward glow.
-- **Nothing is visible before the flip.** Effects are gated on `.is-lit` *and*
-  sit on the back-face-hidden front. Rarity is only attached to a card after it
-  has already flown out of the pack.
-
-### Money
-
-Prices are in **Buckarooz** (Ᏸ - a B wearing the two bars a dollar sign wears,
-drawn as SVG). Popularity sets the **base price**; rarity is a **percentage on
-top**:
-
-```
-price = base(popularity) × (1 + rarity.bonusPct / 100)
-```
-
-`base` runs from Ᏸ20 for an unread article to Ᏸ500 for a front-page-famous one.
-A Common and a Prismatic of the same article share a base - the Prismatic is
-simply worth 33× more of it.
-
-The **balance button in the top bar** is also the explainer: tap it and a panel
-says what Buckarooz are, the two ways to get them (selling duplicates, and the
-free stipend that accrues over time) and what they are for (boosters in the
-Shop). It is there because the currency is invented and nothing else on screen
-would otherwise say so.
-
----
-
-## Opening a booster
-
-**The rip.** No button, no pull-tab - the perforation line *is* the control.
-Grab it near either end and slide; the foil parts in step with the drag behind
-a glowing tear front, revealing the pack's mouth and the card tops inside. Let
-go before 60% and it springs shut, complaining as it goes. Whichever direction
-you pull the first time is remembered, and from then on the pack only tears
-that way. Finish the tear and the torn scrap tumbles away under gravity.
-
-**No loading screen.** Cards start being fetched as soon as a booster reaches
-the middle of the shelf, and the opening animation runs on card *backs*, which
-need no data - so it begins the instant the pack tears. Cards fly up out of the
-pack's mouth one by one from *behind* it, while the pack sinks away, then
-settle into a stack. Card backs take the booster's own colours and icon.
-
-**The reveal.** The current card turns itself over. Swipe **right-to-left** for
-the next card and **left-to-right** to go back, freely. Tapping does not
-advance; holding and moving makes the card *lean* - it turns on its own axes
-rather than sliding around. Pull order is **random**.
-
-**The summary.** Once every card has been turned, the single-card view is
-replaced by the whole booster laid out three to a row, with a Back button.
-
-The stack that the cards settle into uses `perspective`, deliberately *not*
-`transform-style: preserve-3d`. A shared 3D context makes the stacked cards
-coplanar siblings, which retires `z-index` and lets the face-down cards behind
-the top one paint straight through it the moment it leans. Each card carries
-its own perspective instead, so the flip still reads as three-dimensional while
-the stack itself stays flat and correctly ordered.
-
----
-
-## Collection
-
-Every pull is saved to localStorage and shows up in the **Collection** tab.
-
-- Duplicates are kept as a copy count (`×3`); the stored rarity is the *best*
-  pull of that article.
-- **Click any card**, anywhere in the app, to open it full size: the whole
-  article extract, scrollable, and the card itself leans as you drag it.
-- From the binder that detail view also offers **Sell**. The button arms on the
-  first tap and confirms on the second, so it is its own confirmation rather
-  than a second dialog, and it disarms itself after a few seconds.
-- **Favourite** with the star in a card's top-right corner.
-- Filters live behind a **Filters** button rather than eating the top of the
-  screen, with a badge showing how many are active. Filter by booster, tier,
-  popularity band, minimum price, favourites and title; sort by newest, price
-  ascending or descending, rarity, popularity or name.
-
-The **card detail sheet is built narrow-first** and only goes side-by-side at
-780px and up. It used to be the other way round - a row layout undone by a
-`max-width: 720px` query - which meant anything that made the layout viewport
-wider than 720px skipped the breakpoint entirely and a phone got the desktop
-layout: an 860px panel hanging off the side of a 400px screen. Building up
-rather than down means the narrow case is the one that cannot be missed.
-
-That is also why `MainActivity` now calls `setUseWideViewPort(true)`. Without
-it the Android WebView ignores `<meta name="viewport" content="width=device-width">`
-and lays the page out at its own default width, so **every** `max-width` query
-in the stylesheet is measured against the wrong number. That was the actual
-root cause of the sheet hanging off the screen in the APK.
-
-There is exactly **one** fullscreen card view, reached three ways: off the
-reveal stack, off the pack summary, and out of the binder. All three call the
-same function and are styled by the same rules, and a test asserts the three
-are identical down to the pixel, so one cannot drift from the others.
-
----
-
-## Battery
-
-Continuous animation is the single biggest thing this app can do to a battery:
-a shop shelf is twenty-odd boosters, several wearing a rarity treatment that
-never stops moving. Four brakes:
-
-- **One clock.** Everything that needs a timer shares a single 1 Hz interval,
-  and it only runs when the tab is visible *and* a screen that wants it is on
-  display. Rendering the shop once used to leave an interval running for the
-  life of the session, redrawing a countdown nobody was looking at.
-- **Off-screen screens animate nothing.** `animation-play-state: paused` on
-  anything inside an inactive screen, which is free.
-- **Audio parks itself.** A running `AudioContext` keeps the audio thread alive
-  even in silence, so it is suspended when the app goes to the background.
-- **The backdrop is governed hard.** It stops when the document is hidden, and
-  it stops during a takeover, so the frame budget while cards are flying goes
-  entirely to the cards. It renders at a capped pixel ratio, and at half
-  resolution on the themes whose look survives it - they are soft, blurred
-  fields, and nobody sees the difference at arm's length.
-- **Battery saver**, in Settings, paints one static backdrop frame and never
-  runs the loop, stops the ambient motion everywhere, and drops the blurs.
-  Transitions and one-shot animations still run, so the app still feels alive;
-  it just stops repainting when nothing has happened.
-
-Two things in the backdrops are deliberately cheap rather than obvious. Noir's
-film grain comes from **one 128px tile**, generated once and blitted at a new
-offset every eighth of a second; scattering grain across the screen per pixel
-per frame is tens of thousands of trigonometric calls a frame, which is exactly
-the sort of thing that warms a handset. Arcade's scanlines are a **CSS overlay**
-rather than a few hundred `fillRect` calls a frame. All four themes hold 60fps
-with the backdrop running.
-
-The rest of the app pulls in the same direction: the theme's `--motion-scale`
-means Arcade's animations are less than half the length of Aurora's, so the
-snappiest theme is also the cheapest.
-
-Playtime is measured between visibility changes rather than by a stopwatch -
-a timer ticking once a second purely to add one to a number is exactly the sort
-of background work this should not be doing.
-
----
-
-## Secret codes and the special boosters
-
-The last section of **Settings** is *Redeem secret code*: a field for a code
-handed out by hand. A code works for anyone who has it, once per save
-(`profile.codesRedeemed`, so it follows the save through Transfer save and
-cloud sync and cannot be spent twice by relaunching). A valid, unused code
-hands over a whole gift at once, and the reveal lays it out as the event it
-is: the person's message in their colour, the booster, the theme now on, the
-badge now worn. It never names the cards. What is inside the pack stays a
-surprise until it is torn open.
-
-Every code is one entry in `src/codes.js`, and one entry is:
-
-- **a booster** in the person's colour, on the Custom shelf, wearing their
-  own drawn emblem (`src/data/emblems.js`) and a foil, family and burst
-  chosen for them (`styleForSpec` in `src/packstyle.js`);
-- **six cards**: the five things they love, drawn from Wikipedia by exact
-  title in both languages (`cards: [{ en, fr, name? }]`, `drawTitleSet` in
-  `src/wiki.js`), and **The Creator**, the same sixth card in every pack,
-  written by hand (`CREATOR`, with the photo shipped inside the bundle);
-- **the Special tier** for those six, a tier above Prismatic that no
-  popularity earns and no booster rolls (`SPECIAL` in `src/data/rarities.js`,
-  outside the table on purpose), and a card treatment nobody else's cards
-  wear: `[data-special="<id>"]` in `src/styles/cards.css`, one per person and
-  one for The Creator;
-- **an album of their own** (`kind: 'code'` in `src/albums.js`), the one
-  album that can be finished, six of six;
-- **a theme** (`code:` on a row in `src/ui/themes.js`, a token block in
-  `styles/themes.css`, a renderer in `ui/backdrop.js`), applied the moment
-  the code is redeemed and in the picker from then on, never before;
-- **a badge** (`code:` on a row in `src/badges.js`), worn the moment the
-  code is redeemed, unequippable afterwards like any other.
-
-A special theme and a special badge do not exist for a player who has not
-redeemed the code: the theme is filtered out of Customization and the badge
-out of the Badges tab and out of every badge count, so nobody can see a
-reward for a code they were never given. Special boosters also sit outside
-progression on purpose. Opening one grants no experience, counts toward no
-achievement, moves no daily or timed counter, and its six cards are left out
-of the collection totals on the profile. A gift is not a grind.
-
-The six cards are locked for good. `entry.special` names the code on every
-one of them, and that mark is what `regradeCollection()` skips, what the sell
-button, the auction picker, the gift picker and both sides of a trade check
-(`isLocked` in `src/collection.js`), and what files the card in that person's
-album whatever pack id it carries. A special booster itself is never on the
-gift list either.
-
-Every card of the five gets a picture, whatever Wikipedia has: the page's
-lead image, else its first real photograph, else a plate in the booster's
-colour with the card's name on it. A title the French Wikipedia cannot serve
-falls back to the English article. Nothing is dropped.
-
-The Creator has no article to read, no readership and no wishlist: it is not
-a page, it is a signature.
-
-Adding a person is adding one entry to `SECRET_CODES` and, for the full
-gift, one treatment in `cards.css`, one emblem, one theme row with its CSS
-block and backdrop renderer, and one badge row. Nothing else in the app
-knows the list.
-
----
-
-## Language
-
-English and French, chosen on first launch and then **locked**.
-
-That is a deliberate limitation. Cards are stored with the text the wiki gave
-us, so re-translating a collection would mean re-fetching every card through
-langlinks - slow, lossy, and liable to fail halfway, leaving a binder in two
-languages. Locking keeps every card consistent with every other.
-
-The language decides which Wikipedia is queried, which search terms a booster
-uses, and which Fandom language path a custom booster resolves against, so
-cards are always in the selected language rather than whatever the wiki
-happened to return.
-
-To start over during development: `__packywiki.resetAll()`.
-
-## Settings
-
-Four switches, each with a line saying what turning it off actually does
-rather than how it is built:
-
-| Setting | What it does |
-|---|---|
-| Sound | Mutes the app completely, menu taps included |
-| Screen flash | Stops the screen lighting up on a rare pull |
-| Battery saver | Stops the glow, shimmer and drift; plainer, cooler, cheaper |
-| On-screen hints | Hides the swipe tips once you no longer need them |
-
-Above them sits the theme picker (see **Themes**).
-
-**Data → Transfer your save** turns everything you own into one block of text
-you can copy out and paste back. It is the only bridge across a reinstall or a
-move to another phone, and the format is deliberately dull - a JSON envelope
-with a version and the raw stored strings - because a save you cannot inspect
-is a save you cannot rescue by hand.
-
-Importing validates before it touches anything and replaces the whole save
-rather than merging, so a half-recognised blob cannot leave you with neither
-your old save nor the new one. It arms and then confirms, like selling a card.
-
-Below them, the language is shown but locked (see below), and **Erase
-everything** uses the same arm-then-confirm shape as selling a card: the button
-is its own dialog.
-
----
-
-## Intentionally missing (this is a debug build)
-
-- **Local persistence only.** The collection lives in this browser's
-  localStorage. No account, no server, no automatic sync between devices;
-  clearing site data wipes it. **Settings → Data → Transfer your save** is the
-  manual way across, and on Android the system backup covers the rest.
-- **No cross-pack dedupe.** Titles are de-duplicated *within* one pack. Open
-  two Animals packs and you can pull Tardigrade twice - it becomes a `×2`.
-- **Two languages**, English and French, chosen once and then locked.
-- **No trading, no accounts, no sync.** Everything is one browser.
-- **Rarity is not tied to the article.** It's an independent roll, so a stub
-  can come out Prismatic and a featured article can come out Common. Only the
-  price knows how popular a page is.
-- **Timers trust the device clock.** Timed boosters and the daily gift are
-  measured against local time, so moving the clock forward moves them forward.
-  With no server there is nothing else to measure against.
-
-## Natural next steps
-
-- **Trading** - export a card (or a whole binder) as a share code, import
-  someone else's.
-- **Daily goals** - a reason to open a specific subject, on top of the daily
-  gift and the timed trickle.
-- **Set completion** - track which articles a pack *can* yield and show a
-  completion percentage per pack.
-- **Quiz mode** - the article extract is already on the card, so blank out the
-  title and make the player name it; scale the points by rarity.
-- **Duplicate handling** - a "shiny" upgrade path, or dust/crafting from
-  repeats.
-- **More packs** - the table makes this a one-row change; the interesting work
-  is finding categories with deep direct membership.
-
----
-
-## Third-party material
-
-Two theme sample kits (Cartoon, Matrix) use recordings from the `uisfx`
-project, dedicated to the public domain (CC0 1.0) - see
-`src/assets/sfx/LICENSE.md`. The Cartoon theme bundles the Comic Neue
-typeface (SIL OFL 1.1) - see `src/assets/fonts/`. Every other sound in the
-app is synthesised at runtime and every other typeface is a system stack,
-so nothing else in the repo carries third-party rights.
-
-## Notes
+## Names that cannot change
+
+Three identifiers still say `packywiki`, and all three are load bearing:
+
+- **`packywiki.*` localStorage keys.** These are where every player's
+  collection lives. Renaming them without a migration erases every save on
+  every device.
+- **`com.packywiki.app`**, the Android `applicationId`. It is the app's
+  identity to Android and the key to the WebView's storage. Changing it
+  installs a second app and strands the collection in the first.
+- **The key name inside `supabase/schema.sql`**, which has to match the
+  localStorage key it reads.
+
+Everything a player can see says Wiklodo. These three are plumbing, and the
+cost of renaming them is somebody's collection.
+
+## Credits
 
 Article text and images come from Wikipedia and are licensed
-[CC BY-SA](https://en.wikipedia.org/wiki/Wikipedia:Copyrights); every card
-links back to its source article. This is a hobby project and is not
+[CC BY-SA](https://en.wikipedia.org/wiki/Wikipedia:Copyrights). Every card
+links back to the article it came from. This is a hobby project and is not
 affiliated with the Wikimedia Foundation.
+
+Bundled third-party material, all of it credited in place:
+
+- Music: found recordings, credited track by track in
+  `src/assets/music/LICENSE.md`.
+- Two theme sound kits (Cartoon, Matrix) use recordings from the `uisfx`
+  project, CC0 1.0, see `src/assets/sfx/LICENSE.md`.
+- The Cartoon theme bundles Comic Neue, SIL OFL 1.1, see `src/assets/fonts/`.
+
+Every other sound is synthesised at runtime and every other typeface is a
+system stack.
