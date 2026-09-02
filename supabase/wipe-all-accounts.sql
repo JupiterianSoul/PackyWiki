@@ -46,15 +46,25 @@ delete from public.codex;
 delete from public.profiles;
 
 -- The accounts themselves. This is the one that frees the email addresses.
--- If it errors, see the note at the bottom.
+-- Sessions, identities and refresh tokens hang off these rows and go with
+-- them. If it errors, see the note at the bottom.
 delete from auth.users;
+
+-- Where an address can still be READ after the account is gone: the auth
+-- audit log keeps every sign-up and sign-in, address included, and the flow
+-- table keeps half-finished sign-ins. Neither is needed for anything. If a
+-- line errors (a project that keeps the SQL editor out of these), skip it:
+-- the accounts are already gone.
+delete from auth.audit_log_entries;
+delete from auth.flow_state;
 
 -- Check: every one of these should be 0.
 select
-  (select count(*) from auth.users)       as accounts,
-  (select count(*) from public.profiles)  as profiles,
-  (select count(*) from public.saves)     as saves,
-  (select count(*) from public.codex)     as codex_cards;
+  (select count(*) from auth.users)             as accounts,
+  (select count(*) from auth.audit_log_entries) as auth_log,
+  (select count(*) from public.profiles)        as profiles,
+  (select count(*) from public.saves)           as saves,
+  (select count(*) from public.codex)           as codex_cards;
 
 -- =============================================================================
 -- IF `delete from auth.users` REFUSES
