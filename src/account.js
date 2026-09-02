@@ -33,7 +33,7 @@ export const supabase = configured
         autoRefreshToken: true,
         // The WebView has no address bar to carry a token back in.
         detectSessionInUrl: false,
-        storageKey: 'wiklodo.auth'
+        storageKey: 'wikster.auth'
       }
     })
   : null;
@@ -293,7 +293,7 @@ export async function pushSave(userId) {
  */
 export async function clearSave(userId) {
   const { error } = await supabase.from('saves')
-    .upsert({ user_id: userId, data: { format: 'wiklodo-save', version: 1, at: Date.now(), data: {} } },
+    .upsert({ user_id: userId, data: { format: 'wikster-save', version: 1, at: Date.now(), data: {} } },
       { onConflict: 'user_id' });
   if (error) throw error;
   await publishStats(userId, {
@@ -444,7 +444,7 @@ export function forgetSchemaProbe() {
 }
 
 /** The marker a v2-only write throws when the tables are not installed. */
-export const SCHEMA_OUTDATED = 'WIKLODO_SCHEMA_OUTDATED';
+export const SCHEMA_OUTDATED = 'WIKSTER_SCHEMA_OUTDATED';
 
 /**
  * Is this failure "that column/table isn't there", rather than a real error?

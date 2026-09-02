@@ -97,7 +97,7 @@ export function buildCardBack(spec) {
     <div class="cb-foil" aria-hidden="true"></div>
     <div class="cb-deco" aria-hidden="true"></div>
     <div class="cb-emblem" aria-hidden="true">${emblem}</div>
-    <div class="cb-word" aria-hidden="true">WIKLODO</div>
+    <div class="cb-word" aria-hidden="true">WIKSTER</div>
     <div class="cb-frame" aria-hidden="true"></div>`;
   return back;
 }

@@ -25,7 +25,7 @@ export const CARDS_PER_PAGE = 4;
 
 /* --- real category sizes -------------------------------------------------- */
 
-const TOTALS_KEY = 'packywiki.albumTotals.v1';
+const TOTALS_KEY = 'wikster.albumTotals.v1';
 const TOTALS_TTL = 7 * 24 * 60 * 60 * 1000;
 
 let totalsCache = null;

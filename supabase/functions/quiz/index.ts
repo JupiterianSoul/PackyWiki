@@ -1,7 +1,7 @@
 /**
  * THE QUIZ WRITER
  * ----------------------------------------------------------------------------
- * Wiklodo's quiz questions are written by a language model, and the key that
+ * Wikster's quiz questions are written by a language model, and the key that
  * pays for it belongs to the person running the app, not to the players. A
  * key shipped inside an APK is a key anyone can pull back out of it, so this
  * runs the request server-side instead: the app sends the article, this

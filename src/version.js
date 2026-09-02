@@ -9,20 +9,20 @@
  */
 
 /* Filled in by Vite at build time; the dev server has no stamp. */
-const STAMP = typeof __WIKLODO_BUILD__ !== 'undefined' ? __WIKLODO_BUILD__ : null;
+const STAMP = typeof __WIKSTER_BUILD__ !== 'undefined' ? __WIKSTER_BUILD__ : null;
 
 export const BUILD = STAMP ?? { sha: 'dev', at: 0 };
 
 /** The published site. The APK opens this too, and only falls back to its bundled copy offline. */
-export const SITE_URL = 'https://jupiteriansoul.github.io/PackyWiki/';
+export const SITE_URL = 'https://jupiteriansoul.github.io/Wikster/';
 
 /** Where the published site says what its build is. GitHub Pages answers with CORS open. */
 const LATEST_URL = `${SITE_URL}version.json`;
 
-export const APK_URL = 'https://github.com/JupiterianSoul/PackyWiki/releases/download/apk-latest/wiklodo.apk';
+export const APK_URL = 'https://github.com/JupiterianSoul/Wikster/releases/download/apk-latest/wikster.apk';
 
 /** The APK exposes an icon bridge that no browser has. */
-export const isApk = () => typeof window !== 'undefined' && Boolean(window.WiklodoIcon);
+export const isApk = () => typeof window !== 'undefined' && Boolean(window.WiksterIcon);
 
 /** Whether this page is the copy bundled inside the APK rather than the published site. */
 export const isBundledCopy = () => typeof location !== 'undefined' && location.host === 'appassets.androidplatform.net';

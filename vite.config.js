@@ -17,7 +17,7 @@ function buildStamp() {
 const STAMP = buildStamp();
 
 const versionFile = () => ({
-  name: 'wiklodo-version-file',
+  name: 'wikster-version-file',
   generateBundle() {
     this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify(STAMP) });
   }
@@ -29,7 +29,7 @@ export default defineConfig({
   // and from a folder opened on disk. An absolute base would break two of the
   // three the moment the site does not sit at the domain root.
   base: './',
-  define: { __WIKLODO_BUILD__: JSON.stringify(STAMP) },
+  define: { __WIKSTER_BUILD__: JSON.stringify(STAMP) },
   plugins: [versionFile()],
   build: {
     // The sound kits must ride inside the bundle as data URIs: the APK's

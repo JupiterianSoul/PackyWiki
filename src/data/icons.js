@@ -245,12 +245,12 @@ const ICONS = {
 };
 
 /**
- * The Wiklodo mark: a foil booster pack with a W cut across its face and a
+ * The Wikster mark: a foil booster pack with a W cut across its face and a
  * spark beside it. Drawn with `currentColor` so it takes the colour of
  * whatever it sits in, the same as every other icon here.
  */
 /*
- * The Wiklodo mark: a foil booster torn open, a star bursting out of the
+ * The Wikster mark: a foil booster torn open, a star bursting out of the
  * mouth, the W stamped on the face. The same drawing ships as the Android
  * launcher icon (ic_launcher_foreground.xml) - one identity everywhere.
  *

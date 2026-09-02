@@ -1,5 +1,5 @@
 /**
- * WIKLODO - application shell.
+ * WIKSTER - application shell.
  * ============================================================================
  * This file owns the interface and nothing else. Every rule about what a
  * booster costs, what a card is worth, when a gift is due or how a level is
@@ -105,8 +105,8 @@ const shuffle = (arr) => {
   return out;
 };
 
-const THEME_KEY = 'packywiki.theme';
-const RIP_DIR_KEY = 'packywiki.ripDirection';
+const THEME_KEY = 'wikster.theme';
+const RIP_DIR_KEY = 'wikster.ripDirection';
 
 /* --- state ----------------------------------------------------------------- */
 
@@ -153,7 +153,7 @@ const state = {
   viewing: null
 };
 
-/** Test-only switches, reachable through window.__packywiki. */
+/** Test-only switches, reachable through window.__wikster. */
 const debug = { failNextOpen: false };
 
 const settings = () => state.profile.settings;
@@ -365,7 +365,7 @@ function useTheme(id, { announce = false } = {}) {
   synth.setTheme(theme.id);
   // Inside the APK, the launcher icon follows the theme. In a browser the
   // bridge simply is not there.
-  try { window.WiklodoIcon?.setIcon(theme.id); } catch { /* browser build */ }
+  try { window.WiksterIcon?.setIcon(theme.id); } catch { /* browser build */ }
   document.querySelector('meta[name="theme-color"]')
     ?.setAttribute('content', theme.swatch[0]);
   if (announce) { synth.resume(); synth.playTheme(); }
@@ -913,7 +913,7 @@ const FORGE_IDEAS = ['Minecraft', 'Naruto', 'Pokémon', 'Star Wars', 'Zelda', 'O
 
 function paintForgeSeal(text) {
   const subject = text.trim();
-  const style = proceduralStyle((subject || 'wiklodo').toLowerCase());
+  const style = proceduralStyle((subject || 'wikster').toLowerCase());
   el.forgeSeal.style.setProperty('--accent', style.accent);
   el.forgeSeal.style.setProperty('--accent2', style.accent2);
   const letter = (subject.charAt(0) || 'W').toUpperCase();
@@ -7141,7 +7141,7 @@ async function removeAllCards() {
  * failure there leaves the player exactly where they were rather than
  * half-erased.
  *
- * Every packywiki key goes, not a hand-written list of them: the list had
+ * Every wikster key goes, not a hand-written list of them: the list had
  * already fallen behind the wishlist, the badge shelf, the frame and the
  * saved bids, all of which outlived an erase that claimed to remove
  * everything. Redeemed codes live in the profile, so they go too, and a
@@ -7526,7 +7526,7 @@ function applyStrings() {
  * it was first pulled. An article with no version in that language is left
  * exactly where it is and never asked about again.
  */
-const NO_TWIN_KEY = 'packywiki.noTranslation.v1';
+const NO_TWIN_KEY = 'wikster.noTranslation.v1';
 /** At most this many per launch, and never longer than the budget below. */
 const MIGRATE_PER_LAUNCH = 40;
 const MIGRATE_BUDGET_MS = 20000;
@@ -7592,7 +7592,7 @@ async function migrateLanguages() {
  *
  * The same pass gives a picture to the ones that never got one.
  */
-const SPECIAL_FIX_KEY = 'wiklodo.specialCards.v2';
+const SPECIAL_FIX_KEY = 'wikster.specialCards.v2';
 
 /** A picture that is really just the booster's colour with a name on it. */
 const isPlate = (src) => !src || String(src).startsWith('data:image/svg');
@@ -7645,7 +7645,7 @@ async function migrateSpecialCards() {
  * re-graded to the tier the page has always deserved. Cards from other wikis
  * have no readership to ask about and are left alone.
  */
-const VIEWS_FIX_KEY = 'wiklodo.viewsRepair.v1';
+const VIEWS_FIX_KEY = 'wikster.viewsRepair.v1';
 
 async function migrateViews() {
   if (!navigator.onLine) return;
@@ -7723,7 +7723,7 @@ async function lookForUpdate() {
   lastUpdateLook = Date.now();
   const latest = await checkForUpdate();
   if (!latest) return;
-  console.info(`Wiklodo ${BUILD.sha}: a newer build (${latest.sha}) is published`);
+  console.info(`Wikster ${BUILD.sha}: a newer build (${latest.sha}) is published`);
   showUpdateBar('update', latest);
 }
 
@@ -8104,7 +8104,7 @@ let packsRail;
 let binderSeg;
 init();
 
-window.__packywiki = {
+window.__wikster = {
   state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
   draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor, drawPack: toDrawPack, odds, specId,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },

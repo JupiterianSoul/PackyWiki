@@ -16,20 +16,50 @@
 
 /** Every key the app writes. A save is exactly these, and nothing else. */
 export const SAVE_KEYS = [
-  'packywiki.collection.v3',
-  'packywiki.wallet.v1',
-  'packywiki.inventory.v1',
-  'packywiki.profile.v1',
-  'packywiki.customPacks.v2',
-  'packywiki.language',
-  'packywiki.ripDirection',
-  'packywiki.theme'
+  'wikster.collection.v3',
+  'wikster.wallet.v1',
+  'wikster.inventory.v1',
+  'wikster.profile.v1',
+  'wikster.customPacks.v2',
+  'wikster.language',
+  'wikster.ripDirection',
+  'wikster.theme'
 ];
 
 import { BUILD } from './version.js';
 
-const FORMAT = 'wiklodo-save';
+const FORMAT = 'wikster-save';
+/** What the envelope was called before the renames. Still read, never written. */
+const LEGACY_FORMATS = ['wiklodo-save', 'packywiki-save'];
+/** What the storage keys were prefixed with before the rename. */
+const LEGACY_PREFIX = 'packywiki.';
+const PREFIX = 'wikster.';
 const VERSION = 1;
+
+/**
+ * Storage written under the old prefix is carried over ONCE, the first time
+ * this build runs on a device: every `packywiki.*` key becomes the same
+ * `wikster.*` key, and the old one is removed. Runs at import, before anything
+ * has read a key, and is a no-op on a device that has nothing old.
+ */
+export function migrateLegacyStorage() {
+  try {
+    const moves = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(LEGACY_PREFIX)) moves.push(key);
+    }
+    for (const key of moves) {
+      const fresh = PREFIX + key.slice(LEGACY_PREFIX.length);
+      if (localStorage.getItem(fresh) === null) localStorage.setItem(fresh, localStorage.getItem(key));
+      localStorage.removeItem(key);
+    }
+    return moves.length;
+  } catch {
+    return 0;
+  }
+}
+migrateLegacyStorage();
 
 /* --- change notification ------------------------------------------------- */
 
@@ -76,13 +106,13 @@ export function describeSave(text) {
   const read = (key, fallback) => {
     try { return JSON.parse(parsed.data[key] ?? 'null') ?? fallback; } catch { return fallback; }
   };
-  const collection = read('packywiki.collection.v3', { entries: {} });
-  const profile = read('packywiki.profile.v1', {});
+  const collection = read('wikster.collection.v3', { entries: {} });
+  const profile = read('wikster.profile.v1', {});
   const entries = Object.values(collection.entries ?? {});
   return {
     cards: entries.reduce((sum, e) => sum + (e.count ?? 1), 0),
     unique: entries.length,
-    wallet: read('packywiki.wallet.v1', 0),
+    wallet: read('wikster.wallet.v1', 0),
     level: profile?.progress?.level ?? 1,
     boosters: profile?.boostersOpened ?? 0,
     at: parsed.at ?? null
@@ -97,12 +127,15 @@ export function describeSave(text) {
 export function parseSave(text) {
   let parsed;
   try { parsed = JSON.parse(String(text).trim()); } catch { return null; }
-  if (!parsed || parsed.format !== FORMAT) return null;
+  if (!parsed || (parsed.format !== FORMAT && !LEGACY_FORMATS.includes(parsed.format))) return null;
   if (!parsed.data || typeof parsed.data !== 'object') return null;
-  // Unknown keys are dropped rather than trusted.
+  // Unknown keys are dropped rather than trusted. A save written before the
+  // rename carries the old prefix; its keys are read as the new ones.
   const data = {};
   for (const key of SAVE_KEYS) {
-    if (typeof parsed.data[key] === 'string') data[key] = parsed.data[key];
+    const legacy = LEGACY_PREFIX + key.slice(PREFIX.length);
+    const value = parsed.data[key] ?? parsed.data[legacy];
+    if (typeof value === 'string') data[key] = value;
   }
   if (!Object.keys(data).length) return null;
   return { ...parsed, data };

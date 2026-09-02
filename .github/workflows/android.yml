@@ -73,13 +73,13 @@ jobs:
         run: ./gradlew --no-daemon assembleRelease
 
       - name: Rename APK
-        run: cp android/app/build/outputs/apk/release/app-release.apk wiklodo.apk
+        run: cp android/app/build/outputs/apk/release/app-release.apk wikster.apk
 
       - name: Upload APK as a workflow artifact
         uses: actions/upload-artifact@v4
         with:
-          name: wiklodo-apk
-          path: wiklodo.apk
+          name: wikster-apk
+          path: wikster.apk
           if-no-files-found: error
 
       # A release asset gives a direct, tappable .apk link - an artifact only
@@ -89,12 +89,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           gh release delete apk-latest --yes --cleanup-tag || true
-          gh release create apk-latest wiklodo.apk \
+          gh release create apk-latest wikster.apk \
             --target "$GITHUB_SHA" \
-            --title "Wiklodo - latest APK" \
+            --title "Wikster - latest APK" \
             --notes "Sideloadable release build of \`$GITHUB_SHA\`.
 
-          **Install:** download \`wiklodo.apk\` below, tap it, and allow
+          **Install:** download \`wikster.apk\` below, tap it, and allow
           your browser to install unknown apps when prompted.
 
           Android still offers to scan a sideloaded app with Play Protect;
@@ -103,7 +103,7 @@ jobs:
           Settings.
 
           Signed with the project's own key, so this installs over an existing
-          Wiklodo. It opens the published site, so it updates itself: every
+          Wikster. It opens the published site, so it updates itself: every
           change to the site reaches the app on its next launch, with no
           reinstall. The copy built into the APK is only used when the site
           cannot be reached. Needs a network connection - cards are fetched

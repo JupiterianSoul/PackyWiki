@@ -14,7 +14,7 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Wiklodo">
+        android:theme="@style/Theme.Wikster">
 
         <!-- The launcher entry lives on ALIASES, one per theme, so the app
              can wear the icon of whatever theme the player chose. Exactly one

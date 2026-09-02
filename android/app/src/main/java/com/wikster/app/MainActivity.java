@@ -1,4 +1,4 @@
-package com.packywiki.app;
+package com.wikster.app;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -22,7 +22,7 @@ import android.webkit.JavascriptInterface;
 import androidx.webkit.WebViewAssetLoader;
 
 /**
- * Wiklodo is a static web app; this activity is just a host for it.
+ * Wikster is a static web app; this activity is just a host for it.
  *
  * It loads the PUBLISHED SITE. The site updates the moment it is published,
  * and an APK that carried its own frozen copy did not: whoever had not
@@ -42,7 +42,7 @@ public class MainActivity extends Activity {
 
     /** Where the site lives. Only pages under this path stay inside the app. */
     private static final String LIVE_HOST = "jupiteriansoul.github.io";
-    private static final String LIVE_PATH = "/PackyWiki/";
+    private static final String LIVE_PATH = "/Wikster/";
     private static final String LIVE_URL = "https://" + LIVE_HOST + LIVE_PATH;
 
     /** Reserved by androidx.webkit for locally-served assets. */
@@ -68,9 +68,9 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
-        // The web side calls WiklodoIcon.setIcon(themeId) when the theme
+        // The web side calls WiksterIcon.setIcon(themeId) when the theme
         // changes, and the launcher icon follows it. See IconBridge below.
-        webView.addJavascriptInterface(new IconBridge(), "WiklodoIcon");
+        webView.addJavascriptInterface(new IconBridge(), "WiksterIcon");
         settings.setDomStorageEnabled(true);
         // Honour <meta name="viewport" content="width=device-width">. Without
         // this the WebView lays the page out at its own default width rather
@@ -219,7 +219,7 @@ public class MainActivity extends Activity {
             "apotheosis", "raclette", "lecture", "yaourt"
     };
 
-    private static final String ICON_PREFS = "wiklodo.icon";
+    private static final String ICON_PREFS = "wikster.icon";
     private static final String KEY_WANTED = "wanted";
     private static final String KEY_APPLIED = "applied";
 
@@ -290,6 +290,6 @@ public class MainActivity extends Activity {
     }
 
     private ComponentName alias(String theme) {
-        return new ComponentName(getApplicationContext(), "com.packywiki.app.Icon_" + theme);
+        return new ComponentName(getApplicationContext(), "com.wikster.app.Icon_" + theme);
     }
 }

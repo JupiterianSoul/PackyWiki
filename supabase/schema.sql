@@ -1,5 +1,5 @@
 -- ============================================================================
--- WIKLODO - database schema
+-- WIKSTER - database schema
 -- ============================================================================
 -- Run this once, whole, in your Supabase project's SQL editor
 -- (Dashboard -> SQL Editor -> New query -> paste -> Run).
@@ -202,7 +202,7 @@ as $$
   select case
     when auth.uid() = target or public.are_friends(auth.uid(), target) then
       jsonb_build_object('allowed', true, 'cards', (
-        select s.data -> 'data' ->> 'packywiki.collection.v3'
+        select s.data -> 'data' ->> 'wikster.collection.v3'
         from public.saves s where s.user_id = target
       ))
     else jsonb_build_object('allowed', false)

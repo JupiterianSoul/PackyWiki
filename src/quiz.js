@@ -99,7 +99,7 @@ export const QUIZ_MONEY = { small: 40, medium: 120, large: 350 };
  * device does not start the day over.
  */
 export const QUIZ_PER_DAY = 5;
-const PLAYS_KEY = 'packywiki.quizPlays.v1';
+const PLAYS_KEY = 'wikster.quizPlays.v1';
 
 const today = () => Math.floor(Date.now() / 86400000);
 

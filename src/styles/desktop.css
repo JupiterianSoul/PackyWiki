@@ -89,7 +89,7 @@
 
   /* The rail wears the app's name above its destinations. */
   .navbar::before {
-    content: 'Wiklodo';
+    content: 'Wikster';
     font-family: var(--font-display);
     font-weight: var(--display-weight);
     letter-spacing: var(--display-tracking);

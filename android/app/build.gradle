@@ -6,7 +6,7 @@ plugins {
 def buildNumber = (System.getenv('BUILD_NUMBER') ?: '1').toInteger()
 
 android {
-    namespace 'com.packywiki.app'
+    namespace 'com.wikster.app'
     compileSdk 35
 
     /*
@@ -30,19 +30,19 @@ android {
      */
     signingConfigs {
         shared {
-            storeFile file('../keystore/wiklodo-debug.keystore')
-            storePassword 'wiklodo'
-            keyAlias 'wiklodo'
-            keyPassword 'wiklodo'
+            storeFile file('../keystore/wikster-debug.keystore')
+            storePassword 'wikster'
+            keyAlias 'wikster'
+            keyPassword 'wikster'
         }
     }
 
     defaultConfig {
-        // Deliberately unchanged by the rename to Wiklodo. The applicationId
-        // is the app's identity to Android AND the key to the WebView's
-        // storage: changing it installs a second app and strands the player's
-        // whole collection in the old one.
-        applicationId 'com.packywiki.app'
+        // The app's identity on the device. It changed with the rename to
+        // Wikster, so this installs BESIDE an older Wiklodo rather than over
+        // it; the old one is uninstalled by hand, and the account carries
+        // the collection across.
+        applicationId 'com.wikster.app'
         minSdk 26
         targetSdk 35
         // Rises with every CI build so Android always sees a newer version.

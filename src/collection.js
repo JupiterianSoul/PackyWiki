@@ -23,17 +23,16 @@ import { t } from './i18n.js';
 import { touch } from './save.js';
 
 /*
- * The storage keys keep the old `packywiki.` prefix after the rename to
- * Wiklodo, on purpose: they are what an existing player's collection, wallet
- * and progress are filed under, and renaming them would silently wipe every
- * save on the next launch.
+ * The storage keys carry the app's own prefix. A device written under an
+ * older prefix is carried over once at launch (see migrateLegacyStorage in
+ * src/save.js), so nothing here has to know the old names.
  */
-const CARDS_KEY = 'packywiki.collection.v3';
-const WALLET_KEY = 'packywiki.wallet.v1';
-const INVENTORY_KEY = 'packywiki.inventory.v1';
-const PROFILE_KEY = 'packywiki.profile.v1';
-const CUSTOM_KEY = 'packywiki.customPacks.v2';
-const BINDER_VIEW_KEY = 'packywiki.binderView.v1';
+const CARDS_KEY = 'wikster.collection.v3';
+const WALLET_KEY = 'wikster.wallet.v1';
+const INVENTORY_KEY = 'wikster.inventory.v1';
+const PROFILE_KEY = 'wikster.profile.v1';
+const CUSTOM_KEY = 'wikster.customPacks.v2';
+const BINDER_VIEW_KEY = 'wikster.binderView.v1';
 
 /** Every read and write is guarded: localStorage throws in some privacy modes. */
 function readJson(key, fallback) {
@@ -435,7 +434,7 @@ export function takeBooster(inventory, id) {
  * cards are safely in the collection; whatever is still written down on the
  * next launch is handed straight back.
  */
-const IN_FLIGHT_KEY = 'packywiki.openInFlight.v1';
+const IN_FLIGHT_KEY = 'wikster.openInFlight.v1';
 
 export function markOpenInFlight(spec) {
   try { localStorage.setItem(IN_FLIGHT_KEY, JSON.stringify({ spec, at: Date.now() })); }
@@ -605,7 +604,7 @@ export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
 /* --- the wishlist, cached --------------------------------------------------
  * The server copy is the truth (it is what friends can see); this cache is
  * what paints instantly on launch and what an offline build falls back to. */
-const WISH_KEY = 'packywiki.wishlist.v1';
+const WISH_KEY = 'wikster.wishlist.v1';
 export function loadWishlist() {
   try {
     const raw = JSON.parse(localStorage.getItem(WISH_KEY) ?? '[]');
@@ -618,7 +617,7 @@ export function saveWishlist(cards) {
 
 /* Auctions already flagged as carrying a wished card, so the bell rings once
  * per auction rather than once per refresh. */
-const WISH_SEEN_KEY = 'packywiki.wishSeen.v1';
+const WISH_SEEN_KEY = 'wikster.wishSeen.v1';
 export function loadWishSeen() {
   try {
     const raw = JSON.parse(localStorage.getItem(WISH_SEEN_KEY) ?? '[]');
@@ -632,7 +631,7 @@ export function saveWishSeen(ids) {
 /* --- auctions I have bid on ------------------------------------------------
  * Ids only, so the Mine tab can show fights I am in even after being outbid.
  * Capped: an id is worthless once its auction is gone from the listing. */
-const BIDS_KEY = 'packywiki.myBids.v1';
+const BIDS_KEY = 'wikster.myBids.v1';
 export function loadMyBids() {
   try {
     const raw = JSON.parse(localStorage.getItem(BIDS_KEY) ?? '[]');
@@ -646,7 +645,7 @@ export function saveMyBids(ids) {
 /* --- the badges worn on the profile ---------------------------------------
  * Up to four badge ids, chosen on the Badges screen. Empty means "let the
  * app pick": the best-ranked earned chips fill the shelf by default. */
-const LOADOUT_KEY = 'packywiki.badgeLoadout.v1';
+const LOADOUT_KEY = 'wikster.badgeLoadout.v1';
 export function loadBadgeLoadout() {
   try {
     const raw = JSON.parse(localStorage.getItem(LOADOUT_KEY) ?? '[]');
@@ -660,7 +659,7 @@ export function saveBadgeLoadout(ids) {
 /* --- the equipped level-frame style ---------------------------------------
  * Which of the five frame designs wraps your level and your picture. The
  * frame's tier is never stored: it is always derived from the level. */
-const FRAME_KEY = 'packywiki.frameStyle.v1';
+const FRAME_KEY = 'wikster.frameStyle.v1';
 export function loadFrameStyle() {
   try { return localStorage.getItem(FRAME_KEY) || null; } catch { return null; }
 }
@@ -767,7 +766,7 @@ export function healCustomPacks(collection) {
  * wears the treatment drawn for it, which is what `classic` means, so an empty
  * object is the right starting state and a save that predates the picker needs
  * no migration. */
-const FX_KEY = 'packywiki.cardFx.v1';
+const FX_KEY = 'wikster.cardFx.v1';
 
 export function loadCardFx() {
   const data = readJson(FX_KEY, null);

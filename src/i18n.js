@@ -15,7 +15,7 @@
 
 import { touch } from './save.js';
 
-const LANG_KEY = 'packywiki.language';
+const LANG_KEY = 'wikster.language';
 
 export const LANGUAGES = [
   { id: 'en', label: 'English', wiki: 'en' },
@@ -103,7 +103,7 @@ const STRINGS = {
     viewsPerMonth: '{views}/month',
 
     // custom
-    customIntro: 'Name a game, book, film or show and Wiklodo finds that subject’s own wiki, then builds a booster entirely out of it.',
+    customIntro: 'Name a game, book, film or show and Wikster finds that subject’s own wiki, then builds a booster entirely out of it.',
     customPlaceholder: 'e.g. Terraria',
     create: 'Create',
     creating: 'Booster Pack is being created…',
@@ -457,7 +457,7 @@ const STRINGS = {
     saveLoad: 'Load this save',
     saveLoadConfirm: 'Tap again to replace everything',
     saveFound: '{cards} cards · level {level} · {amount}',
-    saveUnreadable: 'That does not look like a Wiklodo save.',
+    saveUnreadable: 'That does not look like a Wikster save.',
     settingsCardWipe: 'Remove all cards',
     settingsCardWipeNote: 'Empties the collection and puts your Buckarooz, boosters, worn badges and theme back to the start. Your level, experience and achievements are kept, and so is anything a secret code gave you.',
     settingsCardWipeDone: 'Collection emptied',
@@ -496,7 +496,7 @@ const STRINGS = {
     createdGoShop: '“{name}” is ready. Find it in the Shop.',
 
     // first run
-    welcomeTitle: 'Welcome to Wiklodo',
+    welcomeTitle: 'Welcome to Wikster',
     welcomeBody: 'Pick a language. This one is permanent, because every card is stored in the language it was pulled in.',
     starterTitle: 'Here’s your starter kit',
     starterBody: 'You get {coins} and {packs} boosters to begin with. Sell duplicates, and check the Shop every couple of hours for new stock and a restock bonus.',
@@ -504,7 +504,7 @@ const STRINGS = {
 
     // odds modal
     walletTitle: 'Buckarooz',
-    walletWhat: 'Buckarooz are the currency of Wiklodo. Your balance is shown in the top bar.',
+    walletWhat: 'Buckarooz are the currency of Wikster. Your balance is shown in the top bar.',
     walletEarn: 'Earn them by selling cards from your collection, and from the restock bonus paid every time the Shop refreshes.',
     walletSpend: 'Spend them in the Shop on boosters. Bigger boosters and rarer ones cost more.',
     walletNote: 'Selling a whole booster never pays back what it cost, so collecting gets you further than churning.',
@@ -524,7 +524,7 @@ const STRINGS = {
     specialFixed: '{n} special cards were redrawn from the right source',
     viewsRepaired: '{n} cards were re-graded from their real readership',
     syncFailedKept: 'The cards are gone from this device, but the account could not be told yet. It will keep trying; stay signed in until it does.',
-    updateWeb: 'A newer Wiklodo is out.',
+    updateWeb: 'A newer Wikster is out.',
     updateReload: 'Reload',
     updateLater: 'Later',
     syncOutdated: 'Not syncing: your account was last saved by a newer version. Update to sync again.',
@@ -532,7 +532,7 @@ const STRINGS = {
     chance: 'Chance',
 
     // account gate
-    gateTitle: 'Wiklodo',
+    gateTitle: 'Wikster',
     gateBody: 'Sign in to keep your collection. It lives on your account, so a new build or a new phone gets it all back.',
     gateSignIn: 'Sign in',
     gateSignUp: 'Create account',
@@ -642,7 +642,7 @@ const STRINGS = {
 
     // custom builder
     creatorTitle: 'Build your own booster',
-    creatorNote: 'Name a subject. Wiklodo finds its wiki and builds a booster entirely out of it.',
+    creatorNote: 'Name a subject. Wikster finds its wiki and builds a booster entirely out of it.',
     deleteBooster: 'Delete',
     deleteArmed: 'Tap again to delete',
     packDeleted: '{name} deleted',
@@ -783,7 +783,7 @@ const STRINGS = {
     copiesOwned: '{n} exemplaires',
     viewsPerMonth: '{views}/mois',
 
-    customIntro: 'Indiquez un jeu, un livre, un film ou une série et Wiklodo trouve le wiki dédié, puis construit un booster entièrement à partir de celui-ci.',
+    customIntro: 'Indiquez un jeu, un livre, un film ou une série et Wikster trouve le wiki dédié, puis construit un booster entièrement à partir de celui-ci.',
     customPlaceholder: 'ex. Terraria',
     create: 'Créer',
     creating: 'Création du booster en cours…',
@@ -1136,7 +1136,7 @@ const STRINGS = {
     saveLoad: 'Charger cette sauvegarde',
     saveLoadConfirm: 'Appuyez encore pour tout remplacer',
     saveFound: '{cards} cartes · niveau {level} · {amount}',
-    saveUnreadable: 'Cela ne ressemble pas à une sauvegarde Wiklodo.',
+    saveUnreadable: 'Cela ne ressemble pas à une sauvegarde Wikster.',
     settingsCardWipe: 'Retirer toutes les cartes',
     settingsCardWipeNote: 'Vide la collection et remet vos Buckarooz, vos boosters, vos badges portés et votre thème au point de départ. Votre niveau, votre expérience et vos succès sont conservés, tout comme ce qu’un code secret vous a donné.',
     settingsCardWipeDone: 'Collection vidée',
@@ -1174,14 +1174,14 @@ const STRINGS = {
     customOwnNote: 'Les boosters que vous créez apparaissent dans la Boutique, sur leur propre étagère, où vous pouvez en acheter autant que vous voulez.',
     createdGoShop: '« {name} » est prêt. Retrouvez-le dans la Boutique.',
 
-    welcomeTitle: 'Bienvenue dans Wiklodo',
+    welcomeTitle: 'Bienvenue dans Wikster',
     welcomeBody: 'Choisissez une langue. Ce choix est définitif, car chaque carte est stockée dans la langue où elle a été tirée.',
     starterTitle: 'Voici votre kit de départ',
     starterBody: 'Vous commencez avec {coins} et {packs} boosters. Vendez les doublons, et passez à la Boutique toutes les deux heures pour du nouveau stock et un bonus de réassort.',
     letsGo: 'C’est parti',
 
     walletTitle: 'Buckarooz',
-    walletWhat: 'Les Buckarooz sont la monnaie de Wiklodo. Votre solde est affiché en haut de l’écran.',
+    walletWhat: 'Les Buckarooz sont la monnaie de Wikster. Votre solde est affiché en haut de l’écran.',
     walletEarn: 'Vous en gagnez en vendant des cartes de votre collection, et grâce au bonus versé à chaque réassort de la Boutique.',
     walletSpend: 'Vous les dépensez à la Boutique pour acheter des boosters. Les boosters plus gros ou plus rares coûtent plus cher.',
     walletNote: 'Revendre un booster entier ne rembourse jamais son prix : collectionner rapporte plus que tout revendre.',
@@ -1201,7 +1201,7 @@ const STRINGS = {
     specialFixed: '{n} cartes spéciales ont été redessinées depuis la bonne source',
     viewsRepaired: '{n} cartes ont été reclassées d’après leur vraie audience',
     syncFailedKept: 'Les cartes ont disparu de cet appareil, mais le compte n’a pas encore pu être prévenu. L’appli réessaiera ; restez connecté jusque-là.',
-    updateWeb: 'Un Wiklodo plus récent est sorti.',
+    updateWeb: 'Un Wikster plus récent est sorti.',
     updateReload: 'Recharger',
     updateLater: 'Plus tard',
     syncOutdated: 'Pas de synchronisation : votre compte a été sauvegardé par une version plus récente. Mettez à jour pour synchroniser à nouveau.',
@@ -1209,7 +1209,7 @@ const STRINGS = {
     chance: 'Chance',
 
     // compte
-    gateTitle: 'Wiklodo',
+    gateTitle: 'Wikster',
     gateBody: 'Connectez-vous pour conserver votre collection. Elle est liée à votre compte : une nouvelle version ou un nouveau téléphone la retrouve entièrement.',
     gateSignIn: 'Connexion',
     gateSignUp: 'Créer un compte',
@@ -1313,7 +1313,7 @@ const STRINGS = {
     freeShelfNote: 'Un de chaque, gratuitement, toutes les quatre heures.',
 
     creatorTitle: 'Créez votre propre booster',
-    creatorNote: 'Nommez un sujet. Wiklodo trouve son wiki et en fait un booster entier.',
+    creatorNote: 'Nommez un sujet. Wikster trouve son wiki et en fait un booster entier.',
     deleteBooster: 'Supprimer',
     deleteArmed: 'Touchez encore pour supprimer',
     packDeleted: '{name} supprimé',

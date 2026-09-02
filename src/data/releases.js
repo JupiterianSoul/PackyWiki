@@ -222,14 +222,14 @@ export const RELEASES = [
   },
   {
     id: 'web', icon: 'wand', accent: '#38bdf8',
-    title: { en: 'Wiklodo on the web', fr: 'Wiklodo sur le web' },
+    title: { en: 'Wikster on the web', fr: 'Wikster sur le web' },
     points: [
       { en: 'The whole game in a browser, desktop included', fr: 'Le jeu entier dans un navigateur, ordinateur compris' },
       { en: 'Search bars that finally match the app', fr: 'Des barres de recherche enfin accordées à l’app' },
       { en: 'A secret code box at the end of Settings', fr: 'Une case à code secret au bout des Réglages' }
     ],
     changelog: [
-      { en: 'Wiklodo runs as a website as well as an app, from the same build', fr: 'Wiklodo tourne en site web comme en application, depuis la même version' },
+      { en: 'Wikster runs as a website as well as an app, from the same build', fr: 'Wikster tourne en site web comme en application, depuis la même version' },
       { en: 'On a desktop screen the game is laid out for a desk: a rail down the left, a header across the top, dialogues in the middle and grids that use the width', fr: 'Sur un écran d’ordinateur le jeu est disposé pour un bureau : une barre à gauche, un en-tête en haut, des boîtes de dialogue au centre et des grilles qui prennent la largeur' },
       { en: 'Every search bar wears the theme now instead of the browser’s white box', fr: 'Chaque barre de recherche porte le thème au lieu de la boîte blanche du navigateur' },
       { en: 'The card index and the auction house line up with the rest of the screen', fr: 'L’index des cartes et la salle des ventes s’alignent avec le reste de l’écran' },

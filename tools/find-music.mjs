@@ -40,7 +40,7 @@ const slug = (s) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
   .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 42) || 'track';
 
 const get = async (url, as = 'json') => {
-  const res = await fetch(url, { headers: { 'User-Agent': 'Wiklodo/1.0 (music sourcing; github.com/JupiterianSoul/PackyWiki)' } });
+  const res = await fetch(url, { headers: { 'User-Agent': 'Wikster/1.0 (music sourcing; github.com/JupiterianSoul/Wikster)' } });
   if (!res.ok) throw new Error(`${res.status} ${url}`);
   return as === 'json' ? res.json() : res;
 };

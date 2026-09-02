@@ -1,4 +1,4 @@
-# Wiklodo
+# Wikster
 
 A trading card game built out of Wikipedia. You buy booster packs, tear them
 open with your thumb, and the cards inside are real Wikipedia articles: a
@@ -7,7 +7,7 @@ people actually read that page last month.
 
 It runs as a website and as an Android app, from one codebase and one build.
 
-- **Play in a browser:** https://jupiteriansoul.github.io/PackyWiki/
+- **Play in a browser:** https://jupiteriansoul.github.io/Wikster/
 - **Android:** the newest APK is always the `apk-latest` release of this
   repository.
 
@@ -392,21 +392,24 @@ android/           the WebView wrapper and its Gradle build
 supabase/          schema.sql: tables, policies, the edge function
 ```
 
-## Names that cannot change
+## The names underneath
 
-Three identifiers still say `packywiki`, and all three are load bearing:
+The app has been PackyWiki, then Wiklodo, and is Wikster. Three identifiers
+carry a rename's cost, and each was handled rather than left behind:
 
-- **`packywiki.*` localStorage keys.** These are where every player's
-  collection lives. Renaming them without a migration erases every save on
-  every device.
-- **`com.packywiki.app`**, the Android `applicationId`. It is the app's
-  identity to Android and the key to the WebView's storage. Changing it
-  installs a second app and strands the collection in the first.
+- **`wikster.*` localStorage keys.** These are where every player's
+  collection lives. The first launch of a build carries every `packywiki.*`
+  key over to its `wikster.*` name and removes the old one
+  (`migrateLegacyStorage` in `src/save.js`), and a pasted save from before
+  the rename is read under its old keys and old envelope name.
+- **`com.wikster.app`**, the Android `applicationId`. It is the app's
+  identity to Android and the key to the WebView's storage. It changed with
+  the rename, so this APK installs beside an older Wiklodo rather than over
+  it: the old one is uninstalled by hand, and the account's save carries the
+  collection across.
 - **The key name inside `supabase/schema.sql`**, which has to match the
-  localStorage key it reads.
-
-Everything a player can see says Wiklodo. These three are plumbing, and the
-cost of renaming them is somebody's collection.
+  localStorage key it reads. It says `wikster.collection.v3`; a project that
+  ran an older schema.sql has to run the current one again.
 
 ## Credits
 

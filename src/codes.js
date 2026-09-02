@@ -378,7 +378,7 @@ export function creatorCard(codeId) {
     // copy to the first.
     key: `${CREATOR.key}:${codeId}`,
     sourceId: 'special',
-    sourceName: 'Wiklodo',
+    sourceName: 'Wikster',
     pageId: null,
     title: tx(CREATOR.title),
     description: tx(CREATOR.description),

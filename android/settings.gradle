@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'Wiklodo'
+rootProject.name = 'Wikster'
 include ':app'
