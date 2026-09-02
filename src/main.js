@@ -1768,6 +1768,27 @@ async function completeRip() {
 
 /* --- opening: drawing ------------------------------------------------------------------------ */
 
+/**
+ * Start every card's picture downloading the moment the draw has chosen it.
+ *
+ * The draw is a few requests now; what a player on a slow line still waits
+ * for is the PICTURE of each card, which only began loading when the card
+ * was bound, one reveal at a time. Warmed here, the pictures are already in
+ * the browser's cache when the reveal asks for them, and the booster was
+ * usually prefetched while the pack was still whole, so they had the whole
+ * tear to arrive.
+ */
+function warmPictures(cards) {
+  if (!Array.isArray(cards)) return;
+  for (const card of cards) {
+    const src = card?.thumbnail;
+    if (typeof src !== 'string' || src.startsWith('data:')) continue;
+    const img = new Image();
+    img.decoding = 'async';
+    img.src = src;
+  }
+}
+
 function schedulePrefetch(spec) {
   clearTimeout(state.prefetchTimer);
   const id = specId(spec);
@@ -1782,6 +1803,7 @@ function schedulePrefetch(spec) {
       .then((value) => {
         record.settled = true;
         record.failed = Boolean(value?.error);
+        if (!record.failed) warmPictures(value);
         paintOpenHint();
         return value;
       });
@@ -1985,6 +2007,7 @@ async function runOpen(booster) {
   // player is owed a booster of the rarity that went missing. Read before the
   // shuffle below, which would build a new array and lose it.
   const owed = Array.isArray(articles.owed) ? articles.owed : [];
+  warmPictures(articles);
 
   const colours = specColours(state.spec);
   // Random order: a Legendary can come first and a Common last.

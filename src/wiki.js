@@ -46,7 +46,23 @@ const wikiCache = new Map();
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
+/** Requests made since the counter was last read: what a draw cost. */
+let requestCount = 0;
+export const takeRequestCount = () => { const n = requestCount; requestCount = 0; return n; };
+
+/**
+ * Whether the line is slow enough that smaller pictures are worth it. The
+ * card face is 640 wide at most; on 2G or 3G, or with data saving on, a 400
+ * wide picture reads the same and arrives in half the time.
+ */
+const slowLine = () => {
+  const c = typeof navigator !== 'undefined' ? navigator.connection : null;
+  return Boolean(c && (c.saveData || /(^|-)(2g|3g)$/.test(String(c.effectiveType ?? ''))));
+};
+const thumbSize = () => (slowLine() ? '400' : '640');
+
 async function fetchJson(url) {
+  requestCount++;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
   try {
@@ -114,7 +130,8 @@ const POOL_LIMIT = 20;
 const PAGE_PROPS = {
   prop: 'extracts|pageimages|categories|info|description|pageviews',
   exintro: '1', explaintext: '1', exchars: '600', exlimit: String(POOL_LIMIT),
-  piprop: 'thumbnail|original', pithumbsize: '640', pilimit: String(POOL_LIMIT),
+  piprop: 'thumbnail|original', pilimit: String(POOL_LIMIT),
+  // pithumbsize is added per request (see pageProps): it depends on the line.
   // The last thirty days of readership, IN THE SAME REQUEST as the page.
   // Readership decides rarity, and it used to cost one round trip per
   // candidate to a second host: forty lookups for a five-card pack, which is
@@ -128,6 +145,9 @@ const PAGE_PROPS = {
   cllimit: '500', clshow: '!hidden',
   inprop: 'url'
 };
+
+/** PAGE_PROPS for this request: the picture size follows the line. */
+const pageProps = () => ({ ...PAGE_PROPS, pithumbsize: thumbSize() });
 
 const pagesOf = (data) => Object.values(data?.query?.pages ?? {}).filter((page) => page?.title);
 
@@ -148,7 +168,7 @@ async function searchPool(query, { preferBig = false } = {}) {
     action: 'query', generator: 'search', gsrsearch: query,
     gsrnamespace: '0', gsrlimit: String(POOL_LIMIT), gsroffset: String(offset),
     gsrinfo: 'totalhits', gsrprop: 'wordcount',
-    ...PAGE_PROPS, format: 'json', origin: '*'
+    ...pageProps(), format: 'json', origin: '*'
   });
   const data = await fetchJson(`${ACTION()}?${params}`);
   const totalHits = data?.query?.searchinfo?.totalhits;
@@ -164,7 +184,7 @@ async function randomPool() {
   const params = new URLSearchParams({
     action: 'query', generator: 'random',
     grnnamespace: '0', grnlimit: String(POOL_LIMIT),
-    ...PAGE_PROPS, format: 'json', origin: '*'
+    ...pageProps(), format: 'json', origin: '*'
   });
   return pagesOf(await fetchJson(`${ACTION()}?${params}`));
 }
@@ -174,7 +194,7 @@ async function pagesByTitle(titles) {
   if (!titles.length) return [];
   const params = new URLSearchParams({
     action: 'query', titles: titles.slice(0, POOL_LIMIT).join('|'),
-    ...PAGE_PROPS, format: 'json', origin: '*'
+    ...pageProps(), format: 'json', origin: '*'
   });
   return pagesOf(await fetchJson(`${ACTION()}?${params}`));
 }
@@ -855,7 +875,7 @@ async function customPagesDetail(wiki, ids) {
     action: 'query', pageids: ids.slice(0, POOL_LIMIT).join('|'),
     prop: 'extracts|pageimages|info',
     exintro: '1', explaintext: '1', exchars: '600', exlimit: String(POOL_LIMIT),
-    piprop: 'thumbnail|original', pithumbsize: '640', pilimit: String(POOL_LIMIT),
+    piprop: 'thumbnail|original', pithumbsize: thumbSize(), pilimit: String(POOL_LIMIT),
     inprop: 'url', format: 'json', origin: '*'
   });
   return pagesOf(await fetchJson(`${wiki.apiUrl}?${params}`));
@@ -1268,7 +1288,7 @@ async function restImage(title, lang) {
 async function resolveTitle(title, lang) {
   const params = new URLSearchParams({
     action: 'query', titles: title, redirects: '1',
-    ...PAGE_PROPS, format: 'json', origin: '*'
+    ...pageProps(), format: 'json', origin: '*'
   });
   try {
     const page = pagesOf(await fetchJson(`https://${lang}.wikipedia.org/w/api.php?${params}`))
@@ -1375,9 +1395,17 @@ async function fetchMonthlyViewsOn(title, lang) {
  * booster; duplicates across boosters are kept and counted as copies.
  */
 export async function drawArticles(pack) {
-  // A written list of pages: exactly these, in this order, no band, no
-  // search. Used by the personal boosters behind a secret code.
-  if (pack.source === 'titles') return drawTitleSet(pack);
-  if (pack.source === 'custom') return drawCustomSet(pack);
-  return drawWikipediaSet(pack);
+  const started = Date.now();
+  takeRequestCount();
+  try {
+    // A written list of pages: exactly these, in this order, no band, no
+    // search. Used by the personal boosters behind a secret code.
+    if (pack.source === 'titles') return await drawTitleSet(pack);
+    if (pack.source === 'custom') return await drawCustomSet(pack);
+    return await drawWikipediaSet(pack);
+  } finally {
+    // Said in the console so a slow booster can be told apart from a slow
+    // line: how many requests the draw made, and how long they took.
+    console.info(`Wikster draw: "${pack.name}" in ${Date.now() - started} ms, ${takeRequestCount()} requests`);
+  }
 }
