@@ -86,7 +86,9 @@ export function badgeStates(evaluated, redeemed = {}) {
   }
   for (const list of byChain.values()) list.sort((a, b) => a.tier - b.tier);
 
-  return BADGES.map((badge) => {
+  // A special badge that has not been earned is not a locked chip: it is
+  // not there at all. Nobody is shown a thing they can never have.
+  return BADGES.filter((badge) => !badge.code || Number(redeemed?.[badge.code] ?? 0) > 0).map((badge) => {
     if (badge.code) {
       // One rung: the code itself. Unlocked by redeeming it, nothing else.
       const on = Number(redeemed?.[badge.code] ?? 0) > 0;

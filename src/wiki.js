@@ -127,6 +127,10 @@ const PAGE_PROPS = {
   prop: 'extracts|pageimages|categories|info|description',
   exintro: '1', explaintext: '1', exchars: '600', exlimit: String(POOL_LIMIT),
   piprop: 'thumbnail|original', pithumbsize: '640', pilimit: String(POOL_LIMIT),
+  // A page's own lead image, whatever its licence: the cover of a game, a
+  // character's own art. Without this the API only answers with free files,
+  // and a card about a comic hero comes back with nothing to show.
+  pilicense: 'any',
   cllimit: '500', clshow: '!hidden',
   inprop: 'url'
 };
@@ -903,19 +907,87 @@ export async function translateCard(entry, targetLang) {
  *   - the pack's extra cards (The Creator) are appended as they are.
  */
 async function drawTitleSet(pack) {
-  const wanted = (pack.titles ?? []).slice(0, POOL_LIMIT);
+  let wanted = (pack.titles ?? []).slice();
+  // A curated pack (the Darwin Awards) names more pages than a booster
+  // holds and deals a random hand of them.
+  if (pack.pick) wanted = shuffled(wanted).slice(0, pack.pick);
+  wanted = wanted.slice(0, POOL_LIMIT);
   const out = [];
   for (const want of wanted) {
-    const page = await resolveTitle(want.title, wikiLang())
-      ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
-    const card = page
-      ? await namedCard(page, want, pack)
-      : placeholderCard(want, pack);
+    let card = null;
+    if (want.wiki) card = await fandomCard(want, pack).catch(() => null);
+    if (!card) {
+      const page = await resolveTitle(want.title, wikiLang())
+        ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
+      card = page ? await namedCard(page, want, pack) : placeholderCard(want, pack);
+    }
     card.special = pack.special ?? null;
     out.push(card);
   }
   for (const extra of pack.extra ?? []) out.push({ ...extra });
   return out;
+}
+
+/**
+ * A card from a subject's own wiki, for the things Wikipedia has no page
+ * for: a card in a board game, a turret in a video game. The wiki is found
+ * by name the way custom boosters find theirs, the page by searching it, so
+ * neither the host nor the exact title has to be known in advance.
+ */
+async function fandomCard(want, pack) {
+  const wiki = await resolveCustomWiki(want.wiki);
+  if (!wiki) return null;
+  const queries = Array.isArray(want.search) ? want.search : [want.search ?? want.title];
+  let hit = null;
+  for (const q of queries) {
+    const params = new URLSearchParams({
+      action: 'query', list: 'search', srsearch: q, srnamespace: '0', srlimit: '5', format: 'json', origin: '*'
+    });
+    const rows = (await fetchJson(`${wiki.apiUrl}?${params}`).catch(() => null))?.query?.search ?? [];
+    hit = rows.find((r) => r.pageid && !/\/|disambiguation/i.test(r.title)) ?? null;
+    if (hit) break;
+  }
+  if (!hit) return null;
+  const detail = await customPageDetail(wiki, hit.pageid);
+  if (!detail) return null;
+  let extract = String(detail.extract ?? '').trim();
+  if (extract.length < 40) extract = (await customLeadText(wiki, hit.pageid).catch(() => null)) ?? extract;
+  const thumbnail = bestImage(detail)
+    ?? await firstPhotoOn(wiki.apiUrl, hit.pageid)
+    ?? platePicture(pack.fallbackArt ?? '#94a3b8', want.name ?? detail.title);
+  const host = new URL(wiki.apiUrl);
+  const card = toCard({
+    sourceId: `wiki:${host.host}${host.pathname.replace('/api.php', '')}`,
+    sourceName: wiki.sitename ?? host.host,
+    pageId: detail.pageid,
+    title: detail.title,
+    description: want.name ? detail.title : (wiki.sitename ?? ''),
+    extract: extract || detail.title,
+    thumbnail,
+    url: detail.fullurl ?? `${wiki.server ?? 'https://' + host.host}${(wiki.articlePath ?? '/wiki/$1').replace('$1', encodeTitle(detail.title))}`,
+    views: null,
+    wordCount: detail.length ? Math.round(detail.length / 6) : null
+  });
+  if (want.name) { card.article = card.title; card.title = want.name; }
+  return card;
+}
+
+/** The first real photograph on a page of any MediaWiki, by page id. */
+async function firstPhotoOn(apiUrl, pageId) {
+  try {
+    const params = new URLSearchParams({
+      action: 'query', pageids: String(pageId), generator: 'images', gimlimit: '20',
+      prop: 'imageinfo', iiprop: 'url|mime|size', iiurlwidth: '640', format: 'json', origin: '*'
+    });
+    const files = pagesOf(await fetchJson(`${apiUrl}?${params}`));
+    const photo = files
+      .map((f) => f.imageinfo?.[0])
+      .filter((i) => i && /image\/(jpeg|png|webp)/.test(i.mime ?? '') && (i.width ?? 0) >= 160)
+      .find((i) => !/(icon|logo|flag|wiki|commons|edit|site-)/i.test(i.descriptionurl ?? i.url ?? ''));
+    return photo?.thumburl ?? photo?.url ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** One page by title on one language's Wikipedia, following redirects. */
@@ -937,6 +1009,9 @@ async function resolveTitle(title, lang) {
 
 /** The first real photograph on a page, when it has no lead image. */
 async function firstPhoto(page, lang) {
+  return firstPhotoOn(`https://${lang}.wikipedia.org/w/api.php`, page.pageid);
+}
+async function firstPhotoLegacy(page, lang) {
   try {
     const params = new URLSearchParams({
       action: 'query', pageids: String(page.pageid), generator: 'images', gimlimit: '20',

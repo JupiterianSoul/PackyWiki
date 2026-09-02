@@ -551,6 +551,39 @@ export const THEME_PACKS = [
       fr: ['incategory:"Mème Internet"', 'mème Internet', 'vidéo virale',
            'phénomène Internet', 'vidéaste web', 'culture Internet']
     }
+  },
+  /* --- THE DARWIN AWARDS ------------------------------------------------------
+     Not a Wikipedia search: a curated roll of the famous cases, each drawn by
+     its own article (both languages), five at random per booster. `titles`
+     instead of `queries` is what makes a pack curated; the album's size is
+     the length of the roll. */
+  {
+    id: 'darwin', icon: 'darwin',
+    name: { en: 'Darwin Awards', fr: 'Darwin Awards' },
+    tagline: { en: 'Honouring those who improved the gene pool by leaving it.',
+               fr: 'En l’honneur de ceux qui ont amélioré le patrimoine génétique en le quittant.' },
+    hero: { en: 'Franz Reichelt', fr: 'Franz Reichelt' },
+    accent: '#a3a3a3', accent2: '#2b2b2b',
+    match: { en: [], fr: [] },
+    queries: { en: [], fr: [] },
+    titles: {
+      en: ['Franz Reichelt', 'Garry Hoy', 'Clement Vallandigham', 'Allan Pinkerton', 'Aeschylus', 'Draco (lawgiver)',
+           'Chrysippus', 'Adolf Frederick, King of Sweden', 'Isadora Duncan', 'Jack Daniel', 'Sherwood Anderson',
+           'Jerome Irving Rodale', 'Tycho Brahe', 'Attila', 'Henry Hall (soldier)', 'Bobby Leach', 'Sam Patch',
+           'Karel Soucek', 'Robert Overacker', 'Jimi Heselden', 'Michael Anderson Godwin', 'Jim Fixx',
+           'Arrichion', 'Pope Adrian IV', 'Sigurd the Mighty', 'Béla I of Hungary', 'Martin of Aragon',
+           'Frederick I, Holy Roman Emperor', 'Fulk, King of Jerusalem', 'Thomas Midgley Jr.', 'Horace Wells',
+           'Alexander Bogdanov', 'Marie Curie', 'Otto Lilienthal', 'John Sedgwick', 'Basil Brown',
+           'Michael Rockefeller', 'Garrett Morgan', 'Marcus Garvey', 'Émile Cohl'],
+      fr: ['Franz Reichelt', 'Garry Hoy', 'Clement Vallandigham', 'Allan Pinkerton', 'Eschyle', 'Dracon',
+           'Chrysippe de Soles', 'Adolphe-Frédéric de Suède', 'Isadora Duncan', 'Jack Daniel', 'Sherwood Anderson',
+           'Jerome Irving Rodale', 'Tycho Brahe', 'Attila', 'Henry Hall (soldat)', 'Bobby Leach', 'Sam Patch',
+           'Karel Soucek', 'Robert Overacker', 'Jimi Heselden', 'Michael Anderson Godwin', 'Jim Fixx',
+           'Arrichion', 'Adrien IV', 'Sigurd Eysteinsson', 'Béla Ier de Hongrie', 'Martin Ier d’Aragon',
+           'Frédéric Barberousse', 'Foulques V d’Anjou', 'Thomas Midgley', 'Horace Wells',
+           'Alexandre Bogdanov', 'Marie Curie', 'Otto Lilienthal', 'John Sedgwick', 'Basil Brown',
+           'Michael Rockefeller', 'Garrett Morgan', 'Marcus Garvey', 'Émile Cohl']
+    }
   }
 ].map((pack) => ({ ...pack, group: 'theme', source: 'wikipedia' }));
 

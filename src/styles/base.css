@@ -98,12 +98,14 @@ h1, h2, h3, h4 {
 }
 /* The special themes (src/codes.js): a CRT for Pixel, a lamp's vignette
    for the brick wall and the felt table. */
+/* No blend mode here: a multiplied full-screen overlay is composited every
+   frame over everything that moves, and on a phone that is the lag. Plain
+   alpha reads the same. */
 [data-theme='pixel'] #texture {
   opacity: 1;
   background:
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
-    radial-gradient(120% 80% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.45) 100%);
-  mix-blend-mode: multiply;
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.35) 100%);
 }
 [data-theme='assur'] #texture,
 [data-theme='tabletop'] #texture {

@@ -461,6 +461,7 @@ const STRINGS = {
     revealTake: 'Open the shelf',
     revealClose: 'Later',
     themeLockedNote: 'Unlocked by a secret code.',
+    notifClearRead: 'Clear {n} read',
     on: 'On',
     off: 'Off',
 
@@ -1102,6 +1103,7 @@ const STRINGS = {
     revealTake: 'Voir l’étagère',
     revealClose: 'Plus tard',
     themeLockedNote: 'Débloqué par un code secret.',
+    notifClearRead: 'Effacer {n} lue(s)',
     on: 'Activé',
     off: 'Désactivé',
 

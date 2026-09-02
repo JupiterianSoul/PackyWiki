@@ -257,7 +257,10 @@ export const RELEASES = [
       { en: 'Four badges, worn the moment the code is redeemed', fr: 'Quatre badges, portés à l’instant où le code est utilisé' },
       { en: 'A special album per code, the one album that can be finished: six of six', fr: 'Un album spécial par code, le seul album qui puisse être terminé : six sur six' },
       { en: 'The reveal lays out the whole gift: the message, the booster, the six names, the theme, the badge', fr: 'La révélation expose tout le cadeau : le message, le booster, les six noms, le thème, le badge' },
-      { en: 'A code works for anyone who has it, once per save', fr: 'Un code fonctionne pour quiconque le possède, une fois par sauvegarde' }
+      { en: 'A code works for anyone who has it, once per save', fr: 'Un code fonctionne pour quiconque le possède, une fois par sauvegarde' },
+      { en: 'What is inside stays a surprise until the pack is torn open; special cards count for no achievement, level or album milestone; a special theme or badge is invisible until its code is redeemed', fr: 'Ce qu’il y a dedans reste une surprise jusqu’à l’ouverture ; les cartes spéciales ne comptent pour aucun succès, niveau ou palier d’album ; un thème ou badge spécial reste invisible tant que son code n’est pas utilisé' },
+      { en: 'The Darwin Awards, a new subject: the famous cases, five at random per booster, told by their own articles', fr: 'Les Darwin Awards, un nouveau sujet : les cas célèbres, cinq au hasard par booster, racontés par leurs propres articles' },
+      { en: 'Notifications can be cleared once read; the launcher icon changes safely when the game is put away', fr: 'Les notifications lues peuvent être effacées ; l’icône change sans risque quand le jeu est mis de côté' }
     ]
   }
 ];

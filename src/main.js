@@ -675,6 +675,24 @@ function openNotifications() {
     }
     const wrap = document.createElement('div');
     wrap.className = 'notes';
+    // Read notes from the stored feed can be swept away; live rows (a
+    // request, a trade, unread chat) are not notes and stay until answered.
+    const sweepable = (state.profile.notifFeed ?? []).filter((note) => isRead(note.id)).length;
+    if (sweepable) {
+      const clear = document.createElement('button');
+      clear.type = 'button';
+      clear.className = 'btn btn-ghost btn-sm btn-block';
+      clear.textContent = t('notifClearRead', { n: sweepable });
+      press(clear, { sound: null });
+      clear.addEventListener('click', () => {
+        state.profile.notifFeed = (state.profile.notifFeed ?? []).filter((note) => !isRead(note.id));
+        store.saveProfile(state.profile);
+        synth.playTap();
+        paintBell();
+        openNotifications();
+      });
+      body.appendChild(clear);
+    }
     wrap.replaceChildren(...list.map((note) => {
       const row = document.createElement('button');
       row.type = 'button';
@@ -1902,12 +1920,16 @@ async function runOpen(booster) {
   // The cards are in the collection now, so the booster is honestly gone.
   store.clearOpenInFlight();
 
-  store.recordOpening(state.profile, pulls);
-  if (state.spec.kind === 'timed') {
-    state.profile.timed.opened = (state.profile.timed.opened ?? 0) + 1;
-    store.saveProfile(state.profile);
+  // A special booster is a gift, not progress: no opening counted, no
+  // rarity tally, no experience. Everything else about it is untouched.
+  if (state.spec.kind !== 'code') {
+    store.recordOpening(state.profile, pulls);
+    if (state.spec.kind === 'timed') {
+      state.profile.timed.opened = (state.profile.timed.opened ?? 0) + 1;
+      store.saveProfile(state.profile);
+    }
+    awardXp(pulls);
   }
-  awardXp(pulls);
   updateBadges();
 
   state.pulls = pulls;
@@ -2817,7 +2839,7 @@ function renderBinder() {
   el.binderSegWrap.hidden = false;
 
   const entries = store.allEntries(state.collection);
-  const stats = store.collectionStats(entries);
+  const stats = store.collectionStats(entries.filter((e) => !e.special));
   const albums = buildAlbums(entries, state.customPacks);
   // Nobody completes an album against a real category, so the shelf reports
   // how many books are open instead of how many are finished.
@@ -4157,7 +4179,9 @@ function openBadgeSheet(st) {
 /* --- achievements ------------------------------------------------------------------------ */
 
 function achFacts() {
-  const entries = store.allEntries(state.collection);
+  // Special cards are outside every ladder: they count for no achievement,
+  // no album milestone, no total.
+  const entries = store.allEntries(state.collection).filter((e) => !e.special);
   return measureAchievements({
     profile: state.profile,
     entries,
@@ -6206,8 +6230,6 @@ function openReveal(entry, { theme, badge }) {
         <div class="reveal-pack"></div>
         <div class="reveal-copy"><span class="label"></span><h3></h3><p></p></div>
       </div>
-      <p class="label reveal-label" data-cards></p>
-      <ol class="reveal-cards"></ol>
       <div class="reveal-grants">
         <div class="reveal-grant" data-theme-grant hidden>
           <span class="reveal-swatch"></span>
@@ -6228,16 +6250,7 @@ function openReveal(entry, { theme, badge }) {
     wrap.querySelector('.reveal-copy .label').textContent = t('revealBooster');
     wrap.querySelector('.reveal-copy h3').textContent = look.name;
     wrap.querySelector('.reveal-copy p').textContent = look.tagline;
-    wrap.querySelector('[data-cards]').textContent = t('revealCards');
-    const names = [...codeTitles(entry).map((c) => c.name ?? c.title), tx(CREATOR.title)];
-    wrap.querySelector('.reveal-cards').replaceChildren(...names.map((name, i) => {
-      const li = document.createElement('li');
-      li.innerHTML = `<span class="reveal-n"></span><span></span>`;
-      li.querySelector('.reveal-n').textContent = String(i + 1);
-      li.querySelector('span:last-child').textContent = name;
-      if (i === names.length - 1) li.classList.add('is-creator');
-      return li;
-    }));
+    // What is inside stays a surprise until the pack is torn open.
     if (theme) {
       const grant = wrap.querySelector('[data-theme-grant]');
       grant.hidden = false;

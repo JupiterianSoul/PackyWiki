@@ -107,6 +107,12 @@ export function fetchAlbumTotal(album) {
       if (album.kind === 'theme') {
         const theme = themeById(album.themeId);
         const lang = getLanguage();
+        // A curated subject is exactly as big as its roll.
+        if (theme?.titles) {
+          const roll = theme.titles[lang] ?? theme.titles.en;
+          rememberTotal(key, Math.max(roll.length, album.owned ?? 0));
+          return roll.length;
+        }
         const queries = theme?.queries?.[lang] ?? theme?.queries?.en ?? [];
         if (queries.length) {
           const hits = await Promise.all(queries.map((q) => queryHits(q).catch(() => 0)));

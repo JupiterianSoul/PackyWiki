@@ -9,10 +9,11 @@
 #      Nothing has to be added here for that, and no token is shared.
 #
 #   2. This workflow, for when the build should happen in GitHub Actions and
-#      only the finished files go to Cloudflare. It needs two repository
-#      secrets: CLOUDFLARE_API_TOKEN (a token with the "Cloudflare Pages:
-#      Edit" permission) and CLOUDFLARE_ACCOUNT_ID. Without them it does
-#      nothing rather than failing, so it is harmless until it is wanted.
+#      only the finished files go to Cloudflare, as a Worker that serves
+#      static assets (wrangler.jsonc). It needs two repository secrets:
+#      CLOUDFLARE_API_TOKEN (a token with the "Workers Scripts: Edit"
+#      permission) and CLOUDFLARE_ACCOUNT_ID. Without them it does nothing
+#      rather than failing, so it is harmless until it is wanted.
 name: Publish to Cloudflare Pages
 
 on:
@@ -71,4 +72,4 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=wiklodo --branch=${{ github.ref_name }}
+          command: deploy

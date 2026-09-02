@@ -146,12 +146,19 @@ export function toDrawPack(spec) {
   // every band and every search, and ends with The Creator: that is what
   // makes it personal. Every card it draws is marked with the code.
   const code = spec.kind === 'code' ? codeById(spec.codeId) : null;
-  const titles = code ? codeTitles(code) : [];
+  // A curated subject (the Darwin Awards) names its pages outright too, and
+  // deals a random hand of them.
+  const roll = !code && themeById(spec.themeId)?.titles;
+  const lang = getLanguage();
+  const titles = code ? codeTitles(code)
+    : roll ? (roll[lang] ?? roll.en).map((title, i) => ({ title, fallback: roll.en[i] ?? title, name: null }))
+      : [];
   return {
     name: specName(spec),
     cards: spec.cards,
-    source: code ? 'titles' : spec.kind === 'custom' ? 'custom' : 'wikipedia',
+    source: (code || roll) ? 'titles' : spec.kind === 'custom' ? 'custom' : 'wikipedia',
     titles,
+    pick: roll ? spec.cards : null,
     extra: code ? [creatorCard(code.id)] : [],
     special: code?.id ?? null,
     fallbackArt: code ? codeLook(code).accent : null,

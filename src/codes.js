@@ -25,7 +25,10 @@
  * languages (the draw follows the player's language, and falls back to the
  * English article when the French one has nothing to show). An optional
  * `name` renames the card on its face when the article's own title is not
- * the thing the person loves by name.
+ * the thing the person loves by name. A thing Wikipedia has no page for
+ * (a card in a board game, a turret in a video game) names its `wiki` (a
+ * Fandom community, found by name the way custom boosters are) and the
+ * `search` terms that find the page there, tried in order.
  */
 import { getLanguage, tx } from './i18n.js';
 import creatorPhoto from './assets/special/creator.jpg';
@@ -52,7 +55,7 @@ export const SECRET_CODES = [
     cards: [
       { en: 'Dassault Rafale', fr: 'Dassault Rafale' },
       { en: 'Travis Scott', fr: 'Travis Scott' },
-      { en: 'Heckler & Koch', fr: 'Heckler & Koch', name: { en: 'HK', fr: 'HK' } },
+      { en: 'Hollow Knight', fr: 'Hollow Knight' },
       { en: 'Charles Leclerc', fr: 'Charles Leclerc' },
       { en: 'Kanye West', fr: 'Kanye West' }
     ]
@@ -120,9 +123,14 @@ export const SECRET_CODES = [
     },
     cards: [
       { en: 'Adolf Hitler', fr: 'Adolf Hitler' },
-      { en: 'Tardigrade', fr: 'Tardigrada', name: { en: 'Tardigrades, Terraforming Mars', fr: 'Tardigrades, Terraforming Mars' } },
+      // The card itself, from the game's own wiki: not the animal.
+      { en: 'Tardigrades', fr: 'Tardigrades', wiki: 'Terraforming Mars', search: ['Tardigrades'],
+        name: { en: 'Tardigrades (Terraforming Mars)', fr: 'Tardigrades (Terraforming Mars)' } },
       { en: 'Leto II Atreides', fr: 'Leto II Atréides', name: { en: 'Leto II, son of Paul Atreides', fr: 'Leto II, fils de Paul Atréides' } },
-      { en: 'Helldivers 2', fr: 'Helldivers 2', name: { en: 'The neurotoxic turret, Helldivers', fr: 'La tourelle neurotoxique, Helldivers' } }
+      // The turret, from the game's own wiki: not the game.
+      { en: 'Neurotoxin turret', fr: 'Tourelle neurotoxique', wiki: 'Helldivers',
+        search: ['neurotoxin turret', 'gas sentry', 'toxic turret', 'neurotoxic sentry'],
+        name: { en: 'The neurotoxin turret (Helldivers)', fr: 'La tourelle neurotoxique (Helldivers)' } }
     ]
   }
 ];
@@ -134,8 +142,8 @@ export const SECRET_CODES = [
  */
 export const CREATOR = {
   key: 'special:creator',
-  title: { en: 'Gabriel’s Biography', fr: 'Biographie Gabriel' },
-  description: { en: 'The Creator', fr: 'Le Créateur' },
+  title: { en: 'The Creator', fr: 'Le Créateur' },
+  description: { en: 'Gabriel’s Biography', fr: 'Biographie Gabriel' },
   extract: {
     en: 'Born on 15 January 2008 in Beaumont, Gabriel Quart, whose real name is Gabriel Quart, also known as Arbre Poilu or Arbre Mou, is passionate about computing. He has built a multitude of apps; useless or not, they led him, in September 2026, to create his Wikipedia booster-opening app. Happy with how far it has come, and knowing it would never have existed without the help of the people close to him, Gabriel owed them a surprise of their own, one for each. If you are reading this, it means you are one of those people, so special in his eyes. So he says thank you, once again, whatever the help you gave!',
     fr: 'Né le 15 janvier 2008 à Beaumont, Gabriel Quart, de son vrai nom Gabriel Quart, aussi connu sous le nom d’Arbre Poilu ou encore d’Arbre Mou, est passionné d’informatique. Il a créé une multitude d’applications ; qu’elles soient inutiles ou non, elles l’ont mené, en septembre 2026, à créer son application d’ouverture de boosters Wikipédia. Heureux de son avancement, et sachant qu’il n’aurait jamais vu le jour sans l’aide de ses proches, Gabriel se devait de leur rendre la pareille en créant une surprise pour chacun d’entre eux. Si vous lisez ceci, c’est que vous faites partie de ces proches si spéciaux à ses yeux. Alors il vous dit merci, encore une fois, quelle que soit l’aide apportée !'
@@ -199,7 +207,10 @@ export function codeTitles(entry, lang = getLanguage()) {
  */
 export function creatorCard(codeId) {
   return {
-    key: CREATOR.key,
+    // One Creator per booster: the key carries the code, so redeeming a
+    // second code adds a second card to that album rather than a second
+    // copy to the first.
+    key: `${CREATOR.key}:${codeId}`,
     sourceId: 'special',
     sourceName: 'Wiklodo',
     pageId: null,

@@ -288,7 +288,9 @@ export const THEMES = [
     },
     swatch: ['#06162e', '#1e90ff', '#cfe7ff'],
     backdrop: { renderer: 'pixel', speed: 0.00022 },
-    motion: { scale: 0.7, ease: 'steps(6, end)', pop: 'cubic-bezier(0.2, 1.4, 0.4, 1)' },
+    // Fast and crisp, but smooth: a stepped easing read as lag, not as
+    // pixels, and pixels come from the corners, the type and the backdrop.
+    motion: { scale: 0.7, ease: 'cubic-bezier(0.2, 0.9, 0.3, 1)', pop: 'cubic-bezier(0.2, 1.4, 0.4, 1)' },
     sound: {
       voice: 'chip',          // eight bits
       gain: 0.5,

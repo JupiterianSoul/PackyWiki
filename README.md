@@ -669,13 +669,13 @@ Custom boosters can turn up on any shelf too.
 
 ## Boosters
 
-**18 subjects**: Cars, Formula One, Planes, Video Games, Books, Movies & Shows,
-Space, Physics, Nature, Animals, Plants, History, Philosophy, Celebrities,
-Quotes, Art, Cactus, Sport.
+**27 subjects**, from Cars, Formula One and Planes to Video Games, Books,
+Movies & Shows, Space, Physics, Nature, Animals, Plants, History, Philosophy,
+Celebrities, Quotes, Art, Cactus, Sport and Darwin Awards.
 
 The **Boosters** tab shows only the ones you own, with a count. Each carries a
-real photograph - its `hero` field names a Wikipedia article, and all 18 lead
-images are fetched in a single batched `pageimages` request. The drawn icon in
+real photograph - its `hero` field names a Wikipedia article, and every lead
+image is fetched in a single batched `pageimages` request. The drawn icon in
 `src/data/icons.js` is only the fallback for when that image is missing.
 
 A **rarity booster** keeps its subject's colours and photo and wears the tier
@@ -701,10 +701,24 @@ under 80 characters, disambiguation pages and `List of` / `Liste de` style
 pages are all rejected, with up to 8 retries per card slot and a random-article
 fallback so a renamed category can never leave a booster unopenable.
 
+### Curated subjects
+
+Most subjects search Wikipedia live. A few are curated instead: the row
+carries a `titles` list per language and the booster draws its cards from
+that list by exact title, so the subject is exactly as large as the list and
+its album total is the list's length rather than a search count.
+
+**Darwin Awards** is the curated one. It is a roll of 40 real articles about
+famously unusual and self-inflicted deaths, from Franz Reichelt off the
+Eiffel Tower to Tycho Brahe's bladder, in both languages. The award itself is
+not a Wikipedia thing and its site cannot be read from the browser, so the
+booster tells the same stories the encyclopedia already holds.
+
 ### Adding a subject
 
 Append a row to `THEME_PACKS` in `src/data/packs.js` with both languages
-filled in. The shop will start stocking it on the next restock.
+filled in, `queries` for a live subject or `titles` for a curated one. The
+shop will start stocking it on the next restock.
 
 ---
 
@@ -922,8 +936,9 @@ handed out by hand. A code works for anyone who has it, once per save
 (`profile.codesRedeemed`, so it follows the save through Transfer save and
 cloud sync and cannot be spent twice by relaunching). A valid, unused code
 hands over a whole gift at once, and the reveal lays it out as the event it
-is: the person's message in their colour, the booster, the six cards by name,
-the theme now on, the badge now worn.
+is: the person's message in their colour, the booster, the theme now on, the
+badge now worn. It never names the cards. What is inside the pack stays a
+surprise until it is torn open.
 
 Every code is one entry in `src/codes.js`, and one entry is:
 
@@ -946,6 +961,14 @@ Every code is one entry in `src/codes.js`, and one entry is:
   the code is redeemed and in the picker from then on, never before;
 - **a badge** (`code:` on a row in `src/badges.js`), worn the moment the
   code is redeemed, unequippable afterwards like any other.
+
+A special theme and a special badge do not exist for a player who has not
+redeemed the code: the theme is filtered out of Customization and the badge
+out of the Badges tab and out of every badge count, so nobody can see a
+reward for a code they were never given. Special boosters also sit outside
+progression on purpose. Opening one grants no experience, counts toward no
+achievement, moves no daily or timed counter, and its six cards are left out
+of the collection totals on the profile. A gift is not a grind.
 
 The six cards are locked for good. `entry.special` names the code on every
 one of them, and that mark is what `regradeCollection()` skips, what the sell
