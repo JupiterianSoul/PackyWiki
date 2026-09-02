@@ -22,21 +22,36 @@ import android.webkit.JavascriptInterface;
 import androidx.webkit.WebViewAssetLoader;
 
 /**
- * PackyWiki is a static web app; this activity is just a host for it.
+ * Wiklodo is a static web app; this activity is just a host for it.
  *
- * The bundled build in assets/ is served through WebViewAssetLoader on a real
- * https:// origin rather than loaded over file://. That matters: WebView blocks
- * cross-origin fetch() from file:// pages, which would break every call to the
- * Wikipedia API. With a proper origin the app behaves exactly as it does in a
- * desktop browser, CORS and all.
+ * It loads the PUBLISHED SITE. The site updates the moment it is published,
+ * and an APK that carried its own frozen copy did not: whoever had not
+ * reinstalled was playing an older build against the same account as
+ * everyone else. So the shell now opens the live site whenever the network
+ * is there, and every publish reaches the phone on the next launch with no
+ * reinstall at all.
+ *
+ * The build bundled in assets/ is the fallback for when the site cannot be
+ * reached. It is served through WebViewAssetLoader on a real https:// origin
+ * rather than loaded over file://. That matters: WebView blocks cross-origin
+ * fetch() from file:// pages, which would break every call to the Wikipedia
+ * API. With a proper origin the app behaves exactly as it does in a desktop
+ * browser, CORS and all.
  */
 public class MainActivity extends Activity {
+
+    /** Where the site lives. Only pages under this path stay inside the app. */
+    private static final String LIVE_HOST = "jupiteriansoul.github.io";
+    private static final String LIVE_PATH = "/PackyWiki/";
+    private static final String LIVE_URL = "https://" + LIVE_HOST + LIVE_PATH;
 
     /** Reserved by androidx.webkit for locally-served assets. */
     private static final String APP_HOST = "appassets.androidplatform.net";
     private static final String START_URL = "https://" + APP_HOST + "/index.html";
 
     private WebView webView;
+    /** Set once the bundled copy has been fallen back to, so it is not done twice. */
+    private boolean fellBack = false;
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override
@@ -83,10 +98,28 @@ public class MainActivity extends Activity {
                 return assetLoader.shouldInterceptRequest(request.getUrl());
             }
 
+            /**
+             * The live site could not be loaded: no network, a captive portal,
+             * the host down. Only the MAIN FRAME counts (a missing image is
+             * not a reason to abandon the site), and only the site's own page:
+             * the bundled copy is then opened instead, once, and the app comes
+             * up on whatever it had at install time. It still needs the
+             * network for cards, but it opens, and it says why cards do not.
+             */
+            @Override
+            public void onReceivedError(WebView view, WebResourceRequest request, android.webkit.WebResourceError error) {
+                if (request.isForMainFrame() && isLive(request.getUrl())) fallBack();
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse response) {
+                if (request.isForMainFrame() && isLive(request.getUrl()) && response.getStatusCode() >= 500) fallBack();
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri url = request.getUrl();
-                if (APP_HOST.equals(url.getHost())) {
+                if (APP_HOST.equals(url.getHost()) || isLive(url)) {
                     return false;
                 }
                 // "Read →" points at wikipedia.org - hand it to the browser
@@ -105,11 +138,39 @@ public class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
         if (savedInstanceState == null) {
-            webView.loadUrl(START_URL);
+            webView.loadUrl(online() ? LIVE_URL : START_URL);
         } else {
             webView.restoreState(savedInstanceState);
         }
         ensureSomeIcon();
+    }
+
+    /** Whether a url is a page of the published site. */
+    private boolean isLive(Uri url) {
+        return url != null && LIVE_HOST.equals(url.getHost())
+                && url.getPath() != null && url.getPath().startsWith(LIVE_PATH);
+    }
+
+    /** Whether the phone has any network at all. Not whether the site answers; that is what the fallback is for. */
+    private boolean online() {
+        try {
+            android.net.ConnectivityManager cm =
+                    (android.net.ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+            if (cm == null) return true;
+            android.net.Network network = cm.getActiveNetwork();
+            if (network == null) return false;
+            android.net.NetworkCapabilities caps = cm.getNetworkCapabilities(network);
+            return caps != null && caps.hasCapability(android.net.NetworkCapabilities.NET_CAPABILITY_INTERNET);
+        } catch (RuntimeException e) {
+            return true;
+        }
+    }
+
+    /** Open the copy bundled at install time, once. */
+    private void fallBack() {
+        if (fellBack) return;
+        fellBack = true;
+        webView.post(() -> webView.loadUrl(START_URL));
     }
 
     /**

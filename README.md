@@ -306,9 +306,18 @@ match.
 
 ## The Android app
 
-A WebView around the built `dist/`, served over a real `https://` origin by
+A WebView that opens the published site. The site updates the moment it is
+published, so the app does too: every change reaches the phone on its next
+launch, with no reinstall. The APK only needs rebuilding when the shell itself
+changes (a new launcher icon, a WebView setting), which is rare.
+
+The built `dist/` still ships inside the APK, as the fallback for when the
+site cannot be reached: the shell opens it if the phone has no network, or if
+the site's page fails to load. It is served over a real `https://` origin by
 `WebViewAssetLoader` so that `fetch()` to Wikipedia obeys ordinary CORS rules
-instead of the restrictions a `file://` page would face.
+instead of the restrictions a `file://` page would face. The two copies are
+different origins, so they keep separate device storage; the account's save
+is what carries a collection between them.
 
 ```sh
 npm run build

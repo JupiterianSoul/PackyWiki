@@ -103,5 +103,8 @@ jobs:
           Settings.
 
           Signed with the project's own key, so this installs over an existing
-          Wiklodo and keeps your collection. Needs a network connection - cards
-          are fetched live from Wikipedia."
+          Wiklodo. It opens the published site, so it updates itself: every
+          change to the site reaches the app on its next launch, with no
+          reinstall. The copy built into the APK is only used when the site
+          cannot be reached. Needs a network connection - cards are fetched
+          live from Wikipedia."

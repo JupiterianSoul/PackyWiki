@@ -54,7 +54,7 @@ import {
   exportSave, importSave, describeSave, parseSave, copyText, readText, onSaveChanged
 } from './save.js';
 import * as account from './account.js';
-import { BUILD, APK_URL, isApk, checkForUpdate } from './version.js';
+import { BUILD, checkForUpdate, goToLatest } from './version.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
@@ -7690,10 +7690,11 @@ async function migrateViews() {
  * The update bar.
  *
  * Two builds of different ages sign into the same account: the site the
- * moment it is published, the APK whenever it was last reinstalled, and a
- * copy of the site left on another host for as long as it stands. The bar
- * is how a build finds out it is old, and it says what that costs: an old
- * build keeps playing but stops writing the account's save (src/account.js).
+ * moment it is published, an APK's bundled copy when it is opened offline,
+ * a tab left open for days, a copy of the site left on another host for as
+ * long as it stands. The bar is how a build finds out it is old, and it says
+ * what that costs: an old build keeps playing but stops writing the
+ * account's save (src/account.js). The way out is always one reload.
  */
 let updateBar = null;
 
@@ -7704,13 +7705,12 @@ function showUpdateBar(why, latest = null) {
     updateBar.setAttribute('role', 'status');
     document.body.appendChild(updateBar);
   }
-  const apk = isApk();
-  const text = why === 'outdated' ? t('syncOutdated') : apk ? t('updateApk') : t('updateWeb');
-  const action = apk
-    ? `<a class="btn btn-primary" href="${APK_URL}" target="_blank" rel="noopener">${esc(t('updateGet'))}</a>`
-    : `<button type="button" class="btn btn-primary" data-act="reload">${esc(t('updateReload'))}</button>`;
+  // The APK opens the published site too, so the newest build is always one
+  // reload away: the site reloads, the bundled offline copy hands over.
+  const text = why === 'outdated' ? t('syncOutdated') : t('updateWeb');
+  const action = `<button type="button" class="btn btn-primary" data-act="reload">${esc(t('updateReload'))}</button>`;
   updateBar.innerHTML = `<p>${esc(text)}</p>${action}<button type="button" class="btn btn-ghost" data-act="later">${esc(t('updateLater'))}</button>`;
-  updateBar.querySelector('[data-act="reload"]')?.addEventListener('click', () => location.reload());
+  updateBar.querySelector('[data-act="reload"]').addEventListener('click', goToLatest);
   updateBar.querySelector('[data-act="later"]').addEventListener('click', () => { updateBar.hidden = true; });
   updateBar.hidden = false;
   updateBar.dataset.latest = latest?.sha ?? '';
