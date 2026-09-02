@@ -90,6 +90,40 @@ export function readableError(error) {
 
 /* --- session ------------------------------------------------------------------ */
 
+/**
+ * A session, checked against the server before it is believed.
+ *
+ * The client keeps the last session in local storage and answers with it
+ * without asking anyone, and its token stays valid for an hour after it was
+ * minted. An account deleted on the server therefore still walked into the
+ * app on the next launch, signed in as someone who no longer exists, until
+ * the token happened to expire. The stored session is now shown to the
+ * server once at launch: an account the server no longer knows is signed out
+ * on the spot. A server that cannot be reached is not the same thing, and
+ * the session is kept so a launch on a bad connection still opens the app.
+ */
+export async function verifySession(session) {
+  if (!session?.access_token || !supabase) return session ?? null;
+  try {
+    // A server that does not answer is not a server that said no: past a
+    // few seconds the stored session is believed and the app opens.
+    const answer = await Promise.race([
+      supabase.auth.getUser(session.access_token),
+      new Promise((resolve) => setTimeout(() => resolve({ timeout: true }), 4000))
+    ]);
+    if (answer.timeout) return session;
+    const { error } = answer;
+    if (!error) return session;
+    const gone = error.status === 401 || error.status === 403
+      || /not (found|exist)|does not exist|invalid/i.test(String(error.message ?? ''));
+    if (!gone) return session;
+  } catch {
+    return session;
+  }
+  await supabase.auth.signOut({ scope: 'local' }).catch(() => {});
+  return null;
+}
+
 export async function currentSession() {
   if (!supabase) return null;
   const { data } = await supabase.auth.getSession();

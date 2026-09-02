@@ -4789,6 +4789,14 @@ async function onSession(session) {
   if (handledUser === id) return;
   handledUser = id;
 
+  // Every path into the app comes through here, so this is where a session
+  // is shown to the server before it is believed: the client restores the
+  // last one from storage without asking anyone, and an account deleted on
+  // the server would otherwise walk straight in until its token expired.
+  if (session) {
+    session = await account.verifySession(session);
+    if (!session) handledUser = null;
+  }
   state.account.session = session ?? null;
   if (!session) { showGate(); endSplash(); return; }
 
