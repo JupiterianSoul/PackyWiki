@@ -11,6 +11,10 @@ All seven are by **migfus20** on [Freesound](https://freesound.org/people/migfus
 kept under their original filenames so the Freesound sound id stays attached
 to the file. Each is used under the licence shown on its own sound page.
 
+Re-encoded to 96 kbps mono for the app (the originals were up to 320 kbps
+stereo, seven times the size for no audible difference under game sound).
+The source files are the ones linked below, not what ships here.
+
 | File | Sound page |
 | --- | --- |
 | `564001__migfus20__jazz-background-music-loop.mp3` | https://freesound.org/s/564001/ |
