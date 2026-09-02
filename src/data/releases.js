@@ -240,6 +240,20 @@ export const RELEASES = [
     ]
   },
   {
+    id: 'endings', icon: 'trash', accent: '#fb7185',
+    title: { en: 'Two ways to end a save', fr: 'Deux façons de finir une sauvegarde' },
+    points: [
+      { en: 'Erase everything now signs you out, so the cloud save cannot pull it back', fr: 'Tout effacer vous déconnecte désormais, pour que la sauvegarde cloud ne puisse pas tout ramener' },
+      { en: 'A new button deletes the account itself, freeing the email address', fr: 'Un nouveau bouton supprime le compte lui-même et libère l’adresse e-mail' },
+      { en: 'Sparkle joins Noah’s special booster', fr: 'Sparkle rejoint le booster spécial de Noah' }
+    ],
+    changelog: [
+      { en: 'Erase everything signs you out as well as wiping the save, which is what it was missing: the address stayed signed in, so the account\u2019s copy came straight back down on the next launch. The save row is now deleted outright rather than blanked, and the device is cleared down to the session token', fr: 'Tout effacer vous déconnecte en plus d’effacer la sauvegarde, ce qui lui manquait : l’adresse restait connectée, et la copie du compte redescendait au lancement suivant. La ligne de sauvegarde est maintenant supprimée et non vidée, et l’appareil est nettoyé jusqu’au jeton de session' },
+      { en: 'Delete account is a second, harder ending: it removes the account itself, so the email stops working and is free to sign up with again as a new player. It runs as an edge function because deleting an account needs a key that must never ship inside the app', fr: 'Supprimer le compte est une fin plus radicale : le compte lui-même disparaît, l’e-mail cesse de fonctionner et redevient libre pour créer un nouveau joueur. Cela passe par une fonction edge, car supprimer un compte demande une clé qui ne doit jamais être livrée dans l’application' },
+      { en: 'Sparkle, from Honkai: Star Rail, joins Noah’s special booster as the last card before The Creator, which brings it to five things and a sixth card like every other', fr: 'Sparkle, de Honkai: Star Rail, rejoint le booster spécial de Noah en dernière carte avant Le Créateur, ce qui le porte à cinq choses et une sixième carte comme tous les autres' }
+    ]
+  },
+  {
     id: 'dressup', icon: 'wand', accent: '#fbbf24',
     title: { en: 'Dress your own collection', fr: 'Habillez votre collection' },
     points: [

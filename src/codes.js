@@ -130,7 +130,12 @@ export const SECRET_CODES = [
       // The turret, from the game's own wiki: not the game.
       { en: 'Neurotoxin turret', fr: 'Tourelle neurotoxique', wiki: 'Helldivers',
         search: ['neurotoxin turret', 'gas sentry', 'toxic turret', 'neurotoxic sentry'],
-        name: { en: 'The neurotoxin turret (Helldivers)', fr: 'La tourelle neurotoxique (Helldivers)' } }
+        name: { en: 'The neurotoxin turret (Helldivers)', fr: 'La tourelle neurotoxique (Helldivers)' } },
+      // Last before The Creator. A character, so the game's own wiki has the
+      // portrait Wikipedia never will.
+      { en: 'Sparkle', fr: 'Sparkle', wiki: 'Honkai Star Rail',
+        search: ['Sparkle', 'Sparkle/Lore', 'Character/Sparkle'],
+        name: { en: 'Sparkle (Honkai: Star Rail)', fr: 'Sparkle (Honkai: Star Rail)' } }
     ]
   },
   /*

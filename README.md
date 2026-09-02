@@ -242,6 +242,36 @@ Syncing is last-writer-wins on a debounce, with the local save always
 authoritative for the session you are in, so a dropped connection never costs
 you cards.
 
+### Ending a save, and ending an account
+
+Settings, Data, holds three destructive buttons that do three different things.
+
+**Remove all cards** empties the collection and keeps the player: level,
+experience, achievements and anything a secret code gave you all stay.
+
+**Erase everything** ends the save and signs you out. The save row is deleted,
+the profile's progress is reset, the wishlist, friends, messages, deliveries,
+trades and auctions go, and the device is cleared down to the session token, so
+the app comes back at the welcome screen. Signing in again finds an account
+with nothing stored against it. Signing out is the point: without it the cloud
+save simply comes back down.
+
+**Delete account** removes the account itself, so the address stops working and
+is free to sign up with again. This one needs an edge function, because
+deleting a row in `auth.users` takes the service key and that key must never
+ship in an APK:
+
+```sh
+supabase secrets set SERVICE_ROLE_KEY=...   # Settings, API, service_role
+supabase functions deploy delete-account
+```
+
+The function takes the caller's id from their token and never from the request
+body, so it can only ever delete the person asking.
+
+To wipe **every** account at once, `supabase/wipe-all-accounts.sql` is run by
+hand in the SQL editor. It is deliberately not something the app can do.
+
 ## Themes, sound and motion
 
 15 themes, each a full palette with its own animated backdrop, its own

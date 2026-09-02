@@ -159,6 +159,15 @@ create policy "you read only your own save"
   to authenticated
   using (auth.uid() = user_id);
 
+-- Erasing a save should REMOVE the row, not leave an empty one behind. Without
+-- this the wipe could only overwrite the save with a blank blob, which reads
+-- as an account that exists and has nothing in it. A player may only delete
+-- their own.
+drop policy if exists "you delete your own save" on public.saves;
+create policy "you delete your own save"
+  on public.saves for delete
+  using (auth.uid() = user_id);
+
 drop policy if exists "you write only your own save" on public.saves;
 create policy "you write only your own save"
   on public.saves for insert

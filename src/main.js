@@ -6295,7 +6295,22 @@ function renderSettings() {
   paintResetButton(resetBtn, 'all');
   resetBtn.addEventListener('click', () => handleReset(resetBtn, 'all'));
 
-  el.dataList.replaceChildren(transferRow, wipeRow, resetRow);
+  // Deleting the account is a different kind of ending from erasing a save, so
+  // it sits last and on its own: erasing leaves the address able to sign back
+  // in, this takes the address with it.
+  const accountRow = document.createElement('div');
+  accountRow.className = 'row';
+  accountRow.innerHTML = `
+    <div class="row-copy"><h4></h4><p></p></div>
+    <button class="btn btn-sm btn-danger row-action" type="button"></button>`;
+  accountRow.querySelector('h4').textContent = t('settingsDeleteAccount');
+  accountRow.querySelector('p').textContent = t('settingsDeleteAccountNote');
+  const accountBtn = accountRow.querySelector('button');
+  press(accountBtn, { sound: null });
+  paintResetButton(accountBtn, 'account');
+  accountBtn.addEventListener('click', () => handleReset(accountBtn, 'account'));
+
+  el.dataList.replaceChildren(transferRow, wipeRow, resetRow, ...(signedIn() ? [accountRow] : []));
 
   // --- secret codes: a booster someone handed you ---------------------------
   el.redeemLabel.textContent = t('redeemTitle');
@@ -6958,13 +6973,13 @@ function openTransfer() {
  * Two different destructive buttons, so two arming states. Sharing one would
  * let a tap that armed the mild button confirm the ruinous one.
  */
-const resetArm = { cards: false, all: false };
-const resetTimers = { cards: null, all: null };
+const resetArm = { cards: false, all: false, account: false };
+const resetTimers = { cards: null, all: null, account: null };
+const RESET_LABELS = { cards: 'settingsCardWipe', all: 'settingsReset', account: 'settingsDeleteAccount' };
 
 function paintResetButton(button, which) {
   const armed = resetArm[which];
-  const label = which === 'cards' ? 'settingsCardWipe' : 'settingsReset';
-  button.textContent = armed ? t('settingsResetConfirm') : t(label);
+  button.textContent = armed ? t('settingsResetConfirm') : t(RESET_LABELS[which]);
   button.classList.toggle('is-armed', armed);
 }
 
@@ -6981,7 +6996,39 @@ function handleReset(button, which) {
     }, 5000);
     return;
   }
-  if (which === 'cards') removeAllCards(); else wipeEverything();
+  if (which === 'cards') removeAllCards();
+  else if (which === 'account') deleteAccountForGood(button);
+  else wipeEverything();
+}
+
+/**
+ * Remove the account, not just what is in it.
+ *
+ * Erasing a save empties the account and signs out; the address stays
+ * registered, so signing in gets it back empty. This gets rid of the account
+ * itself: the row in the auth table goes, the address stops working, and it is
+ * free to sign up with again as a genuinely new player.
+ *
+ * The device is cleared FIRST-ish and unconditionally afterwards, because a
+ * local save left behind would be pushed up under a brand new account the
+ * moment somebody signed up with the same address.
+ */
+async function deleteAccountForGood(button) {
+  if (!signedIn()) { toast(esc(t('settingsDeleteNoAccount')), 'error'); synth.playDenied(); return; }
+  clearTimeout(syncTimer);
+  button.disabled = true;
+  try {
+    await account.deleteAccount();
+  } catch (error) {
+    button.disabled = false;
+    toast(esc(describeError(error)), 'error');
+    synth.playDenied();
+    return;
+  }
+  // The account is gone; the session token that named it is meaningless now.
+  await account.signOut().catch(() => { /* the row is already deleted */ });
+  try { localStorage.clear(); sessionStorage.clear(); } catch { /* nothing to clear */ }
+  location.reload();
 }
 
 /**

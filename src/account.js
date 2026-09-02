@@ -266,7 +266,18 @@ export async function clearSave(userId) {
  */
 export async function hardReset(userId) {
   frozen = true;
-  await clearSave(userId);
+  // Remove the row outright where the policy allows it, which is what makes
+  // the account read as having nothing stored rather than as holding an empty
+  // save. A project running a schema.sql from before that policy existed falls
+  // back to blanking it, which the sync treats the same way on the way back.
+  const { error } = await supabase.from('saves').delete().eq('user_id', userId);
+  if (error) await clearSave(userId);
+  else {
+    await publishStats(userId, {
+      level: 1, rank: null, cards: 0, uniqueCards: 0,
+      boostersOpened: 0, value: 0, bestRarity: null, playMs: 0
+    }).catch(() => { /* the save is already gone */ });
+  }
 
   const quiet = (promise) => Promise.resolve(promise).then(() => true, () => false);
   await Promise.all([
@@ -284,6 +295,27 @@ export async function hardReset(userId) {
       collection_value: 0, best_rarity: null, play_ms: 0
     }).eq('id', userId))
   ]);
+}
+
+/**
+ * Delete the account itself, not just what is in it.
+ *
+ * Emptying a save leaves the address registered, so signing in brings back an
+ * empty account rather than nothing: the only way to be rid of it is to remove
+ * the `auth.users` row, which needs the service key. That key cannot ship in
+ * an APK, so the work happens in the delete-account edge function and this
+ * only asks. The function takes the id from the token, so this can never
+ * delete anybody else.
+ *
+ * Nothing is written afterwards: `frozen` stops any sync in flight from
+ * recreating rows against an id that no longer exists.
+ */
+export async function deleteAccount() {
+  frozen = true;
+  const { data, error } = await supabase.functions.invoke('delete-account', { body: {} });
+  if (error) throw error;
+  if (data?.error) throw new Error(data.error);
+  return true;
 }
 
 export async function fetchSave(userId) {
