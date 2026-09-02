@@ -214,7 +214,17 @@ export async function publishStats(userId, stats) {
 /* --- the save ---------------------------------------------------------------------- */
 
 /** Push the whole local save. Last write wins; there is one device per account. */
+/*
+ * Once a hard reset starts, nothing may write a save again for the life of
+ * this page. Erasing used to race its own syncing: a flush already in flight
+ * finished after the wipe and put the old save straight back on the server, so
+ * the next launch pulled everything down again and the reset looked like it
+ * had done nothing at all.
+ */
+let frozen = false;
+
 export async function pushSave(userId) {
+  if (frozen) return;
   const { error } = await supabase.from('saves')
     .upsert({ user_id: userId, data: JSON.parse(exportSave()) }, { onConflict: 'user_id' });
   if (error) throw error;
@@ -238,6 +248,42 @@ export async function clearSave(userId) {
     level: 1, rank: null, cards: 0, uniqueCards: 0,
     boostersOpened: 0, value: 0, bestRarity: null, playMs: 0
   });
+}
+
+/**
+ * Give the account back to the server as if it had just been made.
+ *
+ * Emptying the save was never enough on its own. The profile row kept the
+ * level and the rank, the wishlist and the friends list survived, and any sync
+ * still in flight could put the old save back. So this freezes writing first,
+ * then takes down everything that belongs to this player.
+ *
+ * Each table is taken down on its own and a refusal on one does not stop the
+ * others: a project running an older schema.sql simply does not have some of
+ * these, and a reset that stops halfway is worse than one that skips a table
+ * the database never had. The save itself is the exception - if that cannot be
+ * emptied the reset has not happened, so its failure is reported.
+ */
+export async function hardReset(userId) {
+  frozen = true;
+  await clearSave(userId);
+
+  const quiet = (promise) => Promise.resolve(promise).then(() => true, () => false);
+  await Promise.all([
+    quiet(supabase.from('wishlists').delete().eq('user_id', userId)),
+    quiet(supabase.from('friendships').delete().or(`requester.eq.${userId},addressee.eq.${userId}`)),
+    quiet(supabase.from('messages').delete().or(`sender.eq.${userId},recipient.eq.${userId}`)),
+    quiet(supabase.from('deliveries').delete().or(`sender.eq.${userId},recipient.eq.${userId}`)),
+    quiet(supabase.from('trades').delete().or(`proposer.eq.${userId},recipient.eq.${userId}`)),
+    quiet(supabase.from('auctions').delete().eq('seller', userId)),
+    // The profile row stays, because the username is claimed against it and a
+    // missing row would read as a deleted account everywhere else. What it
+    // carries about progress goes back to nothing.
+    quiet(supabase.from('profiles').update({
+      level: 1, cards: 0, unique_cards: 0, boosters_opened: 0,
+      collection_value: 0, best_rarity: null, play_ms: 0
+    }).eq('id', userId))
+  ]);
 }
 
 export async function fetchSave(userId) {

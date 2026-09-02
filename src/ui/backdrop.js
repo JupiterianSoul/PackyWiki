@@ -143,6 +143,7 @@ class Backdrop {
       case 'assur': this.#assur(ctx, w, h, t); break;
       case 'pixel': this.#pixel(ctx, w, h, t); break;
       case 'tabletop': this.#tabletop(ctx, w, h, t); break;
+      case 'apotheosis': this.#apotheosis(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -779,6 +780,70 @@ class Backdrop {
    * felt, a hex board faint in the cloth, two dice at rest and a few meeples
    * drifting to their places.
    */
+  /*
+   * APOTHEOSIS: gold leaf on lamp-black.
+   *
+   * A slow shaft of light from the upper left, flecks of leaf drifting across
+   * it, and a ring of rays that turns once every couple of minutes. Nothing
+   * here is a particle system: the flecks are on fixed orbits with a phase
+   * offset each, which is what keeps it cheap on a phone that is also drawing
+   * a card.
+   */
+  #apotheosis(ctx, w, h, t) {
+    const sec = t / 1000;
+    const ground = ctx.createRadialGradient(w * 0.28, h * 0.22, 0, w * 0.5, h * 0.5, Math.max(w, h));
+    ground.addColorStop(0, '#231703');
+    ground.addColorStop(0.5, '#120c04');
+    ground.addColorStop(1, '#070502');
+    ctx.fillStyle = ground;
+    ctx.fillRect(0, 0, w, h);
+
+    // The shaft, wheeling slowly about the top-left corner.
+    ctx.save();
+    ctx.translate(w * 0.24, h * 0.16);
+    ctx.rotate(Math.sin(sec * 0.06) * 0.22 + 0.5);
+    const shaft = ctx.createLinearGradient(0, 0, 0, h * 1.3);
+    shaft.addColorStop(0, 'rgba(253, 230, 138, 0.16)');
+    shaft.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = shaft;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(-w * 0.55, h * 1.3);
+    ctx.lineTo(w * 0.75, h * 1.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
+
+    // A turning crown of rays, centred low so it reads as a horizon.
+    ctx.save();
+    ctx.translate(w * 0.5, h * 0.82);
+    ctx.rotate(sec * 0.05);
+    ctx.strokeStyle = 'rgba(251, 191, 36, 0.09)';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 24; i++) {
+      const a = (Math.PI * 2 / 24) * i;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * h * 0.12, Math.sin(a) * h * 0.12);
+      ctx.lineTo(Math.cos(a) * h * 0.95, Math.sin(a) * h * 0.95);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Leaf, drifting.
+    for (let i = 0; i < 26; i++) {
+      const phase = i * 0.618;
+      const x = ((phase * w) + Math.sin(sec * 0.12 + i) * w * 0.06) % w;
+      const y = ((sec * (6 + (i % 5) * 3) + i * 90) % (h + 60)) - 30;
+      const size = 1.1 + (i % 4) * 0.7;
+      ctx.globalAlpha = 0.18 + ((i % 6) / 6) * 0.5;
+      ctx.fillStyle = i % 3 === 0 ? '#fff7d6' : '#fbbf24';
+      ctx.beginPath();
+      ctx.ellipse(x, y, size, size * 1.7, sec * 0.6 + i, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   #tabletop(ctx, w, h, t) {
     const sec = t / 1000;
     const felt = ctx.createRadialGradient(w * 0.5, h * 0.3, 0, w * 0.5, h * 0.3, h * 0.95);

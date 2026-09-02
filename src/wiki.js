@@ -402,20 +402,25 @@ async function drawWikipediaSet(pack) {
   for (const wish of wishes) {
     const start = rarityRank(wish);
     let card = null;
+    // Down first, one tier at a time.
     for (let rank = start; rank >= 0 && !card; rank--) {
       const shelf = shelves.get(RARITIES[rank].id);
       if (shelf?.length) card = shelf.shift();
-      else if (rank === start) owed.push(wish);
     }
     // Nothing at or under the roll: rather than hand over a short pack, take
-    // whatever the subject does have. Better than asked for is not a debt.
-    if (!card) {
-      for (let rank = start + 1; rank < RARITIES.length && !card; rank++) {
-        const shelf = shelves.get(RARITIES[rank].id);
-        if (shelf?.length) card = shelf.shift();
-      }
+    // whatever the subject does have, however famous.
+    for (let rank = start + 1; rank < RARITIES.length && !card; rank++) {
+      const shelf = shelves.get(RARITIES[rank].id);
+      if (shelf?.length) card = shelf.shift();
     }
-    if (card) out.push(card);
+    if (!card) continue;
+    out.push(card);
+    // A debt is only owed when the player got LESS than the roll promised.
+    // Landing above it is not being short-changed: a subject whose pages are
+    // all famous would otherwise pay a booster for every Common it could not
+    // find, which is a reward for the pack being too good.
+    const got = rarityRank(rarityFromPopularity(card.popularity).id);
+    if (got < start) owed.push(wish);
   }
 
   // Still short (a dead query, a thin subject): random articles, which always

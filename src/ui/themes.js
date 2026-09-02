@@ -322,6 +322,27 @@ export const THEMES = [
       drive: 0.06,
       transient: 'knock'
     }
+  },
+  {
+    id: 'apotheosis', code: 'creator',
+    name: { en: 'Apotheosis', fr: 'Apothéose' },
+    blurb: {
+      en: 'Gold on black, leaf and lamplight. The one nobody else is wearing.',
+      fr: 'De l’or sur du noir, feuille et lumière de lampe. Celui que personne d’autre ne porte.'
+    },
+    swatch: ['#0b0805', '#fbbf24', '#fff7d6'],
+    backdrop: { renderer: 'apotheosis', speed: 0.00016 },
+    motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    sound: {
+      voice: 'bells',
+      gain: 0.7,
+      root: 261.63,           // C4
+      scale: [0, 4, 7, 11, 14],
+      reverb: { seconds: 3.2, decay: 2.4, mix: 0.34 },
+      filter: 5200,
+      drive: 0.04,
+      transient: 'chime'
+    }
   }
 ];
 

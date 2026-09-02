@@ -199,6 +199,21 @@ floor can both see.
   collection milestones.
 - **Badges** in 10 styles, worn four at a time on your profile.
 
+### Dressing the collection
+
+Customization holds two pickers beyond the theme.
+
+**Card effects** choose the look each rarity wears, one row per tier and five
+styles each: the treatment drawn for that tier, plus Foil Sheen, Prism Split,
+Halo and Archive. They are earned by holding cards of that tier, so the cost
+falls as the tier rises and still bites harder in practice. Every alternate is
+painted in the rarity's own colour, so a choice never costs the ladder its
+legibility. The table is `src/data/fx.js`; the CSS lives under `[data-fx]`.
+
+**Level frames** open at a level of their own, from 25 to 450 across eight
+styles. A locked frame still shows its drawing, since the point is to see what
+you are climbing towards.
+
 ## Accounts and the social side
 
 Accounts are optional. Signed in, you get cloud save across devices, plus
@@ -229,7 +244,7 @@ you cards.
 
 ## Themes, sound and motion
 
-14 themes, each a full palette with its own animated backdrop, its own
+15 themes, each a full palette with its own animated backdrop, its own
 synthesised sound kit, and its own launcher icon on Android. The app's mark is
 painted in the current theme's accents, so the drawer, the splash and the sign
 in gate all follow a theme change.
@@ -252,8 +267,12 @@ The codes themselves are not written down here, which is the point of them.
 The machinery is in `src/codes.js` if you need to add one.
 
 Special content is deliberately outside the game's accounting: it counts for
-no achievement, no level and no album milestone, and its themes and badges
-stay invisible until the code that grants them is redeemed.
+no achievement, no level and no album milestone, and its themes, badges and
+frames stay invisible until the code that grants them is redeemed.
+
+One code carries no cards at all. `regalia: true` marks it, and what it hands
+over is a badge, an animated level frame, a theme and the launcher icon to
+match.
 
 ## The Android app
 

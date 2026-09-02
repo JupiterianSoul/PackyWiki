@@ -18,13 +18,30 @@
  * drawn ring lands exactly on the element's edge (116 / 52 = 2.23).
  */
 
+/*
+ * `minLevel` is the level that opens a style. Metal is the one every player
+ * starts in, so it opens at 1; the rest are earned, and the gaps widen as they
+ * go so the last of them is a real destination rather than a Tuesday.
+ *
+ * `code` marks a style no level can reach: it arrives with a secret code and
+ * is hidden from the picker entirely until that code is redeemed, the same way
+ * the special themes and badges are.
+ */
 export const FRAME_STYLES = [
-  { id: 'metal',   name: { en: 'Metal Ages',    fr: 'Âges du métal' } },
-  { id: 'circuit', name: { en: 'Neon Circuit',  fr: 'Circuit néon' } },
-  { id: 'orbit',   name: { en: 'Cosmic Orbit',  fr: 'Orbite cosmique' } },
-  { id: 'crest',   name: { en: 'Foil Crest',    fr: 'Blason métallisé' } },
-  { id: 'crystal', name: { en: 'Crystal Bloom', fr: 'Floraison de cristal' } }
+  { id: 'metal',   minLevel: 1,   name: { en: 'Metal Ages',    fr: 'Âges du métal' } },
+  { id: 'circuit', minLevel: 25,  name: { en: 'Neon Circuit',  fr: 'Circuit néon' } },
+  { id: 'orbit',   minLevel: 60,  name: { en: 'Cosmic Orbit',  fr: 'Orbite cosmique' } },
+  { id: 'crest',   minLevel: 110, name: { en: 'Foil Crest',    fr: 'Blason métallisé' } },
+  { id: 'crystal', minLevel: 180, name: { en: 'Crystal Bloom', fr: 'Floraison de cristal' } },
+  { id: 'aurora',  minLevel: 260, name: { en: 'Aurora Veil',   fr: 'Voile aurore' } },
+  { id: 'runic',   minLevel: 350, name: { en: 'Runic Seal',    fr: 'Sceau runique' } },
+  { id: 'solar',   minLevel: 450, name: { en: 'Solar Crown',   fr: 'Couronne solaire' } },
+  { id: 'god',     minLevel: Infinity, code: 'creator',
+    name: { en: 'Apotheosis', fr: 'Apothéose' } }
 ];
+
+/** Has this player reached the level a style asks for? */
+export const frameUnlocked = (style, level) => (Number(level) || 1) >= (style?.minLevel ?? 1);
 export const DEFAULT_FRAME_STYLE = 'metal';
 export const frameStyleById = (id) =>
   FRAME_STYLES.find((s) => s.id === id) ?? FRAME_STYLES[0];
@@ -296,7 +313,129 @@ function drawCrystal(t, uid) {
 
 /* --- the one public drawing call ------------------------------------------ */
 
-const DRAWERS = { metal: drawMetal, circuit: drawCircuit, orbit: drawOrbit, crest: drawCrest, crystal: drawCrystal };
+/* --- AURORA VEIL: ribbons of light drawn round the ring -------------------- */
+const AURORA_BANDS = [
+  ['#7dd3fc', '#a78bfa'], ['#34d399', '#22d3ee'], ['#f472b6', '#a78bfa'],
+  ['#fbbf24', '#f472b6'], ['#22d3ee', '#818cf8']
+];
+
+function drawAurora(t, uid) {
+  const g = `${uid}a`;
+  const bands = Math.min(2 + Math.floor(t / 6), 8);
+  const defs = glowFilter(g, 2.2) + AURORA_BANDS.map(([a, b], i) =>
+    `<linearGradient id="${uid}g${i}" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient>`).join('');
+
+  // Each ribbon is an arc of its own radius and sweep, leaning further out as
+  // the tier climbs, so a high frame reads as a curtain rather than a circle.
+  const ribbons = Array.from({ length: bands }, (_, i) => {
+    const grad = `url(#${uid}g${i % AURORA_BANDS.length})`;
+    const r = 33 + i * (1.6 + Math.min(t, 40) * 0.05) + jit(i, t) * 2;
+    const span = 90 + jit(i, 5) * 120 + Math.min(t, 30) * 2;
+    const from = -110 + i * 46 + jit(i, 9) * 40;
+    const w = 2.4 + jit(i, 2) * 2.6 + Math.min(t, 30) * 0.05;
+    return arc(r, from, from + span,
+      `stroke="${grad}" stroke-width="${w.toFixed(2)}" stroke-linecap="round" stroke-opacity="${(0.5 + jit(i, 4) * 0.4).toFixed(2)}"`);
+  }).join('');
+
+  const motes = t >= 20 ? Array.from({ length: Math.min(4 + Math.floor((t - 20) / 5), 12) }, (_, i) => {
+    const [x, y] = P(30 + jit(i, 6) * 22, jit(i, 11) * 360).split(',');
+    return `<circle cx="${x}" cy="${y}" r="${(0.7 + jit(i, 8) * 1.1).toFixed(2)}" fill="#ffffff" fill-opacity=".8"/>`;
+  }).join('') : '';
+
+  return `<defs>${defs}</defs><g filter="url(#${g})">${ribbons}</g>${motes}`;
+}
+
+/* --- RUNIC SEAL: marks cut into a ring ------------------------------------ */
+const RUNES = ['M-3,-4 L0,4 L3,-4', 'M-3,-4 L-3,4 M-3,0 L3,-3', 'M0,-4 L0,4 M-3,-1 L3,-1',
+  'M-3,-4 L3,4 M3,-4 L-3,4', 'M-3,4 L0,-4 L3,4 M-2,1 L2,1', 'M-3,-4 L3,-4 L-3,4 L3,4'];
+
+function drawRunic(t, uid) {
+  const g = `${uid}r`;
+  const ink = ['#c7d2fe', '#fde68a', '#a7f3d0', '#fecaca', '#e9d5ff'][Math.min(Math.floor(t / 10), 4)];
+  const count = Math.min(4 + Math.floor(t / 2), 24);
+  const r = 36;
+  const marks = Array.from({ length: count }, (_, i) => {
+    const a = (360 / count) * i - 90;
+    const [x, y] = P(r, a).split(',');
+    const path = RUNES[(i + Math.floor(t / 7)) % RUNES.length];
+    return `<g transform="translate(${x},${y}) rotate(${(a + 90).toFixed(1)})">
+      <path d="${path}" fill="none" stroke="${ink}" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></g>`;
+  }).join('');
+  const rings = arc(30.5, 0, 359.9, `stroke="${ink}" stroke-width=".9" stroke-opacity=".55"`)
+    + (t >= 12 ? arc(41.5, 0, 359.9, `stroke="${ink}" stroke-width=".7" stroke-opacity=".4"`) : '')
+    + (t >= 30 ? arc(45, 0, 359.9, `stroke="${ink}" stroke-width="2.6" stroke-opacity=".18"`) : '');
+  return `<defs>${glowFilter(g, 1.5)}</defs>${rings}<g filter="url(#${g})">${marks}</g>`;
+}
+
+/* --- SOLAR CROWN: rays off a hot core ------------------------------------- */
+function drawSolar(t, uid) {
+  const g = `${uid}s`;
+  const rays = Math.min(8 + t, 44);
+  const hot = ['#fde68a', '#fbbf24', '#fb923c', '#f87171', '#fff7d6'][Math.min(Math.floor(t / 11), 4)];
+  const defs = glowFilter(g, 2) +
+    `<linearGradient id="${uid}ray" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${hot}" stop-opacity=".05"/>
+      <stop offset="1" stop-color="${hot}"/></linearGradient>`;
+  // P() hands back an "x,y" pair and a line needs the two apart, so it is split
+  // here rather than bent through the helper.
+  const lines = Array.from({ length: rays }, (_, i) => {
+    const a = (360 / rays) * i - 90;
+    const long = i % 3 === 0;
+    const inner = 30;
+    const outer = inner + (long ? 12 : 7) + Math.min(t, 34) * 0.24 + jit(i, t) * 3;
+    const [x1, y1] = P(inner, a).split(',');
+    const [x2, y2] = P(outer, a).split(',');
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="url(#${uid}ray)"
+      stroke-width="${(long ? 2.2 : 1.2).toFixed(1)}" stroke-linecap="round"/>`;
+  }).join('');
+  const core = arc(29, 0, 359.9, `stroke="${hot}" stroke-width="1.6" stroke-opacity=".85"`);
+  return `<defs>${defs}</defs>${core}<g filter="url(#${g})">${lines}</g>`;
+}
+
+/* --- GOD: the frame behind the one-time code ------------------------------
+ * Gold on gold, and the only frame in the set that moves on its own: two
+ * counter-rotating rings, a halo that breathes, and rays that never stop. It
+ * cannot be reached by levelling, so it never has to sit politely beside the
+ * others in the picker. */
+function drawGod(t, uid) {
+  const g = `${uid}g`;
+  const defs = glowFilter(g, 2.6) +
+    `<linearGradient id="${uid}gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fff7d6"/><stop offset="0.45" stop-color="#fbbf24"/>
+      <stop offset="0.7" stop-color="#b45309"/><stop offset="1" stop-color="#fde68a"/></linearGradient>
+    <radialGradient id="${uid}halo"><stop offset="0.55" stop-color="#fde68a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fbbf24" stop-opacity=".55"/></radialGradient>`;
+
+  const rays = Array.from({ length: 36 }, (_, i) => {
+    const a = 10 * i - 90;
+    const long = i % 3 === 0;
+    const [x1, y1] = P(31, a).split(',');
+    const [x2, y2] = P(long ? 50 : 41, a).split(',');
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="url(#${uid}gold)"
+      stroke-width="${long ? 2.4 : 1.1}" stroke-linecap="round"/>`;
+  }).join('');
+
+  const teeth = Array.from({ length: 12 }, (_, i) => {
+    const a = 30 * i - 90;
+    const [x, y] = P(37, a).split(',');
+    return `<polygon points="${diamond(+x, +y, 3.4)}" fill="url(#${uid}gold)"/>`;
+  }).join('');
+
+  return `<defs>${defs}</defs>
+    <circle r="46" fill="url(#${uid}halo)" class="god-halo"/>
+    <g filter="url(#${g})">
+      <g class="god-spin">${rays}</g>
+      <g class="god-spin-back">${teeth}</g>
+      ${arc(30.5, 0, 359.9, `stroke="url(#${uid}gold)" stroke-width="2.2"`)}
+      ${arc(44, 0, 359.9, `stroke="url(#${uid}gold)" stroke-width="1" stroke-opacity=".7"`)}
+    </g>`;
+}
+
+const DRAWERS = {
+  metal: drawMetal, circuit: drawCircuit, orbit: drawOrbit, crest: drawCrest, crystal: drawCrystal,
+  aurora: drawAurora, runic: drawRunic, solar: drawSolar, god: drawGod
+};
 
 /**
  * The frame for a style at a tier, as an <svg> string, or '' below tier 1.

@@ -2169,3 +2169,48 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 8px; padding: 18px 10px; height: auto; text-align: center;
 }
+
+/* --- card effects: one row per rarity, one chip per style ------------------ */
+.fx-tiers { display: grid; gap: 14px; }
+.fx-tier { display: grid; gap: 8px; }
+.fx-tier-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.fx-tier-name { font-weight: 700; font-size: 0.9rem; letter-spacing: 0.01em; }
+.fx-tier-count { font-size: 0.74rem; color: var(--ink-faint); }
+.fx-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 8px; }
+.fx-chip {
+  display: grid; gap: 3px; text-align: left; padding: 10px 12px;
+  border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--ink); cursor: pointer;
+}
+.fx-chip-name { font-weight: 650; font-size: 0.82rem; }
+.fx-chip-sub { font-size: 0.7rem; color: var(--ink-dim); line-height: 1.35; }
+.fx-chip.is-on {
+  border-color: color-mix(in srgb, var(--rarity) 70%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--rarity) 45%, transparent);
+  background: color-mix(in srgb, var(--rarity) 12%, var(--surface));
+}
+/* Locked reads as unavailable without hiding what it is: the player is being
+   told what to collect, so the name has to stay legible. */
+.fx-chip.is-locked { opacity: 0.55; }
+.fx-chip.is-locked .fx-chip-sub { color: var(--ink-faint); }
+
+/* --- the Apotheosis frame is the only one that moves ---------------------- */
+.god-spin { transform-origin: 0 0; animation: god-turn 26s linear infinite; }
+.god-spin-back { transform-origin: 0 0; animation: god-turn 18s linear infinite reverse; }
+.god-halo { transform-origin: 0 0; animation: god-breathe 4.6s ease-in-out infinite; }
+@keyframes god-turn { to { transform: rotate(360deg); } }
+@keyframes god-breathe {
+  0%, 100% { opacity: 0.45; transform: scale(0.96); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+/* A frame that never stops is a frame that never lets the phone idle, so it
+   holds still for anyone who asked the system for less motion. */
+@media (prefers-reduced-motion: reduce) {
+  .god-spin, .god-spin-back, .god-halo { animation: none; }
+}
+
+/* A locked frame in the picker still shows its drawing: the player is being
+   told what to climb towards, so hiding it would defeat the point. */
+.frame-card.is-locked { opacity: 0.5; }
+.frame-card.is-locked .frame-copy small { display: block; font-size: 0.68rem; color: var(--ink-faint); margin-top: 2px; }
+.frame-card .frame-copy small:empty { display: none; }

@@ -117,6 +117,12 @@ const P = {
     repeating-linear-gradient(-60deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${21 * s}px),
     repeating-linear-gradient(0deg, rgba(0,0,0,${a}) 0 1px, transparent 1px ${21 * s}px)`,
 
+  /** Beaten gold leaf: uneven sheets, no repeat you can see. The Creator. */
+  goldleaf: (s = 1, a = 0.16) => `
+    repeating-linear-gradient(28deg, rgba(255,247,214,${a}) 0 2px, transparent 2px ${17 * s}px),
+    repeating-linear-gradient(-64deg, rgba(255,247,214,${a * 0.7}) 0 1px, transparent 1px ${29 * s}px),
+    repeating-linear-gradient(96deg, rgba(0,0,0,${a * 0.5}) 0 1px, transparent 1px ${41 * s}px)`,
+
   /** Vinyl grooves ringing out from a centre. Music. */
   grooves: (s = 1, a = 0.14) => `
     repeating-radial-gradient(circle at 50% 42%,

@@ -21,6 +21,7 @@
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
 import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityThresholds } from './data/rarities.js';
 import { oddsRows } from './data/odds.js';
+import { FX_STYLES, DEFAULT_FX, fxById, fxCost, fxUnlocked } from './data/fx.js';
 import * as odds from './data/odds.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
 import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard } from './wiki.js';
@@ -65,7 +66,7 @@ import {
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
 } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
-import { FRAME_STYLES, DEFAULT_FRAME_STYLE, frameStyleById, frameTier, frameSvg } from './frames.js';
+import { FRAME_STYLES, DEFAULT_FRAME_STYLE, frameStyleById, frameTier, frameSvg, frameUnlocked } from './frames.js';
 import { BADGES, badgeStates, romanRank, badgeSvg } from './badges.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
 import { proceduralStyle } from './packstyle.js';
@@ -119,6 +120,7 @@ const state = {
   wallet: store.loadWallet(),
   frameStyle: store.loadFrameStyle() ?? DEFAULT_FRAME_STYLE,
   badgeLoadout: store.loadBadgeLoadout(),
+  cardFx: store.loadCardFx(),
   market: {
     view: 'browse', auctions: [], myBids: store.loadMyBids(),
     search: '', sort: 'ending',
@@ -241,6 +243,7 @@ bind({
   settingsTitle: $('#settings-title'), themeLabel: $('#theme-label'), themeGrid: $('#theme-grid'),
   customizeTitle: $('#customize-title'), identityLabel: $('#identity-label'), identityList: $('#identity-list'),
   framesLabel: $('#frames-label'), framesNote: $('#frames-note'), frameStyles: $('#frame-styles'),
+  fxLabel: $('#fx-label'), fxNote: $('#fx-note'), fxTiers: $('#fx-tiers'),
   badgesLabel: $('#badges-label'), badgeGrid: $('#badge-grid'),
   badgesTitle: $('#badges-title'), badgesIntro: $('#badges-intro'), badgesAll: $('#badges-all'),
   indexTitle: $('#index-title'), indexIntro: $('#index-intro'), indexCounts: $('#index-counts'),
@@ -389,6 +392,8 @@ function showScreen(name) {
   const immersive = name === 'open';
   document.documentElement.classList.toggle('is-immersive', immersive);
   backdrop.setPaused(immersive);
+  // The screen stays lit for a pack and is let go the moment it is done.
+  if (immersive) holdWakeLock(); else releaseWakeLock();
 
   setTickerJob('shop', name === 'shop' ? tickRestock : null);
   setTickerJob('timed', name === 'timed' ? tickTimed : null);
@@ -1704,6 +1709,7 @@ function dropScrap(booster) {
 async function completeRip() {
   if (rip.done) return;
   rip.done = true;
+  buzz(18);
   stopRipLoop();
   const booster = rip.booster;
   await animateRip(rip.progress, 1, 220);
@@ -2074,6 +2080,11 @@ function applyRarityVars(node, rarity) {
   node.dataset.rarity = rarity.id;
   node.style.setProperty('--rarity', rarity.color);
   node.style.setProperty('--rarity-glow', rarity.glow);
+  // The look its owner chose for this tier, if they chose one. Special sits
+  // outside the picker and keeps the treatment its code gave it.
+  const chosen = rarity.id === SPECIAL_RARITY_ID ? DEFAULT_FX : (state.cardFx[rarity.id] ?? DEFAULT_FX);
+  if (chosen && chosen !== DEFAULT_FX) node.dataset.fx = chosen;
+  else delete node.dataset.fx;
 }
 
 function fillFront(front, data, rarity, { ownedTag = false } = {}) {
@@ -2260,6 +2271,9 @@ async function revealCurrent() {
   if (isNew) {
     state.seen.add(state.index);
     synth.playReveal(rarityRank(pull.rarity.id));
+    // The rarer the card, the longer the pulse: the phone says so before the
+    // eye has read the badge.
+    buzz(8 + rarityRank(pull.rarity.id) * 6);
     if (pull.rarity.flash > 0) {
       el.flash.style.setProperty('--flash-tint', pull.rarity.color);
       fireFlash(pull.rarity.flash);
@@ -2841,6 +2855,9 @@ const tilt = {
     this.listening = true;
     let base = null;
     window.addEventListener('deviceorientation', (event) => {
+      // Switched off in Settings: the card keeps its own slow sway, which is
+      // what a desk gets anyway, and the phone stops waking for the sensor.
+      if (settings().tilt === false) return;
       if (event.gamma == null || event.beta == null) return;
       if (!base) base = { beta: event.beta, gamma: event.gamma };
       base.beta += (event.beta - base.beta) * 0.012;
@@ -6224,6 +6241,10 @@ function renderSettings() {
     settingRow('music', 'settingsMusic', 'settingsMusicNote'),
     sliderRow('musicVolume', 'settingsMusicVolume', 'settingsMusicVolumeNote'),
     settingRow('flash', 'settingsFlash', 'settingsFlashNote'),
+    settingRow('tilt', 'settingsTilt', 'settingsTiltNote'),
+    settingRow('haptics', 'settingsHaptics', 'settingsHapticsNote'),
+    settingRow('awake', 'settingsAwake', 'settingsAwakeNote'),
+    settingRow('prices', 'settingsPrices', 'settingsPricesNote'),
     settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
     settingRow('hints', 'settingsHints', 'settingsHintsNote'),
     language
@@ -6324,14 +6345,21 @@ function redeemRow() {
     state.profile.codesRedeemed = state.profile.codesRedeemed ?? {};
     state.profile.codesRedeemed[entry.id] = timesRedeemed(state.profile, entry.id) + 1;
     store.saveProfile(state.profile);
-    const spec = codeSpec(entry);
-    store.addBooster(state.inventory, spec, 1);
+    // A regalia code carries no cards, so it puts no booster on the shelf. The
+    // Creator's code is the only one of these: what it hands over is the badge,
+    // the frame, the theme and the icon.
+    if (!entry.regalia) store.addBooster(state.inventory, codeSpec(entry), 1);
     // The theme goes on now, and the badge is worn now: the whole gift at
     // once, not a booster and a note saying there is more in the menus.
     const theme = THEMES.find((th) => th.code === entry.id);
     if (theme) useTheme(theme.id);
     const badge = BADGES.find((b) => b.code === entry.id);
     if (badge) wearBadge(badge.id);
+    // A frame that arrives with a code goes on at once too, the same as the
+    // theme and the badge: the whole gift, not a hint that there is more in
+    // the menus.
+    const frame = FRAME_STYLES.find((f) => f.code === entry.id);
+    if (frame) pickFrameStyle(frame.id);
     syncSoon();
     input.value = '';
     status.textContent = t('redeemDone', { name: codeLook(entry).name });
@@ -6379,10 +6407,16 @@ function openReveal(entry, { theme, badge }) {
         <button class="btn btn-ghost" type="button" data-later></button>
       </div>`;
     wrap.querySelector('.reveal-message').textContent = tx(entry.message);
-    wrap.querySelector('.reveal-pack').appendChild(buildBooster(codeSpec(entry), { size: 'is-small' }));
-    wrap.querySelector('.reveal-copy .label').textContent = t('revealBooster');
-    wrap.querySelector('.reveal-copy h3').textContent = look.name;
-    wrap.querySelector('.reveal-copy p').textContent = look.tagline;
+    // A regalia code has no booster to show, so the whole row goes rather than
+    // standing there empty with a label over nothing.
+    if (entry.regalia) {
+      wrap.querySelector('.reveal-booster').remove();
+    } else {
+      wrap.querySelector('.reveal-pack').appendChild(buildBooster(codeSpec(entry), { size: 'is-small' }));
+      wrap.querySelector('.reveal-copy .label').textContent = t('revealBooster');
+      wrap.querySelector('.reveal-copy h3').textContent = look.name;
+      wrap.querySelector('.reveal-copy p').textContent = look.tagline;
+    }
     // What is inside stays a surprise until the pack is torn open.
     if (theme) {
       const grant = wrap.querySelector('[data-theme-grant]');
@@ -6406,8 +6440,12 @@ function openReveal(entry, { theme, badge }) {
     later.textContent = t('revealClose');
     press(go, { sound: null });
     press(later, { sound: null });
+    go.textContent = entry.regalia ? t('revealSeeIt') : t('revealTake');
     go.addEventListener('click', () => {
       sheet.hide();
+      // Regalia goes to Customization, where the frame and the theme now live.
+      // Everything else goes to the shelf its booster is on.
+      if (entry.regalia) { showScreen('customize'); renderCustomize(); return; }
       // The screen first: the segmented control measures its buttons when
       // it moves, and a hidden screen measures as nothing.
       showScreen('packs');
@@ -6470,21 +6508,32 @@ function renderCustomize() {
   const tier = frameTier(level);
   el.framesNote.hidden = true;
   const wearing = frameStyle();
-  el.frameStyles.replaceChildren(...FRAME_STYLES.map((style) => {
+  // A frame behind a secret code is not shown at all until that code is
+  // redeemed: the same rule the special themes and badges follow, so nothing
+  // in the picker hints at a code the player has not been given.
+  const offered = FRAME_STYLES.filter((style) => !style.code || hasRedeemed(state.profile, style.code));
+  el.frameStyles.replaceChildren(...offered.map((style) => {
+    const open = style.code ? true : frameUnlocked(style, level);
     const card = document.createElement('button');
     card.type = 'button';
-    card.className = `frame-card${style.id === wearing ? ' is-on' : ''}${tier < 1 ? ' is-dim' : ''}`;
+    card.className = `frame-card${style.id === wearing ? ' is-on' : ''}${tier < 1 ? ' is-dim' : ''}${open ? '' : ' is-locked'}`;
     card.dataset.frame = style.id;
     card.innerHTML = `
       <span class="frame-prev">
         <span class="frame-prev-core">${level}</span>
         <span class="frame-overlay" aria-hidden="true">${frameSvg(style.id, Math.max(tier, 1))}</span>
       </span>
-      <span class="frame-copy"><h4></h4></span>
+      <span class="frame-copy"><h4></h4><small></small></span>
       <span class="theme-check">${iconSvg('check', { size: 14 })}</span>`;
     card.querySelector('h4').textContent = tx(style.name);
+    card.querySelector('small').textContent = open ? '' : t('frameLocked', { level: style.minLevel });
     press(card, { sound: null });
     card.addEventListener('click', () => {
+      if (!open) {
+        synth.playDenied();
+        toast(esc(t('frameLocked', { level: style.minLevel })), 'error');
+        return;
+      }
       if (style.id === frameStyle()) return;
       synth.playTap();
       pickFrameStyle(style.id);
@@ -6492,6 +6541,71 @@ function renderCustomize() {
       renderCustomize();
     });
     return card;
+  }));
+
+  renderCardFx();
+}
+
+/**
+ * CARD EFFECTS: one row per rarity, one chip per style.
+ *
+ * The choice is per rarity on purpose. A single setting for the whole
+ * collection would make every card look the same and take the ladder's
+ * legibility with it; this way a player dresses the tiers they actually
+ * collect, and a locked chip says exactly how many cards of that tier open it.
+ */
+function renderCardFx() {
+  el.fxLabel.textContent = t('fxTitle');
+  el.fxNote.textContent = t('fxNote');
+
+  // How many of each tier are in the collection: what unlocks a style.
+  const held = {};
+  for (const entry of Object.values(state.collection.entries ?? {})) {
+    if (entry?.special) continue;
+    const id = entry.rarityId ?? rarityFromPopularity(entry.popularity ?? 0).id;
+    held[id] = (held[id] ?? 0) + (entry.count ?? 1);
+  }
+
+  el.fxTiers.replaceChildren(...RARITIES.map((rarity) => {
+    const owned = held[rarity.id] ?? 0;
+    const row = document.createElement('div');
+    row.className = 'fx-tier';
+    row.innerHTML = `<div class="fx-tier-head"><span class="fx-tier-name"></span>
+      <span class="fx-tier-count tabular"></span></div><div class="fx-chips"></div>`;
+    const name = row.querySelector('.fx-tier-name');
+    name.textContent = tx(rarity.name);
+    name.style.color = rarity.color;
+    row.querySelector('.fx-tier-count').textContent = t('fxOwned', { n: owned.toLocaleString() });
+
+    row.querySelector('.fx-chips').replaceChildren(...FX_STYLES.map((style) => {
+      const cost = fxCost(style.id, rarity.id);
+      const open = fxUnlocked(style.id, rarity.id, owned);
+      const worn = (state.cardFx[rarity.id] ?? DEFAULT_FX) === style.id;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = `fx-chip${worn ? ' is-on' : ''}${open ? '' : ' is-locked'}`;
+      chip.style.setProperty('--rarity', rarity.color);
+      chip.innerHTML = `<span class="fx-chip-name"></span><span class="fx-chip-sub"></span>`;
+      chip.querySelector('.fx-chip-name').textContent = tx(style.name);
+      chip.querySelector('.fx-chip-sub').textContent = open
+        ? tx(style.note)
+        : t('fxLocked', { n: cost, rarity: tx(rarity.name) });
+      press(chip, { sound: null });
+      chip.addEventListener('click', () => {
+        if (!open) { synth.playDenied(); toast(esc(t('fxLocked', { n: cost, rarity: tx(rarity.name) })), 'error'); return; }
+        synth.playTap();
+        if (style.id === DEFAULT_FX) delete state.cardFx[rarity.id];
+        else state.cardFx[rarity.id] = style.id;
+        store.saveCardFx(state.cardFx);
+        toast(esc(t('fxEquipped', { name: tx(style.name), rarity: tx(rarity.name) })));
+        renderCardFx();
+        // Anything already drawn is wearing the old look.
+        renderBinder();
+        renderCardIndex?.();
+      });
+      return chip;
+    }));
+    return row;
   }));
 }
 
@@ -6923,31 +7037,76 @@ function removeAllCards() {
  * secret code can be redeemed again on the save that comes after this.
  */
 async function wipeEverything() {
-  if (signedIn() && state.account.profile) {
-    clearTimeout(syncTimer);
+  clearTimeout(syncTimer);
+  // Signed in is decided by the SESSION, not by whether the profile happens to
+  // be loaded. Gating on the profile meant a reset run before it arrived left
+  // the account untouched, and the next launch pulled the whole save back
+  // down: the button looked like it had done nothing.
+  if (signedIn()) {
     try {
-      await account.clearSave(userId());
+      await account.hardReset(userId());
     } catch (error) {
       toast(esc(describeError(error)), 'error');
       synth.playDenied();
       return;
     }
+    // Signing out takes the session with it, so the app comes back at the
+    // welcome screen the way a new install does. Signing in again finds an
+    // account with nothing stored against it.
+    await account.signOut().catch(() => { /* the local wipe still stands */ });
   }
   try {
-    const doomed = [];
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key && key.startsWith('packywiki.')) doomed.push(key);
-    }
-    for (const key of doomed) localStorage.removeItem(key);
+    // EVERY key, not the app's own prefix. The prefix left the session token
+    // behind, so the app woke up still signed in and half of "a new account"
+    // was untrue the moment it launched.
+    localStorage.clear();
+    sessionStorage.clear();
   } catch { /* storage unavailable: nothing to remove */ }
   location.reload();
+}
+
+/*
+ * HAPTICS. A short pulse under the taps that already make a sound, so a phone
+ * on silent still answers. Vibration is not on desktop and not on iOS Safari,
+ * and asking for it there throws nothing, so no capability test is needed
+ * beyond the one below.
+ */
+function buzz(ms = 12) {
+  if (settings().haptics === false) return;
+  try { navigator.vibrate?.(ms); } catch { /* no vibrator on this device */ }
+}
+
+/*
+ * KEEP THE SCREEN AWAKE while a booster is being opened.
+ *
+ * A rip is a slow gesture followed by a card at a time, and a phone whose
+ * screen times out mid-pack takes the reveal with it. The lock is held only
+ * for the open screen and dropped everywhere else, because a lock held for a
+ * whole session is a flat battery.
+ */
+let wakeLock = null;
+
+async function holdWakeLock() {
+  if (settings().awake === false || wakeLock) return;
+  try {
+    wakeLock = await navigator.wakeLock?.request('screen') ?? null;
+    // The system drops it whenever the app leaves the screen; forget it so the
+    // next open asks again rather than believing it still holds one.
+    wakeLock?.addEventListener?.('release', () => { wakeLock = null; });
+  } catch { /* unsupported, or refused while backgrounded */ }
+}
+
+function releaseWakeLock() {
+  try { wakeLock?.release?.(); } catch { /* already gone */ }
+  wakeLock = null;
 }
 
 function applySettings() {
   const s = settings();
   document.documentElement.dataset.lowpower = s.lowPower ? '1' : '0';
   document.documentElement.dataset.hints = s.hints ? '1' : '0';
+  document.documentElement.dataset.prices = s.prices === false ? '0' : '1';
+  if (s.awake === false) releaseWakeLock();
   synth.setMuted(!s.sound);
   synth.setVolume(s.volume ?? 1);
   music.setVolume(s.musicVolume ?? 0.4);
@@ -7554,7 +7713,15 @@ function init() {
   // the backdrop are parked entirely while the app is in the background.
   // Autoplay rules: music may only start inside a gesture, so every tap
   // offers it the chance. A playing track makes this a no-op.
-  document.addEventListener('pointerdown', () => music.poke(), { passive: true });
+  // Prime the first track while the splash is still up, then try to play at
+  // once: the APK allows it outright, and a browser that holds out for a
+  // gesture is caught by the listeners below rather than waiting for a tap
+  // that may be seconds away.
+  music.prime();
+  music.poke();
+  for (const gesture of ['pointerdown', 'keydown', 'touchstart']) {
+    document.addEventListener(gesture, () => music.poke(), { passive: true });
+  }
 
   document.addEventListener('visibilitychange', () => {
     const visible = document.visibilityState === 'visible';

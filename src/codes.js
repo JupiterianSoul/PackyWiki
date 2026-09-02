@@ -132,6 +132,33 @@ export const SECRET_CODES = [
         search: ['neurotoxin turret', 'gas sentry', 'toxic turret', 'neurotoxic sentry'],
         name: { en: 'The neurotoxin turret (Helldivers)', fr: 'La tourelle neurotoxique (Helldivers)' } }
     ]
+  },
+  /*
+   * THE CREATOR. Not a person's booster: a set of regalia.
+   *
+   * The four codes above each hand over a booster made for one person. This
+   * one hands over no cards at all, only the marks of the person who built the
+   * game: a badge, a frame that moves, a theme and the launcher icon to match.
+   * `regalia: true` is what tells the redeem flow to skip the booster, and
+   * `cards: []` keeps every helper that counts them honest.
+   */
+  {
+    id: 'creator',
+    code: 'W1KL0D0',
+    person: 'Gabriel',
+    regalia: true,
+    accent: '#fbbf24', accent2: '#7c2d12', light: '#fff7d6',
+    theme: 'apotheosis',
+    emblem: 'seal', foil: 'goldleaf', family: 'crest', shapes: ['orb', 'square'],
+    name: { en: 'The Creator', fr: 'Le Créateur' },
+    tagline: { en: 'The one who built it', fr: 'Celui qui l’a construit' },
+    album: { en: 'The Creator', fr: 'Le Créateur' },
+    badge: { en: 'The Creator', fr: 'Le Créateur' },
+    message: {
+      en: 'You built this. Gold on gold, a frame that never stops moving, and a theme nobody else will ever wear. There is no booster here on purpose: this code hands over the regalia, not cards.',
+      fr: 'Tu as construit tout ça. De l’or sur de l’or, un cadre qui ne s’arrête jamais, et un thème que personne d’autre ne portera. Il n’y a pas de booster ici, volontairement : ce code remet les insignes, pas des cartes.'
+    },
+    cards: []
   }
 ];
 

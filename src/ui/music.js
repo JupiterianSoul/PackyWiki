@@ -7,10 +7,13 @@
  * src/assets/music/LICENSE.md for the artists and licences, and for how to
  * add a track (drop the file in that folder, credit the artist).
  *
- * The player is one HTMLAudio element. It starts only after a user gesture
- * (poke() is called from the app's first-interaction hook, the same one that
- * wakes the synthesiser), parks itself when the app is backgrounded, and
- * obeys two settings: on/off and its own volume, separate from the sounds.
+ * The player is one HTMLAudio element, primed the moment the app boots so the
+ * first track is buffered before anything asks for it. It tries to play
+ * straight away, which the APK allows outright; a browser that refuses until a
+ * gesture arrives is caught by poke(), called from the first-interaction hook
+ * that also wakes the synthesiser. It parks itself when the app is
+ * backgrounded, and obeys two settings: on/off and its own volume, separate
+ * from the sounds.
  */
 const TRACK_URLS = Object.entries(
   import.meta.glob('../assets/music/*.{ogg,mp3}', { eager: true, query: '?url', import: 'default' })
@@ -29,12 +32,30 @@ class Music {
   #ensure() {
     if (this.audio || !TRACK_URLS.length) return;
     this.audio = new Audio();
-    this.audio.preload = 'none';
+    // 'auto', not 'none'. With no preloading the file only STARTED downloading
+    // at the first tap, so the music arrived five or ten seconds into the
+    // session every time. Fetching it while the splash is still up means the
+    // first track is ready before anything asks it to play.
+    this.audio.preload = 'auto';
     this.audio.addEventListener('ended', () => this.#next());
     // A track that cannot decode must not end the music forever.
     this.audio.addEventListener('error', () => setTimeout(() => this.#next(), 4000));
     this.order = [...TRACK_URLS].sort(() => Math.random() - 0.5);
     this.at = -1;
+  }
+
+  /**
+   * Load the first track without playing it. Called at boot whatever the
+   * settings say, because the cost of having it ready is one buffered file and
+   * the cost of not having it is the silence the player hears instead.
+   */
+  prime() {
+    this.#ensure();
+    if (!this.audio || this.audio.src) return;
+    this.at = 0;
+    this.audio.src = this.order[0];
+    this.audio.volume = this.volume;
+    this.audio.load();
   }
 
   #next() {
@@ -45,13 +66,14 @@ class Music {
     this.audio.play().catch(() => { /* until a gesture arrives */ });
   }
 
-  /** A user gesture happened: allowed to start now. */
+  /** Start now if allowed. Called at boot and again on the first gesture. */
   poke() {
     if (!this.on || this.parked) return;
     this.#ensure();
     if (!this.audio) return;
-    if (!this.audio.src) this.#next();
-    else if (this.audio.paused) this.audio.play().catch(() => {});
+    if (!this.audio.src) this.prime();
+    this.audio.volume = this.volume;
+    this.audio.play().catch(() => { /* a browser waiting for a gesture */ });
   }
 
   setOn(on) {

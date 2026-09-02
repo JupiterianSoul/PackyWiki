@@ -67,7 +67,10 @@ export const BADGES = [
   { id: 'special-samuel',  code: 'samuel',  motif: 'pixel',  foil: ['#cfe7ff', '#1e90ff', '#1e3a8a'],
     name: { en: 'Samuel’s Special Badge', fr: 'Badge spécial de Samuel' } },
   { id: 'special-noah',    code: 'noah',    motif: 'dice',   foil: ['#e9d5ff', '#a855f7', '#6b21a8'],
-    name: { en: 'Noah’s Special Badge', fr: 'Badge spécial de Noah' } }
+    name: { en: 'Noah’s Special Badge', fr: 'Badge spécial de Noah' } },
+  // The only badge in gold, and the only one that is not somebody else's.
+  { id: 'special-creator', code: 'creator', motif: 'seal',   foil: ['#fff7d6', '#fbbf24', '#7c2d12'],
+    name: { en: 'The Creator', fr: 'Le Créateur' } }
 ];
 
 /**

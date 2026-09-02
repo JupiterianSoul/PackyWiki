@@ -240,7 +240,24 @@ export const RELEASES = [
     ]
   },
   {
-    id: 'darwin', icon: 'darwin', accent: '#a3a3a3',
+    id: 'dressup', icon: 'wand', accent: '#fbbf24',
+    title: { en: 'Dress your own collection', fr: 'Habillez votre collection' },
+    points: [
+      { en: 'Choose the effect each rarity wears, earned by collecting it', fr: 'Choisissez l’effet porté par chaque rareté, gagné en la collectionnant' },
+      { en: 'Three new level frames, and every frame now opens at a level', fr: 'Trois nouveaux cadres de niveau, et chaque cadre s’ouvre désormais à un niveau' },
+      { en: 'Four new settings, and the music starts the moment the app does', fr: 'Quatre nouveaux réglages, et la musique démarre en même temps que l’application' }
+    ],
+    changelog: [
+      { en: 'Customization now holds a card-effect picker: one row per rarity, five looks each. Foil Sheen, Prism Split, Halo and Archive are earned by holding cards of that tier, and each is painted in the tier’s own colour so choosing a look never costs the ladder its legibility', fr: 'La personnalisation contient désormais un sélecteur d’effets : une ligne par rareté, cinq allures chacune. Éclat métallisé, Éclat prismatique, Halo et Archive s’obtiennent en possédant des cartes de ce palier, et chacun est peint dans la couleur du palier pour que le choix ne coûte jamais sa lisibilité à l’échelle' },
+      { en: 'Three new level frames: Aurora Veil, Runic Seal and Solar Crown. Every frame now opens at a level of its own, from 25 to 450, and a locked one still shows its drawing so you can see what you are climbing towards', fr: 'Trois nouveaux cadres : Voile aurore, Sceau runique et Couronne solaire. Chaque cadre s’ouvre désormais à son propre niveau, de 25 à 450, et un cadre verrouillé montre quand même son dessin pour que vous voyiez vers quoi vous grimpez' },
+      { en: 'Reset all progress really does end the save now: it clears the account on the server, the profile, the wishlist, the friends, the messages and the session itself, so the app comes back at the welcome screen the way a new install does. It also stops any sync still in flight from putting the old save straight back', fr: 'Réinitialiser toute la progression met vraiment fin à la sauvegarde : le compte sur le serveur, le profil, la liste de souhaits, les amis, les messages et la session sont effacés, et l’application revient à l’écran d’accueil comme une nouvelle installation. Une synchronisation encore en vol ne peut plus remettre l’ancienne sauvegarde' },
+      { en: 'The music starts with the app instead of five seconds into it: the first track is fetched while the splash is still up rather than at the first tap', fr: 'La musique démarre avec l’application au lieu de cinq secondes plus tard : le premier morceau est chargé pendant l’écran de démarrage plutôt qu’au premier appui' },
+      { en: 'Four new settings: tilt with the phone, vibration, keep the screen on while opening, and show card values', fr: 'Quatre nouveaux réglages : inclinaison avec le téléphone, vibration, garder l’écran allumé pendant l’ouverture, et afficher la valeur des cartes' },
+      { en: 'A booster is only owed when a roll lands BELOW what it asked for. A subject whose pages are all famous no longer pays out for the Commons it could not find', fr: 'Un booster n’est dû que lorsqu’un tirage tombe EN DESSOUS de ce qu’il demandait. Un sujet dont toutes les pages sont célèbres ne paie plus pour les Communes qu’il n’a pas trouvées' }
+    ]
+  },
+  {
+    id: 'darwin', icon: 'weird', accent: '#a3a3a3',
     title: { en: 'The Darwin Awards, and boosters that keep their word', fr: 'Les Darwin Awards, et des boosters qui tiennent parole' },
     points: [
       { en: 'A new subject: the famous cases of spectacularly bad judgement', fr: 'Un nouveau sujet : les cas célèbres de jugement spectaculairement mauvais' },

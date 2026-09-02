@@ -443,6 +443,11 @@ export function loadProfile() {
   profile.settings.volume ??= 1;
   profile.settings.music ??= true;
   profile.settings.musicVolume ??= 0.4;
+  // Added later; a save that predates them takes the default.
+  profile.settings.haptics ??= true;
+  profile.settings.tilt ??= true;
+  profile.settings.awake ??= true;
+  profile.settings.prices ??= true;
   accrue(profile.timed);
   return profile;
 }
@@ -684,3 +689,17 @@ export function healCustomPacks(collection) {
   }
   return restored;
 }
+
+/* --- the effect a rarity wears ---------------------------------------------
+ * One chosen style per rarity, keyed by rarity id. A rarity missing from here
+ * wears the treatment drawn for it, which is what `classic` means, so an empty
+ * object is the right starting state and a save that predates the picker needs
+ * no migration. */
+const FX_KEY = 'packywiki.cardFx.v1';
+
+export function loadCardFx() {
+  const data = readJson(FX_KEY, null);
+  return data && typeof data === 'object' && !Array.isArray(data) ? data : {};
+}
+
+export const saveCardFx = (choices) => writeJson(FX_KEY, choices ?? {});

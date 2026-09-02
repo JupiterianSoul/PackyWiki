@@ -649,3 +649,46 @@
   --press-shift: 1px;
   --texture: grain;
 }
+
+/* --- APOTHEOSIS: gold leaf on lamp-black, behind a one-time code ---------- */
+[data-theme='apotheosis'] {
+  --ink: #fdf6e3;
+  --ink-dim: #c9ab6a;
+  --ink-faint: #8a733f;
+
+  --surface: rgba(251, 191, 36, 0.09);
+  --surface-2: rgba(251, 191, 36, 0.15);
+  --surface-solid: #17100a;
+  --line: rgba(251, 191, 36, 0.3);
+  --line-strong: rgba(253, 230, 138, 0.6);
+
+  --accent: #fbbf24;
+  --accent-2: #fff7d6;
+  --accent-ink: #140d05;
+  --positive: #86efac;
+  --negative: #fb7185;
+  --warning: #fdba74;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 20px 40px -24px rgba(0, 0, 0, 0.95), inset 0 1px 0 rgba(253, 230, 138, 0.14);
+  --raise-shadow: 0 34px 70px -32px rgba(0, 0, 0, 0.98);
+  --glow: 0 0 34px -6px rgba(251, 191, 36, 0.75);
+  --blur: blur(11px);
+
+  --font: 'Optima', 'Palatino Linotype', ui-serif, Georgia, serif;
+  --font-display: 'Cinzel', 'Trajan Pro', 'Optima', ui-serif, Georgia, serif;
+  --display-weight: 700;
+  --display-tracking: 0.06em;
+  --display-transform: uppercase;
+  --label-tracking: 0.26em;
+
+  --press-scale: 0.98;
+  --press-shift: 1px;
+  --texture: grain;
+}
