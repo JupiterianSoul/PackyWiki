@@ -965,32 +965,54 @@ async function drawTitleSet(pack) {
   if (pack.pick) wanted = shuffled(wanted).slice(0, pack.pick);
   wanted = wanted.slice(0, POOL_LIMIT);
   const out = [];
-  for (const want of wanted) {
-    let card = null;
-    if (want.wiki || want.wikiUrls) {
-      // A card that names its own wiki is a thing Wikipedia has no page for:
-      // the Tardigrades CARD in Terraforming Mars, not the animal. If that
-      // wiki cannot be reached the card stays unillustrated rather than
-      // becoming the encyclopaedia article of the same name, which would be
-      // the wrong subject entirely.
-      card = await fandomCard(want, pack).catch(() => null) ?? placeholderCard(want, pack);
-    } else {
-      const page = await resolveTitle(want.title, wikiLang())
-        ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
-      card = page ? await namedCard(page, want, pack) : placeholderCard(want, pack);
-    }
-    card.special = pack.special ?? null;
-    // A special card is keyed by its CODE as well as its article. Two people
-    // are allowed to love the same thing, and without this the second code to
-    // be redeemed would merge its card into the first one's entry: a single
-    // card cannot belong to two albums, so one of them would sit at five out
-    // of six forever. The Creator has always been keyed this way; every
-    // special card is now.
-    if (card.special && card.key) card.key = `special:${card.special}:${card.key}`;
-    out.push(card);
-  }
+  for (const want of wanted) out.push(await titleCard(want, pack));
   for (const extra of pack.extra ?? []) out.push({ ...extra });
   return out;
+}
+
+/**
+ * One named card, from wherever that name actually lives.
+ *
+ * Exported as `refreshTitleCard` too: a collection written by an older build
+ * holds cards drawn the wrong way, and they are repaired by running the same
+ * title back through this.
+ */
+async function titleCard(want, pack) {
+  let card = null;
+  if (want.wiki || want.wikiUrls) {
+    // A card that names its own wiki is a thing Wikipedia has no page for:
+    // the Tardigrades CARD in Terraforming Mars, not the animal. If that
+    // wiki cannot be reached the card stays unillustrated rather than
+    // becoming the encyclopaedia article of the same name, which would be
+    // the wrong subject entirely.
+    card = await fandomCard(want, pack).catch(() => null) ?? placeholderCard(want, pack);
+  } else {
+    const page = await resolveTitle(want.title, wikiLang())
+      ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
+    card = page ? await namedCard(page, want, pack) : placeholderCard(want, pack);
+  }
+  card.special = pack.special ?? null;
+  // A special card is keyed by its CODE as well as its article. Two people
+  // are allowed to love the same thing, and without this the second code to
+  // be redeemed would merge its card into the first one's entry: a single
+  // card cannot belong to two albums, so one of them would sit at five out
+  // of six forever. The Creator has always been keyed this way; every
+  // special card is now.
+  if (card.special && card.key) card.key = `special:${card.special}:${card.key}`;
+  return card;
+}
+
+/**
+ * The card one title ought to be today, for repairing a card that was drawn
+ * before. Answers null rather than a plate: a stored card is only overwritten
+ * by something better than what is already there.
+ */
+export async function refreshTitleCard(want, pack = {}) {
+  const card = await titleCard(want, pack);
+  if (!card) return null;
+  // A wiki card that fell back to a plate is not an improvement on anything.
+  if ((want.wiki || want.wikiUrls) && !String(card.sourceId ?? '').startsWith('wiki:')) return null;
+  return card;
 }
 
 /**

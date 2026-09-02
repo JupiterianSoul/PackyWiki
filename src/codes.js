@@ -341,6 +341,30 @@ export function codeTitles(entry, lang = getLanguage()) {
   }));
 }
 
+const norm = (value) => String(value ?? '').trim().toLowerCase();
+
+/** Every name one card of a code has ever been drawn or stored under. */
+const cardAliases = (card) => [card.en, card.fr, card.page, card.name?.en, card.name?.fr]
+  .filter(Boolean).map(norm);
+
+/**
+ * The card a stored entry was meant to be, matched by name.
+ *
+ * A collection written by an older build holds special cards drawn from the
+ * wrong place, and their keys are not the keys they would get today. Names
+ * are what survived: the entry carries the display name it was dealt under,
+ * and the article it was read from, and one of the two always matches.
+ */
+export function codeCardFor(codeId, entry, lang = getLanguage()) {
+  const code = codeById(codeId);
+  if (!code) return null;
+  const marks = [entry?.title, entry?.article].filter(Boolean).map(norm);
+  if (!marks.length) return null;
+  const index = (code.cards ?? []).findIndex((card) => cardAliases(card).some((alias) => marks.includes(alias)));
+  if (index < 0) return null;
+  return codeTitles(code, lang)[index] ?? null;
+}
+
 /**
  * The Creator as a card, in the player's language, in the shape every drawn
  * card has. `special` names the code it came in with, so the card wears that

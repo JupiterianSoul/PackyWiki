@@ -521,6 +521,7 @@ const STRINGS = {
     oddsAny: 'Any page',
     regradeToast: 'Rarity rework: {n} of your cards were re-graded from their real popularity',
     langMigrated: '{n} cards were swapped for their English version',
+    specialFixed: '{n} special cards were redrawn from the right source',
     rarity: 'Rarity',
     chance: 'Chance',
 
@@ -1191,6 +1192,7 @@ const STRINGS = {
     oddsAny: 'Toute page',
     regradeToast: 'Refonte des raretés : {n} de vos cartes ont été reclassées selon leur vraie popularité',
     langMigrated: '{n} cartes ont été remplacées par leur version française',
+    specialFixed: '{n} cartes spéciales ont été redessinées depuis la bonne source',
     rarity: 'Rareté',
     chance: 'Chance',
 

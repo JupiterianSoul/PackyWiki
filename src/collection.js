@@ -215,6 +215,69 @@ export function receiveCardEntry(collection, incoming) {
 }
 
 /**
+ * Repair a special card in place.
+ *
+ * A card from a secret code is one exact thing, and an older build could
+ * write down the wrong one: the Tardigrades card in Terraforming Mars was
+ * stored as the animal, because the draw had lost the name of the wiki it
+ * was supposed to read. Rather than leave those collections wrong, the card
+ * is redrawn from the right source and swapped in underneath the player.
+ *
+ * Everything earned stays: how many copies, the favourite star, when it was
+ * first pulled, the booster it came from, and the code that locks it. Only
+ * the identity, the words and the picture change. The key changes with the
+ * source, so the old entry is removed and the new one merged onto whatever
+ * is already there.
+ */
+export function replaceSpecialCard(collection, oldEntry, card) {
+  if (!card?.key || !oldEntry?.key) return false;
+  if (card.key === oldEntry.key
+    && card.title === oldEntry.title
+    && card.extract === oldEntry.extract
+    && card.thumbnail === oldEntry.thumbnail) return false;
+  const kept = {
+    count: oldEntry.count ?? 1,
+    favorite: Boolean(oldEntry.favorite),
+    firstPulledAt: oldEntry.firstPulledAt ?? Date.now(),
+    lastPulledAt: oldEntry.lastPulledAt ?? Date.now(),
+    packId: oldEntry.packId,
+    packName: oldEntry.packName,
+    packIcon: oldEntry.packIcon,
+    packAccent: oldEntry.packAccent,
+    // A special card keeps its code, its tier and its price for good.
+    special: oldEntry.special,
+    creator: Boolean(oldEntry.creator),
+    rarityId: oldEntry.rarityId,
+    price: oldEntry.price
+  };
+  delete collection.entries[oldEntry.key];
+  const existing = collection.entries[card.key];
+  if (existing) {
+    existing.count += kept.count;
+    existing.favorite = existing.favorite || kept.favorite;
+    existing.firstPulledAt = Math.min(existing.firstPulledAt ?? kept.firstPulledAt, kept.firstPulledAt);
+  } else {
+    collection.entries[card.key] = {
+      key: card.key,
+      title: card.title,
+      description: card.description,
+      extract: card.extract,
+      thumbnail: card.thumbnail,
+      url: card.url,
+      lang: card.lang,
+      sourceId: card.sourceId,
+      sourceName: card.sourceName,
+      views: card.views,
+      popularity: card.popularity,
+      article: card.article ?? null,
+      ...kept
+    };
+  }
+  saveCollection(collection);
+  return true;
+}
+
+/**
  * Swap a card for the same article in another language.
  *
  * The card keeps everything the player earned on it - how many copies, the

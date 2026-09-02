@@ -24,7 +24,7 @@ import { oddsRows } from './data/odds.js';
 import { FX_STYLES, DEFAULT_FX, fxById, fxCost, fxUnlocked } from './data/fx.js';
 import * as odds from './data/odds.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
-import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard } from './wiki.js';
+import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard, refreshTitleCard } from './wiki.js';
 import {
   priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS,
   popularityFromViews, popularityFromWordCount
@@ -60,7 +60,7 @@ import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
 import { music } from './ui/music.js';
-import { canRedeem, codeByInput, codeById, codeLook, codeSpec, codeTitles, timesRedeemed, hasRedeemed, CREATOR, SPECIAL_RARITY_ID } from './codes.js';
+import { canRedeem, codeByInput, codeById, codeCardFor, codeLook, codeSpec, codeTitles, timesRedeemed, hasRedeemed, CREATOR, SPECIAL_RARITY_ID } from './codes.js';
 import {
   quizAvailable, buildQuiz, questionCountFor, quizRewards,
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
@@ -7545,6 +7545,61 @@ async function migrateLanguages() {
   toast(t('langMigrated', { n: moved }), 'ok');
 }
 
+/*
+ * Cards from a secret code that were drawn from the wrong place.
+ *
+ * A code names five exact things, and some of them do not live on Wikipedia:
+ * the Tardigrades CARD in Terraforming Mars, the neurotoxin turret, Sparkle.
+ * An older build lost the name of the wiki on the way to the draw and read
+ * the encyclopaedia article of the same name instead, so those collections
+ * hold the real animal. A card cannot be pulled again once it is owned, so
+ * the fix has to reach into what people already have: each one is redrawn
+ * from the right source and swapped in, keeping the copies, the star, the
+ * date and the album it belongs to.
+ *
+ * The same pass gives a picture to the ones that never got one.
+ */
+const SPECIAL_FIX_KEY = 'wiklodo.specialCards.v2';
+
+/** A picture that is really just the booster's colour with a name on it. */
+const isPlate = (src) => !src || String(src).startsWith('data:image/svg');
+
+async function migrateSpecialCards() {
+  if (!navigator.onLine) return;
+  try { if (localStorage.getItem(SPECIAL_FIX_KEY) === 'done') return; } catch { /* storage unavailable */ }
+  const owned = Object.values(state.collection.entries ?? {}).filter((entry) => entry.special && !entry.creator);
+  let fixed = 0;
+  let missed = 0;
+  const deadline = Date.now() + MIGRATE_BUDGET_MS;
+  for (const entry of owned) {
+    if (Date.now() > deadline || !navigator.onLine) { missed++; break; }
+    const want = codeCardFor(entry.special, entry);
+    if (!want) continue;
+    // Wrong source: the card names a wiki and was read off Wikipedia.
+    const wrongSource = Boolean(want.wiki || want.wikiUrls) && !String(entry.sourceId ?? '').startsWith('wiki:');
+    const noPicture = isPlate(entry.thumbnail);
+    if (!wrongSource && !noPicture) continue;
+    const card = await refreshTitleCard(want, {
+      special: entry.special,
+      fallbackArt: codeLook(codeById(entry.special)).accent
+    }).catch(() => null);
+    if (!card) { missed++; continue; }
+    // A card that is merely missing its picture is not replaced by another
+    // card with no picture: nothing was gained, and the entry stays as it is
+    // so a later launch can try again.
+    if (!wrongSource && isPlate(card.thumbnail)) { missed++; continue; }
+    if (store.replaceSpecialCard(state.collection, entry, card)) fixed++;
+  }
+  // Only stop asking once there is nothing left that a better connection
+  // could still repair.
+  if (!missed) { try { localStorage.setItem(SPECIAL_FIX_KEY, 'done'); } catch { /* storage unavailable */ } }
+  if (!fixed) return;
+  regradeCollection();
+  if (userId()) account.pushSave(userId()).catch(() => {});
+  if (state.tab === 'binder') { if (state.album) renderAlbum(); else renderBinder(); }
+  toast(t('specialFixed', { n: fixed }), 'ok');
+}
+
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
 /**
@@ -7633,6 +7688,9 @@ function init() {
   // Cards in the wrong language are swapped for their translation in the
   // background, a few at a time, so launch is never held up by the network.
   setTimeout(migrateLanguages, 3200);
+  // Special cards drawn from the wrong wiki are repaired in the same spirit:
+  // in the background, after launch, and never more than once when it works.
+  setTimeout(migrateSpecialCards, 1600);
 
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });
