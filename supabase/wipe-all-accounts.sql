@@ -22,10 +22,15 @@
 -- spent per save and there are no saves left.
 -- =============================================================================
 
-begin;
+-- Run this ONE STATEMENT AT A TIME if anything errors.
+--
+-- It is deliberately NOT wrapped in begin/commit. A transaction rolls the
+-- whole thing back the moment one statement fails, which is how a wipe can
+-- report an error and leave every account exactly where it was. Each line
+-- stands alone here, so a table this project does not have simply errors on
+-- its own line and the rest still run.
 
--- The game's own tables. Ordered child-first so nothing trips a foreign key on
--- a database where the cascades were not applied.
+-- The game's tables, child rows first.
 delete from public.auctions;
 delete from public.trades;
 delete from public.deliveries;
@@ -34,24 +39,31 @@ delete from public.friendships;
 delete from public.wishlists;
 delete from public.saves;
 
--- The shared card index. This is the record of every card anyone has pulled;
--- keeping it would leave the new first player looking at a full index on an
--- empty game, so it goes too.
+-- The shared card index: every card anyone has ever pulled.
 delete from public.codex;
 
--- Profiles: usernames, avatars, levels, presence. Every row.
+-- Usernames, avatars, levels, presence.
 delete from public.profiles;
 
--- The accounts themselves. Everything above references auth.users with
--- `on delete cascade`, so this would take most of it anyway; it runs last so
--- that a cascade failure cannot leave the game's tables half-emptied.
+-- The accounts themselves. This is the one that frees the email addresses.
+-- If it errors, see the note at the bottom.
 delete from auth.users;
 
-commit;
-
--- Check: all of these should be 0.
+-- Check: every one of these should be 0.
 select
   (select count(*) from auth.users)       as accounts,
   (select count(*) from public.profiles)  as profiles,
   (select count(*) from public.saves)     as saves,
   (select count(*) from public.codex)     as codex_cards;
+
+-- =============================================================================
+-- IF `delete from auth.users` REFUSES
+-- =============================================================================
+-- Some projects do not let the SQL editor's role touch the auth schema. In that
+-- case delete the accounts from the dashboard instead, which always works:
+--
+--   Authentication  ->  Users  ->  tick each row  ->  Delete user
+--
+-- There are only a handful, and everything above has already cleared what they
+-- owned. Deleting the user there also frees the address to sign up again.
+-- =============================================================================

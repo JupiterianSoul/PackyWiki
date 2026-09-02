@@ -313,7 +313,20 @@ export async function hardReset(userId) {
 export async function deleteAccount() {
   frozen = true;
   const { data, error } = await supabase.functions.invoke('delete-account', { body: {} });
-  if (error) throw error;
+  if (error) {
+    // supabase-js reports any non-2xx as the same sentence, which says nothing
+    // about what actually went wrong. The function answers with a reason in
+    // its body, so read that and report it instead.
+    let detail = '';
+    try {
+      const body = await error.context?.json?.();
+      detail = body?.error ? `${body.error}${body.status ? ` (${body.status})` : ''}` : '';
+    } catch { /* not JSON, or nothing to read */ }
+    if (!detail) {
+      try { detail = (await error.context?.text?.())?.slice(0, 200) ?? ''; } catch { /* nothing */ }
+    }
+    throw new Error(detail || error.message || 'DELETE_FAILED');
+  }
   if (data?.error) throw new Error(data.error);
   return true;
 }
