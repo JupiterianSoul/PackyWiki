@@ -54,6 +54,7 @@ import {
   exportSave, importSave, describeSave, parseSave, copyText, readText, onSaveChanged
 } from './save.js';
 import * as account from './account.js';
+import { BUILD, APK_URL, isApk, checkForUpdate } from './version.js';
 
 import { THEMES, DEFAULT_THEME, applyTheme, themeById } from './ui/themes.js';
 import { buildPackElement, buildCardBack } from './packview.js';
@@ -4655,7 +4656,10 @@ async function flushSync() {
   state.account.syncing = true;
   renderAccountRow();
   try {
-    await account.pushSave(userId());
+    const pushed = await account.pushSave(userId());
+    // An older build than the one that last saved this account: play on,
+    // never write. Said once, on screen, with the way out.
+    if (pushed === 'outdated') { state.account.outdated = true; showUpdateBar('outdated'); return; }
     await account.publishStats(userId(), currentStats());
     state.account.syncedAt = Date.now();
     state.account.failed = false;
@@ -4729,6 +4733,13 @@ async function enterApp() {
   hideGate();
   reloadFromStorage();
   if (!state.account.failed) state.account.syncedAt = Date.now();
+  // A save last written by an OLDER build (or one from before builds were
+  // stamped) may carry back what this build already repaired on another
+  // device, so the repairs are allowed to run again here.
+  if (!state.account.failed && account.saveFromOlderBuild()) {
+    for (const key of [SPECIAL_FIX_KEY, VIEWS_FIX_KEY]) { try { localStorage.removeItem(key); } catch { /* storage unavailable */ } }
+  }
+  if (!state.account.failed && account.saveFromNewerBuild()) { state.account.outdated = true; showUpdateBar('outdated'); }
   syncSocial();
   startSocialPoll();
 
@@ -7660,6 +7671,47 @@ async function migrateViews() {
   toast(t('viewsRepaired', { n: regraded }), 'ok');
 }
 
+/*
+ * The update bar.
+ *
+ * Two builds of different ages sign into the same account: the site the
+ * moment it is published, the APK whenever it was last reinstalled, and a
+ * copy of the site left on another host for as long as it stands. The bar
+ * is how a build finds out it is old, and it says what that costs: an old
+ * build keeps playing but stops writing the account's save (src/account.js).
+ */
+let updateBar = null;
+
+function showUpdateBar(why, latest = null) {
+  if (!updateBar) {
+    updateBar = document.createElement('div');
+    updateBar.className = 'update-bar';
+    updateBar.setAttribute('role', 'status');
+    document.body.appendChild(updateBar);
+  }
+  const apk = isApk();
+  const text = why === 'outdated' ? t('syncOutdated') : apk ? t('updateApk') : t('updateWeb');
+  const action = apk
+    ? `<a class="btn btn-primary" href="${APK_URL}" target="_blank" rel="noopener">${esc(t('updateGet'))}</a>`
+    : `<button type="button" class="btn btn-primary" data-act="reload">${esc(t('updateReload'))}</button>`;
+  updateBar.innerHTML = `<p>${esc(text)}</p>${action}<button type="button" class="btn btn-ghost" data-act="later">${esc(t('updateLater'))}</button>`;
+  updateBar.querySelector('[data-act="reload"]')?.addEventListener('click', () => location.reload());
+  updateBar.querySelector('[data-act="later"]').addEventListener('click', () => { updateBar.hidden = true; });
+  updateBar.hidden = false;
+  updateBar.dataset.latest = latest?.sha ?? '';
+}
+
+/** Ask the published site whether it is newer than this build: at most every half hour. */
+let lastUpdateLook = 0;
+async function lookForUpdate() {
+  if (!navigator.onLine || Date.now() - lastUpdateLook < 30 * 60 * 1000) return;
+  lastUpdateLook = Date.now();
+  const latest = await checkForUpdate();
+  if (!latest) return;
+  console.info(`Wiklodo ${BUILD.sha}: a newer build (${latest.sha}) is published`);
+  showUpdateBar('update', latest);
+}
+
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
 /**
@@ -7754,6 +7806,12 @@ function init() {
   // Cards graded while their readership request failed are re-graded from
   // the readership they actually have. Same spirit: background, budgeted.
   setTimeout(migrateViews, 5200);
+  // Whether a newer build is out: asked once at launch, and again whenever
+  // the app comes back to the foreground after a while away.
+  setTimeout(lookForUpdate, 4000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') lookForUpdate();
+  });
 
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });

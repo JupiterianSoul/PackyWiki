@@ -26,6 +26,8 @@ export const SAVE_KEYS = [
   'packywiki.theme'
 ];
 
+import { BUILD } from './version.js';
+
 const FORMAT = 'wiklodo-save';
 const VERSION = 1;
 
@@ -62,7 +64,9 @@ export function exportSave() {
       if (value !== null) data[key] = value;
     } catch { /* unreadable storage: skip the key rather than fail the export */ }
   }
-  return JSON.stringify({ format: FORMAT, version: VERSION, at: Date.now(), data }, null, 1);
+  // The build that wrote it rides along, so a save can be told from one
+  // written by a newer build and left alone by an older one.
+  return JSON.stringify({ format: FORMAT, version: VERSION, at: Date.now(), build: BUILD, data }, null, 1);
 }
 
 /** Roughly what is in a save, for the confirmation line before importing. */

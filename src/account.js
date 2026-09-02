@@ -16,6 +16,7 @@
  *      costs a sync, never a card. Reads happen at sign-in.
  */
 import { normalizeRarityId, rarityIdAliases } from './data/rarities.js';
+import { BUILD, isNewerBuild } from './version.js';
 import { createClient } from '@supabase/supabase-js';
 import { exportSave, importSave, parseSave } from './save.js';
 
@@ -257,11 +258,28 @@ export async function publishStats(userId, stats) {
  */
 let frozen = false;
 
+/*
+ * The build that last wrote the account's save, learned at sign-in. This
+ * build must not write over a save a NEWER build wrote: the site updates the
+ * moment it is published while an installed APK waits to be reinstalled, and
+ * an old build that pushed would put back everything the new one repaired
+ * and drop whatever it does not know how to keep. The old build plays on
+ * what it pulled; it just stops syncing until it is updated.
+ */
+let remoteBuild = null;
+export const remoteBuildStamp = () => remoteBuild;
+export const saveFromNewerBuild = () => isNewerBuild(remoteBuild);
+/** Whether the save pulled at sign-in was written by an older build (or one with no stamp). */
+export const saveFromOlderBuild = () => Boolean(remoteBuild === null || (remoteBuild && !isNewerBuild(remoteBuild) && remoteBuild.sha !== BUILD.sha));
+
 export async function pushSave(userId) {
-  if (frozen) return;
+  if (frozen) return 'frozen';
+  if (saveFromNewerBuild()) return 'outdated';
   const { error } = await supabase.from('saves')
     .upsert({ user_id: userId, data: JSON.parse(exportSave()) }, { onConflict: 'user_id' });
   if (error) throw error;
+  remoteBuild = BUILD;
+  return 'pushed';
 }
 
 /**
@@ -382,6 +400,7 @@ export async function fetchSave(userId) {
  */
 export async function syncOnLogin(userId) {
   const remote = await fetchSave(userId);
+  remoteBuild = remote?.data?.build ?? null;
   if (remote?.data && parseSave(JSON.stringify(remote.data))) {
     const ok = importSave(JSON.stringify(remote.data));
     return ok ? 'pulled' : 'kept';
