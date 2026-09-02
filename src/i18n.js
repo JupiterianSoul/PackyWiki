@@ -494,7 +494,7 @@ const STRINGS = {
     walletSpendTitle: 'Spending',
 
     pullRates: 'Pull rates',
-    oddsNote: 'Rarity now belongs to the article itself: the more people read a page each month, the higher its tier. Every player sees the same rarity on the same card. A tiered booster always contains at least one card of its own tier, and fills the rest from one tier below it and up.',
+    oddsNote: 'Rarity now belongs to the article itself: the more people read a page each month, the higher its tier. Every player sees the same rarity on the same card. A tiered booster always contains at least one card of its own tier and never pays out above it; when its subject runs thin, the rest are the most read pages below the tier, which still beats a booster with no tier at all.',
     oddsViews: 'Reads per month',
     oddsAny: 'Any page',
     regradeToast: 'Rarity rework: {n} of your cards were re-graded from their real popularity',
@@ -1142,7 +1142,7 @@ const STRINGS = {
     walletSpendTitle: 'Dépenser',
 
     pullRates: 'Taux de tirage',
-    oddsNote: 'La rareté appartient désormais à l’article lui-même : plus une page est lue chaque mois, plus son palier est élevé. Tous les joueurs voient la même rareté sur la même carte. Un booster à palier contient toujours au moins une carte de son palier, et complète le reste à partir du palier juste en dessous.',
+    oddsNote: 'La rareté appartient désormais à l’article lui-même : plus une page est lue chaque mois, plus son palier est élevé. Tous les joueurs voient la même rareté sur la même carte. Un booster à palier contient toujours au moins une carte de son palier et ne paie jamais au-dessus ; quand son sujet s’épuise, le reste vient des pages les plus lues sous le palier, ce qui vaut encore mieux qu’un booster sans palier.',
     oddsViews: 'Lectures par mois',
     oddsAny: 'Toute page',
     regradeToast: 'Refonte des raretés : {n} de vos cartes ont été reclassées selon leur vraie popularité',

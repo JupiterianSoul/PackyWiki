@@ -330,12 +330,19 @@ async function gatherCandidates(pack) {
 }
 
 /**
- * Cards from the most-read list, filtered to a popularity floor. This is the
- * only place pages famous enough for the upper tiers reliably live: a random
- * article is Common almost by definition, so topping a tiered booster up from
- * the random pool is precisely what made its tier look like it did nothing.
+ * Cards from the most-read list, inside a popularity BAND. Used for one thing
+ * only: handing a tier booster the single card of its own tier that its
+ * subject could not supply.
+ *
+ * The band matters as much as the floor. This list is the thousand most-read
+ * pages on Wikipedia, so its opening entries are famous beyond any tier but
+ * the very top; drawing from it with only a floor would answer "this pack
+ * needs an Epic" with a Mythic, and a tier booster that pays out above its
+ * own tier is as broken as one that pays out below it. The list is shuffled
+ * before it is read so the search covers its whole range rather than its
+ * head, since the tail is where the middle tiers live.
  */
-async function drawFamous(pack, seen, floor, wanted) {
+async function drawFamous(pack, seen, floor, ceiling, wanted) {
   if (wanted <= 0) return [];
   const rows = await topArticles().catch(() => []);
   const fresh = shuffled(rows.filter((row) => !seen.has(row.title)));
@@ -351,6 +358,7 @@ async function drawFamous(pack, seen, floor, wanted) {
       if (!bestImage(page) || !isUsableText(page.title, page.extract)) continue;
       const card = pageToCard(page, views.get(page.title) ?? null);
       if (!card || card.popularity < floor) continue;
+      if (ceiling != null && card.popularity >= ceiling) continue;
       seen.add(card.title);
       out.push(card);
     }
@@ -398,30 +406,32 @@ async function drawWikipediaSet(pack) {
   // with no trace of the tier printed on it. The most-read list is asked for
   // one card the subject could not supply.
   if (!out.length && pack.minPopularity != null && !outOfTime()) {
-    for (const card of await drawFamous(pack, seen, pack.minPopularity, 1).catch(() => [])) {
+    for (const card of await drawFamous(pack, seen, pack.minPopularity, pack.maxPopularity, 1).catch(() => [])) {
       out.push(card);
     }
   }
 
-  // A booster ALWAYS opens. Anything that was merely outside the tier's band
-  // fills the rest, closest first, before we go looking any further. With only
-  // a floor to miss, closest is also most-read, so the pack fills downward
-  // from its own tier rather than from wherever.
+  // A booster ALWAYS opens, so whatever missed the band fills the rest. Which
+  // misses are preferred is the whole question. Sorting purely by how narrowly
+  // a card missed would put the ones ABOVE the band first, since those miss by
+  // a hair, and an Epic pack would quietly fill with Mythics: the overshoot
+  // walks back in through the filler. So the ones below the band go first,
+  // narrowest miss first, which is also most-read first and is exactly the
+  // "better than an ordinary booster" the tier is paid for. Cards above the
+  // band are the last resort, taken only to avoid handing over a short pack.
   if (out.length < wanted) {
-    nearMisses.sort((a, b) => a.miss - b.miss);
-    for (const { card } of nearMisses) {
+    const top = pack.maxPopularity;
+    const under = [];
+    const over = [];
+    for (const miss of nearMisses) {
+      (top != null && miss.card.popularity >= top ? over : under).push(miss);
+    }
+    under.sort((a, b) => a.miss - b.miss);
+    over.sort((a, b) => a.miss - b.miss);
+    for (const { card } of [...under, ...over]) {
       if (out.length >= wanted) break;
       if (seen.has(card.title)) continue;
       seen.add(card.title);
-      out.push(card);
-    }
-  }
-
-  // Still short, and the pack has a tier to live up to: the most-read list
-  // again, at the floor one tier below the pack's own, so the rest of an Epic
-  // booster is Rare and up rather than whatever the random pool coughs up.
-  if (out.length < wanted && pack.fillPopularity != null && !outOfTime()) {
-    for (const card of await drawFamous(pack, seen, pack.fillPopularity, wanted - out.length).catch(() => [])) {
       out.push(card);
     }
   }

@@ -89,14 +89,25 @@ random hand from that list.
 A booster can carry a rarity on its face, and that is a promise about what is
 inside it:
 
-- It **always contains at least one card of that tier**. If the subject
-  cannot supply one, the draw goes to the most-read list and finds one.
-- The **rest of the pack starts one tier below**. An Epic booster fills with
-  Rare and up, a Rare booster with Uncommon and up.
+A tier is a **band**, not a floor. `[minPop, maxPop)` of that tier is what the
+booster may draw, so a booster deals cards of the rarity printed on it.
 
-Both halves of that matter. Before, a tier booster that ran out of famous
-pages on its subject quietly topped itself up from the open pool, and an Epic
-pack could contain five Commons, which made the tier look decorative.
+- It **always contains at least one card of that tier**. If the subject cannot
+  supply one, the draw takes it from the most-read list, constrained to the
+  same band so the answer to "this pack owes an Epic" is an Epic.
+- It **never pays out above the tier**. When the band runs thin, the rest are
+  the most-read pages *below* it, which still beats a booster with no tier at
+  all, since that one draws from its subject with no preference for readership.
+
+Both failures matter equally. A tier booster that fills from the open pool is
+worthless: an Epic pack holding five Commons is what the old floor-only draw
+produced whenever a subject ran short of famous pages. But a tier booster that
+reliably deals above its tier is not generous, it is mispriced, and it makes
+the ladder meaningless from the other end. The band closes both.
+
+One consequence worth knowing: filling from below is deliberate. A booster
+always opens, so a subject with almost nothing in the band still hands over a
+full pack, weighted to the most-read pages it does have.
 
 ### Custom boosters
 

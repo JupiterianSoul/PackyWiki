@@ -7590,7 +7590,7 @@ init();
 
 window.__packywiki = {
   state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
-  draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor,
+  draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor, drawPack: toDrawPack,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {
     const forced = rarityById(id);
