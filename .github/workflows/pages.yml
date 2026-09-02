@@ -1,10 +1,13 @@
 # The website version of Wiklodo: the same build the APK wraps, served from
 # GitHub Pages so anyone can play in a browser, desktop included.
 #
-# No setup needed: the configure step turns Pages on itself the first time it
-# runs. Every push publishes, and a run can be started by hand from the
-# Actions tab. If the enablement step is ever refused, the manual equivalent
-# is Settings > Pages > Build and deployment > Source: GitHub Actions.
+# One thing has to be done by hand, once, by someone who owns the repository:
+# Settings > Pages > Build and deployment > Source: GitHub Actions. A
+# workflow cannot do it for you. The token Actions hands this job may read
+# the Pages settings but not create the site, so until that switch is
+# flipped every run stops at the configure step with "Resource not
+# accessible by integration". After it, every push publishes, and a run can
+# also be started by hand from the Actions tab.
 name: Publish the website
 
 on:
@@ -54,9 +57,10 @@ jobs:
       - name: Add the fallback page
         run: cp dist/index.html dist/404.html
 
-      # enablement turns Pages on for the repository if it is off, using the
-      # workflow's own pages: write permission. Without it the step fails with
-      # "Get Pages site failed" until someone flips the switch by hand.
+      # enablement asks GitHub to create the Pages site if it is missing. It
+      # succeeds only where the repository's token is allowed to administer
+      # Pages; otherwise this step is where the run stops, and the fix is the
+      # one-off setting named at the top of this file.
       - uses: actions/configure-pages@v5
         with:
           enablement: true
