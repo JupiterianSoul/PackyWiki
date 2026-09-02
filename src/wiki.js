@@ -14,7 +14,7 @@
  * Everything funnels through `toCard`, so a card has the same shape either way.
  */
 import { popularityFromViews, popularityFromWordCount } from './pricing.js';
-import { RARITIES, rarityRank, rarityFromPopularity, tierBand } from './data/rarities.js';
+import { RARITIES, rarityRank } from './data/rarities.js';
 import { rollRarity } from './data/odds.js';
 import { wikiLang, getLanguage } from './i18n.js';
 
@@ -408,9 +408,7 @@ function rollWishes(pack, wanted) {
 
 /**
  * The highest tier a pack may hand out. Only a timed booster has one: its
- * track level caps how famous a page it may pull, so a roll above the cap is
- * brought down to it. Nothing is owed for that: the cap is printed on the
- * track, so the pack never promised more.
+ * track level caps the print, so a roll above the cap is brought down to it.
  */
 function ceilingRank(pack) {
   if (pack.maxPopularity == null) return RARITIES.length - 1;
@@ -420,67 +418,40 @@ function ceilingRank(pack) {
   return 0;
 }
 
-/** Cards filed by the rarity their popularity gives them. */
-function shelveByRarity(cards, shelves = new Map()) {
-  for (const card of cards) {
-    const id = rarityFromPopularity(card.popularity).id;
-    if (!shelves.has(id)) shelves.set(id, []);
-    shelves.get(id).push(card);
-  }
-  return shelves;
-}
+/** The rolls, brought under the pack's ceiling. */
+const cappedWishes = (pack, wishes) => {
+  const ceiling = ceilingRank(pack);
+  return wishes.map((wish) => (rarityRank(wish) > ceiling ? RARITIES[ceiling].id : wish));
+};
 
 /**
- * The card a wish gets off the shelves: its own tier first, then down one
- * tier at a time, then up to the ceiling as a last resort rather than a
- * short pack. Null only when every shelf is bare.
+ * Pages turned into cards. Readership is the article's FAME, which sets the
+ * price; it no longer decides the tier, so a page that came without it is
+ * still a card, priced off its size, and a few missing counts are asked for
+ * once, all at the same time.
  */
-function takeForWish(wish, shelves, ceiling) {
-  const start = Math.min(rarityRank(wish), ceiling);
-  for (let rank = start; rank >= 0; rank--) {
-    const shelf = shelves.get(RARITIES[rank].id);
-    if (shelf?.length) return shelf.shift();
-  }
-  for (let rank = start + 1; rank <= ceiling; rank++) {
-    const shelf = shelves.get(RARITIES[rank].id);
-    if (shelf?.length) return shelf.shift();
-  }
-  return null;
-}
-
-/**
- * Whether a card is a debt against its wish: only when the player got LESS
- * than the roll promised. Landing above it is not being short-changed: a
- * subject whose pages are all famous would otherwise pay a booster for every
- * Common it could not find, which is a reward for the pack being too good.
- */
-const fellShort = (wish, card, ceiling) =>
-  rarityRank(rarityFromPopularity(card.popularity).id) < Math.min(rarityRank(wish), ceiling);
-
-/**
- * Pages turned into graded cards.
- *
- * Nearly every page arrives with its readership on it and costs nothing
- * more. The few that came without (a page created this week, an extension
- * hiccup) are asked about once, all at the same time, and a page whose
- * readership still cannot be had is LEFT OUT rather than guessed at: a
- * Wikipedia card's tier is its readership, and stamping Common on a page
- * because a request failed is how a Legendary pack dealt five Commons and
- * then wrote them into the shared codex that way for everyone.
- */
-async function gradePages(pages, seen, outOfTime) {
+async function pagesToCards(pages, seen, outOfTime) {
   const fresh = pages.filter((page) => !seen.has(page.title) && bestImage(page) && isUsableText(page.title, page.extract));
   for (const page of fresh) seen.add(page.title);
-  const known = fresh.filter((page) => viewsOf(page) != null);
-  // A few pages without readership are asked about; a whole batch without
-  // it means the counts did not come with the pages at all, and then every
-  // page is asked, still all at once, so a pool is one wave and not eight.
-  const unknown = fresh.filter((page) => viewsOf(page) == null).slice(0, known.length ? 8 : POOL_LIMIT * 2);
-  const looked = outOfTime() ? [] : await Promise.all(unknown.map(async (page) => {
-    const views = await fetchMonthlyViews(page.title).catch(() => null);
-    return views == null ? null : pageToCard(page, views);
-  }));
-  return [...known.map((page) => pageToCard(page, viewsOf(page))), ...looked].filter(Boolean);
+  const unknown = fresh.filter((page) => viewsOf(page) == null).slice(0, 8);
+  const looked = new Map();
+  if (!outOfTime() && unknown.length) {
+    await Promise.all(unknown.map(async (page) => {
+      looked.set(page.title, await fetchMonthlyViews(page.title).catch(() => null));
+    }));
+  }
+  return fresh.map((page) => pageToCard(page, viewsOf(page) ?? looked.get(page.title) ?? null)).filter(Boolean);
+}
+
+/**
+ * Stamp each card with the print it was rolled. The print is what the
+ * booster promised; the article is whatever the subject had. The two are
+ * independent, which is the whole point: an Epic pack deals Epics at its
+ * printed rate in every subject, thin or famous.
+ */
+function stampPrints(cards, wishes) {
+  cards.forEach((card, i) => { card.rarityId = wishes[i] ?? wishes[wishes.length - 1] ?? RARITIES[0].id; });
+  return cards;
 }
 
 async function drawWikipediaSet(pack) {
@@ -491,47 +462,19 @@ async function drawWikipediaSet(pack) {
 
   if (navigator.onLine === false) throw new Error('OFFLINE');
 
-  // The rarities this pack owes, rolled first. The draw's whole job below is
-  // to go and find a page for each one.
-  const wishes = rollWishes(pack, wanted);
-  const ceiling = ceilingRank(pack);
-
-  // One pool for the whole pack, graded on arrival: about three requests.
-  const shelves = shelveByRarity(await gradePages(await gatherCandidates(pack), seen, outOfTime));
-
-  // Hand each wish a card off its own shelf. When the subject cannot serve a
-  // rarity, the pack does NOT go looking for it somewhere else: leaving the
-  // subject to satisfy a roll is how an Animals booster ends up holding a
-  // footballer. It drops a tier instead, and the player is owed a booster of
-  // the rarity that could not be served, which is what keeps that fair.
-  const out = [];
-  const owed = [];
-  for (const wish of wishes) {
-    const card = takeForWish(wish, shelves, ceiling);
-    if (!card) continue;
-    out.push(card);
-    if (fellShort(wish, card, ceiling)) owed.push(wish);
-  }
+  // The prints this pack deals, rolled first; then any pages of the subject.
+  const wishes = cappedWishes(pack, rollWishes(pack, wanted));
+  const out = (await pagesToCards(await gatherCandidates(pack), seen, outOfTime)).slice(0, wanted);
 
   // Still short (a dead query, a thin subject): random articles, which always
-  // exist, rather than an error the player cannot do anything about. They
-  // arrive graded like everything else, so a round is one request.
+  // exist, rather than an error the player cannot do anything about.
   for (let round = 0; out.length < wanted && round < 2 && !outOfTime(); round++) {
-    const extra = await gradePages(await randomPool().catch(() => []), seen, outOfTime);
-    const spare = shelveByRarity(extra);
-    while (out.length < wanted) {
-      const card = takeForWish(wishes[out.length] ?? 'common', spare, ceiling);
-      if (!card) break;
-      out.push(card);
-    }
+    const extra = await pagesToCards(await randomPool().catch(() => []), seen, outOfTime);
+    for (const card of extra) { if (out.length >= wanted) break; out.push(card); }
   }
 
   if (!out.length) throw new Error(`No usable article found for "${pack.name}"`);
-  // What the subject could not serve travels with the cards, so the opener can
-  // pay the debt. A plain array everywhere else in the app, so this rides on
-  // it rather than changing the shape of every draw.
-  out.owed = owed;
-  return out;
+  return stampPrints(out, wishes);
 }
 
 /* --- custom wikis -------------------------------------------------------- */
@@ -840,25 +783,6 @@ async function wikiForLanguage(wiki) {
   }
 }
 
-/** Article bytes needed before its word count can read as this popular. */
-function bytesForPopularity(minPopularity) {
-  const words = Math.pow(10, Math.log10(20000) * Math.pow(minPopularity, 1 / 1.15)) - 1;
-  return Math.max(0, Math.round(words * 6));
-}
-
-const AZ = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
-
-/** Titles of pages at least this big, from a random letter on: one request. */
-async function bigTitles(wiki, minPopularity, limit = 30) {
-  const params = new URLSearchParams({
-    action: 'query', list: 'allpages', apnamespace: '0', apfilterredir: 'nonredirects',
-    apminsize: String(bytesForPopularity(minPopularity)),
-    apfrom: pick(AZ), aplimit: String(limit), format: 'json', origin: '*'
-  });
-  return ((await fetchJson(`${wiki.apiUrl}?${params}`))?.query?.allpages ?? [])
-    .filter((r) => r.pageid).map((r) => r.pageid);
-}
-
 /** Random page ids: one request. */
 async function randomIds(wiki, limit = 20) {
   const params = new URLSearchParams({
@@ -952,61 +876,29 @@ async function drawCustomSet(pack) {
   if (navigator.onLine === false) throw new Error('OFFLINE');
 
   const wiki = await wikiForLanguage(pack.wiki);
-  const wishes = rollWishes(pack, wanted);
-  const ceiling = ceilingRank(pack);
+  const wishes = cappedWishes(pack, rollWishes(pack, wanted));
 
-  // Listings, all at once: random pages for the ordinary end, and pages big
-  // enough for each of the better tiers the roll asked for.
-  const floors = [...new Set(wishes.filter((w) => rarityRank(w) >= 2).map((w) => tierBand(w).min))]
-    .sort((a, b) => b - a).slice(0, 2);
-  const lists = await Promise.all([
-    randomIds(wiki, 20).catch(() => []),
-    ...floors.map((floor) => bigTitles(wiki, floor).catch(() => []))
-  ]);
-  const seen = new Set();
-  const ids = [...new Set(lists.flat())];
-
-  // Details twenty a request, in parallel; then sized up and shelved.
-  const chunks = [];
-  for (let i = 0; i < ids.length && chunks.length < 4; i += POOL_LIMIT) chunks.push(ids.slice(i, i + POOL_LIMIT));
-  const details = (await Promise.all(chunks.map((chunk) => customPagesDetail(wiki, chunk).catch(() => [])))).flat();
-  const shelves = shelveByRarity(details.map(protoCard).filter(Boolean));
-
+  // A listing of random pages, then their details twenty a request; the
+  // pages the draw settles on pay for their text and picture, all at once.
+  // A page without a picture is not a card, so a round can come up short and
+  // the next round asks for more.
   const out = [];
-  const owed = [];
-  let pending = wishes.slice();
-  // A chosen page can turn out to have no picture, in which case its wish
-  // goes back on the pile and the next page off the shelf is tried. Every
-  // round finishes its whole pile at once.
-  for (let round = 0; pending.length && round < 4 && !outOfTime(); round++) {
-    const picks = [];
-    const rest = [];
-    for (const wish of pending) {
-      const proto = takeForWish(wish, shelves, ceiling);
-      if (proto && !seen.has(proto.page.title)) { seen.add(proto.page.title); picks.push({ wish, proto }); }
-      else rest.push(wish);
-    }
-    const built = await Promise.all(picks.map(({ proto }) => finishCustomCard(wiki, proto, pack).catch(() => null)));
-    pending = rest;
-    picks.forEach(({ wish, proto }, i) => {
-      const card = built[i];
-      if (!card) { pending.push(wish); return; }
-      out.push(card);
-      if (fellShort(wish, proto, ceiling)) owed.push(wish);
-    });
-    // Shelves bare and wishes left: one more helping of random pages.
-    if (pending.length && rest.length === pending.length && !outOfTime()) {
-      const more = await randomIds(wiki, 20).catch(() => []);
-      const fresh = (await customPagesDetail(wiki, more.filter((id) => !ids.includes(id))).catch(() => []))
-        .map(protoCard).filter(Boolean);
-      if (!fresh.length) break;
-      shelveByRarity(fresh, shelves);
-    }
+  const seen = new Set();
+  for (let round = 0; out.length < wanted && round < 4 && !outOfTime(); round++) {
+    const ids = (await randomIds(wiki, 20).catch(() => []));
+    const details = (await customPagesDetail(wiki, ids).catch(() => []))
+      .map(protoCard).filter((proto) => proto && !seen.has(proto.page.title));
+    for (const proto of details) seen.add(proto.page.title);
+    // Only as many as are still needed, plus a couple of spares for the
+    // pictureless.
+    const picks = details.slice(0, wanted - out.length + 2);
+    const built = await Promise.all(picks.map((proto) => finishCustomCard(wiki, proto, pack).catch(() => null)));
+    for (const card of built) { if (card && out.length < wanted) out.push(card); }
+    if (!details.length) break;
   }
 
   if (!out.length) throw new Error(`No usable page found on ${wiki.sitename}`);
-  out.owed = owed;
-  return out;
+  return stampPrints(out, wishes);
 }
 
 /** The article's full plain text (lead and body), for the quiz. */

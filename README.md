@@ -65,11 +65,9 @@ A card is one Wikipedia article. Drawing one means:
    shown blank.
 3. **Insist on real text.** Disambiguation pages, list articles and stubs
    whose opening lines say nothing are rejected.
-4. **Ask how many people read it.** Monthly pageviews come from the Wikimedia
-   REST API, and that number alone decides the card's rarity.
-
-The same article is therefore the same rarity for every player in the world,
-which is the property the whole economy rests on.
+4. **Ask how many people read it.** Monthly pageviews come back with the
+   page itself, and that number is the article's **fame**: it sets the price.
+   It does not decide the rarity; the booster does, below.
 
 Cards are drawn in the language the app is set to. A French card that has no
 French article falls back to the English one rather than vanishing.
@@ -84,18 +82,14 @@ Darwin Awards. Two of them are curated rolls rather than searches: their
 articles are named outright in `src/data/packs.js` and the booster deals a
 random hand from that list.
 
-### Tier boosters
+### Rarity is the print
 
-A booster can carry a rarity on its face, and that is a promise about what is
-inside it:
-
-Rarity is rolled, then the card is found. Per card, twice over:
-
-1. **Roll a rarity** off the booster's odds row.
-2. **Find an article that has it**, from the popularity range that rarity means.
-
-Rarity is still the article's own property, so the same page is the same rarity
-for everyone. What the table decides is what the draw goes looking for.
+Rarity is rolled when a pack is opened, one roll per card, off the booster's
+odds row. The roll is the card's rarity: its **print**, the way a physical
+card is a common or a foil of the same picture. The article is drawn from the
+subject separately. The two are independent, which is the whole point: an
+Epic pack deals Epics at its printed rate in every subject, thin or famous,
+and nothing has to be owed, capped or repaired afterwards.
 
 A tier booster rolls on a better row and, on top of that, always contains at
 least one card of its tier. A card above the promised tier keeps the promise:
@@ -115,18 +109,8 @@ a Legendary in an Epic pack is not a broken one.
 The whole table lives in `src/data/odds.js`. Booster prices are computed from
 it, so tuning a row reprices the shop rather than desynchronising it.
 
-### When a subject cannot serve a roll
-
-Roll a Mythic in an Animals booster and the subject may hold no page that
-famous. The draw does **not** go looking elsewhere: a footballer in an Animals
-pack is worse than a missing tier. It drops a tier instead, and the player is
-owed a single-card booster of the rarity that went missing, with no subject of
-its own so it can actually deliver it.
-
-One card owed, one card paid, and that size is load bearing. Paying a full pack
-for one missing card is a fivefold rebate, and the odds make that ruinous: a
-Prismatic booster rolls a rarity its subject cannot serve in 98% of openings,
-so it would refund itself nearly every time.
+Pull an article you already own at a better print and the better print takes
+its place in the collection, copies kept. That is what a duplicate is for.
 
 ### Custom boosters
 
@@ -141,30 +125,20 @@ card index.
 
 ## Rarity
 
-Eight tiers, decided entirely by monthly readership:
-
-| Tier | Reads per month, roughly |
-| --- | --- |
-| Common | anything |
-| Uncommon | 2,000 |
-| Rare | 13,000 |
-| Epic | 57,000 |
-| Legendary | 160,000 |
-| Mythic | 360,000 |
-| Exotic | 700,000 |
-| Prismatic | 1,300,000 |
+Eight tiers, rolled per card as described above, plus **Special**, which sits
+outside the table and cannot be drawn (see [Secret codes](#secret-codes)).
 
 Each tier has its own treatment on the card: foils, refraction, glare that
 follows the phone's gyroscope, and for the top tiers an animated surface. The
-odds sheet in the app explains the whole scale to players.
+odds sheet in the app shows the exact rates for the booster in front of you.
 
-There is a ninth rarity, **Special**, which sits outside this table and cannot
-be drawn. See [Secret codes](#secret-codes).
+A collection written before prints existed keeps the tiers it had: a card
+with no tier on record is graded once from its fame, and never again.
 
 ## Money
 
-The currency is Buckarooz. A card's price comes from its readership and its
-tier, selling returns a fraction of that price, and boosters are priced from
+The currency is Buckarooz. A card's price comes from its fame and its print,
+selling returns a fraction of that price, and boosters are priced from
 what they can be expected to contain, so opening and selling always loses
 money on average. That is deliberate: the collection is the point, not the
 arbitrage.

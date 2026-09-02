@@ -10,9 +10,9 @@
  * stored rarity is always the BEST pull of that article - pulling Tardigrade
  * again as a Legendary upgrades the entry.
  */
-import { rarityRank, normalizeRarityId } from './data/rarities.js';
+import { rarityRank, normalizeRarityId, rarityById } from './data/rarities.js';
 import { albumKeyOf, customSlug } from './albums.js';
-import { bandFor } from './pricing.js';
+import { bandFor, priceFor } from './pricing.js';
 import { specId } from './booster.js';
 import {
   STARTER_COINS, STIPEND, STIPEND_MAX_BANKED, windowIndexAt, freeWindowAt
@@ -116,14 +116,12 @@ export function recordPulls(collection, pulls, spec) {
 
     existing.count += 1;
     existing.lastPulledAt = at;
-    // Rarity is the article's readership, and this pull knows it. A copy
-    // graded earlier while the readership request failed is put right here,
-    // whichever way that goes: the tier follows the page, not the first pull.
+    // The article's fame is refreshed by every pull that knows it; the print
+    // is only ever replaced by a better one, just below.
     if (!existing.special && article.views != null && Number.isFinite(article.popularity)) {
       existing.views = article.views;
       existing.popularity = article.popularity;
-      existing.rarityId = rarity.id;
-      existing.price = price;
+      existing.price = priceFor(existing.popularity, rarityById(existing.rarityId));
     }
     if (rarityRank(rarity.id) > rarityRank(existing.rarityId)) {
       existing.rarityId = rarity.id;

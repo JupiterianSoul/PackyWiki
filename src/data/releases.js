@@ -294,5 +294,28 @@ export const RELEASES = [
       { en: 'Notifications can be cleared once read; the launcher icon changes safely when the game is put away', fr: 'Les notifications lues peuvent être effacées ; l’icône change sans risque quand le jeu est mis de côté' },
       { en: 'The Android app ships as a release build rather than a debug one, which is the version Android words its install warnings least harshly about. Same signing key, so it still installs over your copy and keeps your collection', fr: 'L’application Android est désormais une version release plutôt qu’une version debug, celle sur laquelle Android formule ses avertissements le moins durement. Même clé de signature : elle s’installe toujours par-dessus votre copie et conserve votre collection' }
     ]
+  },
+  {
+    id: 'wikster', icon: 'spark', accent: '#a78bfa',
+    title: { en: 'Wikster, and rarity is the print', fr: 'Wikster, et la rareté est l’impression' },
+    points: [
+      { en: 'The game is called Wikster', fr: 'Le jeu s’appelle Wikster' },
+      { en: 'Rarity is rolled with the pack, at the same rates in every subject', fr: 'La rareté se tire avec le booster, aux mêmes taux dans tous les sujets' },
+      { en: 'A better print of a card you own replaces it', fr: 'Une meilleure impression d’une carte possédée la remplace' },
+      { en: 'The app updates itself, and music fades from one track to the next', fr: 'L’appli se met à jour toute seule, et la musique enchaîne en fondu' }
+    ],
+    changelog: [
+      { en: 'Rarity is the print: rolled per card off the booster’s odds row when the pack is opened, and the article is drawn from the subject on its own. An Epic pack deals Epics at its printed rate whatever the subject holds; nothing is owed, capped or re-graded afterwards', fr: 'La rareté est l’impression : tirée par carte selon la table du booster à l’ouverture, l’article étant tiré du sujet à part. Un booster Épique distribue des Épiques à son taux quel que soit le sujet ; plus rien n’est dû, plafonné ou reclassé après coup' },
+      { en: 'Fame (monthly readers) sets the price and the Famous band, and no longer the tier. A card graded while its readership request had failed is priced right on the next launch', fr: 'La notoriété (lecteurs par mois) fixe le prix et la bande Célèbre, plus le palier. Une carte classée alors que sa requête d’audience avait échoué est correctement valorisée au prochain lancement' },
+      { en: 'Pulling an article already owned at a better print replaces the lesser print, copies kept', fr: 'Retirer un article déjà possédé avec une meilleure impression remplace l’ancienne, exemplaires conservés' },
+      { en: 'A booster is two to seven requests: readership comes back with the page, and custom wikis are drawn from one listing rather than a search per card', fr: 'Un booster tient en deux à sept requêtes : l’audience revient avec la page, et les wikis personnalisés se tirent d’une seule liste plutôt que d’une recherche par carte' },
+      { en: 'Every card’s picture starts downloading the moment the draw has chosen it, and smaller pictures are asked for on a slow line', fr: 'L’image de chaque carte se télécharge dès que le tirage l’a choisie, et des images plus petites sont demandées sur une connexion lente' },
+      { en: 'The Android app opens the published site and only falls back to its built-in copy offline, so every publish reaches it with no reinstall', fr: 'L’appli Android ouvre le site publié et ne se rabat sur sa copie intégrée que hors ligne : chaque publication l’atteint sans réinstallation' },
+      { en: 'An older build never overwrites a save written by a newer one; a bar says when a newer build is out', fr: 'Une ancienne version n’écrase jamais une sauvegarde écrite par une plus récente ; une barre signale qu’une version plus récente existe' },
+      { en: 'A deleted account is signed out at launch instead of walking in on a stale token', fr: 'Un compte supprimé est déconnecté au lancement au lieu d’entrer avec un jeton périmé' },
+      { en: 'Remove all cards tells the account before reloading, so the cards no longer come straight back', fr: 'Retirer toutes les cartes prévient le compte avant de recharger, les cartes ne reviennent donc plus aussitôt' },
+      { en: 'Special cards come from their own wikis (the Terraforming Mars card, not the animal), and the ones already owned are repaired', fr: 'Les cartes spéciales viennent de leurs propres wikis (la carte Terraforming Mars, pas l’animal), et celles déjà possédées sont réparées' },
+      { en: 'Music crossfades from one track to the next', fr: 'La musique enchaîne les morceaux en fondu' }
+    ]
   }
 ];

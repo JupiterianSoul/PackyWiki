@@ -19,7 +19,7 @@
  */
 
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
-import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityOfCard, rarityThresholds } from './data/rarities.js';
+import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityOfCard } from './data/rarities.js';
 import { oddsRows } from './data/odds.js';
 import { FX_STYLES, DEFAULT_FX, fxById, fxCost, fxUnlocked } from './data/fx.js';
 import * as odds from './data/odds.js';
@@ -1340,7 +1340,7 @@ function buildFeatured({ spec, price, fullPrice, pct }) {
 function buildVault(items) {
   const list = document.createElement('div');
   list.className = 'vault';
-  list.replaceChildren(...items.map(({ id, spec, price, rarity, minViews }) => {
+  list.replaceChildren(...items.map(({ id, spec, price, rarity }) => {
     const row = document.createElement('div');
     row.className = 'vault-row';
     row.dataset.spec = id;
@@ -1350,7 +1350,7 @@ function buildVault(items) {
       <div class="vault-copy"><b></b><p class="tabular"></p></div>`;
     row.querySelector('b').textContent = specName(spec);
     row.querySelector('p').textContent =
-      `${t('shopItemMeta', { n: spec.cards })} · ${t('shopMinFame', { views: formatViews(minViews) })}`;
+      `${t('shopItemMeta', { n: spec.cards })} · ${t('shopGuarantee', { rarity: tx(rarity.name) })}`;
     row.appendChild(buyButton(spec, price));
     return row;
   }));
@@ -2002,11 +2002,6 @@ async function runOpen(booster) {
     return false;
   }
 
-  // A rarity the roll asked for that the subject could not serve. The pack
-  // dropped a tier rather than go looking outside its own subject, so the
-  // player is owed a booster of the rarity that went missing. Read before the
-  // shuffle below, which would build a new array and lose it.
-  const owed = Array.isArray(articles.owed) ? articles.owed : [];
   warmPictures(articles);
 
   const colours = specColours(state.spec);
@@ -2014,10 +2009,9 @@ async function runOpen(booster) {
   // A special booster keeps its order: the five things, then The Creator.
   const ordered = state.spec.kind === 'code' ? articles : shuffle(articles);
   const pulls = ordered.map((article) => {
-    // The pack chose what it was allowed to draw; the page itself decides
-    // what it is. Same article, same rarity, for everyone. A card from a
-    // secret code is Special, whatever its readership.
-    const rarity = article.special ? rarityById(SPECIAL_RARITY_ID) : rarityFromPopularity(article.popularity);
+    // The print is what the booster rolled; the article's fame sets the
+    // price. A card from a secret code is Special, whatever was rolled.
+    const rarity = article.special ? rarityById(SPECIAL_RARITY_ID) : rarityOfCard(article);
     return {
       article, rarity,
       price: priceFor(article.popularity, article.special ? rarityById('prismatic') : rarity),
@@ -2038,7 +2032,6 @@ async function runOpen(booster) {
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
   // The cards are in the collection now, so the booster is honestly gone.
   store.clearOpenInFlight();
-  payTheDebt(owed);
 
   // A special booster is a gift, not progress: no opening counted, no
   // rarity tally, no experience. Everything else about it is untouched.
@@ -2059,37 +2052,6 @@ async function runOpen(booster) {
   layoutDeck();
   revealCurrent();
   return true;
-}
-
-/**
- * Hand over a booster for a rarity the subject could not serve.
- *
- * The draw refuses to leave its subject to satisfy a roll, because a
- * footballer in an Animals pack is worse than a missing tier. The roll still
- * happened, though, so the player is owed it: a booster of that rarity, in a
- * subject picked at random, which is where that rarity actually lives.
- *
- * What is owed is ONE CARD of that rarity, so that is what is paid: a
- * single-card booster, and one of them however many rolls went unserved.
- *
- * The size is the whole point of this being safe. Paying a full five-card pack
- * for one missing card is a fivefold rebate, and the odds make that ruinous
- * rather than generous: measured over the rows, a Prismatic booster rolls a
- * rarity its subject cannot serve in 98% of openings, so it would refund
- * itself nearly every time and print money. One card owed, one card paid.
- *
- * It has no subject on purpose. A themed pack of that rarity could fail the
- * same way the original did and owe a booster in its turn; a subjectless pack
- * draws from the most-read list as well as the random pool, so it spans every
- * tier and can actually deliver what it promises.
- */
-function payTheDebt(owed) {
-  if (!owed?.length || state.spec?.kind === 'code') return;
-  const best = owed.reduce((a, b) => (rarityRank(b) > rarityRank(a) ? b : a));
-  store.addBooster(state.inventory, { kind: 'open', themeId: null, rarityId: best, cards: 1 }, 1);
-  const name = tx(rarityById(best).name);
-  toast(esc(t('owedBooster', { rarity: name })), 'ok');
-  pushNote('gift', t('owedBooster', { rarity: name }), 'packs');
 }
 
 /* --- cards --------------------------------------------------------------------------------- */
@@ -5995,7 +5957,7 @@ async function startQuiz(themeId) {
     }
     if (state.quiz !== q) return;
     q.card = article;
-    q.rarity = rarityFromPopularity(article.popularity);
+    q.rarity = rarityOfCard(article);
     q.count = questionCountFor(q.rarity.id);
     q.step = 'preview';
     renderQuiz();
@@ -7430,7 +7392,7 @@ function openOdds(rarityId = null) {
       <p style="margin-bottom:12px" data-note></p>
       <p style="margin-bottom:16px" data-row></p>
       <table class="odds-table">
-        <thead><tr><th></th><th></th><th></th></tr></thead>
+        <thead><tr><th></th><th></th></tr></thead>
         <tbody></tbody>
       </table>`;
     body.querySelector('[data-note]').textContent = t('oddsNote');
@@ -7438,14 +7400,12 @@ function openOdds(rarityId = null) {
     rowNote.textContent = rarityId
       ? t('oddsRowTier', { rarity: tx(rarityById(rarityId).name) })
       : t('oddsRowBasic');
-    const [h1, h2, h3] = body.querySelectorAll('th');
+    const [h1, h2] = body.querySelectorAll('th');
     h1.textContent = t('rarity');
     h2.textContent = t('oddsChance');
-    h3.textContent = t('oddsViews');
-    const views = new Map(rarityThresholds().map((r) => [r.rarity.id, r.views]));
     body.querySelector('tbody').replaceChildren(...oddsRows(rarityId).map(({ rarity, pct }) => {
       const row = document.createElement('tr');
-      row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span></span></span></td><td class="odds-pct tabular"></td><td class="odds-pct"></td>`;
+      row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span></span></span></td><td class="odds-pct tabular"></td>`;
       const swatch = row.querySelector('.odds-swatch');
       swatch.style.color = rarity.color;
       swatch.style.background = rarity.color;
@@ -7456,8 +7416,6 @@ function openOdds(rarityId = null) {
       // Below a tenth of a percent, a rounded number reads as zero and looks
       // like the tier cannot happen at all.
       cells[0].textContent = pct >= 0.1 ? `${pct}%` : '< 0.1%';
-      const need = views.get(rarity.id) ?? 0;
-      cells[1].textContent = need <= 0 ? t('oddsAny') : `\u2265 ${formatViews(need)}`;
       return row;
     }));
   });
@@ -7753,10 +7711,11 @@ async function lookForUpdate() {
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
 /**
- * One-time re-grade after the rarity rework: rarity is a function of
- * popularity now, so every stored card is re-derived from what we know of its
- * article. Cards from wikis without stats fall back to their word count, and
- * the profile's per-rarity tallies are rebuilt to match what is owned.
+ * The collection, priced. The print is the card's own and is never touched
+ * here; a card written before prints existed, with no tier on it, is graded
+ * once from its fame so it comes up with a tier at all. Prices follow fame
+ * and print, and the profile's per-rarity tallies are rebuilt to match what
+ * is owned.
  */
 function regradeCollection() {
   let changed = 0;
@@ -7770,7 +7729,7 @@ function regradeCollection() {
         : popularityFromWordCount(entry.wordCount);
       entry.popularity = pop;
     }
-    const rarity = rarityFromPopularity(pop);
+    const rarity = entry.rarityId ? rarityById(entry.rarityId) : rarityFromPopularity(pop);
     const price = priceFor(pop, rarity);
     if (entry.rarityId !== rarity.id || entry.price !== price) {
       entry.rarityId = rarity.id;
@@ -7829,10 +7788,9 @@ function init() {
   const pruned = store.pruneImagelessCards(state.collection);
   if (pruned) console.info(`Removed ${pruned} pictureless card(s) from the collection`);
 
-  // Rarity belongs to the article now. Saves from before the rework carry
-  // rolled rarities, so owned cards are re-graded from popularity once here.
-  // Silent on purpose: it runs on every launch so a save can never drift
-  // out of step with the rarity table, and nobody needs telling twice.
+  // Prices follow fame and print; a card from before prints existed gets its
+  // tier here. Silent on purpose: it runs on every launch and changes
+  // nothing on a save that is already right.
   regradeCollection();
 
   // Cards in the wrong language are swapped for their translation in the

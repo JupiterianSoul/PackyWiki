@@ -15,7 +15,7 @@
  * Prismatic booster you cannot buy is one you cannot farm.
  */
 import { THEME_PACKS } from './data/packs.js';
-import { RARITIES, rarityRank, tierBand, viewsAtPopularity } from './data/rarities.js';
+import { RARITIES, rarityRank } from './data/rarities.js';
 import {
   CARD_COUNT_RANGE, windowIndexAt, boosterPrice, FREE_SLOTS, FREE_CARDS, freeWindowAt
 } from './economy.js';
@@ -154,7 +154,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
       cards: between(rng, 4, 6)
     });
     if (item) {
-      vault.push({ ...item, rarity, minViews: viewsAtPopularity(tierBand(rarity.id).min) });
+      vault.push({ ...item, rarity });
     }
   }
   vault.sort((a, b) => rarityRank(a.rarity.id) - rarityRank(b.rarity.id));

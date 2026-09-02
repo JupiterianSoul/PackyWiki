@@ -1,16 +1,9 @@
 /*
  * PULL RATES.
  *
- * How a card is drawn, in two steps and in this order:
- *
- *   1. Roll a rarity off the table below.
- *   2. Go and find an article whose readership puts it in THAT rarity's band.
- *
- * This is the opposite of what the draw used to do, which was to find an
- * article and read its rarity off afterwards. Rarity is still the article's
- * own property, decided by how many people read the page each month, so the
- * same page is still the same rarity for every player: what the table decides
- * is what the draw goes looking for, not what it finds.
+ * A booster rolls one rarity per card off the table below, and that roll IS
+ * the card's rarity: its print. The article the card shows is drawn from the
+ * subject separately, so the rates hold in every subject, however thin.
  *
  * A booster with a tier printed on it uses a better row. Each row moves the
  * weight up one rarity, keeps a long tail underneath so a pack still has

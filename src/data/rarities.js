@@ -1,22 +1,19 @@
 /**
  * RARITY TABLE
  * ----------------------------------------------------------------------------
- * Rarity is EARNED BY THE ARTICLE, not rolled. The more read a page is, the
- * higher its tier: a card's rarity is a pure function of its popularity
- * (monthly pageviews on Wikipedia, article size on wikis without stats).
- * Price then follows from the two together:
+ * Rarity is the PRINT: it is rolled when a booster is opened, off the pack's
+ * odds row (src/data/odds.js), and belongs to that copy of the card. The
+ * same article can be pulled as a Common one day and a Legendary the next,
+ * and the better print takes the place of the lesser in the collection.
  *
- *     tier  = the tier whose threshold the popularity clears
+ * The article itself has FAME: how many people read the page each month, on
+ * the 0..1 popularity scale from src/pricing.js. Fame sets the price, and the
+ * tier scales it:
+ *
  *     price = basePrice(popularity) x (1 + tier.bonusPct / 100)
  *
- * So the same article is always the same rarity for every player, tiered
- * boosters are packs that only draw sufficiently famous subjects, and "what
- * are the odds" becomes "how famous does a page have to be", which is what
- * the odds sheet now answers.
- *
- * `minPop` is on the 0..1 popularity scale from src/pricing.js, where views
- * map as log10(views + 1) / 6.3. The comment on each row is the monthly
- * pageview count that threshold corresponds to.
+ * `minPop` is only used to grade a card written before prints existed, so
+ * an old collection comes up with the tiers it already had.
  */
 export const RARITIES = [
   { id: 'common',    name: { en: 'Common', fr: 'Commune' },        minPop: 0,     bonusPct: 0,    color: '#9aa5b1', glow: 'rgba(154, 165, 177, 0.45)', flash: 0 },
@@ -74,25 +71,3 @@ export function rarityFromPopularity(popularity) {
  */
 export const rarityOfCard = (card) =>
   card?.rarityId ? rarityById(card.rarityId) : rarityFromPopularity(card?.popularity);
-
-/** Where a tier's popularity band runs: [minPop, maxPop). */
-export function tierBand(id) {
-  const rank = rarityRank(id);
-  const min = RARITIES[rank]?.minPop ?? 0;
-  const max = RARITIES[rank + 1]?.minPop ?? 1;
-  return { min, max };
-}
-
-/** The middle of a tier's band, for pricing a pack before its articles exist. */
-export const tierMidPopularity = (id) => {
-  const { min, max } = tierBand(id);
-  return (min + max) / 2;
-};
-
-/** Monthly pageviews a popularity corresponds to (inverse of the log map). */
-export const viewsAtPopularity = (popularity) =>
-  Math.max(0, Math.round(Math.pow(10, popularity * 6.3) - 1));
-
-/** Rows for the odds sheet: what a page must be read like to reach each tier. */
-export const rarityThresholds = () =>
-  RARITIES.map((rarity) => ({ rarity, views: viewsAtPopularity(rarity.minPop) }));

@@ -15,7 +15,7 @@
  * so E[sell everything] = RETURN_RATE × price, for every booster in the game.
  * Progression therefore comes from time (the shop stipend), not from grinding.
  */
-import { RARITIES, rarityRank, rarityFromPopularity, tierMidPopularity, tierBand } from './data/rarities.js';
+import { RARITIES, rarityById } from './data/rarities.js';
 import { oddsFor } from './data/odds.js';
 import { basePrice, priceFor } from './pricing.js';
 import { timedDrawCaps } from './timed.js';
@@ -82,18 +82,14 @@ export function expectedCardValue(spec) {
   if (spec?.kind === 'timed') {
     const caps = timedDrawCaps(spec.timedLevel ?? 1);
     const pop = Math.min(TYPICAL_POP, caps.maxPopularity ?? 1);
-    return priceFor(pop, rarityFromPopularity(pop));
+    return priceFor(pop, rarityById('common'));
   }
+  // The print is rolled and the article's fame is whatever the subject gives,
+  // so a card is worth the typical fame times the tier it was rolled.
   const row = oddsFor(spec?.rarityId ?? null);
   let value = 0;
   for (let i = 0; i < RARITIES.length; i++) {
-    const rarity = RARITIES[i];
-    const { min, max } = tierBand(rarity.id);
-    // The low part of each band, since readership thins out fast above every
-    // threshold: a card that just cleared Epic is far commoner than one deep
-    // inside the band.
-    const pop = min + (max - min) * 0.35;
-    value += ((row[i] ?? 0) / 100) * priceFor(pop, rarity);
+    value += ((row[i] ?? 0) / 100) * priceFor(TYPICAL_POP, RARITIES[i]);
   }
   return value;
 }
