@@ -7091,7 +7091,7 @@ async function deleteAccountForGood(button) {
  * built from them. Wiping those would take away something a code can only
  * hand over once.
  */
-function removeAllCards() {
+async function removeAllCards() {
   const kept = {};
   for (const [key, entry] of Object.entries(state.collection.entries ?? {})) {
     if (entry?.special) kept[key] = entry;
@@ -7111,9 +7111,24 @@ function removeAllCards() {
   store.saveWishlist([]);
   try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); } catch { /* session only */ }
 
-  // The server holds the same save, so it has to hear about this or the next
-  // launch pulls the cards straight back down.
-  syncSoon();
+  // The server holds the same save, so it has to hear about this BEFORE the
+  // reload, or the next launch pulls the cards straight back down. That is
+  // exactly what happened when this only queued a sync and reloaded: the
+  // reload killed the queued push, and the wipe looked like it had done
+  // nothing. If the push cannot be made now, the device keeps its wiped
+  // save, the sync keeps trying, and the reload waits for it.
+  if (signedIn()) {
+    clearTimeout(syncTimer);
+    let pushed = null;
+    try { pushed = await account.pushSave(userId()); } catch { pushed = null; }
+    if (pushed !== 'pushed') {
+      if (pushed === 'outdated') showUpdateBar('outdated');
+      else { toast(esc(t('syncFailedKept')), 'error'); syncSoon(); }
+      renderPacks(); renderBinder(); refreshWallet();
+      return;
+    }
+    account.publishStats(userId(), currentStats()).catch(() => {});
+  }
   toast(esc(t('settingsCardWipeDone')), 'ok');
   location.reload();
 }
