@@ -53,6 +53,13 @@ Deno.serve(async (req: Request) => {
   const projectUrl = Deno.env.get('SUPABASE_URL') ?? '';
   const serviceKey = Deno.env.get('SERVICE_ROLE_KEY')
     ?? Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  // The ANON key, not the service key, is what identifies a caller's token to
+  // the auth API. Sending the service key as `apikey` alongside a player's
+  // bearer token is a mismatch the API answers with 403, which reads exactly
+  // like a rejected user and is not one.
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+    ?? Deno.env.get('ANON_KEY')
+    ?? Deno.env.get('SUPABASE_PUBLISHABLE_KEY') ?? '';
   const authHeader = req.headers.get('Authorization') ?? '';
 
   if (!projectUrl || !serviceKey) {
@@ -64,12 +71,15 @@ Deno.serve(async (req: Request) => {
   // WHO is asking. The token decides, so a caller can only reach their own row.
   let userId = '';
   try {
-    const who = await fetch(`${projectUrl}/auth/v1/user`, {
-      headers: { Authorization: authHeader, apikey: serviceKey }
-    });
+    const headers: Record<string, string> = { Authorization: authHeader };
+    // Without an anon key, ask with no apikey at all rather than with the
+    // wrong one: the bearer token alone is enough for this endpoint.
+    if (anonKey) headers.apikey = anonKey;
+    const who = await fetch(`${projectUrl}/auth/v1/user`, { headers });
     if (!who.ok) {
-      console.error('delete-account: caller rejected', who.status);
-      return json({ error: 'UNAUTHORISED' }, 401);
+      const detail = (await who.text()).slice(0, 200);
+      console.error('delete-account: caller rejected', who.status, detail);
+      return json({ error: 'UNAUTHORISED', status: who.status, detail }, 401);
     }
     userId = (await who.json())?.id ?? '';
   } catch (err) {
