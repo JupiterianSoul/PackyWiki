@@ -66,6 +66,15 @@ export function rarityFromPopularity(popularity) {
   return RARITIES[0];
 }
 
+/**
+ * The tier of a card as it travels: the one on record, else the one its
+ * readership earns. `rarityById` answers Common for anything it does not
+ * know, so a card that arrived without a tier (an auction row, an index row
+ * written by an older build) must not be asked that way.
+ */
+export const rarityOfCard = (card) =>
+  card?.rarityId ? rarityById(card.rarityId) : rarityFromPopularity(card?.popularity);
+
 /** Where a tier's popularity band runs: [minPop, maxPop). */
 export function tierBand(id) {
   const rank = rarityRank(id);

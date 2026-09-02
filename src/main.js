@@ -19,12 +19,12 @@
  */
 
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
-import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityThresholds } from './data/rarities.js';
+import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityOfCard, rarityThresholds } from './data/rarities.js';
 import { oddsRows } from './data/odds.js';
 import { FX_STYLES, DEFAULT_FX, fxById, fxCost, fxUnlocked } from './data/fx.js';
 import * as odds from './data/odds.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
-import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard, refreshTitleCard } from './wiki.js';
+import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard, refreshTitleCard, fetchViewsFor } from './wiki.js';
 import {
   priceFor, formatAmount, formatViews, bandFor, POPULARITY_BANDS,
   popularityFromViews, popularityFromWordCount
@@ -3443,7 +3443,7 @@ function codexCardData(row) {
 
 function indexTile(row) {
   const data = codexCardData(row);
-  const rarity = rarityById(data.rarityId) ?? RARITIES[0];
+  const rarity = rarityOfCard(data);
   const card = buildStaticCard(data, rarity, null, { fav: false, ownedTag: true });
   card.addEventListener('click', () => { synth.playTap(); openCardDetail(data.key, data, rarity, { fromIndex: true }); });
   return card;
@@ -3851,7 +3851,7 @@ function marketRows() {
 function auctionTile(a) {
   const me = userId();
   const m = state.market;
-  const rarity = rarityById(a.card?.rarityId) ?? rarityFromPopularity(a.card?.popularity ?? 0);
+  const rarity = rarityOfCard(a.card);
 
   const tile = document.createElement('div');
   tile.className = 'auction-tile';
@@ -3937,8 +3937,7 @@ function openAuctionSheet(auctionId) {
       <div class="market-actions"></div>`;
     const art = wrap.querySelector('.market-art');
     if (a.card?.thumbnail) art.style.backgroundImage = `url("${String(a.card.thumbnail).replace(/"/g, '%22')}")`;
-    const rarity = rarityById(a.card?.rarityId);
-    if (rarity) art.style.borderColor = rarity.color;
+    art.style.borderColor = rarityOfCard(a.card).color;
 
     const line = (label, html) =>
       `<p class="market-line"><span>${esc(label)}</span><b>${html}</b></p>`;
@@ -7600,6 +7599,59 @@ async function migrateSpecialCards() {
   toast(t('specialFixed', { n: fixed }), 'ok');
 }
 
+/*
+ * Wikipedia cards graded while their readership request failed.
+ *
+ * Rarity is readership, and readership used to come from a second request
+ * per card that timed out whenever the connection was slow. A card whose
+ * request failed was stamped Common (its popularity fell back to the word
+ * count, which the draw never had) and stored that way for good: a Legendary
+ * pack under a bad connection dealt five Commons. Those cards are recognised
+ * by having no readership on record, asked about twenty at a time, and
+ * re-graded to the tier the page has always deserved. Cards from other wikis
+ * have no readership to ask about and are left alone.
+ */
+const VIEWS_FIX_KEY = 'wiklodo.viewsRepair.v1';
+
+async function migrateViews() {
+  if (!navigator.onLine) return;
+  try { if (localStorage.getItem(VIEWS_FIX_KEY) === 'done') return; } catch { /* storage unavailable */ }
+  const byLang = new Map();
+  for (const entry of Object.values(state.collection.entries ?? {})) {
+    if (entry.special || entry.views != null) continue;
+    const source = String(entry.sourceId ?? '');
+    if (!source.startsWith('wikipedia:')) continue;
+    const lang = source.slice('wikipedia:'.length) || 'en';
+    if (!byLang.has(lang)) byLang.set(lang, []);
+    byLang.get(lang).push(entry);
+  }
+  let fixed = 0;
+  let missed = 0;
+  for (const [lang, entries] of byLang) {
+    // Sixty cards a launch, three requests: the rest wait for the next one.
+    const batch = entries.slice(0, 60);
+    if (batch.length < entries.length) missed++;
+    const views = await fetchViewsFor(batch.map((entry) => entry.title), lang).catch(() => null);
+    if (!views) { missed++; continue; }
+    for (const entry of batch) {
+      const n = views.get(entry.title);
+      // A page with no readership at all is a real answer: leave it be.
+      if (n == null) continue;
+      entry.views = n;
+      entry.popularity = popularityFromViews(n);
+      fixed++;
+    }
+  }
+  if (!missed) { try { localStorage.setItem(VIEWS_FIX_KEY, 'done'); } catch { /* storage unavailable */ } }
+  if (!fixed) return;
+  store.saveCollection(state.collection);
+  const regraded = regradeCollection();
+  if (userId()) account.pushSave(userId()).catch(() => {});
+  if (!regraded) return;
+  if (state.tab === 'binder') { if (state.album) renderAlbum(); else renderBinder(); }
+  toast(t('viewsRepaired', { n: regraded }), 'ok');
+}
+
 /* --- wiring ------------------------------------------------------------------------------------------------------------ */
 
 /**
@@ -7691,6 +7743,9 @@ function init() {
   // Special cards drawn from the wrong wiki are repaired in the same spirit:
   // in the background, after launch, and never more than once when it works.
   setTimeout(migrateSpecialCards, 1600);
+  // Cards graded while their readership request failed are re-graded from
+  // the readership they actually have. Same spirit: background, budgeted.
+  setTimeout(migrateViews, 5200);
 
   walletOdo = new Odometer(el.walletAmount);
   levelRing = new Ring(el.levelBadge, { size: 40, width: 3 });

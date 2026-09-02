@@ -522,6 +522,7 @@ const STRINGS = {
     regradeToast: 'Rarity rework: {n} of your cards were re-graded from their real popularity',
     langMigrated: '{n} cards were swapped for their English version',
     specialFixed: '{n} special cards were redrawn from the right source',
+    viewsRepaired: '{n} cards were re-graded from their real readership',
     rarity: 'Rarity',
     chance: 'Chance',
 
@@ -1193,6 +1194,7 @@ const STRINGS = {
     regradeToast: 'Refonte des raretés : {n} de vos cartes ont été reclassées selon leur vraie popularité',
     langMigrated: '{n} cartes ont été remplacées par leur version française',
     specialFixed: '{n} cartes spéciales ont été redessinées depuis la bonne source',
+    viewsRepaired: '{n} cartes ont été reclassées d’après leur vraie audience',
     rarity: 'Rareté',
     chance: 'Chance',
 

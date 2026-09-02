@@ -1,3 +1,4 @@
+import { RARITIES } from './data/rarities.js';
 /**
  * ACHIEVEMENTS
  * ============================================================================
@@ -59,7 +60,9 @@ export function measure({ profile, entries, albumsDeep, albumsStarted = 0, custo
     maxViews: entries.reduce((m, e) => Math.max(m, e.views ?? 0), 0),
     favorites: entries.filter((e) => e.favorite).length,
     maxCopies: entries.reduce((m, e) => Math.max(m, e.count), 0),
-    raritiesOwned: new Set(entries.map((e) => e.rarityId)).size
+    // The eight tiers of the table: Special is outside it and a card with no
+    // tier on record is not a ninth one.
+    raritiesOwned: new Set(entries.map((e) => e.rarityId).filter((id) => RARITIES.some((r) => r.id === id))).size
   };
 }
 

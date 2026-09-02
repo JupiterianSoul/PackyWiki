@@ -117,6 +117,15 @@ export function recordPulls(collection, pulls, spec) {
 
     existing.count += 1;
     existing.lastPulledAt = at;
+    // Rarity is the article's readership, and this pull knows it. A copy
+    // graded earlier while the readership request failed is put right here,
+    // whichever way that goes: the tier follows the page, not the first pull.
+    if (!existing.special && article.views != null && Number.isFinite(article.popularity)) {
+      existing.views = article.views;
+      existing.popularity = article.popularity;
+      existing.rarityId = rarity.id;
+      existing.price = price;
+    }
     if (rarityRank(rarity.id) > rarityRank(existing.rarityId)) {
       existing.rarityId = rarity.id;
       existing.price = price;
