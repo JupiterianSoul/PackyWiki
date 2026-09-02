@@ -88,9 +88,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release delete apk-latest --yes --cleanup-tag || true
+          # Every release carrying the tag goes, drafts included: a release
+          # that ends up untagged is a draft with this tag name, and it hides
+          # behind the name from then on. Then the tag is moved to this
+          # commit by hand, so the release is never left to make it.
+          for id in $(gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --jq '.[] | select(.tag_name=="apk-latest") | .id'); do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/$id" || true
+          done
+          git tag -f apk-latest "$GITHUB_SHA"
+          git push -f origin apk-latest
           gh release create apk-latest wikster.apk \
-            --target "$GITHUB_SHA" \
+            --verify-tag \
             --title "Wikster - latest APK" \
             --notes "Sideloadable release build of \`$GITHUB_SHA\`.
 
@@ -108,3 +116,6 @@ jobs:
           reinstall. The copy built into the APK is only used when the site
           cannot be reached. Needs a network connection - cards are fetched
           live from Wikipedia."
+          # Not a draft, tagged, with the file on it, or this run has failed.
+          gh release view apk-latest --json isDraft,tagName,assets \
+            --jq 'if .isDraft or .tagName != "apk-latest" or (.assets | length) == 0 then error("release not published") else "published" end'
