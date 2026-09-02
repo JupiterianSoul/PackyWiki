@@ -1579,3 +1579,83 @@ html[data-lowpower='1'] [data-rarity="special"] .fx-a::after { animation: none !
    Settings, Show card values. */
 :root[data-prices='0'] .card-price,
 :root[data-prices='0'] .detail-price { display: none; }
+
+/* --- JULIEN: the melt ------------------------------------------------------
+   Beige on beige, and the only special treatment that runs down the card
+   rather than across it: a sheet of warm cream easing from the top edge, the
+   way the wheel goes when the element has been on a while. */
+[data-special="julien"] {
+  --sp-warm: #f5ead6;
+  --sp-crust: #d8c39a;
+  --sp-dark: #5c4426;
+}
+[data-special="julien"] .card-front {
+  background:
+    radial-gradient(120% 80% at 50% -10%, rgba(245, 234, 214, 0.3), transparent 60%),
+    linear-gradient(178deg, #3a2a17 0%, #241a0f 58%, #17100a 100%);
+}
+[data-special="julien"] .fx-a::before {
+  content: '';
+  position: absolute;
+  inset: -30% -10% auto -10%;
+  height: 62%;
+  background:
+    radial-gradient(58% 100% at 22% 0%, var(--sp-warm) 0 42%, transparent 72%),
+    radial-gradient(48% 100% at 55% 0%, var(--sp-warm) 0 46%, transparent 76%),
+    radial-gradient(56% 100% at 82% 0%, var(--sp-warm) 0 40%, transparent 70%);
+  opacity: 0.34;
+  filter: blur(1px);
+  transform: translate3d(calc(var(--tx, 0) * 2%), calc(var(--ty, 0) * 3%), 0);
+}
+.card.is-lit[data-special="julien"] .fx-a::before { animation: sp-melt 9s ease-in-out infinite; }
+@keyframes sp-melt {
+  0%, 100% { transform: translate3d(0, -2%, 0); }
+  50% { transform: translate3d(0, 4%, 0); }
+}
+[data-special="julien"] .fx-b {
+  box-shadow: inset 0 0 0 1px rgba(216, 195, 154, 0.55),
+    inset 0 22px 42px -26px rgba(245, 234, 214, 0.85);
+}
+[data-special="julien"] .card-desc { color: var(--sp-crust); }
+
+/* --- CATHERINE: the page ---------------------------------------------------
+   Turquoise ink on paper. Ruled lines under the text and a corner that lifts,
+   so the card reads as a leaf out of something rather than a screen. */
+[data-special="catherine"] {
+  --sp-ink: #2dd4bf;
+  --sp-paper: #ccfbf1;
+}
+[data-special="catherine"] .card-front {
+  background:
+    radial-gradient(90% 60% at 74% 12%, rgba(45, 212, 191, 0.22), transparent 62%),
+    linear-gradient(168deg, #11423c 0%, #0b2b28 62%, #061a18 100%);
+}
+[data-special="catherine"] .fx-p::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    180deg, transparent 0 15px, rgba(204, 251, 241, 0.09) 15px 16px);
+  opacity: 0.6;
+  transform: translate3d(0, calc(var(--ty, 0) * 1.5%), 0);
+  pointer-events: none;
+}
+/* The lifted corner, bottom right, catching the lamp. */
+[data-special="catherine"] .fx-b::before {
+  content: '';
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 42%;
+  height: 30%;
+  background: linear-gradient(315deg, rgba(204, 251, 241, 0.22) 0%, transparent 58%);
+  clip-path: polygon(100% 0, 100% 100%, 0 100%);
+  pointer-events: none;
+}
+.card.is-lit[data-special="catherine"] .fx-b::before { animation: sp-leaf 7s ease-in-out infinite; }
+@keyframes sp-leaf {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+[data-special="catherine"] .fx-b { box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.5); }
+[data-special="catherine"] .card-desc { color: var(--sp-ink); }

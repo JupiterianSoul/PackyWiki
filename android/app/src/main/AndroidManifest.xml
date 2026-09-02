@@ -83,6 +83,34 @@
         </activity-alias>
 
         <activity-alias
+            android:name=".Icon_lecture"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_lecture"
+            android:roundIcon="@mipmap/ic_launcher_lecture"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name=".Icon_raclette"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_raclette"
+            android:roundIcon="@mipmap/ic_launcher_raclette"
+            android:label="@string/app_name"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
             android:name=".Icon_apotheosis"
             android:enabled="false"
             android:exported="true"

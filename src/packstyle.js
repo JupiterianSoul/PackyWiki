@@ -123,6 +123,12 @@ const P = {
     repeating-linear-gradient(-64deg, rgba(255,247,214,${a * 0.7}) 0 1px, transparent 1px ${29 * s}px),
     repeating-linear-gradient(96deg, rgba(0,0,0,${a * 0.5}) 0 1px, transparent 1px ${41 * s}px)`,
 
+  /** Woven linen, the weave of a book's cloth binding. Reading. */
+  linen: (s = 1, a = 0.12) => `
+    repeating-linear-gradient(0deg, rgba(255,255,255,${a}) 0 1px, transparent 1px ${5 * s}px),
+    repeating-linear-gradient(90deg, rgba(255,255,255,${a * 0.8}) 0 1px, transparent 1px ${5 * s}px),
+    repeating-linear-gradient(0deg, rgba(0,0,0,${a * 0.4}) 0 1px, transparent 1px ${19 * s}px)`,
+
   /** Vinyl grooves ringing out from a centre. Music. */
   grooves: (s = 1, a = 0.14) => `
     repeating-radial-gradient(circle at 50% 42%,

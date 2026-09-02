@@ -324,6 +324,48 @@ export const THEMES = [
     }
   },
   {
+    id: 'raclette', code: 'julien',
+    name: { en: 'Raclette', fr: 'Raclette' },
+    blurb: {
+      en: 'Julien’s. Beige and lamplight, a half wheel under the heat, an evening that runs long.',
+      fr: 'Celui de Julien. Beige et lumière de lampe, une demi-meule sous la chauffe, une soirée qui s’étire.'
+    },
+    swatch: ['#241a0f', '#d8c39a', '#f5ead6'],
+    backdrop: { renderer: 'raclette', speed: 0.00012 },
+    motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    sound: {
+      voice: 'keys',
+      gain: 0.66,
+      root: 220,              // A3
+      scale: [0, 3, 5, 7, 10],
+      reverb: { seconds: 2.1, decay: 2.6, mix: 0.24 },
+      filter: 3200,
+      drive: 0.07,
+      transient: 'knock'
+    }
+  },
+  {
+    id: 'lecture', code: 'catherine',
+    name: { en: 'Reading', fr: 'Lecture' },
+    blurb: {
+      en: 'Catherine’s. Turquoise on paper, a lamp at the elbow, one more chapter before bed.',
+      fr: 'Celui de Catherine. Turquoise sur papier, une lampe au coude, encore un chapitre avant de dormir.'
+    },
+    swatch: ['#07201d', '#2dd4bf', '#ccfbf1'],
+    backdrop: { renderer: 'lecture', speed: 0.00009 },
+    motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    sound: {
+      voice: 'marimba',
+      gain: 0.6,
+      root: 293.66,           // D4
+      scale: [0, 2, 4, 7, 9],
+      reverb: { seconds: 2.4, decay: 2.2, mix: 0.26 },
+      filter: 4200,
+      drive: 0.03,
+      transient: 'brush'
+    }
+  },
+  {
     id: 'apotheosis', code: 'creator',
     name: { en: 'Apotheosis', fr: 'Apothéose' },
     blurb: {

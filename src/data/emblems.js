@@ -464,6 +464,28 @@ export const EMBLEMS = {
     <path d="M26 16 h10 v-6 h-10Z M46 16 h10 v-6 h-10Z M66 16 h10 v-6 h-10Z M86 16 h10 v-6 h-10Z" fill="${E1}"/>`,
 
   /* Two dice mid-tumble and a meeple standing between them. */
+  /* A half wheel of cheese on its board, cut face to the front. */
+  wheel: `
+    <ellipse cx="60" cy="104" rx="42" ry="6" fill="${INK}" opacity="0.3"/>
+    <rect x="16" y="88" width="88" height="10" rx="4" fill="${INK}" opacity="0.55"/>
+    <path d="M20 88 A40 40 0 0 1 100 88 Z" fill="${E1}"/>
+    <path d="M28 88 A32 32 0 0 1 92 88 Z" fill="${E2}" opacity="0.85"/>
+    <circle cx="46" cy="74" r="4" fill="${INK}" opacity="0.35"/>
+    <circle cx="64" cy="66" r="3" fill="${INK}" opacity="0.35"/>
+    <circle cx="78" cy="78" r="3.4" fill="${INK}" opacity="0.35"/>
+    <path d="M20 88 A40 40 0 0 1 100 88" fill="none" stroke="${INK}" stroke-width="3" opacity="0.5"/>`,
+
+  /* An open book, spine down, pages fanned either side. */
+  openbook: `
+    <ellipse cx="60" cy="102" rx="44" ry="6" fill="${INK}" opacity="0.3"/>
+    <path d="M60 44 C46 34 30 34 18 40 L18 90 C30 84 46 84 60 94 Z" fill="${E1}"/>
+    <path d="M60 44 C74 34 90 34 102 40 L102 90 C90 84 74 84 60 94 Z" fill="${E2}"/>
+    <path d="M60 44 L60 94" stroke="${INK}" stroke-width="3" opacity="0.55"/>
+    <path d="M28 50 L48 56 M28 60 L48 66 M28 70 L48 76" stroke="${INK}" stroke-width="2.4"
+      opacity="0.3" stroke-linecap="round"/>
+    <path d="M72 56 L92 50 M72 66 L92 60 M72 76 L92 70" stroke="${INK}" stroke-width="2.4"
+      opacity="0.3" stroke-linecap="round"/>`,
+
   dice: `
     <ellipse cx="60" cy="102" rx="44" ry="6" fill="${INK}" opacity="0.32"/>
     <g transform="rotate(-14 38 62)">

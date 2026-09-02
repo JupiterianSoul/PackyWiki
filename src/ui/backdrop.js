@@ -144,6 +144,8 @@ class Backdrop {
       case 'pixel': this.#pixel(ctx, w, h, t); break;
       case 'tabletop': this.#tabletop(ctx, w, h, t); break;
       case 'apotheosis': this.#apotheosis(ctx, w, h, t); break;
+      case 'raclette': this.#raclette(ctx, w, h, t); break;
+      case 'lecture': this.#lecture(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -789,6 +791,101 @@ class Backdrop {
    * offset each, which is what keeps it cheap on a phone that is also drawing
    * a card.
    */
+  /*
+   * RACLETTE: the heat above, the melt below.
+   *
+   * A warm bar of light across the top, the colour of an element that has
+   * been on a while, and slow drips that swell and fall from it. The drips
+   * are on fixed tracks with a phase each rather than a particle system, so
+   * the whole thing costs almost nothing to run.
+   */
+  #raclette(ctx, w, h, t) {
+    const sec = t / 1000;
+    const room = ctx.createLinearGradient(0, 0, 0, h);
+    room.addColorStop(0, '#3a2a17');
+    room.addColorStop(0.45, '#241a0f');
+    room.addColorStop(1, '#140e07');
+    ctx.fillStyle = room;
+    ctx.fillRect(0, 0, w, h);
+
+    // The element, glowing across the top.
+    const heat = ctx.createLinearGradient(0, 0, 0, h * 0.34);
+    heat.addColorStop(0, 'rgba(255, 190, 120, 0.24)');
+    heat.addColorStop(1, 'rgba(255, 190, 120, 0)');
+    ctx.fillStyle = heat;
+    ctx.fillRect(0, 0, w, h * 0.34);
+    ctx.fillStyle = 'rgba(255, 214, 160, 0.16)';
+    ctx.fillRect(0, h * 0.1, w, 3);
+
+    // Drips: each swells at the lip, then falls and fades.
+    for (let i = 0; i < 9; i++) {
+      const x = ((i + 0.5) / 9) * w + Math.sin(sec * 0.15 + i) * 10;
+      const period = 7 + (i % 4) * 2.5;
+      const phase = ((sec + i * 1.7) % period) / period;
+      const y = h * 0.11 + phase * h * 0.85;
+      const r = 4 + Math.sin(phase * Math.PI) * 4;
+      ctx.globalAlpha = 0.5 * (1 - phase * 0.75);
+      ctx.fillStyle = '#f5ead6';
+      ctx.beginPath();
+      ctx.ellipse(x, y, r * 0.72, r, 0, 0, Math.PI * 2);
+      ctx.fill();
+      // The thread it leaves behind, back up to the lip.
+      ctx.strokeStyle = 'rgba(245, 234, 214, 0.14)';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(x, h * 0.11);
+      ctx.lineTo(x, y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /*
+   * READING: paper under a lamp.
+   *
+   * A pool of turquoise light off to one side, faint ruled lines drifting
+   * upward like a page being read down, and a page corner that lifts and
+   * settles. Slow on purpose: this is the theme for sitting still.
+   */
+  #lecture(ctx, w, h, t) {
+    const sec = t / 1000;
+    const paper = ctx.createRadialGradient(w * 0.68, h * 0.3, 0, w * 0.5, h * 0.55, Math.max(w, h) * 0.9);
+    paper.addColorStop(0, '#11423c');
+    paper.addColorStop(0.5, '#0b2b28');
+    paper.addColorStop(1, '#061a18');
+    ctx.fillStyle = paper;
+    ctx.fillRect(0, 0, w, h);
+
+    // The lamp's pool.
+    const lamp = ctx.createRadialGradient(w * 0.72, h * 0.26, 0, w * 0.72, h * 0.26, h * 0.6);
+    lamp.addColorStop(0, 'rgba(45, 212, 191, 0.16)');
+    lamp.addColorStop(1, 'rgba(45, 212, 191, 0)');
+    ctx.fillStyle = lamp;
+    ctx.fillRect(0, 0, w, h);
+
+    // Ruled lines, drifting up the way a page is read down.
+    ctx.strokeStyle = 'rgba(204, 251, 241, 0.055)';
+    ctx.lineWidth = 1;
+    const gap = 34;
+    const shift = (sec * 5) % gap;
+    for (let y = h + gap - shift; y > -gap; y -= gap) {
+      ctx.beginPath();
+      ctx.moveTo(w * 0.08, y);
+      ctx.lineTo(w * 0.92, y + 6);
+      ctx.stroke();
+    }
+
+    // A corner lifting and settling, bottom right.
+    const lift = (Math.sin(sec * 0.28) + 1) / 2;
+    ctx.fillStyle = `rgba(204, 251, 241, ${(0.05 + lift * 0.05).toFixed(3)})`;
+    ctx.beginPath();
+    ctx.moveTo(w, h);
+    ctx.lineTo(w - 90 - lift * 40, h);
+    ctx.quadraticCurveTo(w - 40, h - 50 - lift * 30, w, h - 110 - lift * 40);
+    ctx.closePath();
+    ctx.fill();
+  }
+
   #apotheosis(ctx, w, h, t) {
     const sec = t / 1000;
     const ground = ctx.createRadialGradient(w * 0.28, h * 0.22, 0, w * 0.5, h * 0.5, Math.max(w, h));

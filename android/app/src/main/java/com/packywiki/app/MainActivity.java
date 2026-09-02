@@ -153,9 +153,9 @@ public class MainActivity extends Activity {
     private static final String[] ICON_THEMES = {
             "aurora", "paper", "arcade", "noir", "sunset",
             "meadow", "cartoon", "matrix", "casino", "horror",
-            // Behind a one-time code. The alias exists whatever happens, since
-            // a theme the web layer can ask for must have somewhere to land.
-            "apotheosis"
+            // Behind secret codes. The aliases exist whatever happens, since a
+            // theme the web layer can ask for must have somewhere to land.
+            "apotheosis", "raclette", "lecture"
     };
 
     private static final String ICON_PREFS = "wiklodo.icon";

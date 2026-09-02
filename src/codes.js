@@ -138,6 +138,52 @@ export const SECRET_CODES = [
         name: { en: 'Sparkle (Honkai: Star Rail)', fr: 'Sparkle (Honkai: Star Rail)' } }
     ]
   },
+  {
+    id: 'julien',
+    code: 'JUL13N',
+    person: 'Julien',
+    accent: '#d8c39a', accent2: '#5c4426', light: '#f5ead6',
+    theme: 'raclette',
+    emblem: 'wheel', foil: 'goldleaf', family: 'roundel', shapes: ['orb', 'square'],
+    name: { en: 'Julien’s Special Booster', fr: 'Booster spécial de Julien' },
+    tagline: { en: 'Beige, and melted over everything', fr: 'Beige, et fondu sur tout' },
+    album: { en: 'Julien’s Special Album', fr: 'Album spécial de Julien' },
+    badge: { en: 'Julien’s Special Badge', fr: 'Badge spécial de Julien' },
+    message: {
+      en: 'Julien. The half wheel is under the lamp, the evening is long, and five cards are warming beside it. Nobody else gets this one. Made for you.',
+      fr: 'Julien. La demi-meule est sous la lampe, la soirée est longue, et cinq cartes chauffent à côté. Personne d’autre n’aura celui-ci. Fait pour toi.'
+    },
+    cards: [
+      { en: 'Telescope', fr: 'Télescope' },
+      { en: 'Milky Way', fr: 'Voie lactée' },
+      { en: 'Arcade cabinet', fr: 'Borne d’arcade' },
+      { en: 'Sunset', fr: 'Coucher de soleil' },
+      { en: 'Ragdoll', fr: 'Ragdoll', name: { en: 'Ragdoll (cat)', fr: 'Ragdoll (chat)' } }
+    ]
+  },
+  {
+    id: 'catherine',
+    code: 'C4TH3R1N3',
+    person: 'Catherine',
+    accent: '#2dd4bf', accent2: '#0f4c47', light: '#ccfbf1',
+    theme: 'lecture',
+    emblem: 'openbook', foil: 'linen', family: 'plate', shapes: ['square', 'orb'],
+    name: { en: 'Catherine’s Special Booster', fr: 'Booster spécial de Catherine' },
+    tagline: { en: 'Turquoise, and one more chapter', fr: 'Turquoise, et encore un chapitre' },
+    album: { en: 'Catherine’s Special Album', fr: 'Album spécial de Catherine' },
+    badge: { en: 'Catherine’s Special Badge', fr: 'Badge spécial de Catherine' },
+    message: {
+      en: 'Catherine. The lamp is on, the page is turned, and five cards were kept between the leaves. Nobody else gets this one. Made for you.',
+      fr: 'Catherine. La lampe est allumée, la page est tournée, et cinq cartes attendaient entre les feuilles. Personne d’autre n’aura celui-ci. Fait pour toi.'
+    },
+    cards: [
+      { en: 'Book', fr: 'Livre' },
+      { en: 'Forest', fr: 'Forêt' },
+      { en: 'Cooking', fr: 'Cuisine' },
+      { en: 'Yoga', fr: 'Yoga' },
+      { en: 'Travel', fr: 'Voyage' }
+    ]
+  },
   /*
    * THE CREATOR. Not a person's booster: a set of regalia.
    *
