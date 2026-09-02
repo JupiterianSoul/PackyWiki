@@ -379,6 +379,35 @@ const SCREEN_TITLES = {
   friends: 'tabFriends', friend: 'tabFriends'
 };
 
+/*
+ * DESKTOP: the rail IS the menu.
+ *
+ * On a phone the bottom bar carries five destinations and a drawer holds the
+ * rest. Standing that bar up as a rail on a wide screen left the drawer still
+ * there behind a hamburger, which is a menu button next to a menu: everything
+ * in the drawer had room to sit in the rail all along.
+ *
+ * So the drawer's list is MOVED into the rail rather than copied into it. One
+ * list means one place keeps the unread counts, the daily dot and the
+ * achievement badges up to date, and no state can drift between two copies.
+ * The links the rail already shows as destinations are hidden by CSS rather
+ * than filtered here, so nothing about the phone layout has to know.
+ */
+const WIDE = matchMedia('(min-width: 1024px)');
+
+function placeDrawerLinks() {
+  const links = el.drawerLinks;
+  const rail = document.querySelector('.navbar');
+  if (!links || !rail) return;
+  if (WIDE.matches) {
+    if (links.parentElement !== rail) rail.appendChild(links);
+  } else {
+    const panel = document.querySelector('.drawer-panel');
+    if (panel && links.parentElement !== panel) panel.appendChild(links);
+  }
+  document.documentElement.classList.toggle('is-wide', WIDE.matches);
+}
+
 function showScreen(name) {
   Object.entries(el.screens).forEach(([key, node]) => node.classList.toggle('is-active', key === name));
   if (name !== 'open') {
@@ -556,6 +585,8 @@ function buildDrawer() {
     });
     return row;
   }));
+  // Built into the drawer, then put wherever this width wants it.
+  placeDrawerLinks();
   paintDrawerLinks();
 }
 
@@ -7558,6 +7589,13 @@ function init() {
   // connection rather than whatever was true when the screen was built.
   window.addEventListener('online', paintOpenHint);
   window.addEventListener('offline', paintOpenHint);
+  // The rail swallows the drawer on a wide screen, and hands it back on a
+  // narrow one, including when a window is dragged across the threshold.
+  // Built here rather than on first open, because on a wide screen there is no
+  // button left to open it with: the rail IS it, so it has to exist from the
+  // start rather than the first time somebody reaches for a menu.
+  buildDrawer();
+  WIDE.addEventListener('change', () => { buildDrawer(); });
 
   // A special theme belongs to whoever redeemed its code. A save that lost
   // the code (an erased save, a transfer that went the other way) wakes up
@@ -7630,6 +7668,12 @@ function init() {
     if (id === 'profile') { renderProfile(); loadFriends(); }
     showScreen(id);
   });
+
+  // The rail exists now, so the drawer's list has somewhere to be moved to.
+  // Called here as well as from buildDrawer because that runs before the
+  // NavBar is constructed, and a rail that does not exist yet cannot be
+  // filled.
+  placeDrawerLinks();
 
   applySettings();
   applyStrings();

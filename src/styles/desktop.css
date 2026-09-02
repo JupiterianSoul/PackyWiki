@@ -190,3 +190,68 @@
   html.is-immersive #app { padding-left: 0; }
 }
 
+
+/* ==========================================================================
+   THE RAIL IS THE MENU
+   --------------------------------------------------------------------------
+   The drawer's list is moved into the rail at this width (see
+   placeDrawerLinks in main.js), so the hamburger has nothing left to open and
+   goes. What remains is one column: the app's name, the five destinations,
+   then everything else that used to be behind the button.
+   ========================================================================== */
+@media (min-width: 1024px) {
+  /* No menu button next to a menu. */
+  #menu-btn { display: none; }
+  html.is-wide .drawer { display: none !important; }
+
+  .navbar { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 22px; }
+  .navbar::-webkit-scrollbar { width: 0; }
+
+  /* The moved list, sitting under the destinations as one continuous column. */
+  .navbar > .drawer-links {
+    display: grid;
+    gap: 2px;
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: var(--border) var(--border-style) var(--line);
+  }
+  .navbar > .drawer-links .drawer-link {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    min-height: 40px;
+    border-radius: var(--radius-pill);
+    font-size: 0.82rem;
+    color: var(--ink-dim);
+    background: none;
+    border: 0;
+    text-align: left;
+    width: 100%;
+  }
+  [data-theme='arcade'] .navbar > .drawer-links .drawer-link { border-radius: var(--radius); }
+  .navbar > .drawer-links .drawer-link:hover { background: var(--surface); color: var(--ink); }
+  .navbar > .drawer-links .drawer-link.is-current { color: var(--accent); background: var(--surface-2); }
+  .navbar > .drawer-links .drawer-sep {
+    height: 1px;
+    margin: 8px 12px;
+    background: var(--line);
+  }
+  /* The five the rail already carries as destinations would be saying it
+     twice, so they stand down here rather than being filtered in JS. */
+  .navbar > .drawer-links .drawer-link[data-link='shop'],
+  .navbar > .drawer-links .drawer-link[data-link='timed'],
+  .navbar > .drawer-links .drawer-link[data-link='packs'],
+  .navbar > .drawer-links .drawer-link[data-link='binder'],
+  .navbar > .drawer-links .drawer-link[data-link='profile'] { display: none; }
+
+  /* The level ring sits at the very edge of the window, and its frame is drawn
+     larger than the ring it wraps, so the frame was being cut in half by the
+     viewport. The header keeps room for it. */
+  .appbar-side.is-right { padding-right: 10px; }
+  .appbar { padding-right: 22px; }
+
+  /* Grids that stopped at two columns on a screen with room for four. */
+  .shop-free, .shop-grid, .free-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+}
