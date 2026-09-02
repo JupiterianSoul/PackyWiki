@@ -915,41 +915,57 @@ of background work this should not be doing.
 
 ---
 
-## Secret codes
+## Secret codes and the special boosters
 
 The last section of **Settings** is *Redeem secret code*: a field for a code
-handed out by hand. A valid code drops one personal booster into the player's
-inventory, openable like any other, and is spent once per save
-(`profile.codesRedeemed`, so it survives a reinstall through Transfer save and
-cannot be spent twice by relaunching).
+handed out by hand. A code works for anyone who has it, once per save
+(`profile.codesRedeemed`, so it follows the save through Transfer save and
+cloud sync and cannot be spent twice by relaunching). A valid, unused code
+hands over a whole gift at once, and the reveal lays it out as the event it
+is: the person's message in their colour, the booster, the six cards by name,
+the theme now on, the badge now worn.
 
-Every code is one entry in `src/codes.js`, and nothing else has to change to
-add one:
+Every code is one entry in `src/codes.js`, and one entry is:
 
-```js
-export const SECRET_CODES = [
-  {
-    id: 'founders',                  // stable; stored in the save forever
-    code: 'WIKLODO-FOUNDERS',        // what the player types, any case
-    name: { en: 'Founders pack', fr: 'Pack des fondateurs' },
-    tagline: { en: 'For the first hands', fr: 'Pour les premieres mains' },
-    cards: 5,                        // 3 to 7
-    accent: '#f472b6', accent2: '#7c3aed',
-    rarityId: null,                  // or a tier, to floor the draw
-    titles: ['Ada Lovelace', 'Grace Hopper'],   // exact pages, in order
-    queries: ['jazz'],               // or subjects to search instead
-    lang: null,                      // 'en' / 'fr' to pin, null to follow
-    uses: 1                          // redemptions allowed per save
-  }
-];
-```
+- **a booster** in the person's colour, on the Custom shelf, wearing their
+  own drawn emblem (`src/data/emblems.js`) and a foil, family and burst
+  chosen for them (`styleForSpec` in `src/packstyle.js`);
+- **six cards**: the five things they love, drawn from Wikipedia by exact
+  title in both languages (`cards: [{ en, fr, name? }]`, `drawTitleSet` in
+  `src/wiki.js`), and **The Creator**, the same sixth card in every pack,
+  written by hand (`CREATOR`, with the photo shipped inside the bundle);
+- **the Special tier** for those six, a tier above Prismatic that no
+  popularity earns and no booster rolls (`SPECIAL` in `src/data/rarities.js`,
+  outside the table on purpose), and a card treatment nobody else's cards
+  wear: `[data-special="<id>"]` in `src/styles/cards.css`, one per person and
+  one for The Creator;
+- **an album of their own** (`kind: 'code'` in `src/albums.js`), the one
+  album that can be finished, six of six;
+- **a theme** (`code:` on a row in `src/ui/themes.js`, a token block in
+  `styles/themes.css`, a renderer in `ui/backdrop.js`), applied the moment
+  the code is redeemed and in the picker from then on, never before;
+- **a badge** (`code:` on a row in `src/badges.js`), worn the moment the
+  code is redeemed, unequippable afterwards like any other.
 
-`titles` wins over `queries`: a code booster with a title list contains
-exactly those pages, in that order, past every tier band and every search
-(`source: 'titles'` in `src/wiki.js`). A page Wikipedia cannot serve, or one
-with no usable picture, is skipped rather than faked, so a list of five that
-resolves to four opens as four. Typed codes are compared with letters and
-digits only, so dashes, spaces and case never matter.
+The six cards are locked for good. `entry.special` names the code on every
+one of them, and that mark is what `regradeCollection()` skips, what the sell
+button, the auction picker, the gift picker and both sides of a trade check
+(`isLocked` in `src/collection.js`), and what files the card in that person's
+album whatever pack id it carries. A special booster itself is never on the
+gift list either.
+
+Every card of the five gets a picture, whatever Wikipedia has: the page's
+lead image, else its first real photograph, else a plate in the booster's
+colour with the card's name on it. A title the French Wikipedia cannot serve
+falls back to the English article. Nothing is dropped.
+
+The Creator has no article to read, no readership and no wishlist: it is not
+a page, it is a signature.
+
+Adding a person is adding one entry to `SECRET_CODES` and, for the full
+gift, one treatment in `cards.css`, one emblem, one theme row with its CSS
+block and backdrop renderer, and one badge row. Nothing else in the app
+knows the list.
 
 ---
 

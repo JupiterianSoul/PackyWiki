@@ -472,3 +472,180 @@
   --press-shift: 1px;
   --texture: grain;
 }
+
+/* ==========================================================================
+   THE SPECIAL THEMES - one per secret code (src/codes.js). Unlocked by the
+   code, in the person's colour, about their favourite thing.
+   ========================================================================== */
+
+/* --- RIRE: Simon's. Bright blue that cannot keep a straight face ----------- */
+[data-theme='rire'] {
+  --ink: #eaf2ff;
+  --ink-dim: #9db4dc;
+  --ink-faint: #5f79a6;
+
+  --surface: rgba(96, 165, 250, 0.09);
+  --surface-2: rgba(96, 165, 250, 0.15);
+  --surface-solid: #0e1d3d;
+  --line: rgba(147, 197, 253, 0.3);
+  --line-strong: rgba(147, 197, 253, 0.6);
+
+  --accent: #3b82f6;
+  --accent-2: #93c5fd;
+  --accent-ink: #061024;
+  --positive: #4ade80;
+  --negative: #fb7185;
+  --warning: #fde047;
+
+  --radius-sm: 14px;
+  --radius: 22px;
+  --radius-lg: 30px;
+  --radius-pill: 999px;
+  --border: 2px;
+  --border-style: solid;
+
+  --surface-shadow: 0 14px 30px -18px rgba(59, 130, 246, 0.6);
+  --raise-shadow: 0 24px 50px -24px rgba(59, 130, 246, 0.7);
+  --glow: 0 0 34px -8px rgba(96, 165, 250, 0.8);
+  --blur: blur(12px);
+
+  --font: 'Nunito', 'Trebuchet MS', ui-rounded, ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font);
+  --display-weight: 900;
+  --display-tracking: -0.02em;
+  --display-transform: none;
+  --label-tracking: 0.16em;
+
+  --press-scale: 0.94;
+  --press-shift: 2px;
+  --texture: none;
+}
+
+/* --- ASSUR: Céleste's. Rose glaze on palace brick ------------------------- */
+[data-theme='assur'] {
+  --ink: #fbe9f1;
+  --ink-dim: #c99bb1;
+  --ink-faint: #8a6378;
+
+  --surface: rgba(244, 114, 182, 0.08);
+  --surface-2: rgba(244, 114, 182, 0.14);
+  --surface-solid: #2a1121;
+  --line: rgba(245, 208, 169, 0.28);
+  --line-strong: rgba(245, 208, 169, 0.55);
+
+  --accent: #f472b6;
+  --accent-2: #f5d0a9;
+  --accent-ink: #2a0716;
+  --positive: #86efac;
+  --negative: #fb7185;
+  --warning: #f5d0a9;
+
+  --radius-sm: 3px;
+  --radius: 6px;
+  --radius-lg: 10px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 0 0 1px rgba(245, 208, 169, 0.12), 0 24px 48px -30px #000;
+  --raise-shadow: 0 0 0 1px rgba(245, 208, 169, 0.2), 0 36px 70px -34px #000;
+  --glow: 0 0 36px -10px rgba(244, 114, 182, 0.7);
+  --blur: blur(8px);
+
+  --font: 'Palatino Linotype', 'Book Antiqua', Palatino, Georgia, ui-serif, serif;
+  --font-display: 'Cinzel', 'Trajan Pro', 'Palatino Linotype', Georgia, ui-serif, serif;
+  --display-weight: 700;
+  --display-tracking: 0.06em;
+  --display-transform: uppercase;
+  --label-tracking: 0.28em;
+
+  --press-scale: 0.985;
+  --press-shift: 0px;
+  --texture: grain;
+}
+
+/* --- PIXEL: Samuel's. Dodger blue and hard edges -------------------------- */
+[data-theme='pixel'] {
+  --ink: #e8f3ff;
+  --ink-dim: #8fb8e6;
+  --ink-faint: #4f7bb0;
+
+  --surface: rgba(30, 144, 255, 0.1);
+  --surface-2: rgba(30, 144, 255, 0.18);
+  --surface-solid: #07172e;
+  --line: rgba(30, 144, 255, 0.42);
+  --line-strong: rgba(30, 144, 255, 0.8);
+
+  --accent: #1e90ff;
+  --accent-2: #7dd3fc;
+  --accent-ink: #04101f;
+  --positive: #4ade80;
+  --negative: #ff5a7a;
+  --warning: #ffd23f;
+
+  --radius-sm: 0px;
+  --radius: 0px;
+  --radius-lg: 0px;
+  --radius-pill: 0px;
+  --border: 2px;
+  --border-style: solid;
+
+  --surface-shadow: 4px 4px 0 rgba(30, 144, 255, 0.35);
+  --raise-shadow: 6px 6px 0 rgba(30, 144, 255, 0.5);
+  --glow: 0 0 0 2px rgba(30, 144, 255, 0.5);
+  --blur: none;
+
+  --font: 'Silkscreen', 'Press Start 2P', 'Courier New', ui-monospace, monospace;
+  --font-display: var(--font);
+  --display-weight: 700;
+  --display-tracking: 0.04em;
+  --display-transform: uppercase;
+  --label-tracking: 0.2em;
+
+  --press-scale: 0.97;
+  --press-shift: 3px;
+  --texture: scanlines;
+}
+
+/* --- TABLETOP: Noah's. Violet felt under a lamp --------------------------- */
+[data-theme='tabletop'] {
+  --ink: #f3e8ff;
+  --ink-dim: #b795d9;
+  --ink-faint: #7b5c9c;
+
+  --surface: rgba(168, 85, 247, 0.1);
+  --surface-2: rgba(168, 85, 247, 0.16);
+  --surface-solid: #1f0f36;
+  --line: rgba(216, 180, 254, 0.28);
+  --line-strong: rgba(216, 180, 254, 0.55);
+
+  --accent: #a855f7;
+  --accent-2: #fbbf24;
+  --accent-ink: #14062a;
+  --positive: #86efac;
+  --negative: #fb7185;
+  --warning: #fbbf24;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --raise-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.95);
+  --glow: 0 0 32px -8px rgba(168, 85, 247, 0.7);
+  --blur: blur(10px);
+
+  --font: 'Avenir Next', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Fraunces', 'Cooper Black', 'Georgia', ui-serif, serif;
+  --display-weight: 800;
+  --display-tracking: 0;
+  --display-transform: none;
+  --label-tracking: 0.2em;
+
+  --press-scale: 0.975;
+  --press-shift: 1px;
+  --texture: grain;
+}

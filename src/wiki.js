@@ -891,30 +891,124 @@ export async function translateCard(entry, targetLang) {
 }
 
 /**
- * Draw the pages a booster names outright. Anything Wikipedia cannot serve
- * (a renamed page, one with no usable picture) is skipped rather than faked,
- * so a list of five that resolves to four opens as four.
+ * Draw the pages a booster names outright, in order, for the special
+ * boosters behind a secret code. Nothing here is negotiable the way a search
+ * is: these are the five things one person loves, so
+ *
+ *   - every title is followed through redirects, and a French page that has
+ *     nothing to show falls back to the English article;
+ *   - a page always gets a picture: its lead image, else its first real
+ *     photograph, else a plate in the booster's own colour. A card is never
+ *     dropped for want of one;
+ *   - the pack's extra cards (The Creator) are appended as they are.
  */
 async function drawTitleSet(pack) {
-  const wanted = Math.max(1, pack.cards ?? 5);
-  const titles = (pack.titles ?? []).slice(0, POOL_LIMIT);
-  if (!titles.length) return [];
-  const pages = await pagesByTitle(titles);
-  // pagesByTitle answers in the API's order, not ours.
-  const byTitle = new Map(pages.map((page) => [page.title, page]));
-  const ordered = titles.map((title) => byTitle.get(title)).filter(Boolean);
+  const wanted = (pack.titles ?? []).slice(0, POOL_LIMIT);
   const out = [];
-  const seen = new Set();
-  for (const page of ordered) {
-    if (out.length >= wanted) break;
-    if (seen.has(page.title)) continue;
-    const views = await fetchMonthlyViews(page.title).catch(() => null);
-    const card = pageToCard(page, views);
-    if (!card) continue;
-    seen.add(page.title);
+  for (const want of wanted) {
+    const page = await resolveTitle(want.title, wikiLang())
+      ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
+    const card = page
+      ? await namedCard(page, want, pack)
+      : placeholderCard(want, pack);
+    card.special = pack.special ?? null;
     out.push(card);
   }
+  for (const extra of pack.extra ?? []) out.push({ ...extra });
   return out;
+}
+
+/** One page by title on one language's Wikipedia, following redirects. */
+async function resolveTitle(title, lang) {
+  const params = new URLSearchParams({
+    action: 'query', titles: title, redirects: '1',
+    ...PAGE_PROPS, format: 'json', origin: '*'
+  });
+  try {
+    const page = pagesOf(await fetchJson(`https://${lang}.wikipedia.org/w/api.php?${params}`))
+      .find((p) => p.pageid && !p.missing);
+    if (!page) return null;
+    page.lang = lang;
+    return page;
+  } catch {
+    return null;
+  }
+}
+
+/** The first real photograph on a page, when it has no lead image. */
+async function firstPhoto(page, lang) {
+  try {
+    const params = new URLSearchParams({
+      action: 'query', pageids: String(page.pageid), generator: 'images', gimlimit: '20',
+      prop: 'imageinfo', iiprop: 'url|mime|size', iiurlwidth: '640', format: 'json', origin: '*'
+    });
+    const files = pagesOf(await fetchJson(`https://${lang}.wikipedia.org/w/api.php?${params}`));
+    const photo = files
+      .map((f) => f.imageinfo?.[0])
+      .filter((i) => i && /image\/(jpeg|png|webp)/.test(i.mime ?? '') && (i.width ?? 0) >= 200)
+      .find((i) => !/(icon|logo|flag|map|seal|coat|symbol|wiki|commons|edit)/i.test(i.descriptionurl ?? i.url ?? ''));
+    return photo?.thumburl ?? photo?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** A plate in the booster's colour: the last resort for a picture. */
+const platePicture = (colour, title) => 'data:image/svg+xml,' + encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 400"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">`
+  + `<stop offset="0" stop-color="${colour}"/><stop offset="1" stop-color="#0b0d18"/></linearGradient></defs>`
+  + `<rect width="640" height="400" fill="url(#g)"/><text x="320" y="216" text-anchor="middle" font-family="system-ui,sans-serif" `
+  + `font-size="44" font-weight="800" fill="rgba(255,255,255,0.86)">${String(title).replace(/[<>&]/g, ' ').slice(0, 26)}</text></svg>`);
+
+async function namedCard(page, want, pack) {
+  const lang = page.lang ?? wikiLang();
+  const views = await fetchMonthlyViewsOn(page.title, lang).catch(() => null);
+  const thumbnail = bestImage(page)
+    ?? await firstPhoto(page, lang)
+    ?? platePicture(pack.fallbackArt ?? '#94a3b8', want.name ?? page.title);
+  const extract = String(page.extract ?? '').trim() || String(page.description ?? '').trim() || (want.name ?? page.title);
+  const card = toCard({
+    sourceId: `wikipedia:${lang}`,
+    sourceName: 'Wikipedia',
+    pageId: page.pageid,
+    title: page.title,
+    description: page.description,
+    extract,
+    thumbnail,
+    url: page.fullurl ?? `https://${lang}.wikipedia.org/wiki/${encodeTitle(page.title)}`,
+    views,
+    wordCount: null
+  });
+  // The face carries the name the person knows it by; the article keeps its own.
+  if (want.name) { card.article = card.title; card.title = want.name; }
+  card.lang = lang;
+  return card;
+}
+
+/** The card for a title Wikipedia could not serve at all: still a card. */
+function placeholderCard(want, pack) {
+  const title = want.name ?? want.title;
+  return toCard({
+    sourceId: `wikipedia:${wikiLang()}`,
+    sourceName: 'Wikipedia',
+    pageId: null,
+    title,
+    description: '',
+    extract: title,
+    thumbnail: platePicture(pack.fallbackArt ?? '#94a3b8', title),
+    url: `https://${wikiLang()}.wikipedia.org/wiki/${encodeTitle(want.title)}`,
+    views: null,
+    wordCount: null
+  });
+}
+
+/** Monthly views on a named language's Wikipedia (the default helper reads the app's). */
+async function fetchMonthlyViewsOn(title, lang) {
+  const [start, end] = pageviewRange();
+  const url = `${PAGEVIEWS}/${lang}.wikipedia/all-access/user/${encodeTitle(title)}/monthly/${start}/${end}`;
+  const items = (await fetchJson(url))?.items ?? [];
+  if (!items.length) return null;
+  return Math.round(items.reduce((sum, item) => sum + (item.views ?? 0), 0) / items.length);
 }
 
 /* --- public API ---------------------------------------------------------- */

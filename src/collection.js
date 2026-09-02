@@ -77,9 +77,12 @@ export function recordPulls(collection, pulls, spec) {
   const results = [];
   const packId = specId(spec);
 
-  for (const pull of pulls) {
+  pulls.forEach((pull, index) => {
     const { article, rarity, price } = pull;
     const existing = collection.entries[article.key];
+    // A millisecond per card keeps the order of the pull in the timestamps,
+    // which is the order a special album shows its six in.
+    const at = now + index;
 
     if (!existing) {
       collection.entries[article.key] = {
@@ -102,15 +105,18 @@ export function recordPulls(collection, pulls, spec) {
         packAccent: pull.packAccent,
         count: 1,
         favorite: false,
-        firstPulledAt: now,
-        lastPulledAt: now
+        firstPulledAt: at,
+        lastPulledAt: at,
+        // A card from a secret code carries the code for good: it is what
+        // locks the card, keeps its tier, and files it in that person's album.
+        ...(article.special ? { special: article.special, article: article.article ?? null, creator: Boolean(article.creator) } : {})
       };
       results.push({ entry: collection.entries[article.key], isNew: true });
-      continue;
+      return;
     }
 
     existing.count += 1;
-    existing.lastPulledAt = now;
+    existing.lastPulledAt = at;
     if (rarityRank(rarity.id) > rarityRank(existing.rarityId)) {
       existing.rarityId = rarity.id;
       existing.price = price;
@@ -118,9 +124,16 @@ export function recordPulls(collection, pulls, spec) {
       existing.packName = pull.packName;
       existing.packIcon = pull.packIcon;
       existing.packAccent = pull.packAccent;
+      if (article.special) {
+        existing.special = article.special;
+        existing.article = article.article ?? null;
+        existing.creator = Boolean(article.creator);
+        existing.title = article.title;
+        existing.thumbnail = article.thumbnail;
+      }
     }
     results.push({ entry: existing, isNew: false });
-  }
+  });
 
   saveCollection(collection);
   return results;
@@ -149,6 +162,12 @@ export function toggleFavorite(collection, key) {
 }
 
 /** Sell one copy. The last copy removes the card from the binder. */
+/**
+ * A card from a secret code stays where it landed: it cannot be sold, put
+ * up at auction, given or traded. Every one of those doors checks here.
+ */
+export const isLocked = (entry) => Boolean(entry?.special);
+
 export function sellCopy(collection, key) {
   const entry = collection.entries[key];
   if (!entry) return null;

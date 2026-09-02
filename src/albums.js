@@ -16,6 +16,7 @@
  * across: every card was squeezed into a tall thin sliver and the next
  * page's slots peeked in at the edge.
  */
+import { codeById, codeSpec } from './codes.js';
 import { THEME_PACKS, themeById } from './data/packs.js';
 import { styleForSpec } from './packstyle.js';
 import { tx, getLanguage, wikiLang } from './i18n.js';
@@ -95,6 +96,7 @@ const inFlight = new Map();
  * forget: concurrent calls for one album share a single request.
  */
 export function fetchAlbumTotal(album) {
+  if (album.kind === 'code') return Promise.resolve(album.total ?? null);
   const key = totalKeyFor(album.key);
   if (isFresh(album.key)) return Promise.resolve(knownAlbumTotal(album.key));
   if (inFlight.has(key)) return inFlight.get(key);
@@ -156,6 +158,9 @@ export function customSlug(raw) {
 
 /** Which album an owned card belongs to. */
 export function albumKeyOf(entry) {
+  // A card from a secret code belongs to that person's album, whatever pack
+  // id it carries: the mark on the card is the truth.
+  if (entry.special) return `code:${entry.special}`;
   const [kind, ident] = String(entry.packId ?? '').split('|');
   if (kind === 'theme' && ident && ident !== 'any') return `theme:${ident}`;
   if (kind === 'custom' && ident) return `custom:${customSlug(ident)}`;
@@ -165,6 +170,10 @@ export function albumKeyOf(entry) {
 /** A minimal spec for an album, so pack styling (family, emblem, palette)
  *  can be reused for covers and page decoration. */
 export function albumSpec(album) {
+  if (album.kind === 'code') {
+    const code = codeById(album.codeId);
+    return code ? codeSpec(code) : { kind: 'open', themeId: null, rarityId: null, cards: 5 };
+  }
   if (album.kind === 'theme') return { kind: 'theme', themeId: album.themeId, rarityId: null, cards: 5 };
   if (album.kind === 'custom') {
     // The slug lost the dots on the way in; the host it came from is kept on
@@ -234,6 +243,18 @@ export function buildAlbums(entries, customPacks = []) {
     }));
   }
 
+  // The special albums: one per secret code whose cards this save holds,
+  // in the person's colour, named for them, six cards and no more.
+  for (const [key, owned] of byKey) {
+    if (!key.startsWith('code:')) continue;
+    const code = codeById(key.slice('code:'.length));
+    if (!code) continue;
+    albums.push(decorate({
+      key, kind: 'code', codeId: code.id, name: tx(code.album), entries: owned,
+      size: code.cards.length + 1
+    }));
+  }
+
   albums.push(decorate({
     key: 'wild', kind: 'wild', name: 'Wikipedia', entries: byKey.get('wild') ?? []
   }));
@@ -255,6 +276,15 @@ function decorate(album) {
   const style = styleForSpec(albumSpec(album));
   album.style = style;
   album.owned = album.entries.length;
+  if (album.kind === 'code') {
+    // A special album is the one album that can be finished: its size is
+    // written in the code, not read off Wikipedia, and full counts as deep.
+    album.total = album.size;
+    album.unlocked = album.owned > 0;
+    album.complete = album.owned >= album.total;
+    album.deep = album.complete;
+    return album;
+  }
   const known = knownAlbumTotal(album.key);
   album.total = known == null ? null : Math.max(known, album.owned);
   album.unlocked = album.owned > 0;

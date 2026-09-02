@@ -40,8 +40,22 @@ export const normalizeRarityId = (id) => LEGACY_IDS[id] ?? id;
 export const rarityIdAliases = (id) =>
   [id, ...Object.keys(LEGACY_IDS).filter((old) => LEGACY_IDS[old] === id)];
 
-export const rarityRank = (id) => RARITIES.findIndex((r) => r.id === normalizeRarityId(id));
-export const rarityById = (id) => RARITIES.find((r) => r.id === normalizeRarityId(id)) ?? RARITIES[0];
+/**
+ * SPECIAL - the tier of the cards behind a secret code (src/codes.js). It is
+ * deliberately not in the table: no popularity earns it, no booster rolls
+ * it, no shelf sells it, and the odds sheet has nothing to say about it. It
+ * ranks above Prismatic so a special copy always wins a merge, and its colour
+ * is white because the card's own treatment paints the real one.
+ */
+export const SPECIAL = {
+  id: 'special', name: { en: 'Special', fr: 'Spéciale' }, minPop: 2, bonusPct: 3200,
+  color: '#ffffff', glow: 'rgba(255, 255, 255, 0.9)', flash: 1
+};
+
+export const rarityRank = (id) =>
+  normalizeRarityId(id) === SPECIAL.id ? RARITIES.length : RARITIES.findIndex((r) => r.id === normalizeRarityId(id));
+export const rarityById = (id) =>
+  normalizeRarityId(id) === SPECIAL.id ? SPECIAL : (RARITIES.find((r) => r.id === normalizeRarityId(id)) ?? RARITIES[0]);
 
 /** The tier a popularity earns: the highest threshold it clears. */
 export function rarityFromPopularity(popularity) {

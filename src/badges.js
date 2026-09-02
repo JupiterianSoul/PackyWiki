@@ -56,7 +56,18 @@ export const BADGES = [
   { id: 'encyclo',    chain: 'unique',    from: 3, motif: 'scroll',
     name: { en: 'Encyclopedist', fr: 'Encyclopédiste' } },
   { id: 'philanthrope', chain: 'gift',    from: 2, motif: 'heart',
-    name: { en: 'Philanthropist', fr: 'Philanthrope' } }
+    name: { en: 'Philanthropist', fr: 'Philanthrope' } },
+  // The special badges: one per secret code (src/codes.js), earned the
+  // moment the code is redeemed, worn straight away. `code` names the code;
+  // the chip's foil is the person's own colour rather than the rank ladder.
+  { id: 'special-simon',   code: 'simon',   motif: 'laugh',  foil: ['#bfdbfe', '#3b82f6', '#1d4ed8'],
+    name: { en: 'Simon’s Special Badge', fr: 'Badge spécial de Simon' } },
+  { id: 'special-celeste', code: 'celeste', motif: 'lamassu', foil: ['#fce7f3', '#f472b6', '#be185d'],
+    name: { en: 'Céleste’s Special Badge', fr: 'Badge spécial de Céleste' } },
+  { id: 'special-samuel',  code: 'samuel',  motif: 'pixel',  foil: ['#cfe7ff', '#1e90ff', '#1e3a8a'],
+    name: { en: 'Samuel’s Special Badge', fr: 'Badge spécial de Samuel' } },
+  { id: 'special-noah',    code: 'noah',    motif: 'dice',   foil: ['#e9d5ff', '#a855f7', '#6b21a8'],
+    name: { en: 'Noah’s Special Badge', fr: 'Badge spécial de Noah' } }
 ];
 
 /**
@@ -66,7 +77,7 @@ export const BADGES = [
  * rank 0 = locked; rungs = the achievements the chip counts, in order;
  * next = the first rung not yet unlocked, if any.
  */
-export function badgeStates(evaluated) {
+export function badgeStates(evaluated, redeemed = {}) {
   const byChain = new Map();
   for (const a of evaluated) {
     if (!a.chain) continue;
@@ -76,6 +87,13 @@ export function badgeStates(evaluated) {
   for (const list of byChain.values()) list.sort((a, b) => a.tier - b.tier);
 
   return BADGES.map((badge) => {
+    if (badge.code) {
+      // One rung: the code itself. Unlocked by redeeming it, nothing else.
+      const on = Number(redeemed?.[badge.code] ?? 0) > 0;
+      const rung = { id: `code:${badge.code}`, unlocked: on, tier: 1,
+        name: tx(badge.name), desc: tx(CODE_RUNG) };
+      return { badge, rank: on ? 1 : 0, max: 1, rungs: [rung], next: on ? null : rung, name: tx(badge.name) };
+    }
     const rungs = badge.chain
       ? (byChain.get(badge.chain) ?? []).filter((a) => a.tier >= badge.from)
       : evaluated.filter((a) => a.id === badge.ach);
@@ -89,8 +107,13 @@ export function badgeStates(evaluated) {
   });
 }
 
-export const badgesEarned = (evaluated) =>
-  badgeStates(evaluated).filter((s) => s.rank > 0).length;
+export const badgesEarned = (evaluated, redeemed = {}) =>
+  badgeStates(evaluated, redeemed).filter((s) => s.rank > 0).length;
+
+const CODE_RUNG = {
+  en: 'Redeem the secret code made for you in Settings.',
+  fr: 'Utilisez le code secret fait pour vous dans les Réglages.'
+};
 
 /* --- the chip --------------------------------------------------------------
  * Foil sets by rank: cool holo first, warmer and wider the higher the chip
@@ -173,7 +196,32 @@ const MOTIFS = {
     <line x1="0" y1="-6" x2="8" y2="-6"/><line x1="0" y1="0" x2="8" y2="0"/><line x1="0" y1="6" x2="6" y2="6"/></g>`,
   heart: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round">
     <path d="M 0 13 Q -14 3 -14 -5 Q -14 -13 -7 -13 Q -2 -13 0 -8 Q 2 -13 7 -13 Q 14 -13 14 -5 Q 14 3 0 13 Z"/>
-    <path d="M -5 -4 L -1 -4 L 1 -8 L 3 0 L 5 -4" stroke-width="1.8"/></g>`
+    <path d="M -5 -4 L -1 -4 L 1 -8 L 3 0 L 5 -4" stroke-width="1.8"/></g>`,
+  /* A speech bubble laughing: shut eyes, wide mouth. */
+  laugh: (s) => `<g fill="none" stroke="${s}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M -16 -14 Q -16 -17 -13 -17 L 13 -17 Q 16 -17 16 -14 L 16 5 Q 16 8 13 8 L -2 8 L -10 16 L -8 8 L -13 8 Q -16 8 -16 5 Z"/>
+    <path d="M -10 -8 Q -7 -12 -4 -8 M 4 -8 Q 7 -12 10 -8"/>
+    <path d="M -8 -2 Q 0 8 8 -2 Z" fill="${s}"/></g>`,
+  /* A winged bull, in profile. */
+  lamassu: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M -16 4 Q -14 -6 -2 -8 L 12 -8 Q 17 -8 17 -3 L 17 14 M 12 14 L 12 4 M 4 14 L 4 4 M -4 14 L -4 4 M -12 14 L -12 3"/>
+    <path d="M -2 -8 Q -5 -16 3 -18 L 12 -18 Q 17 -18 17 -13 L 17 -8"/>
+    <path d="M -3 -7 L -13 -13 Q -14 -3 -3 0 Z"/>
+    <path d="M 6 -20 L 5 -24 M 12 -20 L 13 -24"/></g>`,
+  /* An eight-bit heart. */
+  pixel: (s) => `<g fill="${s}" stroke="none">
+    <path d="M -14 -10 h 6 v -4 h 6 v 4 h 4 v -4 h 6 v 4 h 6 v 8 h -4 v 4 h -4 v 4 h -4 v 4 h -4 v -4 h -4 v -4 h -4 v -4 h -4 Z" fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round"/>
+    <path d="M -10 -8 h 4 v 4 h -4 Z"/></g>`,
+  /* Two dice, one showing five, one showing three. */
+  dice: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round">
+    <rect x="-17" y="-12" width="16" height="16" rx="3" transform="rotate(-10)"/>
+    <rect x="2" y="-4" width="16" height="16" rx="3" transform="rotate(10)"/>
+    <g fill="${s}" stroke="none">
+      <circle cx="-13" cy="-9" r="1.6" transform="rotate(-10)"/><circle cx="-5" cy="-9" r="1.6" transform="rotate(-10)"/>
+      <circle cx="-9" cy="-4" r="1.6" transform="rotate(-10)"/>
+      <circle cx="-13" cy="1" r="1.6" transform="rotate(-10)"/><circle cx="-5" cy="1" r="1.6" transform="rotate(-10)"/>
+      <circle cx="6" cy="0" r="1.6" transform="rotate(10)"/><circle cx="10" cy="4" r="1.6" transform="rotate(10)"/><circle cx="14" cy="8" r="1.6" transform="rotate(10)"/>
+    </g></g>`
 };
 
 /**
@@ -183,7 +231,7 @@ const MOTIFS = {
  */
 export function badgeSvg(badge, rank, max, { size = 64 } = {}) {
   const uid = `pwb-${badge.id}-${Math.min(rank, FOILS.length - 1)}`;
-  const foil = FOILS[Math.min(rank, FOILS.length - 1)];
+  const foil = rank > 0 && badge.foil ? badge.foil : FOILS[Math.min(rank, FOILS.length - 1)];
   const locked = rank <= 0;
   const stops = foil.map((c, i) => [i / Math.max(foil.length - 1, 1), c]);
   const ink = locked ? '#67719c' : '#ffffff';

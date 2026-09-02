@@ -139,6 +139,10 @@ class Backdrop {
       case 'matrix': this.#matrix(ctx, w, h, t); break;
       case 'casino': this.#casino(ctx, w, h, t); break;
       case 'horror': this.#horror(ctx, w, h, t); break;
+      case 'rire': this.#rire(ctx, w, h, t); break;
+      case 'assur': this.#assur(ctx, w, h, t); break;
+      case 'pixel': this.#pixel(ctx, w, h, t); break;
+      case 'tabletop': this.#tabletop(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
     }
   }
@@ -615,6 +619,250 @@ class Backdrop {
    * seconds or so the light flickers, barely. Nothing chases anyone: dread
    * is a slow renderer.
    */
+  /* --- the special themes (src/codes.js) ---------------------------------- */
+
+  /**
+   * RIRE - Simon's. A blue room that cannot keep a straight face: "HA"
+   * glyphs bubble up from the floor in three sizes, wobbling as they rise,
+   * and a soft blue spotlight breathes over the middle.
+   */
+  #rire(ctx, w, h, t) {
+    const sec = t / 1000;
+    const sky = ctx.createLinearGradient(0, 0, 0, h);
+    sky.addColorStop(0, '#0a1630');
+    sky.addColorStop(1, '#050b1c');
+    ctx.fillStyle = sky;
+    ctx.fillRect(0, 0, w, h);
+
+    const spot = ctx.createRadialGradient(w * 0.5, h * 0.42, 0, w * 0.5, h * 0.42, h * 0.6);
+    const breathe = 0.16 + Math.sin(sec * 0.8) * 0.04;
+    spot.addColorStop(0, `rgba(96, 165, 250, ${breathe})`);
+    spot.addColorStop(1, 'rgba(96, 165, 250, 0)');
+    ctx.fillStyle = spot;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < 14; i++) {
+      const speed = 0.02 + (i % 3) * 0.008;
+      const lane = ((i * 137.5) % w);
+      const y = h + 40 - (((sec * speed * h) + i * h * 0.23) % (h + 120));
+      const wobble = Math.sin(sec * 2.2 + i * 1.7) * 14;
+      const size = 18 + (i % 4) * 12;
+      const tilt = Math.sin(sec * 1.6 + i) * 0.22;
+      ctx.save();
+      ctx.translate(lane + wobble, y);
+      ctx.rotate(tilt);
+      ctx.font = `900 ${size}px 'Nunito', 'Trebuchet MS', sans-serif`;
+      ctx.fillStyle = `rgba(147, 197, 253, ${0.08 + (i % 3) * 0.04})`;
+      ctx.fillText(i % 5 === 0 ? 'HAHA' : 'HA', 0, 0);
+      ctx.restore();
+    }
+  }
+
+  /**
+   * ASSUR - Céleste's. A wall of glazed palace brick in rose, its mortar
+   * lines running in courses, with a warm lamp low on the left and lines of
+   * cuneiform drifting across like dust in the light.
+   */
+  #assur(ctx, w, h, t) {
+    const sec = t / 1000;
+    ctx.fillStyle = '#2a0f1f';
+    ctx.fillRect(0, 0, w, h);
+
+    // The courses of brick: a header row every fourth, offset by half.
+    const bh = 26;
+    const bw = 68;
+    for (let row = 0, y = -bh; y < h + bh; row++, y += bh) {
+      const shift = row % 2 ? bw / 2 : 0;
+      for (let x = -bw + shift; x < w + bw; x += bw) {
+        const tone = ((row * 7 + Math.round(x / bw)) % 5);
+        ctx.fillStyle = `rgba(244, 114, 182, ${0.05 + tone * 0.012})`;
+        ctx.fillRect(x + 1.5, y + 1.5, bw - 3, bh - 3);
+      }
+    }
+
+    // The lamp.
+    const lamp = ctx.createRadialGradient(w * 0.18, h * 0.86, 0, w * 0.18, h * 0.86, h * 0.9);
+    const flicker = 0.2 + Math.sin(sec * 3.1) * 0.012 + Math.sin(sec * 7.3) * 0.008;
+    lamp.addColorStop(0, `rgba(245, 208, 169, ${flicker})`);
+    lamp.addColorStop(0.5, 'rgba(245, 208, 169, 0.05)');
+    lamp.addColorStop(1, 'rgba(245, 208, 169, 0)');
+    ctx.fillStyle = lamp;
+    ctx.fillRect(0, 0, w, h);
+
+    // Cuneiform, drifting. The signs are drawn, not typed: wedges and hooks.
+    ctx.strokeStyle = 'rgba(245, 208, 169, 0.16)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 9; i++) {
+      const y = ((i * 97) % h) + Math.sin(sec * 0.3 + i) * 6;
+      const x = ((sec * (6 + i * 1.5)) + i * 240) % (w + 260) - 130;
+      ctx.save();
+      ctx.translate(x, y);
+      for (let k = 0; k < 6; k++) {
+        const gx = k * 18;
+        const kind = (i + k) % 3;
+        ctx.beginPath();
+        if (kind === 0) { ctx.moveTo(gx, -8); ctx.lineTo(gx + 4, 6); ctx.lineTo(gx - 4, 6); ctx.closePath(); }
+        else if (kind === 1) { ctx.moveTo(gx - 6, 0); ctx.lineTo(gx + 8, 0); ctx.moveTo(gx + 8, 0); ctx.lineTo(gx + 3, -5); }
+        else { ctx.moveTo(gx, -8); ctx.lineTo(gx, 8); ctx.moveTo(gx - 6, -2); ctx.lineTo(gx + 6, -2); }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+  }
+
+  /**
+   * PIXEL - Samuel's. A level select at night: a dodger-blue grid receding
+   * to a horizon, blocky clouds scrolling at two speeds, and a row of
+   * pixel stars that blink on a clock.
+   */
+  #pixel(ctx, w, h, t) {
+    const sec = t / 1000;
+    const px = 6;
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = '#06162e';
+    ctx.fillRect(0, 0, w, h);
+
+    // Stars, snapped to the pixel grid, blinking in phase groups.
+    for (let i = 0; i < 40; i++) {
+      const x = Math.floor(((i * 191) % w) / px) * px;
+      const y = Math.floor(((i * 73) % (h * 0.6)) / px) * px;
+      const on = Math.floor(sec * 2 + i) % 7 !== 0;
+      ctx.fillStyle = on ? `rgba(207, 231, 255, ${0.35 + (i % 3) * 0.2})` : 'rgba(207, 231, 255, 0.08)';
+      ctx.fillRect(x, y, px, px);
+    }
+
+    // Two layers of blocky cloud.
+    const cloud = (y, speed, alpha, scale) => {
+      const off = (sec * speed) % (w + 300);
+      ctx.fillStyle = `rgba(30, 144, 255, ${alpha})`;
+      for (let c = -1; c < w / 300 + 2; c++) {
+        const cx = c * 300 - off;
+        ctx.fillRect(cx, y, 60 * scale, 12 * scale);
+        ctx.fillRect(cx + 18 * scale, y - 12 * scale, 36 * scale, 12 * scale);
+        ctx.fillRect(cx - 12 * scale, y + 12 * scale, 84 * scale, 12 * scale);
+      }
+    };
+    cloud(h * 0.2, 12, 0.12, 1.4);
+    cloud(h * 0.34, 22, 0.08, 1);
+
+    // The floor grid, converging on a horizon.
+    const horizon = h * 0.62;
+    ctx.strokeStyle = 'rgba(30, 144, 255, 0.28)';
+    ctx.lineWidth = 2;
+    for (let i = -8; i <= 8; i++) {
+      ctx.beginPath();
+      ctx.moveTo(w / 2 + i * 40, horizon);
+      ctx.lineTo(w / 2 + i * w * 0.32, h + 10);
+      ctx.stroke();
+    }
+    const scroll = (sec * 40) % 60;
+    for (let k = 0; k < 8; k++) {
+      const p = (k * 60 + scroll) / 480;
+      const y = horizon + p * p * (h - horizon);
+      ctx.globalAlpha = 0.15 + p * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(0, Math.floor(y / px) * px);
+      ctx.lineTo(w, Math.floor(y / px) * px);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = 'rgba(30, 144, 255, 0.35)';
+    ctx.fillRect(0, horizon - 2, w, 4);
+    ctx.imageSmoothingEnabled = true;
+  }
+
+  /**
+   * TABLETOP - Noah's. A violet baize under one warm lamp: the weave of the
+   * felt, a hex board faint in the cloth, two dice at rest and a few meeples
+   * drifting to their places.
+   */
+  #tabletop(ctx, w, h, t) {
+    const sec = t / 1000;
+    const felt = ctx.createRadialGradient(w * 0.5, h * 0.3, 0, w * 0.5, h * 0.3, h * 0.95);
+    felt.addColorStop(0, '#3b1a66');
+    felt.addColorStop(0.55, '#24103f');
+    felt.addColorStop(1, '#150827');
+    ctx.fillStyle = felt;
+    ctx.fillRect(0, 0, w, h);
+
+    // The hex board, faint in the cloth.
+    ctx.strokeStyle = 'rgba(216, 180, 254, 0.07)';
+    ctx.lineWidth = 1.5;
+    const r = 38;
+    const hx = r * 1.5;
+    const hy = r * Math.sqrt(3);
+    for (let col = -1; col < w / hx + 1; col++) {
+      for (let row = -1; row < h / hy + 1; row++) {
+        const cx = col * hx;
+        const cy = row * hy + (col % 2 ? hy / 2 : 0);
+        ctx.beginPath();
+        for (let k = 0; k < 6; k++) {
+          const a = Math.PI / 3 * k;
+          const x = cx + r * Math.cos(a);
+          const y = cy + r * Math.sin(a);
+          if (k === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.stroke();
+      }
+    }
+
+    // The lamp, warm, slightly off centre.
+    const lamp = ctx.createRadialGradient(w * 0.58, h * 0.12, 0, w * 0.58, h * 0.12, h * 0.8);
+    lamp.addColorStop(0, 'rgba(251, 191, 36, 0.16)');
+    lamp.addColorStop(1, 'rgba(251, 191, 36, 0)');
+    ctx.fillStyle = lamp;
+    ctx.fillRect(0, 0, w, h);
+
+    // Meeples, drifting to their places.
+    const meeple = (x, y, size, alpha) => {
+      ctx.fillStyle = `rgba(216, 180, 254, ${alpha})`;
+      ctx.beginPath();
+      ctx.arc(x, y - size * 0.7, size * 0.32, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(x - size * 0.5, y - size * 0.3);
+      ctx.quadraticCurveTo(x, y - size * 0.75, x + size * 0.5, y - size * 0.3);
+      ctx.lineTo(x + size * 0.34, y + size * 0.05);
+      ctx.lineTo(x + size * 0.5, y + size * 0.6);
+      ctx.lineTo(x + size * 0.1, y + size * 0.6);
+      ctx.lineTo(x, y + size * 0.3);
+      ctx.lineTo(x - size * 0.1, y + size * 0.6);
+      ctx.lineTo(x - size * 0.5, y + size * 0.6);
+      ctx.lineTo(x - size * 0.34, y + size * 0.05);
+      ctx.closePath();
+      ctx.fill();
+    };
+    for (let i = 0; i < 6; i++) {
+      const x = w * (0.12 + i * 0.15) + Math.sin(sec * 0.25 + i * 1.3) * 18;
+      const y = h * (0.78 + (i % 2) * 0.1) + Math.cos(sec * 0.2 + i) * 6;
+      meeple(x, y, 22 + (i % 3) * 6, 0.1 + (i % 3) * 0.04);
+    }
+
+    // Two dice at rest, one turning over very slowly.
+    const die = (x, y, s, rot, pips) => {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(rot);
+      ctx.fillStyle = 'rgba(233, 213, 255, 0.14)';
+      ctx.beginPath();
+      ctx.roundRect(-s / 2, -s / 2, s, s, s * 0.18);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(26, 11, 46, 0.7)';
+      for (const [px, py] of pips) {
+        ctx.beginPath();
+        ctx.arc(px * s * 0.28, py * s * 0.28, s * 0.07, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    };
+    die(w * 0.84, h * 0.62, 56, 0.35 + Math.sin(sec * 0.15) * 0.06, [[-1, -1], [1, 1], [0, 0], [-1, 1], [1, -1]]);
+    die(w * 0.9, h * 0.72, 48, -0.2, [[-1, -1], [1, 1], [0, 0]]);
+  }
+
   #horror(ctx, w, h, t) {
     const sec = t / 1000;
 

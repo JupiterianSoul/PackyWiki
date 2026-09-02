@@ -21,6 +21,7 @@
  * visually its own thing without a single stored byte - the same pack always
  * regenerates the same look, on any device.
  */
+import { codeById } from './codes.js';
 import { themeById } from './data/packs.js';
 import { rarityById } from './data/rarities.js';
 
@@ -308,6 +309,23 @@ export function customSeed(spec) {
 /* --- the one entry point ----------------------------------------------------- */
 
 export function styleForSpec(spec) {
+  // A special booster (src/codes.js) is hand-styled: the person's colour, a
+  // foil and a shelf family chosen for them, and their own drawn emblem.
+  if (spec.kind === 'code') {
+    const code = codeById(spec.codeId);
+    if (code) {
+      const light = code.light ?? '#ffffff';
+      return {
+        accent: code.accent, accent2: code.accent2,
+        foil: (P[code.foil] ?? P.facets)(1, 0.15),
+        holo: holo(102, 1.2),
+        particles: burst(code.shapes ?? ['orb', 'star4'], [code.accent, light, '#ffffff'], { count: 34, spread: 1.3, gravity: 0.25 }),
+        family: code.family ?? 'plate',
+        emblem: { kind: 'drawn', id: code.emblem ?? 'seal' }
+      };
+    }
+  }
+
   if (spec.kind === 'custom') {
     const style = proceduralStyle(customSeed(spec));
     const seed = hashSeed(String(customSeed(spec)));

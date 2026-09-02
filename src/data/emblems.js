@@ -421,7 +421,76 @@ export const EMBLEMS = {
     <path d="M16 52 h30 l14 52Z" fill="${E3}" opacity="0.5"/>
     <path d="M88 30 l16 22 h-30Z" fill="${E3}" opacity="0.6"/>
     <path d="M32 30 l14 22 h-30Z" fill="${E2}" opacity="0.9"/>
-    <path d="M60 30 l6 6 -6 6 -6 -6Z" fill="${HI}" opacity="0.9"/>`
+    <path d="M60 30 l6 6 -6 6 -6 -6Z" fill="${HI}" opacity="0.9"/>`,
+
+  /* --- the special boosters (src/codes.js): one mark per person --------- */
+
+  /* A speech bubble laughing out loud: two shut eyes and a wide open mouth. */
+  laugh: `
+    <ellipse cx="60" cy="100" rx="40" ry="6" fill="${INK}" opacity="0.3"/>
+    <path d="M22 26 Q22 16 32 16 L88 16 Q98 16 98 26 L98 66 Q98 76 88 76 L56 76 L38 94 L42 76 L32 76 Q22 76 22 66Z" fill="${E2}"/>
+    <path d="M28 22 Q28 20 30 20 L86 20 Q90 20 90 24 L90 40 Q60 34 28 40Z" fill="${E1}" opacity="0.55"/>
+    <path d="M36 40 Q42 32 48 40" stroke="${INK}" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M70 40 Q76 32 82 40" stroke="${INK}" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <path d="M40 50 Q60 76 80 50Z" fill="${INK}"/>
+    <path d="M46 50 L74 50 Q72 56 60 56 Q48 56 46 50Z" fill="${HI}"/>
+    <path d="M50 62 Q60 68 70 62 Q66 70 60 70 Q54 70 50 62Z" fill="${E3}" opacity="0.9"/>
+    <path d="M100 20 L108 12 M104 30 L114 28 M96 10 L100 2" stroke="${E1}" stroke-width="3" stroke-linecap="round"/>`,
+
+  /* A winged bull of Assyria, in profile: the horned crown, the beard, the
+     great wing, five legs as the palace gates had them. */
+  lamassu: `
+    <ellipse cx="60" cy="102" rx="44" ry="6" fill="${INK}" opacity="0.32"/>
+    <path d="M14 62 Q18 40 44 36 L96 36 Q108 36 108 48 L108 92 L98 92 L98 70 L84 70 L84 92 L74 92 L74 70 L60 70 L60 92 L50 92 L50 70 L36 70 L36 92 L26 92 L26 66 Q14 68 14 62Z" fill="${E2}"/>
+    <path d="M44 36 Q36 20 52 12 L96 12 Q112 12 112 28 L112 40 Q104 34 96 36Z" fill="${E1}" opacity="0.9"/>
+    <path d="M44 38 L28 26 Q22 46 44 52Z" fill="${E1}" opacity="0.9"/>
+    <path d="M92 26 Q98 22 104 26 Q98 30 92 26Z" fill="${INK}"/>
+    <path d="M100 46 Q112 54 108 70 Q100 62 100 46Z" fill="${E3}" opacity="0.85"/>
+    <path d="M100 8 L96 -2 M108 8 L112 -2" stroke="${E3}" stroke-width="4" stroke-linecap="round"/>
+    <rect x="96" y="2" width="20" height="8" rx="3" fill="${E3}"/>
+    <path d="M30 42 L20 50 L30 60 L38 50Z" fill="${E3}" opacity="0.7"/>
+    <path d="M46 44 Q60 38 74 44 L74 62 Q60 66 46 62Z" fill="${E3}" opacity="0.35"/>
+    <path d="M50 46 L70 46 M50 52 L70 52 M50 58 L70 58" stroke="${HI}" stroke-width="2" opacity="0.5"/>`,
+
+  /* An eight-bit heart, blocky and lit from one corner, on a cartridge. */
+  pixelheart: `
+    <rect x="22" y="22" width="76" height="80" rx="6" fill="${E3}"/>
+    <rect x="30" y="30" width="60" height="46" fill="${INK}"/>
+    <path d="M44 38 h8 v6 h6 v-6 h8 v6 h6 v6 h-6 v6 h-6 v6 h-8 v-6 h-6 v-6 h-6 v-6 h6 v-6Z" fill="${E2}"/>
+    <path d="M44 38 h8 v6 h-8Z M56 38 h4 v6 h-4Z" fill="${E1}"/>
+    <rect x="36" y="82" width="48" height="6" rx="2" fill="${E1}" opacity="0.7"/>
+    <rect x="36" y="92" width="26" height="4" rx="2" fill="${E1}" opacity="0.4"/>
+    <rect x="18" y="16" width="84" height="8" rx="3" fill="${E2}"/>
+    <path d="M26 16 h10 v-6 h-10Z M46 16 h10 v-6 h-10Z M66 16 h10 v-6 h-10Z M86 16 h10 v-6 h-10Z" fill="${E1}"/>`,
+
+  /* Two dice mid-tumble and a meeple standing between them. */
+  dice: `
+    <ellipse cx="60" cy="102" rx="44" ry="6" fill="${INK}" opacity="0.32"/>
+    <g transform="rotate(-14 38 62)">
+      <rect x="18" y="42" width="40" height="40" rx="8" fill="${E1}"/>
+      <circle cx="28" cy="52" r="4" fill="${INK}"/><circle cx="48" cy="52" r="4" fill="${INK}"/>
+      <circle cx="38" cy="62" r="4" fill="${INK}"/>
+      <circle cx="28" cy="72" r="4" fill="${INK}"/><circle cx="48" cy="72" r="4" fill="${INK}"/>
+    </g>
+    <g transform="rotate(12 86 66)">
+      <rect x="66" y="46" width="40" height="40" rx="8" fill="${E2}"/>
+      <circle cx="76" cy="56" r="4" fill="${HI}"/><circle cx="96" cy="76" r="4" fill="${HI}"/>
+      <circle cx="86" cy="66" r="4" fill="${HI}"/>
+    </g>
+    <path d="M60 22 a8 8 0 1 1 0.1 0Z" fill="${E3}"/>
+    <path d="M46 46 Q60 30 74 46 L70 58 L78 78 L64 78 L60 66 L56 78 L42 78 L50 58Z" fill="${E3}"/>
+    <path d="M52 44 Q60 36 68 44 L66 50 L54 50Z" fill="${E1}" opacity="0.5"/>`,
+
+  /* A wax seal pressed with a W, a quill laid across it. */
+  seal: `
+    <ellipse cx="60" cy="100" rx="40" ry="6" fill="${INK}" opacity="0.32"/>
+    <path d="M60 22 Q78 18 88 32 Q102 40 96 58 Q100 76 84 84 Q72 96 58 90 Q40 94 32 80 Q18 72 24 56 Q20 38 36 30 Q44 18 60 22Z" fill="${E2}"/>
+    <circle cx="60" cy="56" r="24" fill="${E3}" opacity="0.55"/>
+    <circle cx="60" cy="56" r="24" fill="none" stroke="${E1}" stroke-width="2" opacity="0.6"/>
+    <path d="M44 46 L50 68 L56 52 L62 68 L68 46" fill="none" stroke="${HI}" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+    <path d="M30 96 Q60 70 104 16" stroke="${E1}" stroke-width="5" stroke-linecap="round"/>
+    <path d="M104 16 Q98 34 84 40 Q92 26 104 16Z" fill="${E1}"/>
+    <path d="M86 40 Q80 44 72 46" stroke="${E1}" stroke-width="3" stroke-linecap="round"/>`
 };
 
 /**

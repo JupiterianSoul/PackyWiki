@@ -57,7 +57,7 @@ import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
 import { music } from './ui/music.js';
-import { canRedeem, codeByInput, codeLook, codeSpec, timesRedeemed } from './codes.js';
+import { canRedeem, codeByInput, codeById, codeLook, codeSpec, codeTitles, timesRedeemed, hasRedeemed, CREATOR, SPECIAL_RARITY_ID } from './codes.js';
 import {
   quizAvailable, buildQuiz, questionCountFor, quizRewards,
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
@@ -769,7 +769,8 @@ function buildBooster(spec, { interactive = false, size = '' } = {}) {
 
 function ownedFor(mode) {
   return store.ownedBoosters(state.inventory)
-    .filter((slot) => (mode === 'custom') === (slot.spec.kind === 'custom'))
+    // The special boosters (a secret code's) live on the Custom shelf too.
+    .filter((slot) => (mode === 'custom') === (slot.spec.kind === 'custom' || slot.spec.kind === 'code'))
     .sort((a, b) => specName(a.spec).localeCompare(specName(b.spec)));
 }
 
@@ -1873,23 +1874,26 @@ async function runOpen(booster) {
 
   const colours = specColours(state.spec);
   // Random order: a Legendary can come first and a Common last.
-  const pulls = shuffle(articles.map((article) => {
+  // A special booster keeps its order: the five things, then The Creator.
+  const ordered = state.spec.kind === 'code' ? articles : shuffle(articles);
+  const pulls = ordered.map((article) => {
     // The pack chose what it was allowed to draw; the page itself decides
-    // what it is. Same article, same rarity, for everyone.
-    const rarity = rarityFromPopularity(article.popularity);
+    // what it is. Same article, same rarity, for everyone. A card from a
+    // secret code is Special, whatever its readership.
+    const rarity = article.special ? rarityById(SPECIAL_RARITY_ID) : rarityFromPopularity(article.popularity);
     return {
       article, rarity,
-      price: priceFor(article.popularity, rarity),
+      price: priceFor(article.popularity, article.special ? rarityById('prismatic') : rarity),
       packName: specName(state.spec),
       packIcon: specIcon(state.spec),
       packAccent: colours.accent
     };
-  }));
+  });
 
   const recorded = store.recordPulls(state.collection, pulls, state.spec);
   // The shared codex learns every real card as it is first pulled; custom
-  // wikis stay private to their maker.
-  if (signedIn() && state.spec?.kind !== 'custom') {
+  // wikis stay private to their maker, and so does a special booster.
+  if (signedIn() && state.spec?.kind !== 'custom' && state.spec?.kind !== 'code') {
     const found = pulls.map((pull) => ({ ...pull.article, price: pull.price, rarityId: pull.rarity.id }))
       .filter((card) => card.key && !String(card.packId ?? '').startsWith('custom'));
     account.codexAdd(userId(), found).catch(() => { /* the next opener adds it */ });
@@ -1984,6 +1988,11 @@ function fillFront(front, data, rarity, { ownedTag = false } = {}) {
     fallback();
   }
   dressFront(front, data, rarity);
+  const shell = front.closest('.card');
+  if (shell) {
+    if (data.special) shell.dataset.special = data.creator ? 'creator' : data.special;
+    else delete shell.dataset.special;
+  }
 
   front.querySelector('.card-title').textContent = data.title;
   // In the rooms where you browse cards that are not necessarily yours (the
@@ -1999,8 +2008,9 @@ function fillFront(front, data, rarity, { ownedTag = false } = {}) {
   front.querySelector('.card-extract').textContent = data.extract;
   front.querySelector('.rarity-badge').textContent = tx(rarity.name);
   front.querySelector('.card-price').innerHTML = money(data.price);
-  front.querySelector('.card-views').textContent =
-    data.views ? t('viewsPerMonth', { views: formatViews(data.views) }) : bandFor(data.popularity ?? 0).name;
+  // The Creator is not read on Wikipedia: no readership line for that one.
+  front.querySelector('.card-views').textContent = data.creator ? ''
+    : data.views ? t('viewsPerMonth', { views: formatViews(data.views) }) : bandFor(data.popularity ?? 0).name;
 }
 
 /*
@@ -2439,7 +2449,7 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = fals
   else favButton.remove();
   // The wish bookmark sits under the star, on every card that can name
   // itself - your own, a friend's, a stranger's at auction.
-  if (wish && data.key) {
+  if (wish && data.key && !data.creator) {
     const wishButton = document.createElement('button');
     wishButton.type = 'button';
     wishButton.className = `wish-button${fav && entryKey ? '' : ' is-alone'}`;
@@ -2467,6 +2477,7 @@ function openCardDetail(entryKey, data, rarity) {
     const card = document.createElement('article');
     card.className = 'card giant-card is-revealed is-lit';
     applyRarityVars(card, rarity);
+    if (data.special) card.dataset.special = data.creator ? 'creator' : data.special;
     card.innerHTML = `
       <div class="card-inner">
         <div class="card-face card-front">
@@ -2550,25 +2561,39 @@ function openCardDetail(entryKey, data, rarity) {
     card.querySelector('.card-price').innerHTML = money(data.price);
     // How read the article is decides its tier now, so the number that earned
     // the card its rarity belongs on the card, not just on the small face.
-    const readership = data.views
-      ? t('viewsPerMonth', { views: formatViews(data.views) })
-      : bandFor(data.popularity ?? 0).name;
+    const readership = data.creator ? ''
+      : data.views ? t('viewsPerMonth', { views: formatViews(data.views) })
+        : bandFor(data.popularity ?? 0).name;
     card.querySelector('.card-views').textContent = readership;
     card.querySelector('.giant-facts').innerHTML = [
       `<span class="chip" style="color:${rarity.color};border-color:${rarity.color}">${tx(rarity.name)}</span>`,
-      `<span class="chip">${esc(readership)}</span>`,
+      readership ? `<span class="chip">${esc(readership)}</span>` : '',
       entry && entry.count > 1 ? `<span class="chip">${t('copiesOwned', { n: entry.count })}</span>` : ''
     ].filter(Boolean).join('');
 
     const read = card.querySelector('a');
-    read.href = data.url;
-    read.textContent = t('read');
-    press(read, { sound: null });
+    if (data.url) {
+      read.href = data.url;
+      read.textContent = t('read');
+      press(read, { sound: null });
+    } else {
+      // The Creator has no article to read and is nobody's to wish for.
+      read.remove();
+      wishBtn.remove();
+    }
 
-    // Selling only makes sense for a card actually in the binder.
+    // Selling only makes sense for a card actually in the binder, and never
+    // for a special card: that one says so in its facts instead.
     const sell = card.querySelector('.sell');
-    sell.hidden = !entry;
-    if (entry) {
+    sell.hidden = !entry || store.isLocked(entry);
+    if (store.isLocked(entry ?? data)) {
+      const lock = document.createElement('span');
+      lock.className = 'chip is-lock';
+      lock.innerHTML = `${iconSvg('lock', { size: 12 })}<span>${esc(t('specialLockedShort'))}</span>`;
+      lock.title = t('specialLocked');
+      card.querySelector('.giant-facts').appendChild(lock);
+    }
+    if (entry && !store.isLocked(entry)) {
       state.detail.sellButton = sell;
       paintSellButton();
       press(sell, { sound: null });
@@ -2595,6 +2620,7 @@ function handleSell() {
   if (!detail) return;
   const entry = state.collection.entries[detail.key];
   if (!entry) return;
+  if (store.isLocked(entry)) { synth.playDenied(); toast(t('specialLocked'), 'error'); return; }
 
   // First tap arms, second confirms: the button is its own dialog.
   if (!detail.sellArmed) {
@@ -2989,7 +3015,12 @@ function renderAlbum() {
   el.albumBook.style.setProperty('--accent', album.style.accent);
   el.albumBook.style.setProperty('--accent2', album.style.accent2);
 
-  const visible = store.filterEntries(album.entries, { ...state.filters, pack: '' });
+  const visible = album.kind === 'code'
+    // A special album reads in the order the booster dealt it: the five
+    // things, then The Creator, whatever sort the binder is set to.
+    ? store.filterEntries(album.entries, { ...state.filters, pack: '', sort: 'name' })
+        .sort((a, b) => (a.creator ? 1 : 0) - (b.creator ? 1 : 0) || a.firstPulledAt - b.firstPulledAt)
+    : store.filterEntries(album.entries, { ...state.filters, pack: '' });
   const pages = Math.max(pageCount(album, visible.length), 1);
   const page = Math.min(state.album.spread, pages - 1);
   state.album.spread = page;
@@ -3048,7 +3079,12 @@ function pageCount(album, visibleCount) {
 function turnAlbumPage(dir) {
   const album = currentAlbum();
   if (!album || state.albumTurning) return;
-  const visible = store.filterEntries(album.entries, { ...state.filters, pack: '' });
+  const visible = album.kind === 'code'
+    // A special album reads in the order the booster dealt it: the five
+    // things, then The Creator, whatever sort the binder is set to.
+    ? store.filterEntries(album.entries, { ...state.filters, pack: '', sort: 'name' })
+        .sort((a, b) => (a.creator ? 1 : 0) - (b.creator ? 1 : 0) || a.firstPulledAt - b.firstPulledAt)
+    : store.filterEntries(album.entries, { ...state.filters, pack: '' });
   const pages = Math.max(pageCount(album, visible.length), 1);
   const next = state.album.spread + dir;
   if (next < 0 || next >= pages) {
@@ -3875,7 +3911,7 @@ function openSellSheet() {
     synth.playDenied();
     return;
   }
-  const mine = store.allEntries(state.collection).filter((c) => c.count > 0);
+  const mine = store.allEntries(state.collection).filter((c) => c.count > 0 && !store.isLocked(c));
   openSheet(t('marketPickCard'), (body) => {
     if (!mine.length) {
       body.innerHTML = `<p class="muted">${esc(t('marketNoCards'))}</p>`;
@@ -3973,7 +4009,21 @@ function openListSheet(entry) {
 
 function allBadgeStates() {
   const evaluated = evaluateAchievements(achFacts(), state.profile.achievements?.redeemed ?? []);
-  return badgeStates(evaluated);
+  return badgeStates(evaluated, state.profile.codesRedeemed ?? {});
+}
+
+/** Put a badge on the profile without asking: the code's own, the moment it is redeemed. */
+function wearBadge(id) {
+  const states = allBadgeStates();
+  if (state.badgeLoadout.length === 0) state.badgeLoadout = wornBadges(states).map((w) => w.badge.id);
+  const worn = state.badgeLoadout;
+  if (!worn.includes(id)) {
+    if (worn.length >= 4) worn.shift();
+    worn.push(id);
+  }
+  // Saved even when the automatic shelf already had it: from now on the
+  // choice is explicit, so nothing later can quietly drop the badge.
+  store.saveBadgeLoadout(worn);
 }
 
 /** The chips actually on the profile: the chosen four, or, before anyone has
@@ -4807,6 +4857,7 @@ function toggleFavFriend(id) {
 /** Pick one of my cards; hand it over. The card leaves my save first. */
 function openGiftCard(entry) {
   const mine = store.allEntries(state.collection)
+    .filter((c) => !store.isLocked(c))
     .sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
   openSheet(t('giftCardTitle', { name: entry.profile.username }), (body) => {
     if (!mine.length) {
@@ -4857,7 +4908,8 @@ function openGiftCard(entry) {
 
 /** Pick one of my unopened boosters; hand it over. */
 function openGiftBooster(entry) {
-  const owned = store.ownedBoosters(state.inventory);
+  // A special booster (a secret code's) stays with whoever redeemed it.
+  const owned = store.ownedBoosters(state.inventory).filter((slot) => slot.spec.kind !== 'code');
   openSheet(t('giftBoosterTitle', { name: entry.profile.username }), (body) => {
     if (!owned.length) {
       body.innerHTML = '<p class="muted"></p>';
@@ -4912,7 +4964,9 @@ async function openTradeSheet(entry) {
   let theirs = [];
   try { theirs = (await account.friendCollection(entry.otherId)) ?? []; } catch { theirs = []; }
   const mine = store.allEntries(state.collection)
+    .filter((c) => !store.isLocked(c))
     .sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
+  theirs = theirs.filter((c) => !store.isLocked(c));
   theirs.sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
 
   const give = new Set();
@@ -5014,8 +5068,9 @@ function openTradeAnswer(trade) {
     acceptBtn.textContent = t('tradeAccept');
     declineBtn.textContent = t('tradeDecline');
 
-    // Can I actually pay? Every asked card must still be in my collection.
-    const missing = (trade.ask ?? []).filter((c) => !state.collection.entries[c.key]);
+    // Can I actually pay? Every asked card must still be in my collection,
+    // and a special card is never on the table.
+    const missing = (trade.ask ?? []).filter((c) => !state.collection.entries[c.key] || store.isLocked(state.collection.entries[c.key]));
     if (missing.length) {
       acceptBtn.disabled = true;
       body.querySelector('[data-status]').textContent = t('tradeMissing');
@@ -6114,14 +6169,109 @@ function redeemRow() {
     store.saveProfile(state.profile);
     const spec = codeSpec(entry);
     store.addBooster(state.inventory, spec, 1);
-    synth.playPurchase();
+    // The theme goes on now, and the badge is worn now: the whole gift at
+    // once, not a booster and a note saying there is more in the menus.
+    const theme = THEMES.find((th) => th.code === entry.id);
+    if (theme) useTheme(theme.id);
+    const badge = BADGES.find((b) => b.code === entry.id);
+    if (badge) wearBadge(badge.id);
+    syncSoon();
     input.value = '';
     status.textContent = t('redeemDone', { name: codeLook(entry).name });
     status.className = 'find-status is-ok';
-    toast(t('redeemDone', { name: codeLook(entry).name }), 'ok');
+    synth.playTheme();
     renderPacks();
+    updateBadges();
+    openReveal(entry, { theme, badge });
   });
   return row;
+}
+
+/**
+ * The reveal: what a secret code just handed over, laid out as the event it
+ * is. The person's message first, in their colour; then the booster, the six
+ * cards by name, the theme that is now on, the badge now worn.
+ */
+function openReveal(entry, { theme, badge }) {
+  const look = codeLook(entry);
+  openSheet(t('revealTitle'), (body) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'reveal';
+    wrap.style.setProperty('--accent', look.accent);
+    wrap.style.setProperty('--accent2', look.accent2);
+    wrap.style.setProperty('--light', look.light);
+    wrap.innerHTML = `
+      <p class="reveal-message"></p>
+      <div class="reveal-booster">
+        <div class="reveal-pack"></div>
+        <div class="reveal-copy"><span class="label"></span><h3></h3><p></p></div>
+      </div>
+      <p class="label reveal-label" data-cards></p>
+      <ol class="reveal-cards"></ol>
+      <div class="reveal-grants">
+        <div class="reveal-grant" data-theme-grant hidden>
+          <span class="reveal-swatch"></span>
+          <span class="reveal-grant-copy"><span class="label"></span><b></b></span>
+        </div>
+        <div class="reveal-grant" data-badge-grant hidden>
+          <span class="reveal-badge"></span>
+          <span class="reveal-grant-copy"><span class="label"></span><b></b></span>
+        </div>
+      </div>
+      <p class="reveal-where"></p>
+      <div class="reveal-actions">
+        <button class="btn btn-primary" type="button" data-go></button>
+        <button class="btn btn-ghost" type="button" data-later></button>
+      </div>`;
+    wrap.querySelector('.reveal-message').textContent = tx(entry.message);
+    wrap.querySelector('.reveal-pack').appendChild(buildBooster(codeSpec(entry), { size: 'is-small' }));
+    wrap.querySelector('.reveal-copy .label').textContent = t('revealBooster');
+    wrap.querySelector('.reveal-copy h3').textContent = look.name;
+    wrap.querySelector('.reveal-copy p').textContent = look.tagline;
+    wrap.querySelector('[data-cards]').textContent = t('revealCards');
+    const names = [...codeTitles(entry).map((c) => c.name ?? c.title), tx(CREATOR.title)];
+    wrap.querySelector('.reveal-cards').replaceChildren(...names.map((name, i) => {
+      const li = document.createElement('li');
+      li.innerHTML = `<span class="reveal-n"></span><span></span>`;
+      li.querySelector('.reveal-n').textContent = String(i + 1);
+      li.querySelector('span:last-child').textContent = name;
+      if (i === names.length - 1) li.classList.add('is-creator');
+      return li;
+    }));
+    if (theme) {
+      const grant = wrap.querySelector('[data-theme-grant]');
+      grant.hidden = false;
+      grant.querySelector('.reveal-swatch').innerHTML =
+        theme.swatch.map((c) => `<span style="background:${c}"></span>`).join('');
+      grant.querySelector('.label').textContent = t('revealTheme');
+      grant.querySelector('b').textContent = tx(theme.name);
+    }
+    if (badge) {
+      const grant = wrap.querySelector('[data-badge-grant]');
+      grant.hidden = false;
+      grant.querySelector('.reveal-badge').innerHTML = badgeSvg(badge, 1, 1, { size: 52 });
+      grant.querySelector('.label').textContent = t('revealBadge');
+      grant.querySelector('b').textContent = tx(badge.name);
+    }
+    wrap.querySelector('.reveal-where').textContent = t('revealWhere');
+    const go = wrap.querySelector('[data-go]');
+    const later = wrap.querySelector('[data-later]');
+    go.textContent = t('revealTake');
+    later.textContent = t('revealClose');
+    press(go, { sound: null });
+    press(later, { sound: null });
+    go.addEventListener('click', () => {
+      sheet.hide();
+      // The screen first: the segmented control measures its buttons when
+      // it moves, and a hidden screen measures as nothing.
+      showScreen('packs');
+      state.packMode = 'custom';
+      packsSeg?.select('custom', { silent: true });
+      renderPacks();
+    });
+    later.addEventListener('click', () => sheet.hide());
+    body.appendChild(wrap);
+  });
 }
 
 /**
@@ -6136,7 +6286,7 @@ function renderCustomize() {
 
   // The theme picker previews each theme rather than naming it.
   const current = storedTheme();
-  el.themeGrid.replaceChildren(...THEMES.map((theme) => {
+  el.themeGrid.replaceChildren(...THEMES.filter((theme) => !theme.code || hasRedeemed(state.profile, theme.code)).map((theme) => {
     const card = document.createElement('button');
     card.type = 'button';
     card.className = `theme-card${theme.id === current ? ' is-on' : ''}`;
@@ -6147,6 +6297,12 @@ function renderCustomize() {
       <span class="theme-check">${iconSvg('check', { size: 14 })}</span>`;
     card.querySelector('h4').textContent = tx(theme.name);
     card.querySelector('p').textContent = tx(theme.blurb);
+    if (theme.code) {
+      const note = document.createElement('span');
+      note.className = 'theme-note';
+      note.textContent = t('themeLockedNote');
+      card.querySelector('p').after(note);
+    }
     press(card, { sound: null });
     card.addEventListener('click', () => {
       if (theme.id === storedTheme()) return;
@@ -6943,6 +7099,8 @@ async function migrateLanguages() {
 function regradeCollection() {
   let changed = 0;
   for (const entry of Object.values(state.collection.entries ?? {})) {
+    // A special card keeps its tier for good.
+    if (entry.special) { if (entry.rarityId !== SPECIAL_RARITY_ID) { entry.rarityId = SPECIAL_RARITY_ID; changed++; } continue; }
     let pop = entry.popularity;
     if (!Number.isFinite(pop)) {
       pop = Number.isFinite(entry.views) && entry.views > 0
@@ -6970,6 +7128,13 @@ function regradeCollection() {
 }
 
 function init() {
+  // A special theme belongs to whoever redeemed its code. A save that lost
+  // the code (an erased save, a transfer that went the other way) wakes up
+  // in the default theme rather than one it has no right to.
+  const wanted = themeById(storedTheme());
+  if (wanted.code && !hasRedeemed(state.profile, wanted.code)) {
+    try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); } catch { /* session only */ }
+  }
   useTheme(storedTheme());
   el.splashMark.innerHTML = logoSvg({ size: 78 });
   backdrop.mount(el.backdrop).setTheme(storedTheme());
@@ -7257,7 +7422,7 @@ let binderSeg;
 init();
 
 window.__packywiki = {
-  state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS,
+  state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
   draw: drawArticles, generateShop, syncSocial,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {

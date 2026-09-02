@@ -96,6 +96,20 @@ h1, h2, h3, h4 {
   background-image:
     radial-gradient(circle at 30% 20%, rgba(232, 195, 122, 0.05), transparent 40%);
 }
+/* The special themes (src/codes.js): a CRT for Pixel, a lamp's vignette
+   for the brick wall and the felt table. */
+[data-theme='pixel'] #texture {
+  opacity: 1;
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px),
+    radial-gradient(120% 80% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.45) 100%);
+  mix-blend-mode: multiply;
+}
+[data-theme='assur'] #texture,
+[data-theme='tabletop'] #texture {
+  opacity: 1;
+  background-image: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgba(0, 0, 0, 0.5) 100%);
+}
 
 /* --- the app frame -------------------------------------------------------- */
 

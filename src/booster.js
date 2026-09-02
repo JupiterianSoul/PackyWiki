@@ -20,7 +20,7 @@
  * the spec's contents rather than generated.
  */
 import { THEME_PACKS, themeById } from './data/packs.js';
-import { codeById, codeLook } from './codes.js';
+import { codeById, codeLook, codeTitles, creatorCard } from './codes.js';
 import { rarityById, rarityRank } from './data/rarities.js';
 import { drawCapsFor } from './economy.js';
 import { tx, t, getLanguage } from './i18n.js';
@@ -72,14 +72,15 @@ export function specName(spec) {
  */
 export function specBaseName(spec) {
   if (spec.kind === 'timed') return t('timedBooster');
-  if (spec.kind === 'code') return codeLook(codeById(spec.codeId)).name || t('codeBooster');
+  // The pack face has room for a name and a tier line, not a sentence.
+  if (spec.kind === 'code') return codeById(spec.codeId)?.person ?? t('codeBooster');
   if (spec.kind === 'custom') return spec.customName ?? spec.wiki?.sitename ?? 'Custom';
   if (spec.themeId) return tx(themeById(spec.themeId)?.name);
   return spec.rarityId ? t('wildcard') : t('wildcard');
 }
 
 export const specTierName = (spec) =>
-  spec.rarityId ? tx(rarityById(spec.rarityId).name) : null;
+  spec.kind === 'code' ? t('specialTier') : spec.rarityId ? tx(rarityById(spec.rarityId).name) : null;
 
 export function specTagline(spec) {
   if (spec.kind === 'timed') return t('timedTagline');
@@ -141,16 +142,19 @@ export function specQueries(spec) {
 
 /** Turn a spec into the shape src/wiki.js expects. */
 export function toDrawPack(spec) {
-  // A code booster with a written list of pages draws exactly those, in
-  // order, past every band and every search: that is what makes it personal.
+  // A code booster draws exactly the pages written for it, in order, past
+  // every band and every search, and ends with The Creator: that is what
+  // makes it personal. Every card it draws is marked with the code.
   const code = spec.kind === 'code' ? codeById(spec.codeId) : null;
-  const titles = code?.titles ?? [];
+  const titles = code ? codeTitles(code) : [];
   return {
     name: specName(spec),
     cards: spec.cards,
-    source: titles.length ? 'titles' : spec.kind === 'custom' ? 'custom' : 'wikipedia',
+    source: code ? 'titles' : spec.kind === 'custom' ? 'custom' : 'wikipedia',
     titles,
-    lang: code?.lang ?? null,
+    extra: code ? [creatorCard(code.id)] : [],
+    special: code?.id ?? null,
+    fallbackArt: code ? codeLook(code).accent : null,
     queries: specQueries(spec),
     wiki: spec.wiki ?? null,
     // What the pack is allowed to draw: a tier is a fame floor, the free

@@ -232,6 +232,94 @@ export const THEMES = [
       transient: 'air',
       kit: 'cinematic'        // CC0 recordings; see src/assets/sfx/LICENSE.md
     }
+  },
+  /* --- the special themes: one per secret code (src/codes.js) ---------------
+     `code` names the code that unlocks it. Redeeming the code puts it on;
+     until then it is not in the picker. Each one is the person's colour and
+     their favourite thing, all the way down to the note the app plays. */
+  {
+    id: 'rire', code: 'simon',
+    name: { en: 'Rire', fr: 'Rire' },
+    blurb: {
+      en: 'Simon’s. Bright blue, bouncy springs, and a room that cannot keep a straight face.',
+      fr: 'Celui de Simon. Bleu vif, ressorts bondissants, et une pièce qui ne garde pas son sérieux.'
+    },
+    swatch: ['#0a1630', '#3b82f6', '#bfdbfe'],
+    backdrop: { renderer: 'rire', speed: 0.00016 },
+    motion: { scale: 0.85, ease: 'cubic-bezier(0.2, 0.9, 0.3, 1.2)', pop: 'cubic-bezier(0.34, 1.7, 0.5, 1)' },
+    sound: {
+      voice: 'marimba',       // a wooden giggle
+      gain: 0.7,
+      root: 392.0,            // G4
+      scale: [0, 4, 7, 9, 12],
+      reverb: { seconds: 1.2, decay: 3, mix: 0.16 },
+      filter: 4200,
+      drive: 0.08,
+      transient: 'knock'
+    }
+  },
+  {
+    id: 'assur', code: 'celeste',
+    name: { en: 'Assur', fr: 'Assur' },
+    blurb: {
+      en: 'Céleste’s. Rose glaze on palace brick, cuneiform in the air, slow and ceremonial.',
+      fr: 'Celui de Céleste. Émail rose sur brique de palais, cunéiforme dans l’air, lent et cérémonieux.'
+    },
+    swatch: ['#2a0f1f', '#f472b6', '#f5d0a9'],
+    backdrop: { renderer: 'assur', speed: 0.00006 },
+    motion: { scale: 1.15, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.3, 1.3, 0.5, 1)' },
+    sound: {
+      voice: 'fm',            // temple bells
+      gain: 0.6,
+      root: 220.0,            // A3
+      scale: [0, 1, 4, 5, 7, 8, 11],
+      reverb: { seconds: 4.2, decay: 2.2, mix: 0.4 },
+      filter: 3600,
+      drive: 0.1,
+      transient: 'brush'
+    }
+  },
+  {
+    id: 'pixel', code: 'samuel',
+    name: { en: 'Pixel', fr: 'Pixel' },
+    blurb: {
+      en: 'Samuel’s. Dodger blue, hard pixels, square notes and a level that never ends.',
+      fr: 'Celui de Samuel. Bleu dodger, pixels durs, notes carrées et un niveau qui ne finit jamais.'
+    },
+    swatch: ['#06162e', '#1e90ff', '#cfe7ff'],
+    backdrop: { renderer: 'pixel', speed: 0.00022 },
+    motion: { scale: 0.7, ease: 'steps(6, end)', pop: 'cubic-bezier(0.2, 1.4, 0.4, 1)' },
+    sound: {
+      voice: 'chip',          // eight bits
+      gain: 0.5,
+      root: 329.63,           // E4
+      scale: [0, 2, 4, 7, 9],
+      reverb: { seconds: 0.4, decay: 4, mix: 0.05 },
+      filter: 6000,
+      drive: 0.2,
+      transient: 'bit'
+    }
+  },
+  {
+    id: 'tabletop', code: 'noah',
+    name: { en: 'Tabletop', fr: 'Plateau' },
+    blurb: {
+      en: 'Noah’s. Violet felt under a lamp, dice at rest, meeples waiting for a turn.',
+      fr: 'Celui de Noah. Feutre violet sous une lampe, dés au repos, meeples qui attendent leur tour.'
+    },
+    swatch: ['#1a0b2e', '#a855f7', '#e9d5ff'],
+    backdrop: { renderer: 'tabletop', speed: 0.0001 },
+    motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    sound: {
+      voice: 'keys',          // felt piano on a felt table
+      gain: 0.66,
+      root: 293.66,           // D4
+      scale: [0, 3, 5, 7, 10],
+      reverb: { seconds: 1.8, decay: 2.8, mix: 0.22 },
+      filter: 3800,
+      drive: 0.06,
+      transient: 'knock'
+    }
   }
 ];
 
