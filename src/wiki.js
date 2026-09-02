@@ -128,16 +128,15 @@ const POOL_LIMIT = 20;
 
 /** Everything a card needs, asked for in the same breath as the search. */
 const PAGE_PROPS = {
-  prop: 'extracts|pageimages|categories|info|description|pageviews',
+  prop: 'extracts|pageimages|categories|info|description',
   exintro: '1', explaintext: '1', exchars: '600', exlimit: String(POOL_LIMIT),
   piprop: 'thumbnail|original', pilimit: String(POOL_LIMIT),
   // pithumbsize is added per request (see pageProps): it depends on the line.
-  // The last thirty days of readership, IN THE SAME REQUEST as the page.
-  // Readership decides rarity, and it used to cost one round trip per
-  // candidate to a second host: forty lookups for a five-card pack, which is
-  // what made every booster feel like a lost connection. Wikipedia carries
-  // its pageview counts on the page itself, so a pool arrives already graded.
-  pvipdays: '30',
+  // Readership is deliberately NOT asked for here. Asking the search to
+  // carry pageview counts for twenty candidates made the one request that
+  // matters take several seconds: the wiki fetches those counts one page at
+  // a time on its side. Readership only sets the price, so it is asked for
+  // afterwards, for the handful of pages the draw settled on.
   // A page's own lead image, whatever its licence: the cover of a game, a
   // character's own art. Without this the API only answers with free files,
   // and a card about a comic hero comes back with nothing to show.
@@ -199,35 +198,6 @@ async function pagesByTitle(titles) {
   return pagesOf(await fetchJson(`${ACTION()}?${params}`));
 }
 
-/* --- the most-read list --------------------------------------------------
- * A booster with a high fame floor cannot get there by drawing at random:
- * almost nothing clears it. Wikipedia publishes its own most-read list, so a
- * Legendary booster draws from that instead, and the views come back with
- * the list rather than costing a request each.
- */
-let topCache = null;
-
-async function topArticles() {
-  const lang = wikiLang();
-  if (topCache?.lang === lang && Date.now() - topCache.at < 12 * 60 * 60 * 1000) return topCache.rows;
-  const now = new Date();
-  // Last month, which is always complete.
-  const when = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1));
-  const y = when.getUTCFullYear();
-  const m = String(when.getUTCMonth() + 1).padStart(2, '0');
-  try {
-    const url = `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/${lang}.wikipedia/all-access/${y}/${m}/all-days`;
-    const rows = ((await fetchJson(url))?.items?.[0]?.articles ?? [])
-      .map((row) => ({ title: String(row.article ?? '').replace(/_/g, ' '), views: Math.round(row.views ?? 0) }))
-      .filter((row) => row.title && !row.title.includes(':') && !BAD_TITLE.test(row.title));
-    topCache = { lang, at: Date.now(), rows };
-    return rows;
-  } catch {
-    topCache = { lang, at: Date.now(), rows: [] };
-    return [];
-  }
-}
-
 /* --- is this page actually about the subject? ---------------------------- */
 
 /**
@@ -262,7 +232,9 @@ function pageToCard(page, views) {
     thumbnail,
     url: page.fullurl ?? `https://${lang}.wikipedia.org/wiki/${encodeTitle(page.title)}`,
     views,
-    wordCount: page.index != null ? null : null
+    // The search reports the article's size; until its readership is known,
+    // that is what its fame is priced on.
+    wordCount: page.wordcount ?? null
   });
 }
 
@@ -284,7 +256,6 @@ function pageviewRange() {
  * which is a real answer (a page created this week) and not a failure.
  */
 function viewsOf(page) {
-  if (Number.isFinite(page?.knownViews)) return page.knownViews;
   const days = page?.pageviews;
   if (!days || typeof days !== 'object') return null;
   const counts = Object.values(days).filter((n) => Number.isFinite(n));
@@ -342,23 +313,9 @@ async function gatherCandidates(pack) {
   const live = (pack.queries ?? []).filter((q) => !deadQueries.has(`${wikiLang()}|${q}`));
   const pages = [];
 
-  // No subject to search: this pack's subject IS Wikipedia, so its pool has to
-  // span every tier the roll can ask for. Two sources, because neither covers
-  // the range alone: the most-read list is the only place the famous end
-  // lives, and a random article is Common almost by definition, which is the
-  // end the most-read list never reaches.
-  if (!live.length) {
-    const rows = await topArticles().catch(() => []);
-    const famous = rows.length ? (async () => {
-      const picked = shuffled(rows).slice(0, POOL_LIMIT);
-      const byTitle = new Map(picked.map((row) => [row.title, row.views]));
-      const detailed = await pagesByTitle(picked.map((row) => row.title)).catch(() => []);
-      for (const page of detailed) page.knownViews = byTitle.get(page.title) ?? null;
-      return detailed;
-    })() : Promise.resolve([]);
-    const [top, random] = await Promise.all([famous, randomPool().catch(() => [])]);
-    pages.push(...top, ...random);
-  }
+  // No subject to search: this pack's subject IS Wikipedia, and since the
+  // print is rolled rather than earned, any page will do. One request.
+  if (!live.length) pages.push(...await randomPool().catch(() => []));
 
   if (live.length) {
     // Two different queries widen a booster without costing a request per
@@ -424,23 +381,38 @@ const cappedWishes = (pack, wishes) => {
   return wishes.map((wish) => (rarityRank(wish) > ceiling ? RARITIES[ceiling].id : wish));
 };
 
-/**
- * Pages turned into cards. Readership is the article's FAME, which sets the
- * price; it no longer decides the tier, so a page that came without it is
- * still a card, priced off its size, and a few missing counts are asked for
- * once, all at the same time.
- */
-async function pagesToCards(pages, seen, outOfTime) {
+/** Pages turned into cards, priced on their size until their readership is known. */
+function pagesToCards(pages, seen) {
   const fresh = pages.filter((page) => !seen.has(page.title) && bestImage(page) && isUsableText(page.title, page.extract));
   for (const page of fresh) seen.add(page.title);
-  const unknown = fresh.filter((page) => viewsOf(page) == null).slice(0, 8);
-  const looked = new Map();
-  if (!outOfTime() && unknown.length) {
-    await Promise.all(unknown.map(async (page) => {
-      looked.set(page.title, await fetchMonthlyViews(page.title).catch(() => null));
-    }));
+  return fresh.map((page) => pageToCard(page, null)).filter(Boolean);
+}
+
+/** How long the draw waits for readership before pricing on size instead. */
+const VIEWS_PATIENCE_MS = 2500;
+
+/**
+ * The readership of the cards the draw settled on: ONE request, for a
+ * handful of titles, and no longer than a couple of seconds. Readership is
+ * the article's fame and only sets the price, so a pack is never held for
+ * it: a card whose count did not come in time is priced on its size, and
+ * the next pull of it, or the launch repair, prices it right.
+ */
+async function priceOnReadership(cards) {
+  const titles = cards.map((card) => card.title);
+  if (!titles.length) return cards;
+  const views = await Promise.race([
+    fetchViewsFor(titles).catch(() => null),
+    new Promise((resolve) => setTimeout(() => resolve(null), VIEWS_PATIENCE_MS))
+  ]);
+  if (!views) return cards;
+  for (const card of cards) {
+    const n = views.get(card.title);
+    if (n == null) continue;
+    card.views = n;
+    card.popularity = popularityFromViews(n);
   }
-  return fresh.map((page) => pageToCard(page, viewsOf(page) ?? looked.get(page.title) ?? null)).filter(Boolean);
+  return cards;
 }
 
 /**
@@ -464,16 +436,17 @@ async function drawWikipediaSet(pack) {
 
   // The prints this pack deals, rolled first; then any pages of the subject.
   const wishes = cappedWishes(pack, rollWishes(pack, wanted));
-  const out = (await pagesToCards(await gatherCandidates(pack), seen, outOfTime)).slice(0, wanted);
+  const out = pagesToCards(await gatherCandidates(pack), seen).slice(0, wanted);
 
   // Still short (a dead query, a thin subject): random articles, which always
   // exist, rather than an error the player cannot do anything about.
   for (let round = 0; out.length < wanted && round < 2 && !outOfTime(); round++) {
-    const extra = await pagesToCards(await randomPool().catch(() => []), seen, outOfTime);
+    const extra = pagesToCards(await randomPool().catch(() => []), seen);
     for (const card of extra) { if (out.length >= wanted) break; out.push(card); }
   }
 
   if (!out.length) throw new Error(`No usable article found for "${pack.name}"`);
+  if (!outOfTime()) await priceOnReadership(out);
   return stampPrints(out, wishes);
 }
 

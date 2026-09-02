@@ -65,9 +65,11 @@ A card is one Wikipedia article. Drawing one means:
    shown blank.
 3. **Insist on real text.** Disambiguation pages, list articles and stubs
    whose opening lines say nothing are rejected.
-4. **Ask how many people read it.** Monthly pageviews come back with the
-   page itself, and that number is the article's **fame**: it sets the price.
-   It does not decide the rarity; the booster does, below.
+4. **Ask how many people read it.** Once the draw has settled on its cards,
+   one request fetches their monthly readers, and that number is each
+   article's **fame**: it sets the price. It does not decide the rarity; the
+   booster does, below. A pack is never held for it: past a couple of
+   seconds the card is priced on its size and corrected on its next pull.
 
 Cards are drawn in the language the app is set to. A French card that has no
 French article falls back to the English one rather than vanishing.
