@@ -15,7 +15,8 @@
  * so E[sell everything] = RETURN_RATE × price, for every booster in the game.
  * Progression therefore comes from time (the shop stipend), not from grinding.
  */
-import { rarityRank, rarityFromPopularity, tierMidPopularity, tierBand } from './data/rarities.js';
+import { RARITIES, rarityRank, rarityFromPopularity, tierMidPopularity, tierBand } from './data/rarities.js';
+import { oddsFor } from './data/odds.js';
 import { basePrice, priceFor } from './pricing.js';
 import { timedDrawCaps } from './timed.js';
 
@@ -51,30 +52,50 @@ export const CARD_COUNT_RANGE = [3, 7];
  * when unconstrained.
  */
 export function drawCapsFor(spec) {
+  // A timed booster is the one pack still described by a range: its track
+  // level caps how famous a page it may pull, whatever the roll says.
   if (spec?.kind === 'timed') return timedDrawCaps(spec.timedLevel ?? 1);
-  if (!spec?.rarityId) return { minPopularity: null, maxPopularity: null };
-  // A tier is a BAND, not just a floor. Given only a floor, a tier booster
-  // reaches for the most famous pages it can find and an Epic pack deals
-  // Mythics, which is the same failure as dealing Commons: either way the
-  // rarity on the front stops describing what is inside, and the pack is
-  // mispriced against what it pays out. Inside the band, the tier means
-  // exactly what it says.
-  const { min, max } = tierBand(spec.rarityId);
-  return { minPopularity: min, maxPopularity: max };
+  // Everything else is described by its ODDS ROW, not by a band. The row is
+  // rolled once per card and the roll decides which band that card is fetched
+  // from, so the pack has no single band of its own. `guarantee` is the tier
+  // the pack promises at least one card of, and null when it promises nothing.
+  return {
+    minPopularity: null,
+    maxPopularity: null,
+    odds: spec?.rarityId ?? null,
+    guarantee: spec?.rarityId ?? null
+  };
 }
 
-/** Mean value of a single card out of this booster, from what it may draw. */
+/**
+ * Mean value of a single card out of this booster.
+ *
+ * Read straight off the odds row: the chance of each rarity times what a card
+ * of that rarity is worth. This has to follow the table or the shop misprices
+ * every tier booster the moment the table is tuned, which is exactly what
+ * happened when the price was derived from a band the draw no longer used.
+ *
+ * A timed booster still has a ceiling rather than a row, so it keeps the old
+ * reckoning.
+ */
 export function expectedCardValue(spec) {
-  if (spec?.rarityId) {
-    // A tiered pack draws from its tier's band and up; assume the low half
-    // of the band, since fame thins out fast above every threshold.
-    const { min, max } = tierBand(spec.rarityId);
-    const pop = min + (max - min) * 0.35;
+  if (spec?.kind === 'timed') {
+    const caps = timedDrawCaps(spec.timedLevel ?? 1);
+    const pop = Math.min(TYPICAL_POP, caps.maxPopularity ?? 1);
     return priceFor(pop, rarityFromPopularity(pop));
   }
-  const caps = drawCapsFor(spec);
-  const pop = Math.min(TYPICAL_POP, caps.maxPopularity ?? 1);
-  return priceFor(pop, rarityFromPopularity(pop));
+  const row = oddsFor(spec?.rarityId ?? null);
+  let value = 0;
+  for (let i = 0; i < RARITIES.length; i++) {
+    const rarity = RARITIES[i];
+    const { min, max } = tierBand(rarity.id);
+    // The low part of each band, since readership thins out fast above every
+    // threshold: a card that just cleared Epic is far commoner than one deep
+    // inside the band.
+    const pop = min + (max - min) * 0.35;
+    value += ((row[i] ?? 0) / 100) * priceFor(pop, rarity);
+  }
+  return value;
 }
 
 /** What the shop charges. */

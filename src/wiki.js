@@ -14,6 +14,8 @@
  * Everything funnels through `toCard`, so a card has the same shape either way.
  */
 import { popularityFromViews, popularityFromWordCount } from './pricing.js';
+import { RARITIES, rarityRank, rarityFromPopularity, tierBand } from './data/rarities.js';
+import { rollRarity } from './data/odds.js';
 import { wikiLang, getLanguage } from './i18n.js';
 
 const REQUEST_TIMEOUT_MS = 7000;
@@ -291,17 +293,21 @@ async function gatherCandidates(pack) {
   const floor = pack.minPopularity ?? 0;
   const pages = [];
 
-  // A high floor with no subject to search: draw from the most-read list,
-  // which is the only place those pages actually live.
-  if (!live.length && floor >= 0.755) {
-    const rows = await topArticles();
+  // No subject to search: this pack's subject IS Wikipedia, so its pool has to
+  // span every tier the roll can ask for. Two sources, because neither covers
+  // the range alone: the most-read list is the only place the famous end
+  // lives, and a random article is Common almost by definition, which is the
+  // end the most-read list never reaches.
+  if (!live.length) {
+    const rows = await topArticles().catch(() => []);
     if (rows.length) {
       const picked = shuffled(rows).slice(0, POOL_LIMIT);
       const byTitle = new Map(picked.map((row) => [row.title, row.views]));
-      const detailed = await pagesByTitle(picked.map((row) => row.title));
+      const detailed = await pagesByTitle(picked.map((row) => row.title)).catch(() => []);
       for (const page of detailed) page.knownViews = byTitle.get(page.title) ?? null;
       pages.push(...detailed);
     }
+    pages.push(...await randomPool().catch(() => []));
   }
 
   if (live.length) {
@@ -330,110 +336,86 @@ async function gatherCandidates(pack) {
 }
 
 /**
- * Cards from the most-read list, inside a popularity BAND. Used for one thing
- * only: handing a tier booster the single card of its own tier that its
- * subject could not supply.
+ * What the pack owes, decided before a single page is looked at.
  *
- * The band matters as much as the floor. This list is the thousand most-read
- * pages on Wikipedia, so its opening entries are famous beyond any tier but
- * the very top; drawing from it with only a floor would answer "this pack
- * needs an Epic" with a Mythic, and a tier booster that pays out above its
- * own tier is as broken as one that pays out below it. The list is shuffled
- * before it is read so the search covers its whole range rather than its
- * head, since the tail is where the middle tiers live.
+ * One roll per card off the pack's odds row, then the guarantee on top: a
+ * booster with a tier printed on it always owes at least one card of that
+ * tier. A card ABOVE the promised tier keeps the promise, so a Legendary roll
+ * in an Epic pack satisfies it and nothing is forced.
  */
-async function drawFamous(pack, seen, floor, ceiling, wanted) {
-  if (wanted <= 0) return [];
-  const rows = await topArticles().catch(() => []);
-  const fresh = shuffled(rows.filter((row) => !seen.has(row.title)));
-  const views = new Map();
-  const out = [];
-
-  for (let i = 0; i < fresh.length && out.length < wanted; i += 12) {
-    const chunk = fresh.slice(i, i + 12);
-    for (const row of chunk) views.set(row.title, row.views);
-    const pages = await pagesByTitle(chunk.map((row) => row.title)).catch(() => []);
-    for (const page of pages) {
-      if (out.length >= wanted || seen.has(page.title)) continue;
-      if (!bestImage(page) || !isUsableText(page.title, page.extract)) continue;
-      const card = pageToCard(page, views.get(page.title) ?? null);
-      if (!card || card.popularity < floor) continue;
-      if (ceiling != null && card.popularity >= ceiling) continue;
-      seen.add(card.title);
-      out.push(card);
-    }
-  }
-  return out;
+function rollWishes(pack, wanted) {
+  const wishes = Array.from({ length: wanted }, () => rollRarity(pack.odds));
+  if (!pack.guarantee) return wishes;
+  const promised = rarityRank(pack.guarantee);
+  if (wishes.some((wish) => rarityRank(wish) >= promised)) return wishes;
+  wishes[Math.floor(Math.random() * wishes.length)] = pack.guarantee;
+  return wishes;
 }
 
 async function drawWikipediaSet(pack) {
   const wanted = Math.max(1, pack.cards ?? 5);
   const seen = new Set();
-  const out = [];
-  const nearMisses = [];
   const deadline = Date.now() + DRAW_BUDGET_MS;
   const outOfTime = () => Date.now() > deadline || navigator.onLine === false;
 
   if (navigator.onLine === false) throw new Error('OFFLINE');
 
+  // The rarities this pack owes, rolled first. The draw's whole job below is
+  // to go and find a page for each one.
+  const wishes = rollWishes(pack, wanted);
+  const demand = new Map();
+  for (const wish of wishes) demand.set(wish, (demand.get(wish) ?? 0) + 1);
+
   const pool = await gatherCandidates(pack);
 
-  // Views decide rarity, so they decide whether a candidate is allowed in a
-  // tiered booster. Look them up several at a time instead of one by one.
-  const consider = async (page) => {
-    if (seen.has(page.title)) return null;
-    const views = page.knownViews ?? await fetchMonthlyViews(page.title);
-    const card = pageToCard(page, views);
-    if (!card) return null;
-    if (fitsBand(pack, card.popularity)) return card;
-    nearMisses.push({ card, miss: bandMiss(pack, card.popularity) });
-    return null;
+  // Candidates filed by the rarity their readership gives them.
+  const shelves = new Map();
+  const shelve = (card) => {
+    const id = rarityFromPopularity(card.popularity).id;
+    if (!shelves.has(id)) shelves.set(id, []);
+    shelves.get(id).push(card);
   };
+  const served = () => [...demand].every(([id, n]) => (shelves.get(id)?.length ?? 0) >= n);
 
-  for (let i = 0; i < pool.length && out.length < wanted && !outOfTime(); i += 5) {
+  for (let i = 0; i < pool.length && !outOfTime(); i += 5) {
     const chunk = pool.slice(i, i + 5);
-    const cards = await Promise.all(chunk.map((page) => consider(page).catch(() => null)));
-    for (const card of cards) {
-      if (!card || out.length >= wanted || seen.has(card.title)) continue;
+    const cards = await Promise.all(chunk.map(async (page) => {
+      if (seen.has(page.title)) return null;
+      const views = page.knownViews ?? await fetchMonthlyViews(page.title).catch(() => null);
+      const card = pageToCard(page, views);
+      if (!card || seen.has(card.title)) return null;
       seen.add(card.title);
-      out.push(card);
-    }
+      return card;
+    }).map((promise) => promise.catch(() => null)));
+    for (const card of cards) if (card) shelve(card);
+    // Every wish already has a page waiting for it: stop paying for lookups.
+    if (served()) break;
   }
 
-  // THE TIER'S PROMISE: a booster that names a tier hands over at least one
-  // card of that tier. Nothing reaches `out` above unless it already fits the
-  // band, so an empty `out` is exactly the case that used to produce a pack
-  // with no trace of the tier printed on it. The most-read list is asked for
-  // one card the subject could not supply.
-  if (!out.length && pack.minPopularity != null && !outOfTime()) {
-    for (const card of await drawFamous(pack, seen, pack.minPopularity, pack.maxPopularity, 1).catch(() => [])) {
-      out.push(card);
+  // Hand each wish a card off its own shelf. When the subject cannot serve a
+  // rarity, the pack does NOT go looking for it somewhere else: leaving the
+  // subject to satisfy a roll is how an Animals booster ends up holding a
+  // footballer. It drops a tier instead, and the player is owed a booster of
+  // the rarity that could not be served, which is what keeps that fair.
+  const out = [];
+  const owed = [];
+  for (const wish of wishes) {
+    const start = rarityRank(wish);
+    let card = null;
+    for (let rank = start; rank >= 0 && !card; rank--) {
+      const shelf = shelves.get(RARITIES[rank].id);
+      if (shelf?.length) card = shelf.shift();
+      else if (rank === start) owed.push(wish);
     }
-  }
-
-  // A booster ALWAYS opens, so whatever missed the band fills the rest. Which
-  // misses are preferred is the whole question. Sorting purely by how narrowly
-  // a card missed would put the ones ABOVE the band first, since those miss by
-  // a hair, and an Epic pack would quietly fill with Mythics: the overshoot
-  // walks back in through the filler. So the ones below the band go first,
-  // narrowest miss first, which is also most-read first and is exactly the
-  // "better than an ordinary booster" the tier is paid for. Cards above the
-  // band are the last resort, taken only to avoid handing over a short pack.
-  if (out.length < wanted) {
-    const top = pack.maxPopularity;
-    const under = [];
-    const over = [];
-    for (const miss of nearMisses) {
-      (top != null && miss.card.popularity >= top ? over : under).push(miss);
+    // Nothing at or under the roll: rather than hand over a short pack, take
+    // whatever the subject does have. Better than asked for is not a debt.
+    if (!card) {
+      for (let rank = start + 1; rank < RARITIES.length && !card; rank++) {
+        const shelf = shelves.get(RARITIES[rank].id);
+        if (shelf?.length) card = shelf.shift();
+      }
     }
-    under.sort((a, b) => a.miss - b.miss);
-    over.sort((a, b) => a.miss - b.miss);
-    for (const { card } of [...under, ...over]) {
-      if (out.length >= wanted) break;
-      if (seen.has(card.title)) continue;
-      seen.add(card.title);
-      out.push(card);
-    }
+    if (card) out.push(card);
   }
 
   // Still short (a dead query, a thin subject): random articles, which always
@@ -450,6 +432,10 @@ async function drawWikipediaSet(pack) {
   }
 
   if (!out.length) throw new Error(`No usable article found for "${pack.name}"`);
+  // What the subject could not serve travels with the cards, so the opener can
+  // pay the debt. A plain array everywhere else in the app, so this rides on
+  // it rather than changing the shape of every draw.
+  out.owed = owed;
   return out;
 }
 
@@ -1158,8 +1144,26 @@ export async function drawArticles(pack) {
   // search. Used by the personal boosters behind a secret code.
   if (pack.source === 'titles') return drawTitleSet(pack);
   if (pack.source === 'custom') {
+    // A custom wiki plays by the same rule: a rarity is rolled per card and
+    // the draw goes looking for a page of that size. Readership does not exist
+    // on Fandom, so page length stands in for it, which makes the bands rougher
+    // here than on Wikipedia but keeps one system rather than two.
     const seen = new Set();
-    return Promise.all(Array.from({ length: pack.cards }, () => drawCustomCard(pack, seen)));
+    const wishes = rollWishes(pack, Math.max(1, pack.cards ?? 5));
+    const owed = [];
+    const cards = [];
+    for (const wish of wishes) {
+      const { min, max } = tierBand(wish);
+      const card = await drawCustomCard({ ...pack, minPopularity: min, maxPopularity: max }, seen)
+        .catch(() => null);
+      if (!card) continue;
+      // The wiki could not produce a page of the rolled size: the pack keeps
+      // whatever it did find, and the debt is recorded like anywhere else.
+      if (rarityRank(rarityFromPopularity(card.popularity).id) < rarityRank(wish)) owed.push(wish);
+      cards.push(card);
+    }
+    cards.owed = owed;
+    return cards;
   }
   return drawWikipediaSet(pack);
 }

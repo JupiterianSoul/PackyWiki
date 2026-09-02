@@ -20,6 +20,8 @@
 
 import { THEME_PACKS, themeById as packById } from './data/packs.js';
 import { RARITIES, rarityById, rarityRank, rarityFromPopularity, rarityThresholds } from './data/rarities.js';
+import { oddsRows } from './data/odds.js';
+import * as odds from './data/odds.js';
 import { iconSvg, logoSvg, buckSvg } from './data/icons.js';
 import { drawArticles, resolveCustomWiki, fetchArticleText, translateCard } from './wiki.js';
 import {
@@ -1940,6 +1942,12 @@ async function runOpen(booster) {
     return false;
   }
 
+  // A rarity the roll asked for that the subject could not serve. The pack
+  // dropped a tier rather than go looking outside its own subject, so the
+  // player is owed a booster of the rarity that went missing. Read before the
+  // shuffle below, which would build a new array and lose it.
+  const owed = Array.isArray(articles.owed) ? articles.owed : [];
+
   const colours = specColours(state.spec);
   // Random order: a Legendary can come first and a Common last.
   // A special booster keeps its order: the five things, then The Creator.
@@ -1969,6 +1977,7 @@ async function runOpen(booster) {
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
   // The cards are in the collection now, so the booster is honestly gone.
   store.clearOpenInFlight();
+  payTheDebt(owed);
 
   // A special booster is a gift, not progress: no opening counted, no
   // rarity tally, no experience. Everything else about it is untouched.
@@ -1989,6 +1998,37 @@ async function runOpen(booster) {
   layoutDeck();
   revealCurrent();
   return true;
+}
+
+/**
+ * Hand over a booster for a rarity the subject could not serve.
+ *
+ * The draw refuses to leave its subject to satisfy a roll, because a
+ * footballer in an Animals pack is worse than a missing tier. The roll still
+ * happened, though, so the player is owed it: a booster of that rarity, in a
+ * subject picked at random, which is where that rarity actually lives.
+ *
+ * What is owed is ONE CARD of that rarity, so that is what is paid: a
+ * single-card booster, and one of them however many rolls went unserved.
+ *
+ * The size is the whole point of this being safe. Paying a full five-card pack
+ * for one missing card is a fivefold rebate, and the odds make that ruinous
+ * rather than generous: measured over the rows, a Prismatic booster rolls a
+ * rarity its subject cannot serve in 98% of openings, so it would refund
+ * itself nearly every time and print money. One card owed, one card paid.
+ *
+ * It has no subject on purpose. A themed pack of that rarity could fail the
+ * same way the original did and owe a booster in its turn; a subjectless pack
+ * draws from the most-read list as well as the random pool, so it spans every
+ * tier and can actually deliver what it promises.
+ */
+function payTheDebt(owed) {
+  if (!owed?.length || state.spec?.kind === 'code') return;
+  const best = owed.reduce((a, b) => (rarityRank(b) > rarityRank(a) ? b : a));
+  store.addBooster(state.inventory, { kind: 'open', themeId: null, rarityId: best, cards: 1 }, 1);
+  const name = tx(rarityById(best).name);
+  toast(esc(t('owedBooster', { rarity: name })), 'ok');
+  pushNote('gift', t('owedBooster', { rarity: name }), 'packs');
 }
 
 /* --- cards --------------------------------------------------------------------------------- */
@@ -7085,28 +7125,46 @@ function openWallet() {
   });
 }
 
-function openOdds() {
+/**
+ * The pull rates, for the booster in front of the player rather than in the
+ * abstract: the odds sheet shows the row that booster actually rolls on, next
+ * to what each rarity means in readership. A tier booster's row is visibly
+ * better than the basic one, which is the whole point of paying for it.
+ */
+function openOdds(rarityId = null) {
   openSheet(t('pullRates'), (body) => {
     body.innerHTML = `
-      <p style="margin-bottom:16px" data-note></p>
+      <p style="margin-bottom:12px" data-note></p>
+      <p style="margin-bottom:16px" data-row></p>
       <table class="odds-table">
-        <thead><tr><th></th><th></th></tr></thead>
+        <thead><tr><th></th><th></th><th></th></tr></thead>
         <tbody></tbody>
       </table>`;
     body.querySelector('[data-note]').textContent = t('oddsNote');
-    const [h1, h2] = body.querySelectorAll('th');
+    const rowNote = body.querySelector('[data-row]');
+    rowNote.textContent = rarityId
+      ? t('oddsRowTier', { rarity: tx(rarityById(rarityId).name) })
+      : t('oddsRowBasic');
+    const [h1, h2, h3] = body.querySelectorAll('th');
     h1.textContent = t('rarity');
-    h2.textContent = t('oddsViews');
-    body.querySelector('tbody').replaceChildren(...rarityThresholds().map(({ rarity, views }) => {
+    h2.textContent = t('oddsChance');
+    h3.textContent = t('oddsViews');
+    const views = new Map(rarityThresholds().map((r) => [r.rarity.id, r.views]));
+    body.querySelector('tbody').replaceChildren(...oddsRows(rarityId).map(({ rarity, pct }) => {
       const row = document.createElement('tr');
-      row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span></span></span></td><td class="odds-pct"></td>`;
+      row.innerHTML = `<td><span class="odds-name"><span class="odds-swatch"></span><span></span></span></td><td class="odds-pct tabular"></td><td class="odds-pct"></td>`;
       const swatch = row.querySelector('.odds-swatch');
       swatch.style.color = rarity.color;
       swatch.style.background = rarity.color;
       const label = row.querySelector('.odds-name span:last-child');
       label.textContent = tx(rarity.name);
       label.style.color = rarity.color;
-      row.querySelector('.odds-pct').textContent = views <= 0 ? t('oddsAny') : `\u2265 ${formatViews(views)}`;
+      const cells = row.querySelectorAll('.odds-pct');
+      // Below a tenth of a percent, a rounded number reads as zero and looks
+      // like the tier cannot happen at all.
+      cells[0].textContent = pct >= 0.1 ? `${pct}%` : '< 0.1%';
+      const need = views.get(rarity.id) ?? 0;
+      cells[1].textContent = need <= 0 ? t('oddsAny') : `\u2265 ${formatViews(need)}`;
       return row;
     }));
   });
@@ -7393,7 +7451,13 @@ function init() {
   el.levelBadge.addEventListener('click', () => { renderProfile(); showScreen('profile'); });
 
   el.oddsIcon.innerHTML = iconSvg('gem', { size: 15 });
-  el.oddsBtn.addEventListener('click', openOdds);
+  // Wrapped: passed straight, the click event would arrive as the rarity.
+  // The sheet shows the row for the booster on the open screen when there is
+  // one, and the basic row while browsing.
+  el.oddsBtn.addEventListener('click', () => {
+    const onOpen = el.openScreen?.classList.contains('is-active');
+    openOdds(onOpen ? (state.spec?.rarityId ?? null) : null);
+  });
   el.marketSell.addEventListener('click', () => { synth.playTap(); openSellSheet(); });
   press(el.marketSell, { sound: null });
   document.querySelectorAll('.help-btn').forEach((button) => {
@@ -7590,7 +7654,7 @@ init();
 
 window.__packywiki = {
   state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
-  draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor, drawPack: toDrawPack,
+  draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor, drawPack: toDrawPack, odds, specId,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {
     const forced = rarityById(id);

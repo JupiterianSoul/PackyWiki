@@ -89,25 +89,44 @@ random hand from that list.
 A booster can carry a rarity on its face, and that is a promise about what is
 inside it:
 
-A tier is a **band**, not a floor. `[minPop, maxPop)` of that tier is what the
-booster may draw, so a booster deals cards of the rarity printed on it.
+Rarity is rolled, then the card is found. Per card, twice over:
 
-- It **always contains at least one card of that tier**. If the subject cannot
-  supply one, the draw takes it from the most-read list, constrained to the
-  same band so the answer to "this pack owes an Epic" is an Epic.
-- It **never pays out above the tier**. When the band runs thin, the rest are
-  the most-read pages *below* it, which still beats a booster with no tier at
-  all, since that one draws from its subject with no preference for readership.
+1. **Roll a rarity** off the booster's odds row.
+2. **Find an article that has it**, from the popularity range that rarity means.
 
-Both failures matter equally. A tier booster that fills from the open pool is
-worthless: an Epic pack holding five Commons is what the old floor-only draw
-produced whenever a subject ran short of famous pages. But a tier booster that
-reliably deals above its tier is not generous, it is mispriced, and it makes
-the ladder meaningless from the other end. The band closes both.
+Rarity is still the article's own property, so the same page is the same rarity
+for everyone. What the table decides is what the draw goes looking for.
 
-One consequence worth knowing: filling from below is deliberate. A booster
-always opens, so a subject with almost nothing in the band still hands over a
-full pack, weighted to the most-read pages it does have.
+A tier booster rolls on a better row and, on top of that, always contains at
+least one card of its tier. A card above the promised tier keeps the promise:
+a Legendary in an Epic pack is not a broken one.
+
+| Booster | Com | Unc | Rare | Epic | Leg | Myth | Exo | Pris |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| basic | 68 | 18 | 8 | 3.5 | 1.6 | 0.6 | 0.25 | 0.05 |
+| Uncommon | 50 | 28 | 13 | 5.5 | 2.2 | 0.9 | 0.35 | 0.05 |
+| Rare | 34 | 30 | 20 | 9 | 4.2 | 1.8 | 0.85 | 0.15 |
+| Epic | 20 | 26 | 26 | 16 | 7.5 | 3 | 1.3 | 0.2 |
+| Legendary | 11 | 18 | 25 | 23 | 14 | 6 | 2.6 | 0.4 |
+| Mythic | 6 | 11 | 19 | 24 | 22 | 12 | 5 | 1 |
+| Exotic | 3 | 6 | 12 | 19 | 24 | 20 | 13 | 3 |
+| Prismatic | 1.5 | 3 | 7 | 13 | 20 | 24 | 20 | 11.5 |
+
+The whole table lives in `src/data/odds.js`. Booster prices are computed from
+it, so tuning a row reprices the shop rather than desynchronising it.
+
+### When a subject cannot serve a roll
+
+Roll a Mythic in an Animals booster and the subject may hold no page that
+famous. The draw does **not** go looking elsewhere: a footballer in an Animals
+pack is worse than a missing tier. It drops a tier instead, and the player is
+owed a single-card booster of the rarity that went missing, with no subject of
+its own so it can actually deliver it.
+
+One card owed, one card paid, and that size is load bearing. Paying a full pack
+for one missing card is a fivefold rebate, and the odds make that ruinous: a
+Prismatic booster rolls a rarity its subject cannot serve in 98% of openings,
+so it would refund itself nearly every time.
 
 ### Custom boosters
 
