@@ -967,8 +967,14 @@ async function drawTitleSet(pack) {
   const out = [];
   for (const want of wanted) {
     let card = null;
-    if (want.wiki) card = await fandomCard(want, pack).catch(() => null);
-    if (!card) {
+    if (want.wiki || want.wikiUrls) {
+      // A card that names its own wiki is a thing Wikipedia has no page for:
+      // the Tardigrades CARD in Terraforming Mars, not the animal. If that
+      // wiki cannot be reached the card stays unillustrated rather than
+      // becoming the encyclopaedia article of the same name, which would be
+      // the wrong subject entirely.
+      card = await fandomCard(want, pack).catch(() => null) ?? placeholderCard(want, pack);
+    } else {
       const page = await resolveTitle(want.title, wikiLang())
         ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
       card = page ? await namedCard(page, want, pack) : placeholderCard(want, pack);
@@ -994,23 +1000,35 @@ async function drawTitleSet(pack) {
  * neither the host nor the exact title has to be known in advance.
  */
 async function fandomCard(want, pack) {
-  const wiki = await resolveCustomWiki(want.wiki);
+  // A named endpoint is tried first: guessing a Fandom slug from a game's
+  // title works often, but not always, and these five cards are not allowed
+  // to be a coin toss.
+  let wiki = null;
+  for (const apiUrl of want.wikiUrls ?? []) {
+    wiki = await probeWiki(apiUrl).catch(() => null);
+    if (wiki) break;
+  }
+  if (!wiki && want.wiki) wiki = await resolveCustomWiki(want.wiki).catch(() => null);
   if (!wiki) return null;
-  const queries = Array.isArray(want.search) ? want.search : [want.search ?? want.title];
-  let hit = null;
-  for (const q of queries) {
-    const params = new URLSearchParams({
-      action: 'query', list: 'search', srsearch: q, srnamespace: '0', srlimit: '5', format: 'json', origin: '*'
-    });
-    const rows = (await fetchJson(`${wiki.apiUrl}?${params}`).catch(() => null))?.query?.search ?? [];
-    hit = rows.find((r) => r.pageid && !/\/|disambiguation/i.test(r.title)) ?? null;
-    if (hit) break;
+  // The exact page title when the card gives one, a search when it does not.
+  let hit = want.page ? await pageByTitle(wiki, want.page) : null;
+  if (!hit) {
+    const queries = Array.isArray(want.search) ? want.search : [want.search ?? want.title];
+    for (const q of queries) {
+      const params = new URLSearchParams({
+        action: 'query', list: 'search', srsearch: q, srnamespace: '0', srlimit: '5', format: 'json', origin: '*'
+      });
+      const rows = (await fetchJson(`${wiki.apiUrl}?${params}`).catch(() => null))?.query?.search ?? [];
+      hit = rows.find((r) => r.pageid && !/\/|disambiguation/i.test(r.title)) ?? null;
+      if (hit) break;
+    }
   }
   if (!hit) return null;
   const detail = await customPageDetail(wiki, hit.pageid);
   if (!detail) return null;
   let extract = String(detail.extract ?? '').trim();
   if (extract.length < 40) extract = (await customLeadText(wiki, hit.pageid).catch(() => null)) ?? extract;
+  if (extract.length < 40 && want.text) extract = want.text;
   const thumbnail = bestImage(detail)
     ?? await firstPhotoOn(wiki.apiUrl, hit.pageid)
     ?? platePicture(pack.fallbackArt ?? '#94a3b8', want.name ?? detail.title);
@@ -1031,19 +1049,59 @@ async function fandomCard(want, pack) {
   return card;
 }
 
+/*
+ * Site furniture, by file name: the padlocks, ambox arrows and project logos
+ * every wiki page carries. Matched against the FILE NAME alone. Matching the
+ * description URL, as this once did, rejected everything: a file page always
+ * lives at /wiki/File:..., so every candidate contained "wiki" and no page
+ * ever found a picture this way.
+ *
+ * A series logo is not furniture. A television title card is very often the
+ * only image its article has, so "logo" is not in this list.
+ */
+const CHROME_FILE = /(commons-logo|wikimedia|wikipedia|wiktionary|wikisource|wikiquote|wikidata|ambox|question_book|padlock|lock-|edit-icon|nuvola|crystal_|folder|disambig|portal|symbol_|_icon|icon_|arrow|stub|magnify|sound-icon|speaker|red_pencil|text_document|office-book|gnome-)/i;
+
 /** The first real photograph on a page of any MediaWiki, by page id. */
 async function firstPhotoOn(apiUrl, pageId) {
   try {
     const params = new URLSearchParams({
-      action: 'query', pageids: String(pageId), generator: 'images', gimlimit: '20',
+      action: 'query', pageids: String(pageId), generator: 'images', gimlimit: '30',
       prop: 'imageinfo', iiprop: 'url|mime|size', iiurlwidth: '640', format: 'json', origin: '*'
     });
     const files = pagesOf(await fetchJson(`${apiUrl}?${params}`));
-    const photo = files
-      .map((f) => f.imageinfo?.[0])
-      .filter((i) => i && /image\/(jpeg|png|webp)/.test(i.mime ?? '') && (i.width ?? 0) >= 160)
-      .find((i) => !/(icon|logo|flag|wiki|commons|edit|site-)/i.test(i.descriptionurl ?? i.url ?? ''));
+    const usable = files
+      .map((f) => ({ name: String(f.title ?? '').replace(/^[^:]*:/, ''), info: f.imageinfo?.[0] }))
+      .filter((f) => f.info && /image\/(jpeg|png|webp|svg)/.test(f.info.mime ?? '') && (f.info.width ?? 0) >= 160)
+      .filter((f) => !CHROME_FILE.test(f.name));
+    // The biggest one: on an article the lead photograph is almost always the
+    // largest file, and the strays are small.
+    usable.sort((a, b) => ((b.info.width ?? 0) * (b.info.height ?? 0)) - ((a.info.width ?? 0) * (a.info.height ?? 0)));
+    const photo = usable[0]?.info;
     return photo?.thumburl ?? photo?.url ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** One page of any MediaWiki by its exact title, following redirects. */
+async function pageByTitle(wiki, title) {
+  const params = new URLSearchParams({
+    action: 'query', titles: title, redirects: '1', format: 'json', origin: '*'
+  });
+  const page = pagesOf(await fetchJson(`${wiki.apiUrl}?${params}`).catch(() => null) ?? {})
+    .find((p) => p.pageid && !p.missing);
+  return page ?? null;
+}
+
+/**
+ * A page's picture from the REST summary. Wikipedia serves a lead image here
+ * that the action API sometimes will not, and it is the endpoint that answers
+ * for a television series whose only image is its title card.
+ */
+async function restImage(title, lang) {
+  try {
+    const data = await fetchJson(`https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeTitle(title)}`);
+    return data?.thumbnail?.source ?? data?.originalimage?.source ?? null;
   } catch {
     return null;
   }
@@ -1094,13 +1152,31 @@ const platePicture = (colour, title) => 'data:image/svg+xml,' + encodeURICompone
   + `<rect width="640" height="400" fill="url(#g)"/><text x="320" y="216" text-anchor="middle" font-family="system-ui,sans-serif" `
   + `font-size="44" font-weight="800" fill="rgba(255,255,255,0.86)">${String(title).replace(/[<>&]/g, ' ').slice(0, 26)}</text></svg>`);
 
+/**
+ * Every picture a Wikipedia article can be made to give up, in order.
+ *
+ * French Wikipedia hosts no non-free file at all, so a series whose only
+ * image is its title card has nothing to show there while the English
+ * article does. A named title therefore crosses the language line for its
+ * picture rather than going out as a blank plate.
+ */
+async function articlePicture(page, want, lang) {
+  const found = bestImage(page) ?? await restImage(page.title, lang) ?? await firstPhoto(page, lang);
+  if (found) return found;
+  if (lang === 'en') return null;
+  const title = want.fallback ?? want.title ?? page.title;
+  const twin = await resolveTitle(title, 'en');
+  if (!twin) return await restImage(title, 'en');
+  return bestImage(twin) ?? await restImage(twin.title, 'en') ?? await firstPhoto(twin, 'en');
+}
+
 async function namedCard(page, want, pack) {
   const lang = page.lang ?? wikiLang();
   const views = await fetchMonthlyViewsOn(page.title, lang).catch(() => null);
-  const thumbnail = bestImage(page)
-    ?? await firstPhoto(page, lang)
+  const thumbnail = await articlePicture(page, want, lang).catch(() => null)
     ?? platePicture(pack.fallbackArt ?? '#94a3b8', want.name ?? page.title);
-  const extract = String(page.extract ?? '').trim() || String(page.description ?? '').trim() || (want.name ?? page.title);
+  const extract = String(page.extract ?? '').trim() || String(page.description ?? '').trim()
+    || want.text || (want.name ?? page.title);
   const card = toCard({
     sourceId: `wikipedia:${lang}`,
     sourceName: 'Wikipedia',
@@ -1128,9 +1204,16 @@ function placeholderCard(want, pack) {
     pageId: null,
     title,
     description: '',
-    extract: title,
+    // A card whose page could not be reached still says what it is, when the
+    // booster wrote it down.
+    extract: want.text || title,
     thumbnail: platePicture(pack.fallbackArt ?? '#94a3b8', title),
-    url: `https://${wikiLang()}.wikipedia.org/wiki/${encodeTitle(want.title)}`,
+    // Never the encyclopaedia article of the same name for a card that lives
+    // on another wiki: that link would lead to the wrong subject.
+    url: want.link
+      ?? (want.wikiUrls?.[0]
+        ? want.wikiUrls[0].replace(/\/api\.php$/, `/wiki/${encodeTitle(want.page ?? want.fallback ?? want.title)}`)
+        : `https://${wikiLang()}.wikipedia.org/wiki/${encodeTitle(want.title)}`),
     views: null,
     wordCount: null
   });

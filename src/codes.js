@@ -123,19 +123,47 @@ export const SECRET_CODES = [
     },
     cards: [
       { en: 'Adolf Hitler', fr: 'Adolf Hitler' },
-      // The card itself, from the game's own wiki: not the animal.
-      { en: 'Tardigrades', fr: 'Tardigrades', wiki: 'Terraforming Mars', search: ['Tardigrades'],
-        name: { en: 'Tardigrades (Terraforming Mars)', fr: 'Tardigrades (Terraforming Mars)' } },
-      { en: 'Leto II Atreides', fr: 'Leto II Atréides', name: { en: 'Leto II, son of Paul Atreides', fr: 'Leto II, fils de Paul Atréides' } },
+      // The card itself, from the game's own wiki: not the animal. The
+      // endpoints are named outright because guessing a Fandom slug from a
+      // game's title is a coin toss, and this card has to be the right one.
+      { en: 'Tardigrades', fr: 'Tardigrades',
+        wiki: 'Terraforming Mars',
+        wikiUrls: ['https://terraforming-mars.fandom.com/api.php', 'https://terraformingmars.fandom.com/api.php'],
+        page: 'Tardigrades', search: ['Tardigrades'],
+        name: { en: 'Tardigrades (Terraforming Mars)', fr: 'Tardigrades (Terraforming Mars)' },
+        text: {
+          en: 'A microbe project card in Terraforming Mars. It costs four megacredits, gains a microbe every generation, and each three microbes on it are worth one victory point at the end of the game. Small, patient and quietly decisive.',
+          fr: 'Une carte projet microbe dans Terraforming Mars. Elle coûte quatre mégacrédits, gagne un microbe à chaque génération, et chaque groupe de trois microbes vaut un point de victoire en fin de partie. Petite, patiente et discrètement décisive.'
+        } },
+      { en: 'Leto II Atreides', fr: 'Leto II Atréides',
+        wiki: 'Dune', wikiUrls: ['https://dune.fandom.com/api.php'],
+        page: 'Leto Atreides II', search: ['Leto Atreides II', 'Leto II', 'God Emperor of Dune'],
+        name: { en: 'Leto II, son of Paul Atreides', fr: 'Leto II, fils de Paul Atréides' },
+        text: {
+          en: 'The son of Paul Atreides, who took the sandtrout onto his skin and became the God Emperor of Dune. He ruled for three thousand five hundred years to force humanity down the Golden Path, and let himself be killed the moment it was safe.',
+          fr: 'Le fils de Paul Atréides, qui prit les truites des sables sur sa peau et devint le God Emperor de Dune. Il régna trois mille cinq cents ans pour forcer l’humanité sur le Sentier d’Or, et se laissa tuer dès que ce fut possible.'
+        } },
       // The turret, from the game's own wiki: not the game.
-      { en: 'Neurotoxin turret', fr: 'Tourelle neurotoxique', wiki: 'Helldivers',
-        search: ['neurotoxin turret', 'gas sentry', 'toxic turret', 'neurotoxic sentry'],
-        name: { en: 'The neurotoxin turret (Helldivers)', fr: 'La tourelle neurotoxique (Helldivers)' } },
+      { en: 'Neurotoxin turret', fr: 'Tourelle neurotoxique',
+        wiki: 'Helldivers',
+        wikiUrls: ['https://helldivers.fandom.com/api.php', 'https://helldivers.wiki.gg/api.php'],
+        search: ['neurotoxin turret', 'A/AC-7 Neurotoxin', 'gas sentry', 'toxic turret', 'neurotoxic sentry'],
+        name: { en: 'The neurotoxin turret (Helldivers)', fr: 'La tourelle neurotoxique (Helldivers)' },
+        text: {
+          en: 'A sentry stratagem called down from orbit, planted in the dirt and left to work. It fills the ground around it with neurotoxin, holds a corridor on its own, and does not care in the slightest which side of the line you are standing on.',
+          fr: 'Une sentinelle appelée depuis l’orbite, plantée dans la terre et laissée à son travail. Elle remplit le sol autour d’elle de neurotoxine, tient un couloir toute seule, et se moque complètement du côté de la ligne où vous vous trouvez.'
+        } },
       // Last before The Creator. A character, so the game's own wiki has the
       // portrait Wikipedia never will.
-      { en: 'Sparkle', fr: 'Sparkle', wiki: 'Honkai Star Rail',
-        search: ['Sparkle', 'Sparkle/Lore', 'Character/Sparkle'],
-        name: { en: 'Sparkle (Honkai: Star Rail)', fr: 'Sparkle (Honkai: Star Rail)' } }
+      { en: 'Sparkle', fr: 'Sparkle',
+        wiki: 'Honkai Star Rail',
+        wikiUrls: ['https://honkai-star-rail.fandom.com/api.php', 'https://honkaistarrail.fandom.com/api.php'],
+        page: 'Sparkle', search: ['Sparkle', 'Sparkle/Lore', 'Character/Sparkle'],
+        name: { en: 'Sparkle (Honkai: Star Rail)', fr: 'Sparkle (Honkai: Star Rail)' },
+        text: {
+          en: 'A Masked Fool of the Harmony, quantum element, and a liar with excellent timing. She wears whichever face the scene calls for, plays the whole Astral Express for her own amusement, and is genuinely delightful about it.',
+          fr: 'Une Masque de la Folie, élément quantique, et une menteuse au timing parfait. Elle porte le visage que la scène demande, joue tout l’Astral Express pour son propre amusement, et le fait avec un vrai charme.'
+        } }
     ]
   },
   {
@@ -291,12 +319,25 @@ export function codeLook(entry) {
   };
 }
 
-/** The five exact titles for the draw, in one language, with their display names. */
+/**
+ * The five exact titles for the draw, in one language, with their display
+ * names and everything the draw needs to find the right page.
+ *
+ * A card that names a `wiki` is a thing Wikipedia has no page for: a card in
+ * a board game, a turret in a shooter, a character in a gacha. Those fields
+ * have to travel with the title, or the draw falls back to the encyclopaedia
+ * and hands over the real animal instead of the game card.
+ */
 export function codeTitles(entry, lang = getLanguage()) {
   return (entry?.cards ?? []).map((card) => ({
     title: card[lang] ?? card.en,
     fallback: card.en,
-    name: card.name ? tx(card.name) : null
+    name: card.name ? tx(card.name) : null,
+    wiki: card.wiki ?? null,
+    wikiUrls: card.wikiUrls ?? null,
+    page: card.page ?? null,
+    search: card.search ?? null,
+    text: card.text ? tx(card.text) : null
   }));
 }
 
