@@ -63,10 +63,8 @@ import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, cu
 import { RELEASES } from './data/releases.js';
 import { music } from './ui/music.js';
 import * as wikdle from './wikdle.js';
-import { spinSlots, casinoOpen, SPIN_COST, REEL_STOP_MS, REEL_EASE } from './slots.js';
-import { SYMBOLS, REEL, PAYLINES, PAYTABLE, LINE_BETS, ROWS as SLOT_ROWS } from './data/slots.js';
-import { layChip, staked as stakedOn, spinRoulette, restAngle, WHEEL_SPIN_MS, WHEEL_EASE } from './roulette.js';
-import { WHEEL_ORDER, colorOf, TIER_BETS, CHIPS, TABLE_LIMIT, returnsFor } from './data/roulette.js';
+import { spinSlots, casinoOpen, SPIN_COST, REEL_STOP_MS, BONUS_STOP_MS, REEL_EASE } from './slots.js';
+import { SYMBOLS, REEL, PAYLINES, PAYTABLE, LINE_BETS, WILD, SCATTER, SCATTER_MIN, BONUS_SPINS, symbolById, winTier } from './data/slots.js';
 import * as quests from './quests.js';
 import { QUEST_TIERS } from './data/quests.js';
 import * as leaderboard from './leaderboard.js';
@@ -186,12 +184,11 @@ bind({
     market: $('#screen-market'), cardindex: $('#screen-cardindex'),
     glossary: $('#screen-glossary'), open: $('#screen-open'),
     games: $('#screen-games'), wikdle: $('#screen-wikdle'), slots: $('#screen-slots'),
-    roulette: $('#screen-roulette'), quests: $('#screen-quests'), leaderboard: $('#screen-leaderboard')
+    quests: $('#screen-quests'), leaderboard: $('#screen-leaderboard')
   },
   gamesTitle: $('#games-title'), gamesSub: $('#games-sub'), gamesList: $('#games-list'),
   wikdleTitle: $('#wikdle-title'), wikdleBody: $('#wikdle-body'), wikdleBack: $('#wikdle-back'),
   slotsTitle: $('#slots-title'), slotsBody: $('#slots-body'), slotsBack: $('#slots-back'),
-  rouletteTitle: $('#roulette-title'), rouletteBody: $('#roulette-body'), rouletteBack: $('#roulette-back'),
   questsTitle: $('#quests-title'), questsSub: $('#quests-sub'), questsBody: $('#quests-body'),
   leaderboardTitle: $('#leaderboard-title'), leaderboardSeg: $('#leaderboard-seg'),
   leaderboardBody: $('#leaderboard-body'), leaderboardMe: $('#leaderboard-me'),
@@ -467,7 +464,7 @@ const navTabFor = (screen) =>
   screen === 'market' ? 'shop'
     : screen === 'cardindex' ? 'binder'
       : screen === 'glossary' ? 'packs'
-        : ['wikdle', 'slots', 'roulette'].includes(screen) ? 'games'
+        : ['wikdle', 'slots'].includes(screen) ? 'games'
           : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz', 'games', 'quests', 'leaderboard'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
@@ -674,20 +671,40 @@ function pushNote(icon, title, screen = 'friends') {
   paintBell();
 }
 
+/**
+ * Where a note leads. Every screen is reached the way the drawer reaches
+ * it, renderer included, so a note about a quest lands on a quests screen
+ * painted with the progress the note is about, not on whatever the screen
+ * showed the last time it was open.
+ */
+function goToScreen(screen) {
+  const item = drawerItems().find((entry) => entry.id === screen);
+  if (item?.run) { item.run(); return; }
+  showScreen(screen);
+}
+
+/**
+ * What kind of thing a note is, from where it leads and what it wears. The
+ * kind picks the colour of its mark and the small label under the title.
+ */
+function noteKind(icon, screen) {
+  if (icon === 'addFriend') return 'request';
+  if (icon === 'trade') return 'trade';
+  if (icon === 'chat') return 'message';
+  if (icon === 'gift') return 'gift';
+  if (screen === 'quests') return 'quest';
+  if (screen === 'ach') return 'achievement';
+  if (screen === 'market' || icon === 'bell') return 'auction';
+  if (screen === 'packs' || icon === 'packs') return 'booster';
+  return 'news';
+}
+
 function notifications() {
-  const go = (screen) => () => {
-    const renderers = {
-      friends: renderFriends, packs: renderPacks, binder: renderBinder,
-      shop: renderShop, timed: renderTimed, ach: renderAchievements,
-      market: renderMarket, cardindex: renderCardIndex
-    };
-    renderers[screen]?.();
-    showScreen(screen);
-  };
+  const go = (screen) => () => goToScreen(screen);
   const rows = [];
 
   for (const entry of state.social.incoming) {
-    rows.push({ id: entry.id, icon: 'addFriend',
+    rows.push({ id: entry.id, icon: 'addFriend', kind: 'request',
       title: t('notifRequest', { name: entry.profile.username }),
       when: entry.created_at, run: go('friends') });
   }
@@ -695,20 +712,20 @@ function notifications() {
   for (const trade of state.social.trades ?? []) {
     if (trade.status !== 'pending' || trade.recipient !== userId()) continue;
     const who = state.social.friends.find((f) => f.otherId === trade.proposer)?.profile?.username ?? '?';
-    rows.push({ id: `trade-${trade.id}`, icon: 'trade',
+    rows.push({ id: `trade-${trade.id}`, icon: 'trade', kind: 'trade',
       title: t('notifTrade', { name: who }), when: trade.created_at, run: go('friends') });
   }
   // Unread chats, one row per sender.
   for (const [sender, n] of state.social.unread ?? []) {
     const who = state.social.friends.find((f) => f.otherId === sender);
     if (!who) continue;
-    rows.push({ id: `chat-${sender}-${n}`, icon: 'chat',
+    rows.push({ id: `chat-${sender}-${n}`, icon: 'chat', kind: 'message',
       title: t('notifMessages', { n, name: who.profile.username }),
       when: null, run: () => openChat(who) });
   }
-  // The stored feed (gifts received, trades resolved).
+  // The stored feed (gifts received, trades resolved, quests done).
   for (const note of state.profile.notifFeed ?? []) {
-    rows.push({ id: note.id, icon: note.icon, title: note.title,
+    rows.push({ id: note.id, icon: note.icon, kind: noteKind(note.icon, note.screen), title: note.title,
       when: note.when, run: go(note.screen) });
   }
   return rows;
@@ -734,27 +751,75 @@ function paintBell() {
   el.bell.classList.toggle('is-hot', n > 0);
 }
 
+/**
+ * The notifications sheet. Two shelves: what is new (unread when the sheet
+ * was opened) and what came earlier. Each row wears the colour of its kind,
+ * says in a word what kind of thing it is and how long ago, and leads to
+ * the screen it is about, painted fresh. Opening the sheet reads it; a
+ * button clears the read notes that are only notes (a request, a trade or
+ * an unread chat stays until it is answered).
+ */
 function openNotifications() {
   const list = notifications();
-  // Opening the list reads it, at the end of this function. The sweep has to
-  // work off what was already read BEFORE that, or the button would count
-  // four and quietly take away six.
+  // Opening the list reads it, at the end of this function. The shelves and
+  // the sweep have to work off what was already read BEFORE that, or the
+  // button would count four and quietly take away six.
   const readBefore = new Set(state.profile.notifRead ?? []);
+  const fresh = list.filter((n) => !readBefore.has(n.id));
+  const earlier = list.filter((n) => readBefore.has(n.id));
   openSheet(t('notifTitle'), (body) => {
+    body.classList.add('notes-body');
     if (!list.length) {
-      body.innerHTML = `<p class="muted" style="font-size:.88rem;line-height:1.6"></p>`;
-      body.querySelector('p').textContent = t('notifEmpty');
+      const empty = document.createElement('div');
+      empty.className = 'notes-empty';
+      empty.innerHTML = `<span class="notes-empty-mark">${iconSvg('bell', { size: 30 })}</span><b></b><p></p>`;
+      empty.querySelector('b').textContent = t('notifEmptyTitle');
+      empty.querySelector('p').textContent = t('notifEmpty');
+      body.appendChild(empty);
       return;
     }
-    const wrap = document.createElement('div');
-    wrap.className = 'notes';
-    // Read notes from the stored feed can be swept away; live rows (a
-    // request, a trade, unread chat) are not notes and stay until answered.
+    const head = document.createElement('div');
+    head.className = 'notes-head';
+    head.innerHTML = `<span class="notes-count"></span>`;
+    head.querySelector('.notes-count').textContent = fresh.length
+      ? t('notifNewCount', { n: fresh.length }) : t('notifAllRead');
+    body.appendChild(head);
+
+    const shelf = (label, notes, unread) => {
+      if (!notes.length) return;
+      const title = document.createElement('p');
+      title.className = 'notes-shelf';
+      title.textContent = label;
+      body.appendChild(title);
+      const wrap = document.createElement('div');
+      wrap.className = 'notes';
+      wrap.replaceChildren(...notes.map((note) => {
+        const row = document.createElement('button');
+        row.type = 'button';
+        row.className = `note-row is-${note.kind}${unread ? ' is-unread' : ''}`;
+        row.innerHTML = `<span class="note-mark">${iconSvg(note.icon, { size: 18 })}</span>
+          <span class="note-copy"><b></b><span class="note-sub"><em></em><i></i></span></span>
+          <span class="note-go">${iconSvg('chevron', { size: 16 })}</span>`;
+        row.querySelector('b').textContent = note.title;
+        row.querySelector('em').textContent = t(`notifKind_${note.kind}`);
+        const when = whenText(note.when);
+        row.querySelector('i').textContent = when ? ` · ${when}` : '';
+        press(row, { sound: null });
+        row.addEventListener('click', () => { synth.playTap(); sheet.hide(); note.run(); });
+        return row;
+      }));
+      body.appendChild(wrap);
+    };
+    shelf(t('notifNew'), fresh, true);
+    shelf(t('notifEarlier'), earlier, false);
+
+    // Read notes from the stored feed can be swept away; live rows are not
+    // notes and stay until answered.
     const sweepable = (state.profile.notifFeed ?? []).filter((note) => readBefore.has(note.id)).length;
     if (sweepable) {
       const clear = document.createElement('button');
       clear.type = 'button';
-      clear.className = 'btn btn-ghost btn-sm btn-block';
+      clear.className = 'btn btn-ghost btn-sm btn-block notes-clear';
       clear.textContent = t('notifClearRead', { n: sweepable });
       press(clear, { sound: null });
       clear.addEventListener('click', () => {
@@ -766,20 +831,6 @@ function openNotifications() {
       });
       body.appendChild(clear);
     }
-    wrap.replaceChildren(...list.map((note) => {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = `note-row${isRead(note.id) ? '' : ' is-unread'}`;
-      row.innerHTML = `<span class="note-mark">${iconSvg(note.icon, { size: 18 })}</span>
-        <span class="note-copy"><b></b><span></span></span>
-        <span class="muted">${iconSvg('chevron', { size: 17 })}</span>`;
-      row.querySelector('b').textContent = note.title;
-      row.querySelector('.note-copy span').textContent = whenText(note.when);
-      press(row, { sound: null });
-      row.addEventListener('click', () => { sheet.hide(); note.run(); });
-      return row;
-    }));
-    body.appendChild(wrap);
   });
   // Opening the list is reading it.
   markRead(list.map((n) => n.id));
@@ -816,7 +867,6 @@ const HELP = {
   games:   { steps: 3, tip: true },
   wikdle:  { steps: 3, tip: true },
   slots:   { steps: 3, tip: true },
-  roulette: { steps: 3, tip: true },
   quests:  { steps: 3, tip: true },
   leaderboard: { steps: 3, tip: true }
 };
@@ -7827,7 +7877,6 @@ function renderGames() {
   const tiles = [
     { id: 'wikdle', icon: 'grid', color: '#4ade80', title: t('wikdleTitle'), note: t('gamesWikdleNote'), run: () => { renderWikdle(); showScreen('wikdle'); } },
     { id: 'slots', icon: 'reel', color: '#fbbf24', title: t('slotsTitle'), note: t('gamesSlotsNote'), run: () => { renderSlots(); showScreen('slots'); } },
-    { id: 'roulette', icon: 'wheel', color: '#f472b6', title: t('rouletteTitle'), note: t('gamesRouletteNote'), run: () => { renderRoulette(); showScreen('roulette'); } }
   ];
   const list = document.createElement('div');
   list.className = 'games-list';
@@ -7856,6 +7905,45 @@ function renderGames() {
 
 const KEYBOARD_ROWS = ['qwertyuiop', 'asdfghjkl', '⏎zxcvbnm⌫'];
 
+/** Paper confetti over a node: a short burst from its middle, falling and tumbling. */
+function confettiOver(node, count = 90) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'wikdle-confetti';
+  node.appendChild(canvas);
+  const box = node.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(box.width * dpr);
+  canvas.height = Math.round(box.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = box.width, H = box.height;
+  const colors = ['#4ade80', '#fbbf24', '#f472b6', '#60a5fa', '#a78bfa', '#fff'];
+  const bits = Array.from({ length: count }, (_, i) => ({
+    x: W / 2 + (Math.random() - 0.5) * W * 0.4, y: H * 0.45,
+    vx: (Math.random() - 0.5) * 14, vy: -6 - Math.random() * 11,
+    w: 5 + Math.random() * 5, h: 3 + Math.random() * 4, a: Math.random() * Math.PI, va: (Math.random() - 0.5) * 0.35,
+    color: colors[i % colors.length]
+  }));
+  const start = performance.now();
+  const frame = (now) => {
+    const t = now - start;
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for (const b of bits) {
+      b.vy += 0.35; b.vx *= 0.99; b.x += b.vx; b.y += b.vy; b.a += b.va;
+      if (b.y > H + 10) continue;
+      alive++;
+      ctx.save(); ctx.translate(b.x, b.y); ctx.rotate(b.a);
+      ctx.fillStyle = b.color; ctx.globalAlpha = Math.max(0, 1 - t / 2600);
+      ctx.fillRect(-b.w / 2, -b.h / 2, b.w, b.h);
+      ctx.restore();
+    }
+    if (alive && t < 2800) requestAnimationFrame(frame); else canvas.remove();
+  };
+  requestAnimationFrame(frame);
+}
+
 function renderWikdle() {
   el.wikdleTitle.textContent = t('wikdleTitle');
   el.wikdleBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
@@ -7864,19 +7952,38 @@ function renderWikdle() {
   const body = el.wikdleBody;
   const wrap = document.createElement('div');
   wrap.className = 'wikdle';
+
+  // The header: today's date, the streak, and how many hints are left.
+  const head = document.createElement('div');
+  head.className = 'wikdle-head';
+  const stats0 = wikdle.loadStats();
+  const streakNow = stats0.lastWonDay === game.day || stats0.lastWonDay === new Date(new Date(`${game.day}T00:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10) ? stats0.streak : 0;
+  head.innerHTML = `
+    <span class="wikdle-pill"><span class="wikdle-pill-icon">${iconSvg('calendar', { size: 14 })}</span><span></span></span>
+    <span class="wikdle-pill is-streak${streakNow >= 3 ? ' is-hot' : ''}"><span class="wikdle-pill-icon">${iconSvg('flame', { size: 14 })}</span><span></span></span>
+    <span class="wikdle-pill is-hints"><span class="wikdle-pill-icon">${iconSvg('bulb', { size: 14 })}</span><span></span></span>`;
+  head.children[0].lastElementChild.textContent = game.day;
+  head.children[1].lastElementChild.textContent = t('wikdleStreakPill', { n: streakNow });
+  const hintsPill = head.children[2].lastElementChild;
+
+  const stage = document.createElement('div');
+  stage.className = 'wikdle-stage';
   const grid = document.createElement('div');
   grid.className = 'wikdle-grid';
+  stage.appendChild(grid);
   const status = document.createElement('p');
   status.className = 'wikdle-status';
+  const hints = document.createElement('div');
+  hints.className = 'wikdle-hints';
   const keys = document.createElement('div');
   keys.className = 'wikdle-keys';
   const done = document.createElement('div');
   done.className = 'wikdle-done';
   done.hidden = true;
-  wrap.append(grid, status, keys, done);
+  wrap.append(head, stage, status, hints, keys, done);
   body.replaceChildren(wrap);
 
-  const paintGrid = (revealRow = -1) => {
+  const paintGrid = (revealRow = -1, dance = false) => {
     grid.replaceChildren(...Array.from({ length: wikdle.ROWS }, (_, r) => {
       const row = document.createElement('div');
       row.className = 'wikdle-row';
@@ -7889,10 +7996,14 @@ function renderWikdle() {
         if (played) {
           cell.textContent = played.guess[c];
           cell.classList.add(`is-${played.marks[c]}`);
-          if (r === revealRow) { cell.classList.add('is-revealing'); cell.style.animationDelay = `${c * 110}ms`; }
+          if (r === revealRow) { cell.classList.add('is-revealing'); cell.style.animationDelay = `${c * 130}ms`; }
+          if (dance && r === game.rows.length - 1 && game.status === 'won') { cell.classList.add('is-dance'); cell.style.animationDelay = `${c * 90}ms`; }
         } else if (current && typed[c]) {
           cell.textContent = typed[c];
           cell.classList.add('is-filled');
+          if (c === typed.length - 1) cell.classList.add('is-pop');
+        } else if (current) {
+          cell.classList.add('is-current');
         }
         row.appendChild(cell);
       }
@@ -7909,40 +8020,100 @@ function renderWikdle() {
         const key = document.createElement('button');
         key.type = 'button';
         key.className = 'wikdle-key';
-        if (ch === '⏎') { key.classList.add('is-wide'); key.textContent = t('wikdleEnter'); key.dataset.key = 'enter'; }
-        else if (ch === '⌫') { key.classList.add('is-wide'); key.innerHTML = iconSvg('chevronLeft', { size: 16 }); key.dataset.key = 'back'; }
+        if (ch === '⏎') { key.classList.add('is-wide', 'is-enter'); key.textContent = t('wikdleEnter'); key.dataset.key = 'enter'; }
+        else if (ch === '⌫') { key.classList.add('is-wide'); key.innerHTML = iconSvg('backspace', { size: 20 }); key.dataset.key = 'back'; key.setAttribute('aria-label', 'Backspace'); }
         else { key.textContent = ch; key.dataset.key = ch; if (marks[ch]) key.classList.add(`is-${marks[ch]}`); }
         key.disabled = game.status !== 'playing';
-        key.addEventListener('click', () => press_(key.dataset.key));
+        key.addEventListener('pointerdown', (event) => { event.preventDefault(); press_(key.dataset.key); });
         row.appendChild(key);
       }
       return row;
     }));
   };
 
+  // THE HINTS: two, from the word's own article, each for a hundred of the day's points.
+  const paintHints = () => {
+    const used = game.hints ?? [];
+    hintsPill.textContent = t('wikdleHintsLeft', { n: Math.max(0, wikdle.HINTS_MAX - used.length) });
+    hints.replaceChildren(...used.map((text, i) => {
+      const line = document.createElement('p');
+      line.className = 'wikdle-hint';
+      line.innerHTML = `<span class="wikdle-hint-icon">${iconSvg('bulb', { size: 15 })}</span><b></b><span></span>`;
+      line.querySelector('b').textContent = i === 0 ? t('wikdleHintDef') : t('wikdleHintSentence');
+      line.querySelector('span:last-child').textContent = text;
+      return line;
+    }));
+    if (game.status === 'playing' && used.length < wikdle.HINTS_MAX && game.rows.length >= 1) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-ghost btn-sm wikdle-hint-btn';
+      btn.innerHTML = `${iconSvg('bulb', { size: 15 })}<span></span><small></small>`;
+      btn.querySelector('span').textContent = used.length === 0 ? t('wikdleHint') : t('wikdleHintMore');
+      btn.querySelector('small').textContent = t('wikdleHintCost', { n: wikdle.HINT_COST });
+      press(btn, { sound: null });
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        btn.classList.add('is-busy');
+        synth.playTap();
+        const text = await wikdle.fetchHint(wikdle.wordForDay(game.day), used.length);
+        if (game.status !== 'playing') return;
+        if (!text) { btn.disabled = false; btn.classList.remove('is-busy'); toast(esc(t('wikdleHintNone')), 'error'); synth.playDenied(); return; }
+        game = wikdle.takeHint(game, text);
+        synth.playReveal?.();
+        paintHints();
+      });
+      hints.appendChild(btn);
+    } else if (game.status === 'playing' && used.length < wikdle.HINTS_MAX) {
+      const note = document.createElement('p');
+      note.className = 'wikdle-hint-note';
+      note.textContent = t('wikdleHintAfter');
+      hints.appendChild(note);
+    }
+  };
+
   const paintDone = () => {
     if (game.status === 'playing') { done.hidden = true; return; }
     const stats = wikdle.loadStats();
     const won = game.status === 'won';
-    const answer = wikdle.wordForDay(game.day).toUpperCase();
+    const word = wikdle.wordForDay(game.day);
     const points = wikdle.wikdlePoints(game);
+    const base = wikdle.basePoints(game);
+    const hintsUsed = game.hints?.length ?? 0;
+    const bonus = won ? wikdle.streakBonus(stats.streak) : 0;
     const max = Math.max(1, ...stats.guesses);
+    const tiles = [
+      ['calendar', stats.played, t('wikdlePlayed')],
+      ['target', `${stats.played ? Math.round(100 * stats.won / stats.played) : 0}%`, t('wikdleWinRate')],
+      ['flame', stats.streak, t('wikdleStreak')],
+      ['trophy', stats.best, t('wikdleBest')]
+    ];
     done.innerHTML = `
-      <b></b><p class="game-note" data-answer></p>
-      <div class="wikdle-stats">
-        <div class="wikdle-stat"><b>${stats.played}</b><span>${esc(t('wikdlePlayed'))}</span></div>
-        <div class="wikdle-stat"><b>${stats.played ? Math.round(100 * stats.won / stats.played) : 0}%</b><span>${esc(t('wikdleWinRate'))}</span></div>
-        <div class="wikdle-stat"><b>${stats.streak}</b><span>${esc(t('wikdleStreak'))}</span></div>
-        <div class="wikdle-stat"><b>${stats.best}</b><span>${esc(t('wikdleBest'))}</span></div>
+      <div class="wikdle-verdict"><span class="wikdle-verdict-icon">${iconSvg(won ? 'trophy' : 'grid', { size: 26 })}</span><b></b></div>
+      <p class="wikdle-answer"><span></span><a class="wikdle-read" target="_blank" rel="noopener"></a></p>
+      <div class="wikdle-breakdown" ${won ? '' : 'hidden'}>
+        <div><span></span><b class="tabular">${base}</b></div>
+        <div ${hintsUsed ? '' : 'hidden'}><span></span><b class="tabular">−${hintsUsed * wikdle.HINT_COST}</b></div>
+        <div ${bonus > 0 ? '' : 'hidden'}><span></span><b class="tabular">+${Math.round(bonus * 100)}%</b></div>
+        <div class="is-total"><span></span><b class="tabular">${points}</b></div>
       </div>
-      <div class="wikdle-bars">${stats.guesses.map((n, i) => `<div class="wikdle-bar"><span>${i + 1}</span><i style="width:${Math.max(4, Math.round(100 * n / max))}%"></i></div>`).join('')}</div>
-      <p class="wikdle-next" data-next></p>`;
-    done.querySelector('b').textContent = won ? t('wikdleWon', { n: game.rows.length, points }) : t('wikdleLost');
-    done.querySelector('[data-answer]').textContent = t('wikdleAnswer', { word: answer });
+      <div class="wikdle-stats">${tiles.map(([icon, n, label]) => `<div class="wikdle-stat"><span class="wikdle-stat-icon">${iconSvg(icon, { size: 16 })}</span><b class="tabular">${esc(String(n))}</b><span>${esc(label)}</span></div>`).join('')}</div>
+      <div class="wikdle-bars">${stats.guesses.map((n, i) => `<div class="wikdle-bar${won && i === game.rows.length - 1 ? ' is-today' : ''}"><span>${i + 1}</span><i style="width:${Math.max(6, Math.round(100 * n / max))}%"><em>${n}</em></i></div>`).join('')}</div>
+      <p class="wikdle-next"><span class="wikdle-next-icon">${iconSvg('hourglass', { size: 14 })}</span><span data-next></span></p>`;
+    done.querySelector('.wikdle-verdict b').textContent = won ? t('wikdleWon', { n: game.rows.length, points }) : t('wikdleLost');
+    done.querySelector('.wikdle-answer span').textContent = t('wikdleAnswer', { word: word.toUpperCase() });
+    const read = done.querySelector('.wikdle-read');
+    read.href = wikdle.articleUrl(word);
+    read.textContent = t('wikdleRead');
+    const rows = done.querySelectorAll('.wikdle-breakdown > div');
+    rows[0].querySelector('span').textContent = t('wikdlePointsBase', { n: game.rows.length });
+    rows[1].querySelector('span').textContent = t('wikdleHintsUsed', { n: hintsUsed });
+    rows[2].querySelector('span').textContent = t('wikdleStreakBonus', { n: stats.streak });
+    rows[3].querySelector('span').textContent = t('wikdlePointsTotal');
     const share = document.createElement('button');
     share.type = 'button';
-    share.className = 'btn btn-ghost btn-sm';
-    share.textContent = t('wikdleShare');
+    share.className = 'btn btn-ghost btn-sm wikdle-share';
+    share.innerHTML = `${iconSvg('share', { size: 15 })}<span></span>`;
+    share.querySelector('span').textContent = t('wikdleShare');
     press(share, { sound: null });
     share.addEventListener('click', async () => { synth.playTap(); const ok = await copyText(wikdle.shareText(game)); toast(ok ? t('wikdleCopied') : t('wikdleCopyFailed'), ok ? 'ok' : 'error'); });
     done.appendChild(share);
@@ -7951,21 +8122,33 @@ function renderWikdle() {
     clearInterval(state.wikdleTimer);
     state.wikdleTimer = setInterval(() => { if (state.tab !== 'wikdle') { clearInterval(state.wikdleTimer); return; } tick(); }, 1000);
     done.hidden = false;
+    hints.hidden = true;
   };
 
   const settle = () => {
     // The finished board is worth points, once: on the day's board, into the
-    // quests, the wallet and, signed in, the leaderboard.
+    // quests, the wallet and, signed in, the leaderboard. A streak pays a
+    // bonus on the coins; a fast solve and every seventh day of a streak
+    // hand over a booster on top.
     if (game.status === 'playing' || game.settled) return;
     game.settled = true;
     const points = wikdle.wikdlePoints(game);
+    const stats = wikdle.loadStats();
     reportQuest('wikdle', { won: game.status === 'won', guesses: game.rows.length });
     if (points > 0) {
       reportQuest('points', { amount: points, game: 'wikdle' });
-      const coins = Math.round(points / 2);
+      const coins = Math.round((points / 2) * (1 + wikdle.streakBonus(stats.streak)));
       store.saveWallet(store.loadWallet() + coins);
       refreshWallet();
       toast(esc(t('wikdlePaid', { amount: coins })), 'ok');
+      if (game.rows.length <= wikdle.FAST_SOLVE_ROWS) {
+        gainBooster({ kind: 'open', themeId: null, rarityId: 'rare', cards: 1 }, 1);
+        toast(esc(t('wikdleBoosterFast', { n: game.rows.length })), 'ok');
+      }
+      if (stats.streak > 0 && stats.streak % wikdle.STREAK_BOOSTER_EVERY === 0) {
+        gainBooster({ kind: 'open', themeId: null, rarityId: 'uncommon', cards: 3 }, 1);
+        toast(esc(t('wikdleBoosterStreak', { n: stats.streak })), 'ok');
+      }
       if (signedIn()) leaderboard.submitWikdle(points, game.day).catch(() => { /* the board can miss one */ });
     }
   };
@@ -7976,6 +8159,7 @@ function renderWikdle() {
       const result = wikdle.playGuess(game, typed);
       if (result.error) {
         status.textContent = result.error === 'short' ? t('wikdleTooShort') : result.error === 'unknown' ? t('wikdleNotAWord') : '';
+        status.classList.add('is-error');
         const row = grid.querySelector(`[data-row="${game.rows.length}"]`);
         row?.classList.add('is-shake');
         setTimeout(() => row?.classList.remove('is-shake'), 400);
@@ -7985,14 +8169,24 @@ function renderWikdle() {
       game = result;
       typed = '';
       status.textContent = '';
-      synth.playTap();
+      status.classList.remove('is-error');
+      synth.playFlip?.() ?? synth.playTap();
       paintGrid(game.rows.length - 1);
       paintKeys();
-      if (game.status !== 'playing') { settle(); setTimeout(() => { paintDone(); synth[game.status === 'won' ? 'playResolved' : 'playDenied']?.(); }, 700); }
+      paintHints();
+      if (game.status !== 'playing') {
+        settle();
+        setTimeout(() => {
+          paintGrid(-1, true);
+          paintDone();
+          if (game.status === 'won') { confettiOver(stage, game.rows.length <= 2 ? 160 : 90); if (game.rows.length <= 2) synth.playFanfare?.(); else synth.playResolved?.(); }
+          else synth.playDenied();
+        }, 900);
+      }
       return;
     }
     if (key === 'back') { typed = typed.slice(0, -1); paintGrid(); return; }
-    if (/^[a-z]$/.test(key) && typed.length < wikdle.COLUMNS) { typed += key; paintGrid(); }
+    if (/^[a-z]$/.test(key) && typed.length < wikdle.COLUMNS) { typed += key; synth.playTap(); paintGrid(); }
   };
 
   // A hardware keyboard works too.
@@ -8006,11 +8200,67 @@ function renderWikdle() {
 
   paintGrid();
   paintKeys();
+  paintHints();
   paintDone();
   status.textContent = game.status === 'playing' ? t('wikdleIntro') : '';
 }
 
 /* --- the slot machine ----------------------------------------------------------------------- */
+
+/** A symbol's drawing, at a size. */
+function symbolSvg(sym, size = 40) {
+  return `<svg viewBox="0 0 64 64" width="${size}" height="${size}" aria-hidden="true">${sym.art}</svg>`;
+}
+
+/**
+ * Coins raining over the reels on a win. A short burst on a canvas laid over
+ * the window: gold discs thrown up from the payline, falling under gravity,
+ * spinning as they go. Bigger wins throw more. Reduced motion throws none.
+ */
+function rainCoins(canvas, count) {
+  if (!count || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const box = canvas.getBoundingClientRect();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  canvas.width = Math.round(box.width * dpr);
+  canvas.height = Math.round(box.height * dpr);
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const W = box.width, H = box.height;
+  const coins = Array.from({ length: count }, (_, i) => ({
+    x: W * (0.2 + Math.random() * 0.6), y: H * 0.55,
+    vx: (Math.random() - 0.5) * 9, vy: -7 - Math.random() * 9,
+    r: 5 + Math.random() * 4, spin: Math.random() * Math.PI, vs: (Math.random() - 0.5) * 0.4,
+    hue: 40 + (i % 3) * 6, delay: Math.random() * 220
+  }));
+  const start = performance.now();
+  canvas.hidden = false;
+  const frame = (now) => {
+    const t = now - start;
+    ctx.clearRect(0, 0, W, H);
+    let alive = 0;
+    for (const c of coins) {
+      if (t < c.delay) { alive++; continue; }
+      c.vy += 0.42; c.x += c.vx; c.y += c.vy; c.spin += c.vs;
+      if (c.y - c.r > H + 4) continue;
+      alive++;
+      const squash = Math.abs(Math.cos(c.spin));
+      ctx.save();
+      ctx.translate(c.x, c.y);
+      ctx.scale(Math.max(0.18, squash), 1);
+      ctx.beginPath();
+      ctx.arc(0, 0, c.r, 0, Math.PI * 2);
+      ctx.fillStyle = `hsl(${c.hue} 92% ${52 + squash * 14}%)`;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = `hsl(${c.hue} 80% 30%)`;
+      ctx.stroke();
+      ctx.restore();
+    }
+    if (alive && t < 2600) requestAnimationFrame(frame);
+    else { ctx.clearRect(0, 0, W, H); canvas.hidden = true; }
+  };
+  requestAnimationFrame(frame);
+}
 
 function renderSlots() {
   el.slotsTitle.textContent = t('slotsTitle');
@@ -8022,43 +8272,91 @@ function renderSlots() {
   }
   const machine = state.slots ??= { phase: 'idle', lineBet: LINE_BETS[1], last: null };
   machine.phase = 'idle';
+  const CELL = 64;
+  const COPIES = 3;
 
   const wrap = document.createElement('div');
   wrap.className = 'slots';
+
+  // THE CABINET: a marquee of bulbs, the glass, the reels, and the pay line lamps.
   const cabinet = document.createElement('div');
   cabinet.className = 'slots-cabinet';
+  const marquee = document.createElement('div');
+  marquee.className = 'slots-marquee';
+  marquee.innerHTML = `<span class="slots-bulbs" aria-hidden="true"></span><b></b><small></small><span class="slots-bulbs" aria-hidden="true"></span>`;
+  marquee.querySelector('b').textContent = t('slotsTitle');
+  marquee.querySelector('small').textContent = t('slotsMarquee', { x: PAYTABLE[WILD][3] });
+  cabinet.appendChild(marquee);
+
+  const glass = document.createElement('div');
+  glass.className = 'slots-glass';
+  const lampsL = document.createElement('div');
+  lampsL.className = 'slots-lamps';
+  const lampsR = document.createElement('div');
+  lampsR.className = 'slots-lamps';
+  for (const side of [lampsL, lampsR]) {
+    side.replaceChildren(...PAYLINES.map((line, i) => {
+      const lamp = document.createElement('span');
+      lamp.className = 'slots-lamp';
+      lamp.dataset.line = line.id;
+      lamp.textContent = String(i + 1);
+      return lamp;
+    }));
+  }
   const win = document.createElement('div');
   win.className = 'slots-window';
-  win.innerHTML = '<span class="slots-payline"></span>';
+  win.style.height = `${CELL * 3}px`;
   const strips = [];
-  const CELL = 64.67;
   for (let reel = 0; reel < 3; reel++) {
     const reelBox = document.createElement('div');
     reelBox.className = 'slots-reel';
     const strip = document.createElement('div');
     strip.className = 'slots-strip';
-    // The strip twice over, so a spin can roll through the whole reel and land inside the copy.
-    const twice = [...REEL, ...REEL];
-    strip.replaceChildren(...twice.map((id) => {
+    const cells = [];
+    for (let copy = 0; copy < COPIES; copy++) for (const id of REEL) cells.push(id);
+    strip.replaceChildren(...cells.map((id) => {
       const cell = document.createElement('div');
-      cell.className = 'slots-cell';
-      const sym = SYMBOLS.find((sy) => sy.id === id);
-      cell.style.color = sym.color;
-      cell.innerHTML = iconSvg(sym.glyph, { size: 40 });
+      cell.className = `slots-cell is-${id}`;
+      cell.style.height = `${CELL}px`;
+      cell.innerHTML = symbolSvg(symbolById(id), 46);
       return cell;
     }));
     reelBox.appendChild(strip);
     win.appendChild(reelBox);
     strips.push({ box: reelBox, strip });
   }
-  cabinet.appendChild(win);
+  const overlay = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  overlay.setAttribute('class', 'slots-overlay');
+  overlay.setAttribute('aria-hidden', 'true');
+  win.appendChild(overlay);
+  const coins = document.createElement('canvas');
+  coins.className = 'slots-coins';
+  coins.hidden = true;
+  win.appendChild(coins);
+  const banner = document.createElement('div');
+  banner.className = 'slots-banner';
+  banner.hidden = true;
+  win.appendChild(banner);
+  glass.append(lampsL, win, lampsR);
+  cabinet.appendChild(glass);
+
   const result = document.createElement('p');
   result.className = 'slots-result';
-  cabinet.appendChild(result);
+  const bonusLine = document.createElement('div');
+  bonusLine.className = 'slots-bonus';
+  bonusLine.hidden = true;
+  cabinet.append(result, bonusLine);
   wrap.appendChild(cabinet);
 
+  // THE BETS and THE LEVER.
+  const betRow = document.createElement('div');
+  betRow.className = 'slots-betrow';
+  const betLabel = document.createElement('span');
+  betLabel.className = 'slots-betlabel';
+  betLabel.textContent = t('slotsLineBet');
   const bets = document.createElement('div');
   bets.className = 'slots-bets';
+  betRow.append(betLabel, bets);
   const lever = document.createElement('button');
   lever.type = 'button';
   lever.className = 'btn btn-primary slots-lever';
@@ -8068,322 +8366,240 @@ function renderSlots() {
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = `slots-bet${machine.lineBet === bet ? ' is-on' : ''}`;
-      btn.innerHTML = money(bet);
+      btn.textContent = String(bet);
       btn.disabled = machine.phase !== 'idle';
       btn.addEventListener('click', () => { if (machine.phase !== 'idle') return; machine.lineBet = bet; synth.playTap(); paintBets(); });
       return btn;
     }));
-    lever.innerHTML = `${esc(t('slotsSpin'))} · ${money(SPIN_COST(machine.lineBet))}`;
+    lever.innerHTML = `<span class="slots-lever-word">${esc(t('slotsSpin'))}</span><span class="slots-lever-cost">${money(SPIN_COST(machine.lineBet))}</span>`;
     lever.disabled = machine.phase !== 'idle';
     lever.classList.toggle('is-poor', SPIN_COST(machine.lineBet) > state.wallet);
   };
-  wrap.append(bets, lever);
+  wrap.append(betRow, lever);
 
+  // THE BOOK: every symbol and what it pays, the wild and the bonus explained.
   const book = document.createElement('div');
   book.className = 'slots-book';
-  book.replaceChildren(...SYMBOLS.map((sym) => {
+  const bookTitle = document.createElement('p');
+  bookTitle.className = 'slots-book-title';
+  bookTitle.textContent = t('slotsBookTitle');
+  const bookGrid = document.createElement('div');
+  bookGrid.className = 'slots-book-grid';
+  bookGrid.replaceChildren(...SYMBOLS.filter((s) => PAYTABLE[s.id]).map((sym) => {
     const row = document.createElement('div');
     row.className = 'slots-book-row';
-    const pays = Object.entries(PAYTABLE[sym.id] ?? {}).map(([n, m]) => `${n}× ${m}`).join(' · ');
-    row.innerHTML = `<span style="color:${sym.color}">${iconSvg(sym.glyph, { size: 16 })}<span></span></span><span class="tabular">${esc(pays)}</span>`;
-    row.querySelector('span span').textContent = tx(sym.name);
+    const pays = Object.entries(PAYTABLE[sym.id]).map(([n, m]) => `<span><i>${n}×</i>${m}</span>`).join('');
+    row.innerHTML = `${symbolSvg(sym, 30)}<b></b><span class="slots-book-pays tabular">${pays}</span>`;
+    row.querySelector('b').textContent = tx(sym.name);
     return row;
   }));
-  const bookNote = document.createElement('p');
-  bookNote.className = 'game-closed';
-  bookNote.textContent = t('slotsBookNote', { lines: PAYLINES.length });
-  wrap.append(book, bookNote);
+  const notes = document.createElement('div');
+  notes.className = 'slots-book-notes';
+  const noteWild = document.createElement('p');
+  noteWild.innerHTML = `${symbolSvg(symbolById(WILD), 22)}<span></span>`;
+  noteWild.querySelector('span').textContent = t('slotsBookWild', { x: PAYTABLE[WILD][3] });
+  const noteBonus = document.createElement('p');
+  noteBonus.innerHTML = `${symbolSvg(symbolById(SCATTER), 22)}<span></span>`;
+  noteBonus.querySelector('span').textContent = t('slotsBookBonus', { n: BONUS_SPINS, min: SCATTER_MIN });
+  const noteHouse = document.createElement('p');
+  noteHouse.className = 'game-closed';
+  noteHouse.textContent = t('slotsBookNote', { lines: PAYLINES.length });
+  notes.append(noteWild, noteBonus, noteHouse);
+  book.append(bookTitle, bookGrid, notes);
+  wrap.appendChild(book);
   body.replaceChildren(wrap);
 
-  const setStrip = (i, stop, animate) => {
+  /* --- motion ------------------------------------------------------------- */
+
+  // The strip's cell at `index` sits on the window's top row.
+  const restAt = (stop) => -(stop + REEL.length) * CELL;
+  const setStrip = (i, stop) => {
     const { strip, box } = strips[i];
-    const offset = -(stop + REEL.length) * CELL + CELL; // the stop sits on the middle row, from the second copy
-    box.classList.toggle('is-spinning', false);
-    strip.style.transition = animate ? `transform ${REEL_STOP_MS[i]}ms ${REEL_EASE}` : 'none';
-    strip.style.transform = `translateY(${offset}px)`;
+    box.classList.remove('is-spinning');
+    strip.style.transition = 'none';
+    strip.style.transform = `translateY(${restAt(stop)}px)`;
   };
-  // Where the reels sit now: the last spin's stops, or the top of the strip.
-  const last = machine.last?.stops ?? [0, 0, 0];
-  last.forEach((stop, i) => setStrip(i, stop, false));
+  const last = () => machine.last?.stops ?? [0, 0, 0];
+  last().forEach((stop, i) => setStrip(i, stop));
+
+  /** Roll every reel from where it is to the stops named, left to right. */
+  const roll = (from, stops, durations) => new Promise((resolve) => {
+    strips.forEach(({ strip, box }, i) => {
+      // Jump one copy up (the same picture) so there is a whole strip to travel.
+      strip.style.transition = 'none';
+      strip.style.transform = `translateY(${-(from[i]) * CELL}px)`;
+      box.classList.add('is-spinning');
+    });
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      strips.forEach(({ strip }, i) => {
+        strip.style.transition = `transform ${durations[i]}ms ${REEL_EASE}`;
+        strip.style.transform = `translateY(${-(stops[i] + 2 * REEL.length) * CELL}px)`;
+      });
+      durations.forEach((ms, i) => setTimeout(() => { strips[i].box.classList.remove('is-spinning'); strips[i].box.classList.add('is-landed'); synth.playSnap?.(); setTimeout(() => strips[i].box.classList.remove('is-landed'), 260); }, ms));
+    }));
+    setTimeout(() => {
+      // Settle onto the middle copy, so the next roll has room again.
+      stops.forEach((stop, i) => setStrip(i, stop));
+      resolve();
+    }, Math.max(...durations) + 80);
+  });
+
+  const cellCenter = (reel, row) => {
+    const box = strips[reel].box.getBoundingClientRect();
+    const frame = win.getBoundingClientRect();
+    return { x: box.left - frame.left + box.width / 2, y: row * CELL + CELL / 2 };
+  };
+  const clearWins = () => {
+    overlay.replaceChildren();
+    win.querySelectorAll('.is-won').forEach((c) => c.classList.remove('is-won'));
+    glass.querySelectorAll('.slots-lamp.is-on').forEach((l) => l.classList.remove('is-on'));
+  };
+  /** Light the cells and lamps of the lines that paid, and draw each line across the glass. */
+  const showWins = (spun) => {
+    clearWins();
+    const frame = win.getBoundingClientRect();
+    overlay.setAttribute('viewBox', `0 0 ${frame.width} ${frame.height}`);
+    spun.lines.forEach((line, n) => {
+      const pl = PAYLINES.find((p) => p.id === line.id);
+      const color = symbolById(line.symbol)?.color ?? '#fbbf24';
+      const points = [];
+      pl.rows.forEach((row, reel) => {
+        if (reel >= line.count) return;
+        const cell = strips[reel].strip.children[spun.stops[reel] + REEL.length + row];
+        if (cell) { cell.classList.add('is-won'); cell.style.setProperty('--won', color); }
+        const c = cellCenter(reel, row);
+        points.push(`${c.x.toFixed(1)},${c.y.toFixed(1)}`);
+      });
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+      path.setAttribute('points', points.join(' '));
+      path.setAttribute('stroke', color);
+      path.style.animationDelay = `${n * 120}ms`;
+      overlay.appendChild(path);
+      glass.querySelectorAll(`.slots-lamp[data-line="${line.id}"]`).forEach((l) => l.classList.add('is-on'));
+    });
+    // Bonus symbols glow wherever they landed when they opened the bonus.
+    if (spun.bonus) spun.windows.forEach((column, reel) => column.forEach((id, row) => {
+      if (id !== SCATTER) return;
+      const cell = strips[reel].strip.children[spun.stops[reel] + REEL.length + row];
+      if (cell) { cell.classList.add('is-won'); cell.style.setProperty('--won', symbolById(SCATTER).color); }
+    }));
+  };
+  const showBanner = async (kind, text, ms) => {
+    banner.className = `slots-banner is-${kind}`;
+    banner.innerHTML = `<b></b><span></span>`;
+    banner.querySelector('b').textContent = text.title;
+    banner.querySelector('span').textContent = text.sub ?? '';
+    banner.hidden = false;
+    await wait(ms);
+    banner.hidden = true;
+  };
+  const coinsFor = (tier) => ({ win: 14, big: 34, mega: 70, jackpot: 130 }[tier] ?? 0);
+  const say = (text, tier) => {
+    result.textContent = text;
+    result.className = `slots-result${tier ? ` is-win is-${tier}` : ''}`;
+  };
+
+  /* --- the spin ------------------------------------------------------------ */
 
   const spin = async () => {
     if (machine.phase !== 'idle') return;
     const cost = SPIN_COST(machine.lineBet);
-    if (state.wallet < cost) { synth.playDenied(); toast(t('cantAfford'), 'error'); return; }
+    if (state.wallet < cost) { synth.playDenied(); toast(t('cantAfford'), 'error'); lever.classList.add('is-poor'); return; }
     machine.phase = 'spinning';
     paintBets();
-    result.textContent = '';
-    result.className = 'slots-result';
-    win.querySelectorAll('.is-won').forEach((c) => c.classList.remove('is-won'));
+    say('', null);
+    bonusLine.hidden = true;
+    clearWins();
     store.saveWallet(state.wallet - cost);
     refreshWallet();
-    // Roll from the top of the strip so every spin visibly travels.
-    strips.forEach(({ strip }) => { strip.style.transition = 'none'; strip.style.transform = 'translateY(0px)'; });
+    synth.playArm?.();
+    const from = last();
+    // Ask the house while the reels are already turning: the answer is in
+    // hand long before the first reel has to land.
+    const asked = spinSlots(machine.lineBet);
+    const rolled = roll(from, from, [700, 700, 700]).then(() => null);
     let spun;
     try {
-      spun = await spinSlots(machine.lineBet);
+      spun = await asked;
     } catch (error) {
       // The house did not answer: the coin comes back, nothing is shown.
+      await rolled;
       store.saveWallet(store.loadWallet() + cost);
       refreshWallet();
       machine.phase = 'idle';
       paintBets();
-      last.forEach((stop, i) => setStrip(i, stop, false));
+      from.forEach((stop, i) => setStrip(i, stop));
       toast(esc(houseError(error)), 'error');
       synth.playDenied();
       return;
     }
+    await rolled;
     machine.phase = 'settling';
-    // Land the reels left to right on what the house decided.
-    requestAnimationFrame(() => spun.stops.forEach((stop, i) => setStrip(i, stop, true)));
-    await wait(Math.max(...REEL_STOP_MS) + 120);
+    await roll(from, spun.stops, REEL_STOP_MS);
     machine.phase = 'paying';
     machine.last = spun;
+    const tier = winTier(spun.total, cost);
     if (spun.total > 0) {
       store.saveWallet(store.loadWallet() + spun.total);
       refreshWallet();
-      for (const line of spun.lines) {
-        const pl = PAYLINES.find((p) => p.id === line.id);
-        pl.rows.forEach((row, reel) => {
-          if (reel >= line.count) return;
-          const cells = strips[reel].strip.children;
-          cells[spun.stops[reel] + REEL.length + row]?.classList.add('is-won');
-        });
-      }
-      result.textContent = t('slotsWon', { amount: formatAmount(spun.total) });
-      result.classList.add('is-win');
-      synth.playPurchase();
+      showWins(spun);
+      say(t('slotsWon', { amount: formatAmount(spun.total) }), tier);
+      rainCoins(coins, coinsFor(tier));
+      synth.playCoins?.();
+      if (tier === 'jackpot') { synth.playFanfare?.(); await showBanner('jackpot', { title: t('slotsJackpot'), sub: money(spun.total).replace(/<[^>]+>/g, '') }, 2200); }
+      else if (tier === 'mega') { synth.playFanfare?.(); await showBanner('mega', { title: t('slotsMega'), sub: formatAmount(spun.total) }, 1700); }
+      else if (tier === 'big') await showBanner('big', { title: t('slotsBig'), sub: formatAmount(spun.total) }, 1300);
+    } else if (spun.bonus) {
+      showWins(spun);
     } else {
-      result.textContent = t('slotsLost');
+      say(t('slotsLost'), null);
     }
-    reportQuest('slots', { bet: cost, won: spun.total > 0, lines: spun.lines });
-    if (spun.total > 0) reportQuest('points', { amount: Math.round(spun.total), game: 'slots' });
-    await wait(500);
+    reportQuest('slots', { bet: cost, won: spun.grand > 0, lines: spun.lines, bonus: spun.bonus });
+
+    // THE BONUS: the free spins the house already played, drawn one by one.
+    if (spun.bonus) {
+      machine.phase = 'bonus';
+      synth.playFanfare?.();
+      await showBanner('bonus', { title: t('slotsBonusOpen', { n: BONUS_SPINS }) }, 1800);
+      bonusLine.hidden = false;
+      // The free spins are paid as they land, from one exact sum: rounding
+      // each half-coin on its own would pay a coin the book did not.
+      const bank = store.loadWallet();
+      let paid = 0;
+      let at = spun.stops;
+      for (let i = 0; i < spun.bonus.spins.length; i++) {
+        const free = spun.bonus.spins[i];
+        bonusLine.innerHTML = `<b></b><span class="tabular"></span>`;
+        bonusLine.querySelector('b').textContent = t('slotsBonusRound', { i: i + 1, n: spun.bonus.spins.length });
+        bonusLine.querySelector('span').innerHTML = money(paid);
+        clearWins();
+        await roll(at, free.stops, BONUS_STOP_MS);
+        at = free.stops;
+        if (free.total > 0) {
+          paid += free.total;
+          store.saveWallet(bank + paid);
+          refreshWallet();
+          showWins({ ...free, bonus: false });
+          rainCoins(coins, 10);
+          synth.playCoins?.();
+          bonusLine.querySelector('span').innerHTML = money(paid);
+          await wait(650);
+        } else {
+          await wait(220);
+        }
+      }
+      machine.last = { ...spun, stops: at };
+      bonusLine.querySelector('b').textContent = t('slotsBonusPaid', { amount: formatAmount(paid) });
+      const bonusTier = winTier(paid, cost);
+      say(t('slotsWon', { amount: formatAmount(spun.grand) }), bonusTier ?? tier);
+      if (paid > 0) await showBanner(bonusTier === 'jackpot' || bonusTier === 'mega' ? 'mega' : 'big', { title: t('slotsBonusDone'), sub: formatAmount(paid) }, 1500);
+    }
+    if (spun.grand > 0) reportQuest('points', { amount: Math.round(spun.grand), game: 'slots' });
+    await wait(300);
     machine.phase = 'idle';
     paintBets();
   };
   lever.addEventListener('click', spin);
-  paintBets();
-}
-
-/* --- the roulette --------------------------------------------------------------------------- */
-
-function wheelSvg() {
-  const n = WHEEL_ORDER.length;
-  const step = 360 / n;
-  const r = 100, inner = 62;
-  const rad = (deg) => (deg - 90) * Math.PI / 180;
-  const arc = (from, to) => {
-    const a0 = rad(from), a1 = rad(to);
-    return `M${(r * Math.cos(a0)).toFixed(2)},${(r * Math.sin(a0)).toFixed(2)} A${r},${r} 0 0 1 ${(r * Math.cos(a1)).toFixed(2)},${(r * Math.sin(a1)).toFixed(2)} L${(inner * Math.cos(a1)).toFixed(2)},${(inner * Math.sin(a1)).toFixed(2)} A${inner},${inner} 0 0 0 ${(inner * Math.cos(a0)).toFixed(2)},${(inner * Math.sin(a0)).toFixed(2)} Z`;
-  };
-  const fill = { green: '#15803d', red: '#b91c1c', black: '#111827' };
-  const pockets = WHEEL_ORDER.map((num, i) => {
-    const from = i * step - step / 2, to = from + step;
-    const mid = rad(i * step);
-    const tx = (84 * Math.cos(mid)).toFixed(2), ty = (84 * Math.sin(mid)).toFixed(2);
-    return `<path d="${arc(from, to)}" fill="${fill[colorOf(num)]}" stroke="#d4a017" stroke-width="0.6"/>
-      <text x="${tx}" y="${ty}" fill="#fff" font-size="8" font-weight="700" text-anchor="middle" dominant-baseline="middle" transform="rotate(${i * step} ${tx} ${ty})">${num}</text>`;
-  }).join('');
-  return `<svg viewBox="-104 -104 208 208" class="roulette-wheel" aria-hidden="true">
-    <circle r="102" fill="#3b2a12"/>${pockets}
-    <circle r="60" fill="#1c1917" stroke="#d4a017" stroke-width="2"/>
-    <circle r="12" fill="#d4a017"/></svg>`;
-}
-
-function renderRoulette() {
-  el.rouletteTitle.textContent = t('rouletteTitle');
-  el.rouletteBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
-  const body = el.rouletteBody;
-  if (!casinoOpen(signedIn())) {
-    body.replaceChildren(gameStage('wheel', t('gameSignIn'), { label: t('gateSignIn'), run: () => showGate() }));
-    return;
-  }
-  const table = state.roulette ??= { phase: 'idle', chip: CHIPS[1], bets: [], angle: 0, last: null };
-  table.phase = 'idle';
-
-  const wrap = document.createElement('div');
-  wrap.className = 'roulette';
-  const wheelBox = document.createElement('div');
-  wheelBox.className = 'roulette-wheelbox';
-  wheelBox.innerHTML = `<span class="roulette-marker"></span>${wheelSvg()}`;
-  const wheel = wheelBox.querySelector('.roulette-wheel');
-  wheel.style.transform = `rotate(${table.angle}deg)`;
-  const result = document.createElement('div');
-  result.className = 'roulette-result';
-  wrap.append(wheelBox, result);
-
-  const chips = document.createElement('div');
-  chips.className = 'roulette-chips';
-  const CHIP_COLORS = { 5: '#64748b', 10: '#2563eb', 25: '#16a34a', 50: '#dc2626', 100: '#7c3aed' };
-  const paintChips = () => {
-    chips.replaceChildren(...CHIPS.map((value) => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = `chip-btn${table.chip === value ? ' is-on' : ''}`;
-      btn.style.setProperty('--chip', CHIP_COLORS[value] ?? '#64748b');
-      btn.textContent = String(value);
-      btn.disabled = table.phase !== 'idle';
-      btn.addEventListener('click', () => { table.chip = value; synth.playTap(); paintChips(); });
-      return btn;
-    }));
-  };
-  wrap.appendChild(chips);
-
-  const layout = document.createElement('div');
-  layout.className = 'roulette-table';
-  const cellFor = (kind, pick, label, cls = '') => {
-    const cell = document.createElement('button');
-    cell.type = 'button';
-    cell.className = `bet-cell ${cls}`;
-    cell.dataset.kind = kind;
-    cell.dataset.pick = String(pick);
-    cell.textContent = label;
-    cell.addEventListener('click', () => {
-      if (table.phase !== 'idle') return;
-      const amount = table.chip;
-      if (stakedOn(table.bets) + amount > state.wallet) { synth.playDenied(); toast(t('cantAfford'), 'error'); return; }
-      const next = layChip(table.bets, { kind, pick, amount });
-      if (next === table.bets) { synth.playDenied(); toast(t('rouletteLimit', { limit: formatAmount(TABLE_LIMIT) }), 'error'); return; }
-      table.bets = next;
-      synth.playTap();
-      paintBets();
-    });
-    return cell;
-  };
-  const zero = document.createElement('div');
-  zero.className = 'roulette-zero';
-  zero.appendChild(cellFor('straight', 0, '0', 'is-green'));
-  const numbers = document.createElement('div');
-  numbers.className = 'roulette-grid';
-  // Three rows of twelve, the top row being the third column of a real table (3, 6, 9 ...).
-  for (let row = 3; row >= 1; row--) for (let col = 0; col < 12; col++) {
-    const n = col * 3 + row;
-    numbers.appendChild(cellFor('straight', n, String(n), `is-${colorOf(n)}`));
-  }
-  const columns = document.createElement('div');
-  columns.className = 'roulette-row is-3';
-  [1, 2, 3].forEach((c) => columns.appendChild(cellFor('column', c, t('rouletteColumn', { n: c }), 'is-outside')));
-  const dozens = document.createElement('div');
-  dozens.className = 'roulette-row is-3';
-  [1, 2, 3].forEach((d) => dozens.appendChild(cellFor('dozen', d, t('rouletteDozen', { n: d }), 'is-outside')));
-  const outside = document.createElement('div');
-  outside.className = 'roulette-row is-6';
-  outside.append(
-    cellFor('half', 'low', '1-18', 'is-outside'), cellFor('parity', 'even', t('rouletteEven'), 'is-outside'),
-    cellFor('color', 'red', t('rouletteRed'), 'is-red'), cellFor('color', 'black', t('rouletteBlack'), 'is-black'),
-    cellFor('parity', 'odd', t('rouletteOdd'), 'is-outside'), cellFor('half', 'high', '19-36', 'is-outside'));
-  const tiers = document.createElement('div');
-  tiers.className = 'roulette-row is-7';
-  for (const tb of TIER_BETS) {
-    const rarity = rarityById(tb.id);
-    const cell = cellFor('tier', tb.id, `${tx(rarity.name).slice(0, 4)} ${tb.multiplier}×`, 'is-tier');
-    cell.style.setProperty('--tier', rarity.color);
-    cell.title = t('rouletteTierHint', { rarity: tx(rarity.name), n: tb.numbers, x: tb.multiplier });
-    tiers.appendChild(cell);
-  }
-  layout.append(zero, numbers, columns, dozens, outside, tiers);
-  wrap.appendChild(layout);
-
-  const stakedLine = document.createElement('p');
-  stakedLine.className = 'roulette-staked';
-  const actions = document.createElement('div');
-  actions.className = 'roulette-actions';
-  const clear = document.createElement('button');
-  clear.type = 'button';
-  clear.className = 'btn btn-ghost';
-  clear.textContent = t('rouletteClear');
-  const spinBtn = document.createElement('button');
-  spinBtn.type = 'button';
-  spinBtn.className = 'btn btn-primary';
-  press(clear, { sound: null });
-  press(spinBtn, { sound: null });
-  actions.append(clear, spinBtn);
-  wrap.append(stakedLine, actions);
-  body.replaceChildren(wrap);
-
-  const paintBets = () => {
-    layout.querySelectorAll('.bet-chip').forEach((c) => c.remove());
-    for (const bet of table.bets) {
-      const cell = layout.querySelector(`.bet-cell[data-kind="${bet.kind}"][data-pick="${bet.pick}"]`);
-      if (!cell) continue;
-      const chip = document.createElement('span');
-      chip.className = 'bet-chip';
-      chip.textContent = String(bet.amount);
-      cell.appendChild(chip);
-    }
-    const total = stakedOn(table.bets);
-    stakedLine.innerHTML = total ? `${esc(t('rouletteStaked'))} ${money(total)}` : esc(t('rouletteLayChips'));
-    spinBtn.innerHTML = esc(t('rouletteSpin'));
-    spinBtn.disabled = table.phase !== 'idle' || !table.bets.length;
-    clear.disabled = table.phase !== 'idle' || !table.bets.length;
-    layout.querySelectorAll('.bet-cell').forEach((c) => { c.disabled = table.phase !== 'idle'; });
-  };
-  clear.addEventListener('click', () => { if (table.phase !== 'idle') return; table.bets = []; synth.playTap(); paintBets(); });
-
-  const spin = async () => {
-    if (table.phase !== 'idle' || !table.bets.length) return;
-    const bets = table.bets.map((b) => ({ ...b }));
-    const total = stakedOn(bets);
-    if (state.wallet < total) { synth.playDenied(); toast(t('cantAfford'), 'error'); return; }
-    table.phase = 'spinning';
-    paintChips();
-    paintBets();
-    result.className = 'roulette-result';
-    result.innerHTML = `<span>${esc(t('rouletteSpinning'))}</span>`;
-    layout.querySelectorAll('.is-won').forEach((c) => c.classList.remove('is-won'));
-    store.saveWallet(state.wallet - total);
-    refreshWallet();
-    let spun;
-    try {
-      spun = await spinRoulette(bets);
-    } catch (error) {
-      store.saveWallet(store.loadWallet() + total);
-      refreshWallet();
-      table.phase = 'idle';
-      result.innerHTML = '';
-      paintChips();
-      paintBets();
-      toast(esc(houseError(error)), 'error');
-      synth.playDenied();
-      return;
-    }
-    table.phase = 'settling';
-    // The wheel turns to the pocket the house named, and comes to rest on it.
-    const angle = restAngle(spun.pocket, table.angle);
-    wheel.style.transition = `transform ${WHEEL_SPIN_MS}ms ${WHEEL_EASE}`;
-    requestAnimationFrame(() => { wheel.style.transform = `rotate(${angle}deg)`; });
-    await wait(WHEEL_SPIN_MS + 80);
-    // Keep the angle small so the next spin's arithmetic stays exact.
-    table.angle = angle % 360;
-    wheel.style.transition = 'none';
-    wheel.style.transform = `rotate(${table.angle}deg)`;
-    table.phase = 'paying';
-    table.last = spun;
-    for (const r of spun.results) {
-      if (!r.won) continue;
-      layout.querySelector(`.bet-cell[data-kind="${r.kind}"][data-pick="${r.pick}"]`)?.classList.add('is-won');
-    }
-    layout.querySelector(`.bet-cell[data-kind="straight"][data-pick="${spun.pocket}"]`)?.classList.add('is-won');
-    if (spun.returned > 0) {
-      store.saveWallet(store.loadWallet() + spun.returned);
-      refreshWallet();
-      result.classList.add('is-win');
-      synth.playPurchase();
-    } else {
-      synth.playDenied();
-    }
-    result.innerHTML = `<b>${spun.pocket} <small>${esc(t(`roulette${spun.color[0].toUpperCase()}${spun.color.slice(1)}`))}</small></b><span>${esc(spun.returned > 0 ? t('rouletteWon', { amount: formatAmount(spun.returned) }) : t('rouletteLost', { amount: formatAmount(total) }))}</span>`;
-    reportQuest('roulette', { staked: total, net: spun.net, won: spun.returned > 0, bets: spun.results });
-    if (spun.returned > 0) reportQuest('points', { amount: Math.round(spun.returned), game: 'roulette' });
-    // The chips come off the table; the player lays the next round.
-    table.bets = [];
-    table.phase = 'idle';
-    paintChips();
-    paintBets();
-  };
-  spinBtn.addEventListener('click', spin);
-  paintChips();
   paintBets();
 }
 
@@ -8923,7 +9139,6 @@ function init() {
   // The arcade's back buttons, and the quests' chip in the drawer.
   el.wikdleBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
   el.slotsBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
-  el.rouletteBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
   quests.onQuestsChange(() => paintDrawerLinks());
   reportAlbums();
   document.addEventListener('visibilitychange', () => {

@@ -74,6 +74,8 @@ export const BADGES = [
     name: { en: 'Catherine’s Special Badge', fr: 'Badge spécial de Catherine' } },
   { id: 'special-mathilde', code: 'mathilde', motif: 'pot',      foil: ['#ede9fe', '#a78bfa', '#3b1f6b'],
     name: { en: 'Mathilde’s Special Badge', fr: 'Badge spécial de Mathilde' } },
+  { id: 'special-lorna', code: 'lorna', motif: 'thorns', foil: ['#ffe4de', '#fa8072', '#5b1717'],
+    name: { en: 'The Creator’s Special Badge', fr: 'Badge spécial du Créateur' } },
   // The only badge in gold, and the only one that is not somebody else's.
   { id: 'special-creator', code: 'creator', motif: 'seal',   foil: ['#fff7d6', '#fbbf24', '#7c2d12'],
     name: { en: 'The Creator', fr: 'Le Créateur' } }

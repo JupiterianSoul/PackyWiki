@@ -46,9 +46,14 @@ export const DEFAULT_FRAME_STYLE = 'metal';
 export const frameStyleById = (id) =>
   FRAME_STYLES.find((s) => s.id === id) ?? FRAME_STYLES[0];
 
-/** Which frame a level wears: one tier per 10 levels, none below 10. */
+/**
+ * Which frame a level wears: the first tier from level 1, so an equipped
+ * style is always visible, then one tier more every ten levels up to the
+ * fiftieth at 500. A frame the player picked and cannot see is a bug, not a
+ * reward waiting at level 10.
+ */
 export const frameTier = (level) =>
-  Math.max(0, Math.min(50, Math.floor((Number(level) || 1) / 10)));
+  Math.max(1, Math.min(50, Math.floor((Number(level) || 1) / 10)));
 
 /* --- small helpers --------------------------------------------------------- */
 

@@ -1505,7 +1505,21 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 /* --- chat ------------------------------------------------------------------- */
 
 #screen-chat { display: none; }
-#screen-chat.is-active { display: flex; flex-direction: column; min-height: calc(100dvh - 140px); }
+/* The conversation fills the room above the bottom bar; the log grows and
+   the composer stays on the floor, above the bar, whatever the phone's
+   idea of a viewport is. */
+#screen-chat.is-active { display: flex; flex-direction: column; min-height: calc(100vh - 150px); min-height: calc(100dvh - 60px - var(--nav-height) - var(--safe-bottom) - 26px); }
+.chat-log { flex: 1; }
+.chat-bar {
+  position: sticky;
+  bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
+  z-index: 6;
+  margin-top: auto;
+  background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
+  backdrop-filter: var(--blur);
+  -webkit-backdrop-filter: var(--blur);
+  border-top: var(--border) var(--border-style) var(--line);
+}
 .chat-presence { font-size: 0.72rem; font-weight: 700; color: var(--ink-faint); }
 .chat-presence.is-online { color: #4ade80; }
 .chat-log {
@@ -1547,7 +1561,7 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .chat-bar {
   display: flex;
   gap: 8px;
-  padding: 8px var(--gutter) 12px;
+  padding: 10px var(--gutter) 10px;
 }
 .chat-input {
   flex: 1;

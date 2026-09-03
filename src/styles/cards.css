@@ -1697,3 +1697,160 @@ html[data-lowpower='1'] [data-rarity="special"] .fx-a::after { animation: none !
     inset 0 -30px 46px -34px rgba(237, 233, 254, 0.7);
 }
 [data-special="mathilde"] .card-desc { color: var(--sp-violet); }
+
+/* --- LORNA - salmon pink, pain remains ------------------------------------
+   The Creator's own, and the loudest treatment in the game. Black obsidian
+   with salmon veins for a ground; embers rising behind the picture on a
+   loop; a slow eclipse turning behind the art; the picture itself doubled
+   in a salmon aura that slides with the tilt; film grain over it; a
+   lightning flash every few seconds; a holographic sweep across the face; a
+   halo of thorns turning around the plate; a ring that burns; a heartbeat
+   on the whole card; and a title cut in serif capitals whose colour
+   fringes split and snap back like a glitch. Every loop moves only
+   transform, opacity or background-position; the light slides the rest. */
+[data-special="lorna"] {
+  --lorna: #fa8072;
+  --lorna-light: #ffe4de;
+  --lorna-dark: #5b1717;
+  --lorna-embers: radial-gradient(circle, rgba(255, 228, 222, 0.95) 0 1.1px, transparent 2px) 12% 90% / 9cqw 11cqw,
+    radial-gradient(circle, rgba(250, 128, 114, 0.9) 0 1.4px, transparent 2.4px) 60% 70% / 13cqw 15cqw,
+    radial-gradient(circle, rgba(250, 128, 114, 0.7) 0 0.9px, transparent 1.8px) 35% 40% / 7cqw 9cqw,
+    radial-gradient(circle, rgba(255, 179, 167, 0.8) 0 1.2px, transparent 2.2px) 85% 20% / 11cqw 13cqw;
+}
+[data-special="lorna"] .card-front {
+  background:
+    repeating-conic-gradient(from 20deg at 30% 60%, rgba(250, 128, 114, 0.06) 0 4deg, transparent 4deg 11deg),
+    repeating-conic-gradient(from 200deg at 70% 30%, rgba(250, 128, 114, 0.05) 0 3deg, transparent 3deg 13deg),
+    radial-gradient(120% 90% at 50% 100%, #3a1010, #120505 55%, #050202);
+  box-shadow: inset 0 0 0 2px rgba(250, 128, 114, 0.55), inset 0 0 40px rgba(250, 128, 114, 0.12);
+}
+/* Embers, rising in four fields at four speeds, fading out near the top. */
+[data-special="lorna"] .fx-a::before {
+  content: '';
+  position: absolute;
+  inset: -20% 0 0;
+  background: var(--lorna-embers);
+  opacity: 0.9;
+  -webkit-mask: linear-gradient(180deg, transparent 0, #000 25%, #000 85%, rgba(0, 0, 0, 0.5));
+  mask: linear-gradient(180deg, transparent 0, #000 25%, #000 85%, rgba(0, 0, 0, 0.5));
+}
+.is-lit[data-special="lorna"] .fx-a::before { animation: lorna-rise 9s linear infinite; }
+@keyframes lorna-rise {
+  from { background-position: 12% 90%, 60% 70%, 35% 40%, 85% 20%; }
+  to { background-position: 14% -30%, 58% -50%, 36% -60%, 84% -100%; }
+}
+/* The eclipse: a ring of salmon light turning slowly behind the art. */
+[data-special="lorna"] .fx-a::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 34%;
+  width: 120cqw; height: 120cqw;
+  margin: -60cqw 0 0 -60cqw;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, transparent 0 40%, rgba(250, 128, 114, 0.55) 48%, rgba(255, 228, 222, 0.9) 50%, rgba(250, 128, 114, 0.55) 52%, transparent 60% 100%);
+  -webkit-mask: radial-gradient(circle, transparent 0 38%, #000 40% 46%, transparent 49%);
+  mask: radial-gradient(circle, transparent 0 38%, #000 40% 46%, transparent 49%);
+  opacity: 0.85;
+  transform: rotate(calc(var(--lx) * 40deg));
+}
+.is-lit[data-special="lorna"] .fx-a::after { animation: lorna-turn 18s linear infinite; }
+@keyframes lorna-turn { to { transform: rotate(360deg); } }
+/* The aura: the picture again, in salmon, pushed by the tilt. */
+[data-special="lorna"] .fx-art::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--art) center / cover;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+  filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-22deg) contrast(1.25) blur(1px);
+  transform: translate(calc(var(--lx) * 2.6cqw), calc(var(--ly) * -1.6cqw)) scale(1.04);
+}
+/* Film grain and the lightning. */
+[data-special="lorna"] .fx-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 38%, rgba(255, 236, 232, 0.9) 47%, rgba(255, 255, 255, 1) 49%, rgba(255, 236, 232, 0.9) 51%, transparent 60%),
+    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  background-size: 300% 100%, auto;
+  background-position: 120% 0, 0 0;
+  background-repeat: no-repeat, repeat;
+  mix-blend-mode: screen;
+  opacity: 0.6;
+}
+.is-lit[data-special="lorna"] .fx-art::after { animation: lorna-lightning 6.5s steps(1, end) infinite; }
+@keyframes lorna-lightning {
+  0%, 92% { background-position: 120% 0, 0 0; opacity: 0.6; }
+  93% { background-position: 60% 0, 0 0; opacity: 1; }
+  94.5% { background-position: 120% 0, 0 0; opacity: 0.6; }
+  96% { background-position: 40% 0, 0 0; opacity: 1; }
+  97% { background-position: 120% 0, 0 0; opacity: 0.6; }
+}
+/* The holographic sweep, riding the tilt, with its own slow shimmer. */
+[data-special="lorna"] .fx-b::before {
+  content: '';
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(100deg,
+    transparent 30%, rgba(250, 128, 114, 0.35) 42%, rgba(255, 228, 222, 0.75) 48%, rgba(255, 179, 167, 0.5) 52%, rgba(250, 128, 114, 0.35) 58%, transparent 70%);
+  mix-blend-mode: screen;
+  opacity: 0.8;
+  transform: translateX(calc(var(--lx) * 45%));
+}
+.is-lit[data-special="lorna"] .fx-b::before { animation: lorna-sweep 5s ease-in-out infinite alternate; }
+@keyframes lorna-sweep { from { opacity: 0.55; } to { opacity: 0.95; } }
+/* The halo of thorns around the plate. */
+[data-special="lorna"] .fx-b::after {
+  content: '';
+  position: absolute;
+  left: 50%; top: 34%;
+  width: 96cqw; height: 96cqw;
+  margin: -48cqw 0 0 -48cqw;
+  border-radius: 50%;
+  background: repeating-conic-gradient(from 0deg, var(--lorna) 0 3deg, transparent 3deg 5deg, rgba(255, 228, 222, 0.9) 5deg 6deg, transparent 6deg 12deg);
+  -webkit-mask: radial-gradient(circle, transparent 0 44%, #000 45% 49%, transparent 50%);
+  mask: radial-gradient(circle, transparent 0 44%, #000 45% 49%, transparent 50%);
+  opacity: 0.7;
+  transform: rotate(calc(var(--lx) * -30deg));
+}
+.is-lit[data-special="lorna"] .fx-b::after { animation: lorna-turn 30s linear infinite reverse; }
+/* The ring burns. */
+[data-special="lorna"] .fx-ring { padding: 3px; }
+[data-special="lorna"] .fx-ring::before {
+  background: conic-gradient(from 0deg, var(--lorna), var(--lorna-light), #000 30%, var(--lorna) 50%, var(--lorna-light), #000 80%, var(--lorna));
+  transform: rotate(calc(var(--lx) * 60deg));
+}
+.is-lit[data-special="lorna"] .fx-ring::before { animation: spin 7s linear infinite; }
+.is-lit[data-special="lorna"] .fx-ring { animation: lorna-burn 2.8s ease-in-out infinite; }
+@keyframes lorna-burn {
+  0%, 100% { filter: drop-shadow(0 0 4px rgba(250, 128, 114, 0.5)); }
+  50% { filter: drop-shadow(0 0 16px rgba(250, 128, 114, 0.95)); }
+}
+/* The heartbeat: two quick swells, then rest. */
+.is-lit[data-special="lorna"] .card-face { animation: lorna-heart 2.8s ease-in-out infinite; }
+@keyframes lorna-heart {
+  0%, 20%, 34%, 100% { transform: scale(1); }
+  8% { transform: scale(1.014); }
+  27% { transform: scale(1.01); }
+}
+/* The title: serif capitals, salmon, and colour fringes that split and snap. */
+[data-special="lorna"] .card-title {
+  font-family: 'Cinzel', 'Trajan Pro', 'Georgia', ui-serif, serif;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--lorna-light);
+  text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.02em 0 0 rgba(255, 90, 70, 0.8), -0.02em 0 0 rgba(120, 220, 255, 0.6);
+}
+.is-lit[data-special="lorna"] .card-title { animation: lorna-glitch 4s steps(1, end) infinite; }
+@keyframes lorna-glitch {
+  0%, 88%, 100% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.02em 0 0 rgba(255, 90, 70, 0.8), -0.02em 0 0 rgba(120, 220, 255, 0.6); transform: none; }
+  89% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.12em 0 0 rgba(255, 90, 70, 0.9), -0.12em 0 0 rgba(120, 220, 255, 0.9); transform: translateX(-0.04em); }
+  91% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), -0.08em 0 0 rgba(255, 90, 70, 0.9), 0.08em 0 0 rgba(120, 220, 255, 0.9); transform: translateX(0.04em) skewX(-6deg); }
+  93% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.02em 0 0 rgba(255, 90, 70, 0.8), -0.02em 0 0 rgba(120, 220, 255, 0.6); transform: none; }
+}
+[data-special="lorna"] .card-desc { color: var(--lorna); letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.9em; }
+[data-special="lorna"] .card-extract { color: rgba(255, 228, 222, 0.82); }
+[data-special="lorna"] .rarity-badge { background: var(--lorna); border-color: var(--lorna-light); color: #1a0808; text-shadow: none; }

@@ -821,3 +821,46 @@
   --press-shift: 1px;
   --texture: grain;
 }
+
+/* --- PAIN REMAINS: salmon on black, behind the Creator's own code ------- */
+[data-theme='lorna'] {
+  --ink: #ffe9e4;
+  --ink-dim: #d9a49a;
+  --ink-faint: #8f6a63;
+
+  --surface: rgba(250, 128, 114, 0.09);
+  --surface-2: rgba(250, 128, 114, 0.16);
+  --surface-solid: #170b0b;
+  --line: rgba(250, 128, 114, 0.28);
+  --line-strong: rgba(255, 228, 222, 0.55);
+
+  --accent: #fa8072;
+  --accent-2: #ffb3a7;
+  --accent-ink: #1a0808;
+  --positive: #9fe3b0;
+  --negative: #ff7a6b;
+  --warning: #ffc07a;
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 18px;
+  --radius-pill: 999px;
+  --border: 1px;
+  --border-style: solid;
+
+  --surface-shadow: 0 18px 34px -22px rgba(0, 0, 0, 0.9), inset 0 1px 0 rgba(255, 228, 222, 0.08);
+  --raise-shadow: 0 30px 60px -30px rgba(0, 0, 0, 0.95);
+  --glow: 0 0 34px -8px rgba(250, 128, 114, 0.75);
+  --blur: blur(10px);
+
+  --font: 'Avenir Next', 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
+  --font-display: 'Cinzel', 'Trajan Pro', 'Georgia', ui-serif, serif;
+  --display-weight: 800;
+  --display-tracking: 0.08em;
+  --display-transform: uppercase;
+  --label-tracking: 0.2em;
+
+  --press-scale: 0.97;
+  --press-shift: 1px;
+  --texture: grain;
+}

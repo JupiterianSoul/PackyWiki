@@ -721,7 +721,7 @@ update public.trades
 --
 -- Three new pieces of furniture. `scores` is every point anyone ever earned
 -- in a minigame, written by the game functions with the service key (the
--- slot machine and the wheel) or by submit_score() for Wikdle, never by a
+-- slot machine) or by submit_score() for Wikdle, never by a
 -- plain insert from a client. `quests` is each player's dealt quests for
 -- each day, dealt by the quests function. The three leaderboard tables are
 -- caches over `scores`, one per window, kept by a trigger and emptied by

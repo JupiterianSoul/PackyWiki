@@ -1,7 +1,7 @@
 /**
  * ONE CALL TO THE HOUSE
  * ============================================================================
- * The slot machine, the roulette and the quests are each an edge function,
+ * The slot machine and the quests are each an edge function,
  * and they all fail the same ways. This is the one place a call is made and
  * a failure is named, so every game says the same thing for the same fault:
  *

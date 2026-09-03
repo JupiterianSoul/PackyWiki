@@ -1101,6 +1101,9 @@ async function titleCard(want, pack) {
       ?? (want.fallback && want.fallback !== want.title ? await resolveTitle(want.fallback, 'en') : null);
     card = page ? await namedCard(page, want, pack) : placeholderCard(want, pack);
   }
+  // A card whose face is drawn rather than fetched (the Matrix card wears
+  // the rain of the Matrix theme) takes the drawing over any picture.
+  if (typeof want.art === 'function') { const drawn = want.art(); if (drawn) card.thumbnail = drawn; }
   card.special = pack.special ?? null;
   // A special card is keyed by its CODE as well as its article. Two people
   // are allowed to love the same thing, and without this the second code to
@@ -1108,6 +1111,9 @@ async function titleCard(want, pack) {
   // card cannot belong to two albums, so one of them would sit at five out
   // of six forever. The Creator has always been keyed this way; every
   // special card is now.
+  // Several cards read from one article (a band's members) each keep a
+  // slot of their own, or the collection would fold them into one entry.
+  if (want.slot && card.key) card.key = `${card.key}#${want.slot}`;
   if (card.special && card.key) card.key = `special:${card.special}:${card.key}`;
   return card;
 }

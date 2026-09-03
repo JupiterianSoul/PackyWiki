@@ -236,6 +236,79 @@ export const SECRET_CODES = [
     ]
   },
   /*
+   * THE CREATOR'S OWN. Not a person's booster made by someone else: the one
+   * the person who built the game made for himself. Salmon pink and black,
+   * the band on every card of the first row, and the things around the band.
+   * Sixteen cards, the most of any code, and a treatment of its own that
+   * outdoes every other (cards.css, data-special="lorna").
+   *
+   * The band's members have no articles of their own but one; those cards
+   * are read from the band's article, wear their own name and text, and
+   * carry the band's picture. The Matrix card is not a photograph at all:
+   * its face is drawn on the spot as the rain of the Matrix theme.
+   */
+  {
+    id: 'lorna',
+    code: 'TH3CR34T0R',
+    person: 'Gabriel',
+    accent: '#fa8072', accent2: '#5b1717', light: '#ffe4de',
+    theme: 'lorna',
+    emblem: 'thorns', foil: 'facets', family: 'crest', shapes: ['shard', 'star4'],
+    name: { en: 'The Creator’s Special Booster', fr: 'Booster spécial du Créateur' },
+    tagline: { en: 'Salmon pink, and pain remains', fr: 'Rose saumon, et la douleur demeure' },
+    album: { en: 'The Creator’s Special Album', fr: 'Album spécial du Créateur' },
+    badge: { en: 'The Creator’s Special Badge', fr: 'Badge spécial du Créateur' },
+    message: {
+      en: 'Gabriel. You made every other booster in this game for somebody else. This one is yours: the band, the games, the show, the rain. Sixteen cards, salmon pink, and the loudest treatment the game has. Made by you, for you.',
+      fr: 'Gabriel. Tu as fait chaque autre booster de ce jeu pour quelqu’un d’autre. Celui-là est le tien : le groupe, les jeux, la série, la pluie. Seize cartes, rose saumon, et le traitement le plus bruyant du jeu. Fait par toi, pour toi.'
+    },
+    cards: [
+      { en: 'Lorna Shore', fr: 'Lorna Shore' },
+      { en: 'Will Ramos', fr: 'Will Ramos',
+        text: {
+          en: 'The voice of Lorna Shore since 2018. Will Ramos sings deathcore the way a storm sings: gutturals that drop through the floor, shrieks that go through the ceiling, and, in between, a kind of tenderness nobody expects. He made the band the biggest thing in the genre with To the Hellfire, and then with Pain Remains.',
+          fr: 'La voix de Lorna Shore depuis 2018. Will Ramos chante le deathcore comme une tempête : des gutturaux qui traversent le plancher, des cris qui percent le plafond, et entre les deux une tendresse que personne n’attend. Il a fait du groupe le plus gros nom du genre avec To the Hellfire, puis avec Pain Remains.'
+        } },
+      { en: 'Lorna Shore', fr: 'Lorna Shore', slot: 'demicco', name: { en: 'Adam De Micco', fr: 'Adam De Micco' },
+        text: {
+          en: 'Lead guitar, and the last founding member still in Lorna Shore. Adam De Micco writes the riffs the band is built on: symphonic, technical, and then, without warning, a breakdown that could level a building. He has been there since 2010, through every line-up, and the sound is his.',
+          fr: 'Guitare solo, et le dernier membre fondateur encore dans Lorna Shore. Adam De Micco écrit les riffs sur lesquels le groupe est bâti : symphoniques, techniques, puis, sans prévenir, un breakdown à raser un immeuble. Il est là depuis 2010, à travers chaque formation, et le son est le sien.'
+        } },
+      { en: 'Lorna Shore', fr: 'Lorna Shore', slot: 'oconnor', name: { en: 'Andrew O’Connor', fr: 'Andrew O’Connor' },
+        text: {
+          en: 'Rhythm guitar, the wall the rest of the band stands in front of. Andrew O’Connor joined in 2019 and locked in with De Micco so tightly that the two guitars read as one enormous instrument. Every chug on Pain Remains that feels like a door slamming is his.',
+          fr: 'Guitare rythmique, le mur devant lequel le reste du groupe se tient. Andrew O’Connor a rejoint le groupe en 2019 et s’est calé sur De Micco si serré que les deux guitares se lisent comme un seul instrument énorme. Chaque chug de Pain Remains qui sonne comme une porte qui claque est le sien.'
+        } },
+      { en: 'Lorna Shore', fr: 'Lorna Shore', slot: 'archey', name: { en: 'Austin Archey', fr: 'Austin Archey' },
+        text: {
+          en: 'Drums, since 2012. Austin Archey plays blast beats at speeds that look like a rendering error and still makes them groove; the cymbal work under the orchestras is half of why the songs feel cinematic rather than merely fast. The engine room of Lorna Shore.',
+          fr: 'Batterie, depuis 2012. Austin Archey joue des blast beats à des vitesses qui ressemblent à un bug d’affichage et les fait quand même groover ; le travail de cymbales sous les orchestrations est la moitié de ce qui rend les morceaux cinématographiques plutôt que simplement rapides. La salle des machines de Lorna Shore.'
+        } },
+      { en: 'Lorna Shore', fr: 'Lorna Shore', slot: 'yager', name: { en: 'Michael Yager', fr: 'Michael Yager' },
+        text: {
+          en: 'Bass, and the low end that makes the breakdowns physical. Michael Yager joined in 2020, in time for the band’s biggest years, and holds the floor under all of it: the guitars can go anywhere because the bass is always exactly where it should be.',
+          fr: 'Basse, et le grave qui rend les breakdowns physiques. Michael Yager a rejoint le groupe en 2020, à temps pour ses plus grandes années, et tient le sol sous tout ça : les guitares peuvent aller n’importe où parce que la basse est toujours exactement là où il faut.'
+        } },
+      { en: 'Terraria', fr: 'Terraria' },
+      { en: 'Dead Cells', fr: 'Dead Cells' },
+      { en: 'The Mentalist', fr: 'Mentalist (série télévisée)', name: { en: 'The Mentalist', fr: 'The Mentalist' } },
+      { en: 'The Matrix', fr: 'Matrix (film)', name: { en: 'Matrix', fr: 'Matrix' }, art: 'matrix' },
+      { en: 'Computer programming', fr: 'Programmation informatique', name: { en: 'Programming', fr: 'Programmation' } },
+      { en: 'Video game', fr: 'Jeu vidéo', name: { en: 'Video games', fr: 'Jeux vidéo' } },
+      { en: 'Death metal', fr: 'Death metal', name: { en: 'Death metal', fr: 'Death metal' } },
+      { en: 'The Binding of Isaac (video game)', fr: 'The Binding of Isaac', name: { en: 'The Binding of Isaac', fr: 'The Binding of Isaac' } },
+      { en: 'Esquie', fr: 'Esquie',
+        wiki: 'Clair Obscur: Expedition 33',
+        wikiUrls: ['https://clairobscur.fandom.com/api.php', 'https://clair-obscur-expedition-33.fandom.com/api.php', 'https://expedition33.fandom.com/api.php'],
+        page: 'Esquie', search: ['Esquie', 'Esquie (character)'],
+        name: { en: 'Esquie (Clair Obscur: Expedition 33)', fr: 'Esquie (Clair Obscur : Expedition 33)' },
+        text: {
+          en: 'A big, soft, unbothered creature from Clair Obscur: Expedition 33, who carries the Expedition across the continent, swims, flies once he finds his friend, and is happy about absolutely everything. In a game about grief, Esquie is the part that is not.',
+          fr: 'Une grosse créature douce et imperturbable de Clair Obscur : Expedition 33, qui porte l’Expédition à travers le continent, nage, vole une fois son ami retrouvé, et se réjouit d’absolument tout. Dans un jeu sur le deuil, Esquie est la partie qui n’en est pas.'
+        } }
+    ]
+  },
+  /*
    * THE CREATOR. Not a person's booster: a set of regalia.
    *
    * The four codes above each hand over a booster made for one person. This
@@ -337,7 +410,9 @@ export function codeTitles(entry, lang = getLanguage()) {
     wikiUrls: card.wikiUrls ?? null,
     page: card.page ?? null,
     search: card.search ?? null,
-    text: card.text ? tx(card.text) : null
+    text: card.text ? tx(card.text) : null,
+    art: card.art === 'matrix' ? matrixArt : null,
+    slot: card.slot ?? null
   }));
 }
 
@@ -360,7 +435,11 @@ export function codeCardFor(codeId, entry, lang = getLanguage()) {
   if (!code) return null;
   const marks = [entry?.title, entry?.article].filter(Boolean).map(norm);
   if (!marks.length) return null;
-  const index = (code.cards ?? []).findIndex((card) => cardAliases(card).some((alias) => marks.includes(alias)));
+  // Several cards of one code can be read from the same article (a band's
+  // members, from the band's page): the name on the face decides first.
+  const byName = (code.cards ?? []).findIndex((card) => card.name && [card.name.en, card.name.fr].map(norm).includes(norm(entry?.title)));
+  const index = byName >= 0 ? byName
+    : (code.cards ?? []).findIndex((card) => cardAliases(card).some((alias) => marks.includes(alias)));
   if (index < 0) return null;
   return codeTitles(code, lang)[index] ?? null;
 }
@@ -392,4 +471,49 @@ export function creatorCard(codeId) {
     special: codeId,
     creator: true
   };
+}
+
+/**
+ * THE MATRIX CARD'S FACE, drawn rather than photographed: the falling rain
+ * of the Matrix theme, frozen on a card. Green glyphs on black, brightest at
+ * the head of each column, fading up the tail; a plate the size of a card
+ * so it looks right on the face and in the binder. Null outside a browser.
+ */
+export function matrixArt() {
+  if (typeof document === 'undefined') return null;
+  try {
+    const W = 480, H = 640;
+    const canvas = document.createElement('canvas');
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#010b04';
+    ctx.fillRect(0, 0, W, H);
+    const colW = 22, cell = 24;
+    const glyphs = '01アイウエオカキクケコサシスセソタチツテト<>+*';
+    ctx.font = '18px ui-monospace, Menlo, monospace';
+    ctx.textAlign = 'center';
+    // Deterministic: the same card every time it is drawn.
+    let seed = 1337;
+    const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+    for (let i = 0; i < Math.ceil(W / colW); i++) {
+      const length = 8 + Math.floor(rnd() * 12);
+      const head = Math.floor(rnd() * (H / cell + length));
+      for (let seg = 0; seg < length; seg++) {
+        const y = (head - seg) * cell;
+        if (y < -cell || y > H + cell) continue;
+        const fade = 1 - seg / length;
+        ctx.fillStyle = seg === 0 ? 'rgba(200, 255, 215, 0.95)' : `rgba(0, 255, 65, ${(0.18 + 0.6 * fade * fade).toFixed(3)})`;
+        ctx.fillText(glyphs[Math.floor(rnd() * glyphs.length)], i * colW + colW / 2, y);
+      }
+    }
+    // A soft green glow in the middle, so the face has a centre.
+    const glow = ctx.createRadialGradient(W / 2, H * 0.42, 20, W / 2, H * 0.42, H * 0.6);
+    glow.addColorStop(0, 'rgba(0, 255, 65, 0.16)');
+    glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, W, H);
+    return canvas.toDataURL('image/png');
+  } catch {
+    return null;
+  }
 }

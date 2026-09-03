@@ -339,5 +339,25 @@ export const RELEASES = [
       { en: 'Special badges can be taken off, all of them, and stay off', fr: 'Les badges spéciaux peuvent tous être retirés, et le restent' },
       { en: 'Updates are numbered: the fifth update is called the fifth update', fr: 'Les mises à jour sont numérotées : la cinquième s’appelle la cinquième' }
     ]
+  },
+  {
+    id: 'house', icon: 'reel', accent: '#fa8072',
+    title: { en: 'The house, rebuilt', fr: 'La maison, reconstruite' },
+    points: [
+      { en: 'The slot machine rebuilt: new symbols, a wild, a bonus of free spins', fr: 'La machine à sous refaite : nouveaux symboles, un joker, un bonus de tours gratuits' },
+      { en: 'Wikdle with hints from Wikipedia and streaks that pay', fr: 'Wikdle avec des indices de Wikipédia et des séries qui paient' },
+      { en: 'Notifications redesigned, and the chat bar back where it belongs', fr: 'Les notifications refaites, et la barre de discussion remise à sa place' },
+      { en: 'A frame from level 1, quests that keep count, and one more secret code', fr: 'Un cadre dès le niveau 1, des quêtes qui tiennent le compte, et un code secret de plus' }
+    ],
+    changelog: [
+      { en: 'The slot machine, again from the ground up: eight symbols drawn as pictures, a wild that stands in for any of them and pays 700 times the line bet three across, and a bonus symbol that opens eight free spins when three land anywhere in the window. The house plays the free spins on the spot and the app draws them one by one. Pay lines are drawn across the glass, winning cells glow, coins rain, and a big, mega or jackpot win gets its banner. The book returns about 95%, bonus counted', fr: 'La machine à sous, de nouveau depuis zéro : huit symboles dessinés, un joker qui remplace n’importe lequel et paie 700 fois la mise par ligne quand il est aligné trois fois, et un symbole bonus qui ouvre huit tours gratuits quand trois tombent n’importe où dans la fenêtre. La maison joue les tours gratuits sur-le-champ et l’appli les dessine un par un. Les lignes gagnantes se tracent sur la vitre, les cases gagnantes brillent, les pièces pleuvent, et un gros, méga ou jackpot a sa bannière. Le livre rend environ 95 %, bonus compris' },
+      { en: 'Wikdle: two hints from the word’s own Wikipedia article for a hundred points each, a streak bonus on the coins up to half again, a Rare booster for a solve in two, a booster every seventh day of a streak, a link to the article once the board is done, tiles that flip and dance, confetti, and a done panel that shows where the points came from', fr: 'Wikdle : deux indices tirés de l’article Wikipédia du mot pour cent points chacun, un bonus de série sur les pièces jusqu’à la moitié en plus, un booster Rare pour une réussite en deux essais, un booster tous les sept jours de série, un lien vers l’article une fois la grille finie, des cases qui se retournent et dansent, des confettis, et un panneau de fin qui montre d’où viennent les points' },
+      { en: 'The roulette is gone', fr: 'La roulette a disparu' },
+      { en: 'Notifications: a redesigned sheet, new and earlier on two shelves, a colour and a label per kind, and every note opens its screen freshly painted, so a quest note lands on the quest with its progress', fr: 'Notifications : une feuille refaite, nouveau et plus tôt sur deux étagères, une couleur et un libellé par genre, et chaque note ouvre son écran fraîchement peint, si bien qu’une note de quête arrive sur la quête avec sa progression' },
+      { en: 'Daily quests keep a ledger of everything done today, so progress survives signing in, a change of deal, or a server that had not seen it', fr: 'Les quêtes du jour tiennent un registre de tout ce qui a été fait aujourd’hui, si bien que la progression survit à une connexion, à un changement de distribution ou à un serveur qui ne l’avait pas vue' },
+      { en: 'A message notification opens the conversation with the composer showing; the chat bar stays above the bottom bar on every phone', fr: 'Une notification de message ouvre la conversation avec la zone de saisie visible ; la barre de discussion reste au-dessus de la barre du bas sur tous les téléphones' },
+      { en: 'An equipped level frame shows from level 1, with a new tier every ten levels', fr: 'Un cadre de niveau équipé s’affiche dès le niveau 1, avec un nouveau palier tous les dix niveaux' },
+      { en: 'One more secret code, with fifteen cards, a theme, a badge, a card drawn rather than photographed, and a treatment that outdoes every other', fr: 'Un code secret de plus, avec quinze cartes, un thème, un badge, une carte dessinée plutôt que photographiée, et un traitement qui dépasse tous les autres' }
+    ]
   }
 ];

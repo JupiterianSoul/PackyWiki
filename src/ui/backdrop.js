@@ -145,6 +145,7 @@ class Backdrop {
       case 'tabletop': this.#tabletop(ctx, w, h, t); break;
       case 'apotheosis': this.#apotheosis(ctx, w, h, t); break;
       case 'raclette': this.#raclette(ctx, w, h, t); break;
+      case 'lorna': this.#lorna(ctx, w, h, t); break;
       case 'lecture': this.#lecture(ctx, w, h, t); break;
       case 'yaourt': this.#yaourt(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
@@ -800,6 +801,67 @@ class Backdrop {
    * are on fixed tracks with a phase each rather than a particle system, so
    * the whole thing costs almost nothing to run.
    */
+  /**
+   * PAIN REMAINS - black, with salmon embers rising through it and, every
+   * few seconds, lightning. The fog is two slow blobs; the embers are a
+   * field of time-driven particles that never allocate; the lightning is a
+   * jagged line from a seeded walk, drawn for a quarter of a second and
+   * gone. Loud in one place, quiet everywhere else.
+   */
+  #lorna(ctx, w, h, t) {
+    const sec = t / 1000;
+    ctx.fillStyle = '#0c0606';
+    ctx.fillRect(0, 0, w, h);
+
+    // Fog: two salmon glows drifting.
+    for (let i = 0; i < 2; i++) {
+      const x = w * (0.3 + 0.4 * i) + Math.sin(sec * 0.07 + i * 2.1) * w * 0.18;
+      const y = h * (0.75 - 0.35 * i) + Math.cos(sec * 0.05 + i) * h * 0.1;
+      const g = ctx.createRadialGradient(x, y, 0, x, y, h * 0.55);
+      g.addColorStop(0, 'rgba(250, 128, 114, 0.14)');
+      g.addColorStop(1, 'rgba(250, 128, 114, 0)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, w, h);
+    }
+
+    // Embers: rising, drifting, fading as they climb.
+    const count = 70;
+    for (let i = 0; i < count; i++) {
+      const speed = 0.018 + ((i * 7) % 9) * 0.004;
+      const life = (sec * speed + (i * 0.137) % 1) % 1;
+      const x = ((i * 173.3) % w) + Math.sin(sec * 0.6 + i) * 22;
+      const y = h * (1.05 - life * 1.15);
+      const r = 1 + ((i * 5) % 3) * 0.7;
+      const a = (1 - life) * (0.35 + ((i * 3) % 4) * 0.12);
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, TAU);
+      ctx.fillStyle = i % 5 === 0 ? `rgba(255, 228, 222, ${a.toFixed(3)})` : `rgba(250, 128, 114, ${a.toFixed(3)})`;
+      ctx.fill();
+    }
+
+    // Lightning: a flash every seven seconds, on a jagged seeded walk.
+    const period = 7;
+    const phase = sec % period;
+    if (phase < 0.28) {
+      const bolt = Math.floor(sec / period);
+      const flash = 1 - phase / 0.28;
+      ctx.fillStyle = `rgba(255, 228, 222, ${(0.16 * flash).toFixed(3)})`;
+      ctx.fillRect(0, 0, w, h);
+      let seed = bolt * 9973 + 17;
+      const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      let x = w * (0.2 + rnd() * 0.6), y = 0;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      while (y < h * 0.7) { x += (rnd() - 0.5) * 60; y += 18 + rnd() * 30; ctx.lineTo(x, y); }
+      ctx.strokeStyle = `rgba(255, 240, 236, ${(0.9 * flash).toFixed(3)})`;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(250, 128, 114, 0.9)';
+      ctx.shadowBlur = 18;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+  }
+
   #raclette(ctx, w, h, t) {
     const sec = t / 1000;
     const room = ctx.createLinearGradient(0, 0, 0, h);

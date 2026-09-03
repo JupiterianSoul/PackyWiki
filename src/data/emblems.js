@@ -532,6 +532,16 @@ export const EMBLEMS = {
     <circle cx="60" cy="92" r="7" fill="${E2}"/><circle cx="60" cy="92" r="3" fill="${HI}"/>`,
 
   /* A wax seal pressed with a W, a quill laid across it. */
+  thorns: `
+    <ellipse cx="60" cy="102" rx="38" ry="6" fill="${INK}" opacity="0.32"/>
+    <circle cx="60" cy="58" r="34" fill="none" stroke="${E2}" stroke-width="9"/>
+    <circle cx="60" cy="58" r="34" fill="none" stroke="${E1}" stroke-width="3" stroke-dasharray="4 9"/>
+    <g fill="${E1}">
+      <path d="M60 18l4 10-4 4-4-4z"/><path d="M88 30l-2 10-5 1-2-5z"/><path d="M100 58l-10 4-4-4 4-4z"/><path d="M88 86l-10-2-1-5 5-2z"/>
+      <path d="M60 98l-4-10 4-4 4 4z"/><path d="M32 86l2-10 5-1 2 5z"/><path d="M20 58l10-4 4 4-4 4z"/><path d="M32 30l10 2 1 5-5 2z"/>
+    </g>
+    <path d="M60 34c-10 12-14 20-14 28a14 14 0 0 0 28 0c0-6-3-9-6-13 0 5-2 8-5 9 3-8-1-16-3-24z" fill="${E3}"/>
+    <path d="M60 48c-5 7-7 11-7 15a7 7 0 0 0 14 0c0-3-2-5-3-7 0 3-1 4-2 5 1-4-1-9-2-13z" fill="${HI}"/>`,
   seal: `
     <ellipse cx="60" cy="100" rx="40" ry="6" fill="${INK}" opacity="0.32"/>
     <path d="M60 22 Q78 18 88 32 Q102 40 96 58 Q100 76 84 84 Q72 96 58 90 Q40 94 32 80 Q18 72 24 56 Q20 38 36 30 Q44 18 60 22Z" fill="${E2}"/>

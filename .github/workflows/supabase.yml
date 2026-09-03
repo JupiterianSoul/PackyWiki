@@ -51,7 +51,7 @@ jobs:
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          supabase functions deploy slots roulette quests quiz delete-account --project-ref "$PROJECT_REF"
+          supabase functions deploy slots quests quiz delete-account --project-ref "$PROJECT_REF"
 
       - name: List what the project now has
         env:

@@ -387,6 +387,27 @@ export const THEMES = [
     }
   },
   {
+    id: 'lorna', code: 'lorna',
+    name: { en: 'Pain Remains', fr: 'Pain Remains' },
+    blurb: {
+      en: 'The Creator’s own. Salmon on black, embers in the dark, and lightning when the breakdown hits.',
+      fr: 'Celui du Créateur. Saumon sur noir, des braises dans l’obscurité, et la foudre quand le breakdown tombe.'
+    },
+    swatch: ['#0c0606', '#fa8072', '#ffe4de'],
+    backdrop: { renderer: 'lorna', speed: 0.00016 },
+    motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
+    sound: {
+      voice: 'keys',
+      gain: 0.7,
+      root: 110,              // A2
+      scale: [0, 2, 3, 5, 7, 8, 10],
+      reverb: { seconds: 3.4, decay: 3.2, mix: 0.3 },
+      filter: 2600,
+      drive: 0.22,
+      transient: 'knock'
+    }
+  },
+  {
     id: 'apotheosis', code: 'creator',
     name: { en: 'Apotheosis', fr: 'Apothéose' },
     blurb: {

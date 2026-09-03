@@ -171,10 +171,75 @@ export function playGuess(game, guess) {
   return next;
 }
 
-/** What a finished board is worth: more for fewer rows, nothing for a loss. */
+/* --- hints, from the encyclopaedia ----------------------------------------- */
+
+/** What a hint costs, in the day's points, and how many a board may take. */
+export const HINT_COST = 100;
+export const HINTS_MAX = 2;
+
+/** The word with its letters hidden, in a sentence about it. */
+const mask = (text, word) => String(text ?? '').replace(new RegExp(`\\b${word}(s|es|ed|ing)?\\b`, 'gi'), (m) => '▮'.repeat(word.length) + (m.length > word.length ? m.slice(word.length) : ''));
+
+/**
+ * A hint for the day's word: first its short description on Wikipedia,
+ * then the opening sentence of its article with the word blanked out. Both
+ * come from the encyclopaedia's summary endpoint for the word itself; a
+ * word whose page is a list of meanings still says so, which is a hint of
+ * its own. Resolves to null when nothing can be reached, and then nothing
+ * is charged.
+ */
+export async function fetchHint(word, n) {
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`, { headers: { accept: 'application/json' } });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (n === 0) {
+      const description = String(data.description ?? '').trim();
+      return description ? mask(description, word) : mask(firstSentence(data.extract), word) || null;
+    }
+    const sentence = firstSentence(data.extract);
+    return sentence ? mask(sentence, word) : null;
+  } catch {
+    return null;
+  }
+}
+
+const firstSentence = (text) => {
+  const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
+  if (!clean) return '';
+  const cut = clean.match(/^.*?[.!?](\s|$)/);
+  return (cut ? cut[0] : clean).trim().slice(0, 220);
+};
+
+/** Record a hint taken on today's board, so it is charged once and shown again after a relaunch. */
+export function takeHint(game, text) {
+  const hints = [...(game.hints ?? []), text];
+  const next = { ...game, hints };
+  saveGame(next);
+  return next;
+}
+
+/** The Wikipedia article of the day's word, to read once the board is done. */
+export const articleUrl = (word) => `https://en.wikipedia.org/wiki/${encodeURIComponent(word)}`;
+
+/** What a finished board is worth: more for fewer rows, less for each hint, nothing for a loss. */
 export const WIKDLE_POINTS = [600, 500, 400, 300, 200, 100];
+export const basePoints = (game) => (game.status === 'won' ? WIKDLE_POINTS[game.rows.length - 1] ?? 100 : 0);
 export const wikdlePoints = (game) =>
-  game.status === 'won' ? WIKDLE_POINTS[game.rows.length - 1] ?? 100 : 0;
+  game.status === 'won' ? Math.max(50, basePoints(game) - (game.hints?.length ?? 0) * HINT_COST) : 0;
+
+/**
+ * The streak's bonus on the day's coins: five percent a day, up to half
+ * again at ten days. A streak is a habit, and a habit pays.
+ */
+export const STREAK_BONUS_STEP = 0.05;
+export const STREAK_BONUS_MAX = 0.5;
+export const streakBonus = (streak) => Math.min(STREAK_BONUS_MAX, Math.max(0, (Number(streak) || 0) - 1) * STREAK_BONUS_STEP);
+
+/** Solving in this many rows or fewer hands over a booster on top of the coins. */
+export const FAST_SOLVE_ROWS = 2;
+/** Every streak of this many days hands over a booster too. */
+export const STREAK_BOOSTER_EVERY = 7;
 
 /** The shareable grid of squares, the way people post it. */
 export function shareText(game) {

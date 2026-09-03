@@ -17,7 +17,6 @@
  *   buy            a booster bought               detail: { price, kind }
  *   wikdle         a Wikdle finished              detail: { won, guesses }
  *   slots          a spin                         detail: { bet, won, lines }
- *   roulette       a spin                         detail: { staked, net, bets }
  *   points         minigame points earned         detail: { game }
  *   quiz           a quiz finished                detail: { correct }
  *   album          an album completed
@@ -111,20 +110,13 @@ hard({ id: 'wikdle-2', metric: 'wikdle', where: { won: true, maxGuesses: 2 }, ta
 easy({ id: 'slots-3', metric: 'slots', target: 3, reward: R(60), name: { en: 'Three spins', fr: 'Trois tours de rouleaux' } });
 easy({ id: 'slots-10', metric: 'slots', target: 10, reward: R(120), name: { en: 'Ten spins', fr: 'Dix tours de rouleaux' } });
 easy({ id: 'slots-win-1', metric: 'slots', where: { won: true }, target: 1, reward: R(80), name: { en: 'Win a spin', fr: 'Gagnez un tour' } });
-easy({ id: 'roulette-3', metric: 'roulette', target: 3, reward: R(60), name: { en: 'Three spins of the wheel', fr: 'Trois tours de roulette' } });
-easy({ id: 'roulette-win-1', metric: 'roulette', where: { won: true }, target: 1, reward: R(80), name: { en: 'Win at the wheel', fr: 'Gagnez à la roulette' } });
 easy({ id: 'points-200', metric: 'points', sum: 'amount', target: 200, reward: R(90), name: { en: '200 minigame points', fr: '200 points de mini-jeux' } });
 medium({ id: 'points-500', metric: 'points', sum: 'amount', target: 500, reward: R(300), name: { en: '500 minigame points', fr: '500 points de mini-jeux' } });
 medium({ id: 'slots-line-3', metric: 'slots', where: { threeOfAKind: true }, target: 1, reward: R(320), name: { en: 'Three of a kind', fr: 'Trois symboles alignés' } });
 medium({ id: 'slots-25', metric: 'slots', target: 25, reward: R(300), name: { en: 'Twenty-five spins', fr: 'Vingt-cinq tours' } });
-medium({ id: 'roulette-straight', metric: 'roulette', where: { straightWin: true }, target: 1, reward: R(360), name: { en: 'Hit a straight number', fr: 'Touchez un numéro plein' } });
-medium({ id: 'roulette-tier', metric: 'roulette', where: { tierWin: true }, target: 1, reward: R(300), name: { en: 'Win a tier bet', fr: 'Gagnez une mise de palier' } });
-medium({ id: 'roulette-10', metric: 'roulette', target: 10, reward: R(280), name: { en: 'Ten spins of the wheel', fr: 'Dix tours de roulette' } });
 hard({ id: 'points-2000', metric: 'points', sum: 'amount', target: 2000, reward: R(1100), name: { en: '2,000 minigame points', fr: '2 000 points de mini-jeux' } });
 hard({ id: 'slots-star', metric: 'slots', where: { symbol: 'star', count: 3 }, target: 1, reward: R(1000), name: { en: 'Three stars on a line', fr: 'Trois étoiles alignées' } });
 hard({ id: 'slots-jackpot', metric: 'slots', where: { symbol: 'wiki', count: 3 }, target: 1, reward: RB(3000, { kind: 'open', themeId: null, rarityId: 'legendary', cards: 5 }), name: { en: 'The jackpot', fr: 'Le jackpot' } });
-hard({ id: 'roulette-net-500', metric: 'roulette', sum: 'net', target: 500, reward: R(1000), name: { en: 'Leave the wheel 500 up', fr: 'Quittez la roulette avec 500 de plus' } });
-hard({ id: 'roulette-exotic', metric: 'roulette', where: { tierWin: 'exotic' }, target: 1, reward: R(1200), name: { en: 'Win the Exotic tier bet', fr: 'Gagnez la mise Exotique' } });
 
 // --- the quiz, the album, the friends ----------------------------------------
 easy({ id: 'quiz-1', metric: 'quiz', target: 1, reward: R(70), name: { en: 'Take a quiz', fr: 'Faites un quiz' } });

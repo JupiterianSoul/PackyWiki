@@ -170,7 +170,7 @@ floor can both see.
 ## Progression
 
 - **Levels** to 500, earned by opening boosters, with a frame for your avatar
-  every 10 levels across 5 styles.
+  from level 1 and a new tier of it every 10 levels, across 8 styles.
 - **100 achievements** in chains, from your first booster to genuinely absurd
   collection milestones.
 - **Badges** in 10 styles, worn four at a time on your profile.
@@ -280,6 +280,12 @@ One code carries no cards at all. `regalia: true` marks it, and what it hands
 over is a badge, an animated level frame, a theme and the launcher icon to
 match.
 
+A card in a code booster can name its own `wiki` (a thing Wikipedia has no
+page for), carry its own `text`, keep a `slot` of its own when several cards
+are read from one article, or be drawn rather than fetched (`art`): one
+code's Matrix card wears the rain of the Matrix theme, painted on a canvas
+the moment the pack is opened.
+
 ## The Android app
 
 A WebView that opens the published site. The site updates the moment it is
@@ -340,6 +346,64 @@ date, so everyone on Earth has the same one and a phone's clock cannot fetch
 tomorrow's; a guess has to be in the dictionary before it costs a row;
 duplicate letters are scored the way the original scores them (one E in the
 word never lights two); and the board is written down after every guess, so
+it survives a closed app and cannot be replayed once it is over. Two hints
+come from the word's own Wikipedia article, its short description and its
+opening sentence with the word blanked, for a hundred of the day's points
+each. A solve is worth 600 points in one guess down to 100 in six, paid
+half in Buckarooz with a streak bonus of five percent a day up to half
+again; a solve in two rows hands over a Rare booster, and every seventh day
+of a streak a booster too. Signed in, the points are sent once to the
+leaderboard.
+
+**The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
+reels, five paylines and eight symbols drawn as their own small pictures: six
+that pay, a **wild** that stands in for any of them (three wilds is the
+jackpot at 700 times the line bet), and a **bonus** scatter: three anywhere
+in the window open eight free spins at the same bet, which the house plays on
+the spot and answers with all at once. The paytable is tuned so that the
+machine returns about 95% of what is bet over the long run, bonus counted;
+`tools/slots-rtp.mjs` computes that figure exactly from the tables. The spin
+is decided by the `slots` edge function with `crypto.getRandomValues`, never
+by the app: the app takes the coin, asks, checks every window it is handed
+against the book (the stops exist, the windows match them, the total adds
+up, the bonus has exactly eight spins) and only then pays. If the house does
+not answer, or the answer does not add up, the coin comes back. The machine
+is one state at a time, idle, spinning, settling, paying, bonus, and refuses
+any input that is not for the state it is in, so a double tap buys one spin.
+
+**Daily quests** and **Leaderboard**. The rule that holds all of it together
+is that nothing which pays out is decided on the phone.
+
+**Wikdle** (`src/wikdle.js`, words in `src/data/wikdle-words.js`) is the
+five-letter word of the day in six rows. The word is a function of the UTC
+date, so everyone on Earth has the same one and a phone's clock cannot fetch
+tomorrow's; a guess has to be in the dictionary before it costs a row;
+duplicate letters are scored the way the original scores them (one E in the
+word never lights two); and the board is written down after every guess, so
+it survives a closed app and cannot be replayed once it is over. A solve is
+worth 600 points in one guess down to 100 in six, paid half in Buckarooz and,
+signed in, sent once to the leaderboard.
+
+**The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
+reels, five symbols, five paylines and a paytable tuned so that it returns
+95% of what is bet over the long run; `tools/slots-rtp.mjs` computes that
+figure exactly from the tables. The spin is decided by the `slots` edge
+function with `crypto.getRandomValues`, never by the app: the app takes the
+coin, asks, checks the answer against the book (the stops exist, the windows
+match them, the total adds up) and only then pays. If the house does not
+answer, or the answer does not add up, the coin comes back. The machine is
+one state at a time, idle, spinning, settling, paying, and refuses any input
+that is not for the state it is in, so a double tap buys one spin.
+
+**Daily quests** and **Leaderboard**. The rule that holds all of it together
+is that nothing which pays out is decided on the phone.
+
+**Wikdle** (`src/wikdle.js`, words in `src/data/wikdle-words.js`) is the
+five-letter word of the day in six rows. The word is a function of the UTC
+date, so everyone on Earth has the same one and a phone's clock cannot fetch
+tomorrow's; a guess has to be in the dictionary before it costs a row;
+duplicate letters are scored the way the original scores them (one E in the
+word never lights two); and the board is written down after every guess, so
 it survives a closed app and cannot be replayed once it is over. A solve is
 worth 600 points in one guess down to 100 in six, paid half in Buckarooz and,
 signed in, sent once to the leaderboard.
@@ -389,10 +453,10 @@ terminal instead:
 
 ```
 npx supabase login
-npx supabase functions deploy slots roulette quests --project-ref lfcehzltokzaymnqodgh
+npx supabase functions deploy slots quests --project-ref lfcehzltokzaymnqodgh
 ```
 
-`tools/sync-game-tables.mjs` copies the books (slots, roulette, quests) into
+`tools/sync-game-tables.mjs` copies the books (slots, quests) into
 `supabase/functions/_shared/` as TypeScript, so the server and the app can
 never disagree about what a line pays. Without the functions the app still
 runs: Wikdle and the quests work on the device, the casino says the house is
@@ -428,7 +492,7 @@ src/
   shop.js          the shelves, seeded so everyone sees the same shop
   albums.js        filing cards, and how big an album really is
   codes.js         secret codes and the cards they hand over
-  wikdle.js  slots.js  roulette.js  quests.js  leaderboard.js  house.js
+  wikdle.js  slots.js  quests.js  leaderboard.js  house.js
   achievements.js  badges.js  frames.js  progression.js  daily.js  quiz.js
   timed.js  pricing.js  packstyle.js  packview.js  save.js  i18n.js
   data/            rarities, subjects, icons, emblems, release notes,
