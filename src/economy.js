@@ -117,11 +117,35 @@ export function boosterPrice(spec) {
   return Math.max(5, Math.round((raw * themed) / 5) * 5);
 }
 
-/** A bundle of the same booster, a little under the sum of its parts. */
-export const BUNDLE_SIZE = 3;
-export const BUNDLE_OFF_PCT = 12;
-export const bundlePrice = (spec) =>
-  Math.max(5, Math.round((boosterPrice(spec) * BUNDLE_SIZE * (100 - BUNDLE_OFF_PCT)) / 100 / 5) * 5);
+/**
+ * THE PRESS charges a premium over the plain price of a tier booster. The
+ * plain price is the booster's expected sell value over RETURN_RATE, the
+ * same rule as everything else, and by that rule a Mythic pack is only a
+ * little over twice a Rare one: most of its cards are still low prints.
+ * But a tier booster is a guarantee, and the guarantee is what is being
+ * sold: the markup climbs with the tier, so a Mythic run costs several
+ * times a Rare one and a Prismatic run is a real event. The rule that
+ * opening and selling loses money on average is only made stronger.
+ */
+export const PRESS_MARKUP = {
+  uncommon: 1.05, rare: 1.2, epic: 1.45, legendary: 1.9, mythic: 2.6, exotic: 3.6, prismatic: 5
+};
+export const pressPrice = (spec) =>
+  Math.max(5, Math.round((boosterPrice(spec) * (PRESS_MARKUP[spec.rarityId] ?? 1)) / 5) * 5);
+
+/** A bundle: several boosters, one price, this far under the sum of their parts. */
+export const BUNDLE_OFF_RANGE = [10, 20];
+export const bundlePrice = (specs, pct) =>
+  Math.max(5, Math.round((specs.reduce((sum, spec) => sum + boosterPrice(spec), 0) * (100 - pct)) / 100 / 5) * 5);
+
+/**
+ * THE CRATE: one price whatever comes out, and each crate bought in a
+ * restock makes the next one dearer, back to the floor at the restock.
+ */
+export const CRATE_BASE_PRICE = 1000;
+export const CRATE_STEP_PCT = 25;
+export const cratePriceAt = (bought) =>
+  Math.round((CRATE_BASE_PRICE * Math.pow(1 + CRATE_STEP_PCT / 100, Math.max(0, bought))) / 5) * 5;
 
 /** What the player gets for a card. */
 export const sellPriceFor = (price) => Math.max(1, Math.round(price * SELL_RATE));

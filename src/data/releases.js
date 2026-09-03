@@ -225,8 +225,7 @@ export const RELEASES = [
     title: { en: 'Wikster on the web', fr: 'Wikster sur le web' },
     points: [
       { en: 'The whole game in a browser, desktop included', fr: 'Le jeu entier dans un navigateur, ordinateur compris' },
-      { en: 'Search bars that finally match the app', fr: 'Des barres de recherche enfin accordées à l’app' },
-      { en: 'A secret code box at the end of Settings', fr: 'Une case à code secret au bout des Réglages' }
+      { en: 'Search bars that finally match the app', fr: 'Des barres de recherche enfin accordées à l’app' }
     ],
     changelog: [
       { en: 'Wikster runs as a website as well as an app, from the same build', fr: 'Wikster tourne en site web comme en application, depuis la même version' },
@@ -234,7 +233,6 @@ export const RELEASES = [
       { en: 'Every search bar wears the theme now instead of the browser’s white box', fr: 'Chaque barre de recherche porte le thème au lieu de la boîte blanche du navigateur' },
       { en: 'The card index and the auction house line up with the rest of the screen', fr: 'L’index des cartes et la salle des ventes s’alignent avec le reste de l’écran' },
       { en: 'Changing theme no longer closes the game: the launcher icon changes once you leave', fr: 'Changer de thème ne ferme plus le jeu : l’icône change quand vous quittez' },
-      { en: 'Settings ends with Redeem secret code, for the personal boosters to come', fr: 'Les Réglages se terminent par un code secret, pour les boosters personnels à venir' },
       { en: 'The music is slow jazz now: piano, blues and a modal walk, and the restless tracks are gone', fr: 'La musique est du jazz lent : piano, blues et une marche modale, et les morceaux agités ont disparu' },
       { en: 'The chat stopped polling in the background after you left the room', fr: 'La discussion cesse de sonder en arrière-plan une fois la salle quittée' }
     ]
@@ -347,7 +345,7 @@ export const RELEASES = [
       { en: 'The slot machine rebuilt: new symbols, a wild, a bonus of free spins', fr: 'La machine à sous refaite : nouveaux symboles, un joker, un bonus de tours gratuits' },
       { en: 'Wikdle with hints from Wikipedia and streaks that pay', fr: 'Wikdle avec des indices de Wikipédia et des séries qui paient' },
       { en: 'Notifications redesigned, and the chat bar back where it belongs', fr: 'Les notifications refaites, et la barre de discussion remise à sa place' },
-      { en: 'A frame from level 1, quests that keep count, and one more secret code', fr: 'Un cadre dès le niveau 1, des quêtes qui tiennent le compte, et un code secret de plus' }
+      { en: 'A frame from level 1, and quests that keep count', fr: 'Un cadre dès le niveau 1, et des quêtes qui tiennent le compte' }
     ],
     changelog: [
       { en: 'The slot machine, again from the ground up: eight symbols drawn as pictures, a wild that stands in for any of them and pays 700 times the line bet three across, and a bonus symbol that opens eight free spins when three land anywhere in the window. The house plays the free spins on the spot and the app draws them one by one. Pay lines are drawn across the glass, winning cells glow, coins rain, and a big, mega or jackpot win gets its banner. The book returns about 95%, bonus counted', fr: 'La machine à sous, de nouveau depuis zéro : huit symboles dessinés, un joker qui remplace n’importe lequel et paie 700 fois la mise par ligne quand il est aligné trois fois, et un symbole bonus qui ouvre huit tours gratuits quand trois tombent n’importe où dans la fenêtre. La maison joue les tours gratuits sur-le-champ et l’appli les dessine un par un. Les lignes gagnantes se tracent sur la vitre, les cases gagnantes brillent, les pièces pleuvent, et un gros, méga ou jackpot a sa bannière. Le livre rend environ 95 %, bonus compris' },
@@ -357,10 +355,27 @@ export const RELEASES = [
       { en: 'Daily quests keep a ledger of everything done today, so progress survives signing in, a change of deal, or a server that had not seen it', fr: 'Les quêtes du jour tiennent un registre de tout ce qui a été fait aujourd’hui, si bien que la progression survit à une connexion, à un changement de distribution ou à un serveur qui ne l’avait pas vue' },
       { en: 'A message notification opens the conversation with the composer showing; the chat bar stays above the bottom bar on every phone', fr: 'Une notification de message ouvre la conversation avec la zone de saisie visible ; la barre de discussion reste au-dessus de la barre du bas sur tous les téléphones' },
       { en: 'An equipped level frame shows from level 1, with a new tier every ten levels', fr: 'Un cadre de niveau équipé s’affiche dès le niveau 1, avec un nouveau palier tous les dix niveaux' },
-      { en: 'One more secret code, with fifteen cards, a theme, a badge that burns, a level frame that burns, a card drawn rather than photographed, and a lava-and-flame treatment of its own', fr: 'Un code secret de plus, avec quinze cartes, un thème, un badge qui brûle, un cadre de niveau qui brûle, une carte dessinée plutôt que photographiée, et un traitement lave-et-flammes qui lui est propre' },
-      { en: 'The first version of that code was withdrawn: whatever it had handed over is removed from every save at launch, as if it had never been typed, and the code itself no longer exists', fr: 'La première version de ce code a été retirée : tout ce qu’elle avait remis est effacé de chaque sauvegarde au lancement, comme si elle n’avait jamais été saisie, et le code lui-même n’existe plus' },
       { en: 'A special album shows every one of its cards whatever the binder’s filters say', fr: 'Un album spécial montre chacune de ses cartes quels que soient les filtres du classeur' },
       { en: 'The special badges draw their own motifs (a seal, a wheel, a book, a pot) instead of a star', fr: 'Les badges spéciaux dessinent leurs propres motifs (un sceau, une meule, un livre, un pot) au lieu d’une étoile' }
+    ]
+  },
+  {
+    id: 'shining', icon: 'gem', accent: '#fbbf24',
+    title: { en: 'The Shining Shop', fr: 'La boutique qui brille' },
+    points: [
+      { en: 'The crate rolls: one price, the whole shop goes by, and it stops on yours', fr: 'La caisse tourne : un seul prix, toute la boutique défile, et elle s’arrête sur la vôtre' },
+      { en: 'The press rebuilt, with prices that mean something', fr: 'La presse refaite, avec des prix qui veulent dire quelque chose' },
+      { en: 'Bundles of every kind, and a shop that runs out', fr: 'Des lots de toutes sortes, et une boutique qui s’épuise' },
+      { en: 'Updates by name, with their number beside them', fr: 'Les mises à jour par leur nom, avec leur numéro à côté' }
+    ],
+    changelog: [
+      { en: 'The crate: one price, 1,000, and anything the shop sells can come out, any subject or pack you built, any size from three cards, any tier, the bigger and the rarer the less likely. Buying one rolls a reel of the whole shop across the screen that slows and stops on your booster, with a proper sheet saying what it held. Each crate bought makes the next one a quarter dearer until the restock', fr: 'La caisse : un seul prix, 1 000, et tout ce que vend la boutique peut en sortir, n’importe quel sujet ou pack que vous avez créé, n’importe quelle taille à partir de trois cartes, n’importe quel palier, plus c’est grand et rare, moins c’est probable. L’acheter fait défiler toute la boutique à l’écran, qui ralentit et s’arrête sur votre booster, avec une vraie fiche disant ce qu’elle contenait. Chaque caisse achetée rend la suivante un quart plus chère jusqu’au réassort' },
+      { en: 'The press, again from scratch: a plate per tier that says exactly what it promises, at least one card of the tier and every print rolled on that tier’s row, with a run of one or two copies and a price that carries the premium the promise is worth. A Mythic run now costs several times a Rare one, and a Prismatic run is an event', fr: 'La presse, de nouveau depuis zéro : une plaque par palier qui dit exactement ce qu’elle promet, au moins une carte du palier et chaque impression tirée sur la ligne de ce palier, avec une série d’un ou deux exemplaires et un prix qui porte la prime que vaut la promesse. Une série Mythique coûte désormais plusieurs fois une Rare, et une série Prismatique est un événement' },
+      { en: 'Bundles of two to four boosters, several of one or a mix of subjects, sizes and tiers, ten to twenty percent under the sum, with the saving on the label and the wrappers fanned sideways rather than climbing', fr: 'Des lots de deux à quatre boosters, plusieurs d’un même ou un mélange de sujets, tailles et paliers, dix à vingt pour cent sous la somme, avec l’économie sur l’étiquette et les emballages en éventail plutôt qu’en escalier' },
+      { en: 'The shop runs out: the spotlight and every bundle are one each, subjects and press runs a few copies, all counted per restock and shown on the shelf; the crate and your own packs never run out', fr: 'La boutique s’épuise : la vitrine et chaque lot sont uniques, les sujets et les séries de la presse à quelques exemplaires, tous comptés par réassort et affichés sur l’étagère ; la caisse et vos propres packs ne s’épuisent jamais' },
+      { en: 'The spotlight deal shows what it saves you, that there is only one, and a shine that crosses it', fr: 'L’offre en vitrine montre ce qu’elle vous fait économiser, qu’il n’y en a qu’une, et un reflet qui la traverse' },
+      { en: 'The balance at the top of the shop follows every purchase', fr: 'Le solde en haut de la boutique suit chaque achat' },
+      { en: 'Updates are named again, every one, with its number next to the name', fr: 'Les mises à jour ont de nouveau un nom, chacune, avec son numéro à côté' }
     ]
   }
 ];

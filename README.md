@@ -27,7 +27,6 @@ application and everything else is a module it pulls in.
 - [Progression](#progression)
 - [Accounts and the social side](#accounts-and-the-social-side)
 - [Themes, sound and motion](#themes-sound-and-motion)
-- [Secret codes](#secret-codes)
 - [The Android app](#the-android-app)
 - [The website](#the-website)
 - [Project layout](#project-layout)
@@ -128,7 +127,7 @@ card index.
 ## Rarity
 
 Eight tiers, rolled per card as described above, plus **Special**, which sits
-outside the table and cannot be drawn (see [Secret codes](#secret-codes)).
+outside the table and cannot be drawn.
 
 Each tier has its own treatment on the card: foils, refraction, glare that
 follows the phone's gyroscope, and for the top tiers an animated surface. The
@@ -156,7 +155,7 @@ vault of tier boosters, and everything you have built yourself.
 ## The collection
 
 Cards are filed into **albums**, one per subject, plus albums for custom wikis
-and for each secret code. An album knows its real total: for a searched
+and for each personal booster. An album knows its real total: for a searched
 subject it is the number of matching articles on Wikipedia, so most albums
 cannot be finished, and that is the joke.
 
@@ -223,7 +222,7 @@ you cards.
 Settings, Data, holds three destructive buttons that do three different things.
 
 **Remove all cards** empties the collection and keeps the player: level,
-experience, achievements and anything a secret code gave you all stay.
+experience, achievements and personal boosters all stay.
 
 **Erase everything** ends the save and signs you out. The save row is deleted,
 the profile's progress is reset, the wishlist, friends, messages, deliveries,
@@ -261,36 +260,6 @@ recordings, credited in `src/assets/music/LICENSE.md`.
 
 A low power mode cuts the backdrop and the card effects for phones that get
 hot, and everything respects `prefers-reduced-motion`.
-
-## Secret codes
-
-Settings has a field for a secret code. A valid one hands over a whole gift at
-once: a booster made for one specific person, an album of its own, a theme, a
-badge, and cards wearing the **Special** tier that can never be sold,
-auctioned, gifted or traded, and are never re-graded.
-
-The codes themselves are not written down here, which is the point of them.
-The machinery is in `src/codes.js` if you need to add one.
-
-Special content is deliberately outside the game's accounting: it counts for
-no achievement, no level and no album milestone, and its themes, badges and
-frames stay invisible until the code that grants them is redeemed.
-
-One code carries no cards at all. `regalia: true` marks it, and what it hands
-over is a badge, an animated level frame, a theme and the launcher icon to
-match.
-
-A card in a code booster can name its own `wiki` (a thing Wikipedia has no
-page for), carry its own `text`, keep a `slot` of its own when several cards
-are read from one article, or be drawn rather than fetched (`art`): one
-code's Matrix card wears the rain of the Matrix theme, painted on a canvas
-the moment the pack is opened.
-
-A code can also bring a level frame (`code` on a style in `src/frames.js`)
-and a badge with a live effect (`live` on a badge in `src/badges.js`); both
-go on the moment the code is redeemed. A code that is withdrawn is listed in
-`RETIRED_CODES`, and everything it handed over is removed from a save at
-launch, as if it had never been typed.
 
 ## The Android app
 
@@ -497,7 +466,6 @@ src/
   economy.js       prices, tiers, the shop cadence, what a pack guarantees
   shop.js          the shelves, seeded so everyone sees the same shop
   albums.js        filing cards, and how big an album really is
-  codes.js         secret codes and the cards they hand over
   wikdle.js  slots.js  quests.js  leaderboard.js  house.js
   achievements.js  badges.js  frames.js  progression.js  daily.js  quiz.js
   timed.js  pricing.js  packstyle.js  packview.js  save.js  i18n.js
@@ -505,7 +473,7 @@ src/
                    the arcade's books and the Wikdle words
   ui/              themes, animated backdrops, the synth, the music player
   styles/          base, components, screens, cards, themes, desktop, games
-  assets/          fonts, music, sound kits, the images a code hands over
+  assets/          fonts, music, sound kits, a few bundled pictures
 android/           the WebView wrapper and its Gradle build
 supabase/          schema.sql: tables, policies; functions/: the edge functions
 tools/             sync-game-tables.mjs, slots-rtp.mjs

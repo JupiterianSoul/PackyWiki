@@ -606,6 +606,26 @@ export function markFreeTaken(profile, id, freeWindow = freeWindowAt()) {
   saveProfile(profile);
 }
 
+/* --- the shop's stock ------------------------------------------------------
+ * How many of each shelf item this save has bought in the current restock
+ * window. The shelves hold a few copies of each thing (shop.js says how
+ * many); a copy bought is a copy gone until the next restock. The crate's
+ * count is what makes each crate dearer than the last. */
+
+export function shopBought(profile, id, windowIndex = windowIndexAt()) {
+  const stock = profile.shopStock;
+  if (!stock || stock.window !== windowIndex) return 0;
+  return Number(stock.bought?.[id] ?? 0);
+}
+
+export function markShopBought(profile, id, n = 1, windowIndex = windowIndexAt()) {
+  if (!profile.shopStock || profile.shopStock.window !== windowIndex) {
+    profile.shopStock = { window: windowIndex, bought: {} };
+  }
+  profile.shopStock.bought[id] = (Number(profile.shopStock.bought[id]) || 0) + n;
+  saveProfile(profile);
+}
+
 /* --- custom boosters ----------------------------------------------------- */
 
 /** Which way the collection was last read: as albums, or as one long list. */
