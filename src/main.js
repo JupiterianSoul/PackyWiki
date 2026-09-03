@@ -1789,26 +1789,74 @@ function warmPictures(cards) {
   }
 }
 
-function schedulePrefetch(spec) {
+/*
+ * THE DRAWER: packs drawn ahead of the tear.
+ *
+ * Every wait a player felt after the rip was the network: one search and
+ * the pictures. The only way to make that zero is to have done it already,
+ * so a draw is now kept ready for every kind of booster the player is about
+ * to open: the one on the open screen, the one under the finger on the
+ * shelf, the next copy of the pack just opened, and, at launch, a few of
+ * the most-owned kinds. A ready draw is one set of cards for one kind of
+ * booster, held in memory and used by the next tear of that kind; it costs
+ * a few requests at a quiet moment and is thrown away after half an hour,
+ * or if it failed, so a stale or broken one never reaches a pack.
+ */
+const READY_TTL_MS = 30 * 60 * 1000;
+const READY_WARM_AT_LAUNCH = 3;
+const readyDraws = new Map();
+
+/** The ready draw for this kind, started now if there is none fresh. */
+function ensureReady(spec) {
+  const id = specId(spec);
+  const held = readyDraws.get(id);
+  if (held && !held.failed && Date.now() - held.at < READY_TTL_MS) return held;
+  if (navigator.onLine === false) return held ?? null;
+  const record = { id, settled: false, failed: false, at: Date.now() };
+  record.promise = drawArticles(toDrawPack(spec))
+    .catch((error) => ({ error }))
+    // Whether the cards are already in hand decides whether a booster can
+    // be opened with no connection at all, and whether they came back at
+    // all decides what the idle screen is allowed to promise.
+    .then((value) => {
+      record.settled = true;
+      record.failed = Boolean(value?.error);
+      if (!record.failed) warmPictures(value);
+      if (state.prefetch === record) paintOpenHint();
+      return value;
+    });
+  readyDraws.set(id, record);
+  return record;
+}
+
+/** A draw was used, or went stale: forget it. */
+function dropReady(id) { readyDraws.delete(id); }
+
+/**
+ * Point the open screen at the ready draw for this pack. From the shelf
+ * this waits a moment, so flicking through the shelf does not start a draw
+ * per pack flicked past; from the open screen it is immediate.
+ */
+function schedulePrefetch(spec, { delay = PREFETCH_DELAY } = {}) {
   clearTimeout(state.prefetchTimer);
   const id = specId(spec);
-  if (state.prefetch?.id === id) return;
-  state.prefetchTimer = setTimeout(() => {
-    const record = { id, settled: false, failed: false };
-    record.promise = drawArticles(toDrawPack(spec))
-      .catch((error) => ({ error }))
-      // Whether the cards are already in hand decides whether a booster can
-      // be opened with no connection at all, and whether they came back at
-      // all decides what the idle screen is allowed to promise.
-      .then((value) => {
-        record.settled = true;
-        record.failed = Boolean(value?.error);
-        if (!record.failed) warmPictures(value);
-        paintOpenHint();
-        return value;
-      });
-    state.prefetch = record;
-  }, PREFETCH_DELAY);
+  if (state.prefetch?.id === id && !state.prefetch.failed) return;
+  const point = () => { state.prefetch = ensureReady(spec); paintOpenHint(); };
+  if (delay) state.prefetchTimer = setTimeout(point, delay);
+  else point();
+}
+
+/**
+ * At a quiet moment, draw ahead for the kinds the player owns most of, so
+ * the first tear of the session is as instant as the ones after it.
+ */
+function warmDrawer() {
+  if (navigator.onLine === false || navigator.connection?.saveData) return;
+  const owned = Object.values(state.inventory ?? {})
+    .filter((slot) => slot?.spec && slot.count > 0 && slot.spec.kind !== 'code')
+    .sort((a, b) => b.count - a.count)
+    .slice(0, READY_WARM_AT_LAUNCH);
+  owned.forEach((slot, i) => setTimeout(() => ensureReady(slot.spec), i * 1500));
 }
 
 /**
@@ -1847,11 +1895,10 @@ function paintOpenHint() {
 
 function drawFor(spec) {
   const id = specId(spec);
-  if (state.prefetch?.id === id) {
-    const { promise } = state.prefetch;
-    state.prefetch = null;
-    return promise;
-  }
+  const held = readyDraws.get(id) ?? (state.prefetch?.id === id ? state.prefetch : null);
+  state.prefetch = null;
+  dropReady(id);
+  if (held && !held.failed && Date.now() - held.at < READY_TTL_MS) return held.promise;
   return drawArticles(toDrawPack(spec)).catch((error) => ({ error }));
 }
 
@@ -1879,7 +1926,7 @@ function openScreenFor(spec) {
   el.boosterSlot.replaceChildren(booster);
   initRip(booster);
 
-  schedulePrefetch(spec);
+  schedulePrefetch(spec, { delay: 0 });
   paintOpenHint();
   showScreen('open');
 }
@@ -2051,6 +2098,9 @@ async function runOpen(booster) {
 
   state.pulls = pulls;
   bindCards(pulls);
+  // The next copy of this pack, if there is one, is drawn while this one is
+  // being read: the next tear is then instant.
+  if ((state.inventory[specId(state.spec)]?.count ?? 0) > 0) ensureReady(state.spec);
   el.openScreen.classList.replace('phase-opening', 'phase-reveal');
   state.index = 0;
   layoutDeck();
@@ -7809,6 +7859,7 @@ function init() {
   // Whether a newer build is out: asked once at launch, and again whenever
   // the app comes back to the foreground after a while away.
   setTimeout(lookForUpdate, 4000);
+  setTimeout(warmDrawer, 2500);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') lookForUpdate();
   });

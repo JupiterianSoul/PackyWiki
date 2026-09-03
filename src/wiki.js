@@ -884,6 +884,15 @@ async function huntCustomCard(wiki, pack, seen, outOfTime, tally) {
   return null;
 }
 
+/**
+ * The free candidates a custom draw did not use, kept per wiki for the next
+ * draw on it: a page whose text and picture came with its details costs
+ * nothing to deal, so a leftover from this pack is an instant card in the
+ * next. Held in memory only, a few dozen per wiki.
+ */
+const spareCustom = new Map();
+const SPARE_KEEP = 40;
+
 async function drawCustomSet(pack) {
   const wanted = Math.max(1, pack.cards ?? 5);
   const deadline = Date.now() + DRAW_BUDGET_MS;
@@ -897,6 +906,15 @@ async function drawCustomSet(pack) {
   // Why candidates were turned away, for the console: a pack that comes
   // back empty has to be readable from the outside.
   const tally = { noText: 0, noImage: 0, other: 0 };
+  // Leftovers from the last draw on this wiki: dealt first, at no cost.
+  const spares = spareCustom.get(wiki.apiUrl) ?? [];
+  while (spares.length && out.length < wanted) {
+    const proto = spares.shift();
+    if (seen.has(proto.page.title)) continue;
+    seen.add(proto.page.title);
+    try { out.push(await finishCustomCard(wiki, proto, pack)); } catch { /* not a card after all */ }
+  }
+  if (out.length) console.info(`Wikster custom draw "${pack.name}": ${out.length} cards from the spares, ${spares.length} spares left`);
   const say = (what) => console.info(`Wikster custom draw "${pack.name}" on ${wiki.apiUrl}: ${what}; turned away: ${tally.noText} without text, ${tally.noImage} without picture, ${tally.other} other`);
 
   // First the pool: a listing of random pages and their details twenty a
@@ -920,9 +938,10 @@ async function drawCustomSet(pack) {
     const costly = protos.filter((proto) => !isFreeCard(proto));
     let built = 0;
     for (const proto of free) {
-      if (out.length >= wanted) break;
+      if (out.length >= wanted) { spares.push(proto); continue; }
       try { out.push(await finishCustomCard(wiki, proto, pack)); built++; } catch (err) { tallyMiss(err?.message); }
     }
+    spareCustom.set(wiki.apiUrl, spares.slice(-SPARE_KEEP));
     for (let i = 0; i < costly.length && out.length < wanted && !outOfTime(); i += 3) {
       const settled = await Promise.allSettled(costly.slice(i, i + 3).map((proto) => finishCustomCard(wiki, proto, pack)));
       for (const result of settled) {
