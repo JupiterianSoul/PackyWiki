@@ -68,7 +68,7 @@ import { SYMBOLS, REEL, PAYLINES, PAYTABLE, LINE_BETS, WILD, SCATTER, SCATTER_MI
 import * as quests from './quests.js';
 import { QUEST_TIERS } from './data/quests.js';
 import * as leaderboard from './leaderboard.js';
-import { canRedeem, codeByInput, codeById, codeCardFor, codeLook, codeSpec, codeTitles, timesRedeemed, hasRedeemed, CREATOR, SPECIAL_RARITY_ID } from './codes.js';
+import { canRedeem, codeByInput, codeById, codeCardFor, codeLook, codeSpec, codeTitles, timesRedeemed, hasRedeemed, CREATOR, SPECIAL_RARITY_ID, RETIRED_CODES } from './codes.js';
 import {
   quizAvailable, buildQuiz, questionCountFor, quizRewards,
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
@@ -3487,10 +3487,10 @@ function renderAlbum() {
   el.albumBook.style.setProperty('--accent2', album.style.accent2);
 
   const visible = album.kind === 'code'
-    // A special album reads in the order the booster dealt it: the five
-    // things, then The Creator, whatever sort the binder is set to.
-    ? store.filterEntries(album.entries, { ...state.filters, pack: '', sort: 'name' })
-        .sort((a, b) => (a.creator ? 1 : 0) - (b.creator ? 1 : 0) || a.firstPulledAt - b.firstPulledAt)
+    // A special album shows every one of its cards, whatever the binder's
+    // filters say (a rarity, a band or a search set elsewhere must not empty
+    // it), in the order the booster dealt them: the things, then The Creator.
+    ? [...album.entries].sort((a, b) => (a.creator ? 1 : 0) - (b.creator ? 1 : 0) || (a.firstPulledAt ?? 0) - (b.firstPulledAt ?? 0))
     : store.filterEntries(album.entries, { ...state.filters, pack: '' });
   const pages = Math.max(pageCount(album, visible.length), 1);
   const page = Math.min(state.album.spread, pages - 1);
@@ -3551,10 +3551,10 @@ function turnAlbumPage(dir) {
   const album = currentAlbum();
   if (!album || state.albumTurning) return;
   const visible = album.kind === 'code'
-    // A special album reads in the order the booster dealt it: the five
-    // things, then The Creator, whatever sort the binder is set to.
-    ? store.filterEntries(album.entries, { ...state.filters, pack: '', sort: 'name' })
-        .sort((a, b) => (a.creator ? 1 : 0) - (b.creator ? 1 : 0) || a.firstPulledAt - b.firstPulledAt)
+    // A special album shows every one of its cards, whatever the binder's
+    // filters say (a rarity, a band or a search set elsewhere must not empty
+    // it), in the order the booster dealt them: the things, then The Creator.
+    ? [...album.entries].sort((a, b) => (a.creator ? 1 : 0) - (b.creator ? 1 : 0) || (a.firstPulledAt ?? 0) - (b.firstPulledAt ?? 0))
     : store.filterEntries(album.entries, { ...state.filters, pack: '' });
   const pages = Math.max(pageCount(album, visible.length), 1);
   const next = state.album.spread + dir;
@@ -5066,6 +5066,50 @@ async function enterApp() {
   }
 }
 
+/**
+ * A withdrawn code leaves nothing behind. Everything it handed over goes:
+ * its cards, its booster on the shelf, its badge from the loadout, its
+ * theme and frame if they are worn, and the redemption itself, so the save
+ * reads as if the code had never been typed. Runs on what is in memory,
+ * so it is called after every load, local or from the cloud. Returns
+ * whether anything was removed.
+ */
+function purgeRetiredCodes() {
+  let changed = false;
+  const retired = new Set(RETIRED_CODES);
+  try {
+    const entries = state.collection?.entries ?? {};
+    for (const [key, entry] of Object.entries(entries)) {
+      if (entry?.special && retired.has(entry.special)) { delete entries[key]; changed = true; }
+    }
+    if (changed) store.saveCollection(state.collection);
+    let shelf = false;
+    for (const [id, slot] of Object.entries(state.inventory ?? {})) {
+      if (slot?.spec?.kind === 'code' && retired.has(slot.spec.codeId)) { delete state.inventory[id]; dropReady(id); shelf = true; }
+    }
+    if (shelf) { store.saveInventory(state.inventory); changed = true; }
+    const profile = state.profile ?? {};
+    for (const id of retired) {
+      if (profile.codesRedeemed?.[id] != null) { delete profile.codesRedeemed[id]; changed = true; }
+    }
+    if (Array.isArray(state.badgeLoadout) && state.badgeLoadout.some((b) => retired.has(String(b).replace(/^special-/, '')))) {
+      state.badgeLoadout = state.badgeLoadout.filter((b) => !retired.has(String(b).replace(/^special-/, '')));
+      store.saveBadgeLoadout(state.badgeLoadout);
+      changed = true;
+    }
+    if (changed) store.saveProfile(profile);
+    // A theme or a frame the code brought is taken off; the picker no longer offers them.
+    const worn = THEMES.find((th) => th.id === storedTheme());
+    if (!worn || (worn.code && retired.has(worn.code))) { useTheme(DEFAULT_THEME); changed = true; }
+    const frame = FRAME_STYLES.find((f) => f.id === state.frameStyle);
+    if (!frame || (frame.code && retired.has(frame.code))) { state.frameStyle = DEFAULT_FRAME_STYLE; store.saveFrameStyle(DEFAULT_FRAME_STYLE); changed = true; }
+    if (changed) { console.info('A withdrawn code was removed from this save'); syncSoon(); }
+  } catch (error) {
+    console.warn('purge failed', error);
+  }
+  return changed;
+}
+
 /** Re-read everything from storage, after an import or a sign-in pull. */
 function reloadFromStorage() {
   state.collection = store.loadCollection();
@@ -5075,6 +5119,7 @@ function reloadFromStorage() {
   state.badgeLoadout = store.loadBadgeLoadout();
   state.customPacks = store.loadCustomPacks();
   state.wallet = store.loadWallet();
+  purgeRetiredCodes();
   applySettings();
   applyStrings();
   refreshWallet();
@@ -9117,6 +9162,9 @@ function init() {
   const pruned = store.pruneImagelessCards(state.collection);
   if (pruned) console.info(`Removed ${pruned} pictureless card(s) from the collection`);
 
+  // A withdrawn code leaves nothing behind, before anything else looks at
+  // the collection.
+  purgeRetiredCodes();
   // Prices follow fame and print; a card from before prints existed gets its
   // tier here. Silent on purpose: it runs on every launch and changes
   // nothing on a save that is already right.
@@ -9423,6 +9471,7 @@ init();
 
 window.__wikster = {
   state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
+  codeByInput,
   draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor, drawPack: toDrawPack, odds, specId,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },
   debugRarity(id) {

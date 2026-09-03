@@ -33,6 +33,14 @@
 import { getLanguage, tx } from './i18n.js';
 import creatorPhoto from './assets/special/creator.jpg';
 
+/**
+ * Codes that once existed and were withdrawn. Everything they handed over is
+ * removed from a save at launch (main.js, purgeRetiredCodes) as if the code
+ * had never been typed: the cards, the booster, the badge, the theme, and
+ * the redemption itself. A retired id is never reused.
+ */
+export const RETIRED_CODES = ['lorna'];
+
 /** The tier every special card wears. Not in the rarity table: never rolled. */
 export const SPECIAL_RARITY_ID = 'special';
 
@@ -239,8 +247,8 @@ export const SECRET_CODES = [
    * THE CREATOR'S OWN. Not a person's booster made by someone else: the one
    * the person who built the game made for himself. Salmon pink and black,
    * the band on every card of the first row, and the things around the band.
-   * Sixteen cards, the most of any code, and a treatment of its own that
-   * outdoes every other (cards.css, data-special="lorna").
+   * Fifteen cards, the most of any code, a level frame and a badge that burn,
+   * and a treatment of its own (cards.css, data-special="hellfire").
    *
    * The band's members have no articles of their own but one; those cards
    * are read from the band's article, wear their own name and text, and
@@ -248,19 +256,19 @@ export const SECRET_CODES = [
    * its face is drawn on the spot as the rain of the Matrix theme.
    */
   {
-    id: 'lorna',
-    code: 'TH3CR34T0R',
+    id: 'hellfire',
+    code: 'H3LLF1R3',
     person: 'Gabriel',
     accent: '#fa8072', accent2: '#5b1717', light: '#ffe4de',
-    theme: 'lorna',
-    emblem: 'thorns', foil: 'facets', family: 'crest', shapes: ['shard', 'star4'],
+    theme: 'hellfire',
+    emblem: 'hellfire', foil: 'facets', family: 'crest', shapes: ['shard', 'star4'],
     name: { en: 'The Creator’s Special Booster', fr: 'Booster spécial du Créateur' },
-    tagline: { en: 'Salmon pink, and pain remains', fr: 'Rose saumon, et la douleur demeure' },
+    tagline: { en: 'Salmon pink, to the hellfire', fr: 'Rose saumon, vers le feu de l’enfer' },
     album: { en: 'The Creator’s Special Album', fr: 'Album spécial du Créateur' },
     badge: { en: 'The Creator’s Special Badge', fr: 'Badge spécial du Créateur' },
     message: {
-      en: 'Gabriel. You made every other booster in this game for somebody else. This one is yours: the band, the games, the show, the rain. Sixteen cards, salmon pink, and the loudest treatment the game has. Made by you, for you.',
-      fr: 'Gabriel. Tu as fait chaque autre booster de ce jeu pour quelqu’un d’autre. Celui-là est le tien : le groupe, les jeux, la série, la pluie. Seize cartes, rose saumon, et le traitement le plus bruyant du jeu. Fait par toi, pour toi.'
+      en: 'Gabriel. You made every other booster in this game for somebody else. This one is yours: the band, the games, the show, the rain. Fifteen cards and yourself, salmon pink, lava under every one of them, a frame that burns and a badge that never goes out. Made by you, for you.',
+      fr: 'Gabriel. Tu as fait chaque autre booster de ce jeu pour quelqu’un d’autre. Celui-là est le tien : le groupe, les jeux, la série, la pluie. Quinze cartes et toi, rose saumon, de la lave sous chacune, un cadre qui brûle et un badge qui ne s’éteint jamais. Fait par toi, pour toi.'
     },
     cards: [
       { en: 'Lorna Shore', fr: 'Lorna Shore' },

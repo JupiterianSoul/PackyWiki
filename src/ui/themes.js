@@ -387,14 +387,14 @@ export const THEMES = [
     }
   },
   {
-    id: 'lorna', code: 'lorna',
-    name: { en: 'Pain Remains', fr: 'Pain Remains' },
+    id: 'hellfire', code: 'hellfire',
+    name: { en: 'Hellfire', fr: 'Feu de l’enfer' },
     blurb: {
-      en: 'The Creator’s own. Salmon on black, embers in the dark, and lightning when the breakdown hits.',
+      en: 'The Creator’s own. Salmon on black, embers in the dark, lava in the cracks, and lightning when the breakdown hits.',
       fr: 'Celui du Créateur. Saumon sur noir, des braises dans l’obscurité, et la foudre quand le breakdown tombe.'
     },
     swatch: ['#0c0606', '#fa8072', '#ffe4de'],
-    backdrop: { renderer: 'lorna', speed: 0.00016 },
+    backdrop: { renderer: 'hellfire', speed: 0.00016 },
     motion: { scale: 1, ease: 'cubic-bezier(0.22, 1, 0.36, 1)', pop: 'cubic-bezier(0.34, 1.56, 0.64, 1)' },
     sound: {
       voice: 'keys',

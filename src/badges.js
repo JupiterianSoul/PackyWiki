@@ -74,8 +74,9 @@ export const BADGES = [
     name: { en: 'Catherine’s Special Badge', fr: 'Badge spécial de Catherine' } },
   { id: 'special-mathilde', code: 'mathilde', motif: 'pot',      foil: ['#ede9fe', '#a78bfa', '#3b1f6b'],
     name: { en: 'Mathilde’s Special Badge', fr: 'Badge spécial de Mathilde' } },
-  { id: 'special-lorna', code: 'lorna', motif: 'thorns', foil: ['#ffe4de', '#fa8072', '#5b1717'],
-    name: { en: 'The Creator’s Special Badge', fr: 'Badge spécial du Créateur' } },
+  // The only badge that burns: a live flame behind the skull (badge-live-fire in screens.css).
+  { id: 'special-hellfire', code: 'hellfire', motif: 'hellfire', live: 'fire', foil: ['#ffe4de', '#fa8072', '#5b1717'],
+    name: { en: 'To the Hellfire', fr: 'Vers le Feu de l’enfer' } },
   // The only badge in gold, and the only one that is not somebody else's.
   { id: 'special-creator', code: 'creator', motif: 'seal',   foil: ['#fff7d6', '#fbbf24', '#7c2d12'],
     name: { en: 'The Creator', fr: 'Le Créateur' } }
@@ -234,7 +235,26 @@ const MOTIFS = {
       <circle cx="-9" cy="-4" r="1.6" transform="rotate(-10)"/>
       <circle cx="-13" cy="1" r="1.6" transform="rotate(-10)"/><circle cx="-5" cy="1" r="1.6" transform="rotate(-10)"/>
       <circle cx="6" cy="0" r="1.6" transform="rotate(10)"/><circle cx="10" cy="4" r="1.6" transform="rotate(10)"/><circle cx="14" cy="8" r="1.6" transform="rotate(10)"/>
-    </g></g>`
+    </g></g>`,
+  /* A wax seal with the W pressed into it, for The Creator. */
+  seal: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M0 -15 Q9 -17 13 -9 Q19 -4 15 4 Q16 12 8 15 Q2 20 -5 16 Q-13 17 -15 9 Q-20 3 -15 -3 Q-16 -11 -8 -13 Q-5 -18 0 -15 Z"/>
+    <path d="M-8 -5 L-4 6 L0 -2 L4 6 L8 -5"/></g>`,
+  /* A half wheel of cheese under the lamp, for Julien. */
+  wheel: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-17 4 A17 17 0 0 1 17 4 Z"/><path d="M-17 4 v7 h34 v-7"/><path d="M-6 -2 a2 2 0 1 0 .1 0 M6 -4 a1.6 1.6 0 1 0 .1 0"/></g>`,
+  /* An open book, for Catherine. */
+  openbook: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M0 -9 Q-8 -14 -17 -11 V11 Q-8 8 0 13 Q8 8 17 11 V-11 Q8 -14 0 -9 Z"/><path d="M0 -9 V13"/><path d="M-12 -6 Q-7 -7 -4 -5 M-12 0 Q-7 -1 -4 1 M4 -5 Q7 -7 12 -6 M4 1 Q7 -1 12 0"/></g>`,
+  /* A pot of yoghurt with the spoon in it, for Mathilde. */
+  pot: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-13 -8 h26 l-3 22 h-20 Z"/><path d="M-15 -8 h30"/><path d="M4 -15 l6 12"/><path d="M-8 2 h6"/></g>`,
+  /* A skull in flames, for the Hellfire code. */
+  hellfire: (s) => `<g fill="none" stroke="${s}" stroke-width="2.2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M-9 4 a9 8 0 0 1 18 0 c0 3-1.5 5-3.5 6.5 V15 h-11 v-4.5 C-7.5 9 -9 7 -9 4 Z"/>
+    <path d="M-5 4 a1.8 1.8 0 1 0 .1 0 M5 4 a1.8 1.8 0 1 0 .1 0"/><path d="M-2 15 v2 M2 15 v2"/>
+    <path d="M0 -19 c-3 4 -6 7 -6 11 0 2 1 3 2 4 0-3 1-4 3-5 -1 2 0 4 1 5 1-1 2-3 2-5 2 1 3 2 3 5 1-1 2-2 2-4 0-4 -4 -7 -7 -11 Z"/>
+    <path d="M-14 -3 c-2 3 -3 6 -2 9 M14 -3 c2 3 3 6 2 9"/></g>`
 };
 
 /**
@@ -256,13 +276,19 @@ export function badgeSvg(badge, rank, max, { size = 64 } = {}) {
       fill="${on ? foil[Math.min(1, foil.length - 1)] : 'none'}" stroke="${on ? 'none' : '#4a5478'}" stroke-width="1"/>`;
   }).join('') : '';
 
-  return `<svg viewBox="-50 -46 100 96" width="${size}" height="${size * 0.96}" aria-hidden="true" style="display:block">
+  const live = !locked && badge.live ? ` class="badge-live badge-live-${badge.live}"` : '';
+  return `<svg viewBox="-50 -46 100 96" width="${size}" height="${size * 0.96}" aria-hidden="true" style="display:block"${live}>
     <defs>
       <linearGradient id="${uid}g" x1="0" y1="0" x2="1" y2="1">${stops.map(([o, c]) => `<stop offset="${o}" stop-color="${c}"/>`).join('')}</linearGradient>
       <clipPath id="${uid}c"><polygon points="${hexPoints(40)}"/></clipPath>
     </defs>
     <polygon points="${hexPoints(40)}" fill="url(#${uid}g)" stroke="${locked ? '#4a5478' : '#ffffff'}" stroke-opacity="${locked ? 1 : 0.8}" stroke-width="1.8" stroke-linejoin="round"/>
     <polygon points="${hexPoints(32.5)}" fill="#151936" fill-opacity="${locked ? 0.92 : 0.82}"/>
+    ${live ? `<g clip-path="url(#${uid}c)" class="badge-flames">
+      <path class="badge-flame is-1" d="M-26 40 C-24 22 -14 14 -18 -2 C-8 8 -6 20 -10 34 C-2 22 4 8 -2 -8 C10 4 12 22 6 34 C14 24 18 10 12 -4 C24 10 26 26 26 40 Z" fill="#fa8072" opacity="0.55"/>
+      <path class="badge-flame is-2" d="M-22 40 C-20 26 -12 20 -14 8 C-6 16 -4 26 -8 36 C-2 26 2 16 -2 4 C8 14 10 26 4 36 C12 28 14 16 10 6 C20 16 22 30 22 40 Z" fill="#ffb3a7" opacity="0.5"/>
+      <path class="badge-flame is-3" d="M-14 40 C-12 30 -8 26 -8 18 C-2 24 0 30 -2 38 C2 30 6 24 4 16 C10 24 12 32 12 40 Z" fill="#fff1ec" opacity="0.55"/>
+    </g>` : ''}
     <g transform="translate(0,-3)">${(MOTIFS[badge.motif] ?? MOTIFS.star)(ink)}</g>
     ${pipRow}
     ${locked ? '' : `<g clip-path="url(#${uid}c)"><rect x="-64" y="-13" width="128" height="14" fill="#ffffff" opacity=".3" transform="rotate(-32)"/></g>`}

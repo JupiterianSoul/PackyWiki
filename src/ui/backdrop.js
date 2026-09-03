@@ -145,7 +145,7 @@ class Backdrop {
       case 'tabletop': this.#tabletop(ctx, w, h, t); break;
       case 'apotheosis': this.#apotheosis(ctx, w, h, t); break;
       case 'raclette': this.#raclette(ctx, w, h, t); break;
-      case 'lorna': this.#lorna(ctx, w, h, t); break;
+      case 'hellfire': this.#hellfire(ctx, w, h, t); break;
       case 'lecture': this.#lecture(ctx, w, h, t); break;
       case 'yaourt': this.#yaourt(ctx, w, h, t); break;
       default: this.#aurora(ctx, w, h, t);
@@ -802,13 +802,13 @@ class Backdrop {
    * the whole thing costs almost nothing to run.
    */
   /**
-   * PAIN REMAINS - black, with salmon embers rising through it and, every
+   * HELLFIRE - black, with salmon embers rising through it and, every
    * few seconds, lightning. The fog is two slow blobs; the embers are a
    * field of time-driven particles that never allocate; the lightning is a
    * jagged line from a seeded walk, drawn for a quarter of a second and
    * gone. Loud in one place, quiet everywhere else.
    */
-  #lorna(ctx, w, h, t) {
+  #hellfire(ctx, w, h, t) {
     const sec = t / 1000;
     ctx.fillStyle = '#0c0606';
     ctx.fillRect(0, 0, w, h);

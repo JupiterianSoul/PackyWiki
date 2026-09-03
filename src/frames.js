@@ -37,7 +37,9 @@ export const FRAME_STYLES = [
   { id: 'runic',   minLevel: 350, name: { en: 'Runic Seal',    fr: 'Sceau runique' } },
   { id: 'solar',   minLevel: 450, name: { en: 'Solar Crown',   fr: 'Couronne solaire' } },
   { id: 'god',     minLevel: Infinity, code: 'creator',
-    name: { en: 'Apotheosis', fr: 'Apothéose' } }
+    name: { en: 'Apotheosis', fr: 'Apothéose' } },
+  { id: 'hellfire', minLevel: Infinity, code: 'hellfire',
+    name: { en: 'Hellfire', fr: 'Feu de l’enfer' } }
 ];
 
 /** Has this player reached the level a style asks for? */
@@ -437,9 +439,72 @@ function drawGod(t, uid) {
     </g>`;
 }
 
+/* --- J. hellfire ------------------------------------------------------------
+ * The Creator's own, behind a code. A ring of lava with glowing cracks, and
+ * flames standing up all around it that flicker (hell-* in screens.css);
+ * embers ride a second ring the other way. The tier only raises the fire:
+ * more tongues, taller, brighter, and from tier 25 a second, outer row. */
+function drawHellfire(t, uid) {
+  const g = `${uid}g`;
+  const tongues = 14 + Math.min(10, Math.floor(t / 5));
+  const height = 8 + Math.min(10, t * 0.22);
+  const outer = t >= 24;
+  const defs = glowFilter(g, 2.2) +
+    `<linearGradient id="${uid}fire" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#7a1d0f"/><stop offset="0.45" stop-color="#fa8072"/>
+      <stop offset="0.8" stop-color="#ffc9a3"/><stop offset="1" stop-color="#fff5ee"/></linearGradient>
+    <linearGradient id="${uid}lava" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2a0b08"/><stop offset="0.5" stop-color="#5b1717"/><stop offset="1" stop-color="#1a0605"/></linearGradient>
+    <radialGradient id="${uid}heat"><stop offset="0.5" stop-color="#fa8072" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fa8072" stop-opacity=".5"/></radialGradient>`;
+
+  // A tongue of flame standing on the ring at angle a, its tip leaning with the jitter.
+  const tongue = (a, r, h, w, cls) => {
+    const [bx, by] = P(r, a).split(',').map(Number);
+    const [tx, ty] = P(r + h, a + (jit(Math.round(a), 3) - 0.5) * 8).split(',').map(Number);
+    const [lx, ly] = P(r, a - w).split(',').map(Number);
+    const [rx, ry] = P(r, a + w).split(',').map(Number);
+    const [mx, my] = P(r + h * 0.55, a).split(',').map(Number);
+    return `<path class="${cls}" d="M${lx},${ly} Q${mx - (tx - bx) * 0.2},${my - (ty - by) * 0.2} ${tx},${ty} Q${mx + (tx - bx) * 0.2},${my + (ty - by) * 0.2} ${rx},${ry} Z" fill="url(#${uid}fire)" style="transform-origin:${bx}px ${by}px"/>`;
+  };
+  const flames = Array.from({ length: tongues }, (_, i) => {
+    const a = (360 / tongues) * i - 90;
+    const h = height * (0.7 + jit(i, 1) * 0.6);
+    return tongue(a, 33, h, 360 / tongues / 2.6, `hell-flame hell-f${i % 3}`);
+  }).join('');
+  const outerFlames = outer ? Array.from({ length: Math.round(tongues * 1.5) }, (_, i) => {
+    const a = (360 / Math.round(tongues * 1.5)) * i - 84;
+    return tongue(a, 46, height * 0.55 * (0.7 + jit(i, 2) * 0.6), 360 / tongues / 4, `hell-flame hell-f${(i + 1) % 3}`);
+  }).join('') : '';
+
+  // Cracks of light in the lava ring.
+  const cracks = Array.from({ length: 10 + Math.min(8, Math.floor(t / 6)) }, (_, i) => {
+    const a = (360 / (10 + Math.min(8, Math.floor(t / 6)))) * i + jit(i, 5) * 20 - 90;
+    const [x1, y1] = P(28.5, a).split(',');
+    const [x2, y2] = P(33, a + (jit(i, 6) - 0.5) * 14).split(',');
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#ffb3a7" stroke-width="1.1" stroke-linecap="round" class="hell-crack"/>`;
+  }).join('');
+
+  const embers = Array.from({ length: 12 + Math.min(12, Math.floor(t / 4)) }, (_, i) => {
+    const a = (360 / (12 + Math.min(12, Math.floor(t / 4)))) * i;
+    const [x, y] = P(40 + jit(i, 7) * 8, a).split(',');
+    return `<circle cx="${x}" cy="${y}" r="${(0.7 + jit(i, 8) * 1.1).toFixed(2)}" fill="${i % 4 === 0 ? '#fff1ec' : '#fa8072'}"/>`;
+  }).join('');
+
+  return `<defs>${defs}</defs>
+    <circle r="50" fill="url(#${uid}heat)" class="hell-heat"/>
+    <g filter="url(#${g})">
+      <g class="hell-flames">${outerFlames}${flames}</g>
+      ${arc(30.5, 0, 359.9, `stroke="url(#${uid}lava)" stroke-width="5"`)}
+      <g class="hell-cracks">${cracks}</g>
+      ${arc(28, 0, 359.9, `stroke="#fa8072" stroke-width="0.8" stroke-opacity=".8"`)}
+      <g class="hell-embers">${embers}</g>
+    </g>`;
+}
+
 const DRAWERS = {
   metal: drawMetal, circuit: drawCircuit, orbit: drawOrbit, crest: drawCrest, crystal: drawCrystal,
-  aurora: drawAurora, runic: drawRunic, solar: drawSolar, god: drawGod
+  aurora: drawAurora, runic: drawRunic, solar: drawSolar, god: drawGod, hellfire: drawHellfire
 };
 
 /**

@@ -286,6 +286,12 @@ are read from one article, or be drawn rather than fetched (`art`): one
 code's Matrix card wears the rain of the Matrix theme, painted on a canvas
 the moment the pack is opened.
 
+A code can also bring a level frame (`code` on a style in `src/frames.js`)
+and a badge with a live effect (`live` on a badge in `src/badges.js`); both
+go on the moment the code is redeemed. A code that is withdrawn is listed in
+`RETIRED_CODES`, and everything it handed over is removed from a save at
+launch, as if it had never been typed.
+
 ## The Android app
 
 A WebView that opens the published site. The site updates the moment it is

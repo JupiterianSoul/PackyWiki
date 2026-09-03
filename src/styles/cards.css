@@ -1698,159 +1698,157 @@ html[data-lowpower='1'] [data-rarity="special"] .fx-a::after { animation: none !
 }
 [data-special="mathilde"] .card-desc { color: var(--sp-violet); }
 
-/* --- LORNA - salmon pink, pain remains ------------------------------------
-   The Creator's own, and the loudest treatment in the game. Black obsidian
-   with salmon veins for a ground; embers rising behind the picture on a
-   loop; a slow eclipse turning behind the art; the picture itself doubled
-   in a salmon aura that slides with the tilt; film grain over it; a
-   lightning flash every few seconds; a holographic sweep across the face; a
-   halo of thorns turning around the plate; a ring that burns; a heartbeat
-   on the whole card; and a title cut in serif capitals whose colour
-   fringes split and snap back like a glitch. Every loop moves only
-   transform, opacity or background-position; the light slides the rest. */
-[data-special="lorna"] {
-  --lorna: #fa8072;
-  --lorna-light: #ffe4de;
-  --lorna-dark: #5b1717;
-  --lorna-embers: radial-gradient(circle, rgba(255, 228, 222, 0.95) 0 1.1px, transparent 2px) 12% 90% / 9cqw 11cqw,
-    radial-gradient(circle, rgba(250, 128, 114, 0.9) 0 1.4px, transparent 2.4px) 60% 70% / 13cqw 15cqw,
-    radial-gradient(circle, rgba(250, 128, 114, 0.7) 0 0.9px, transparent 1.8px) 35% 40% / 7cqw 9cqw,
-    radial-gradient(circle, rgba(255, 179, 167, 0.8) 0 1.2px, transparent 2.2px) 85% 20% / 11cqw 13cqw;
+/* --- HELLFIRE - salmon pink, lava and flame ---------------------------------
+   The Creator's own. Everything here sits INSIDE the card, on layers the
+   card already stacks, so nothing is drawn across the text:
+
+     .card-front   cooled lava: near-black rock with glowing cracks that
+                   pulse, a heat haze low on the card
+     .fx-a         behind the picture: a slow lava flow that drifts, and
+                   large soft embers rising through the whole face
+     .fx-art       on the picture: an ember-orange bloom that slides with the
+                   tilt, and flames licking up from its bottom edge
+     .fx-b         over the face: flames along the card's foot, a thin
+                   holographic glint that rides the tilt
+     .fx-ring      a ring of fire turning, its glow breathing
+     .card-title   serif capitals set in fire, with a slow flicker
+
+   Every loop moves only transform, opacity or background-position; the
+   light (--lx/--ly) slides the rest. The flames are one SVG silhouette
+   repeated, stretched and offset three ways so they never read as a tile. */
+[data-special="hellfire"] {
+  --hf: #fa8072;
+  --hf-light: #ffe4de;
+  --hf-hot: #ffb347;
+  --hf-dark: #3a0e0a;
+  --hf-flames: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='60' viewBox='0 0 120 60'%3E%3Cpath d='M0 60 C6 40 8 30 4 14 C14 26 16 38 12 52 C20 36 26 24 20 4 C32 18 34 34 28 50 C36 38 42 26 38 8 C48 22 50 38 46 54 C52 40 58 30 54 12 C64 26 66 40 62 56 C70 40 76 26 72 6 C82 22 84 38 80 54 C88 40 94 28 90 10 C100 24 102 40 98 56 C106 42 112 32 108 14 C116 28 118 44 120 60 Z' fill='%23fa8072'/%3E%3C/svg%3E");
+  --hf-cracks: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140' viewBox='0 0 140 140'%3E%3Cg fill='none' stroke='%23fa8072' stroke-width='1.2' stroke-linecap='round' opacity='0.9'%3E%3Cpath d='M4 30 L28 44 L36 70 L22 96 L40 124'/%3E%3Cpath d='M28 44 L54 36 L70 8'/%3E%3Cpath d='M36 70 L64 78 L92 66 L108 92 L136 100'/%3E%3Cpath d='M92 66 L100 40 L128 28'/%3E%3Cpath d='M64 78 L58 108 L78 134'/%3E%3Cpath d='M108 92 L122 118'/%3E%3C/g%3E%3C/svg%3E");
 }
-[data-special="lorna"] .card-front {
+[data-special="hellfire"] .card-front {
   background:
-    repeating-conic-gradient(from 20deg at 30% 60%, rgba(250, 128, 114, 0.06) 0 4deg, transparent 4deg 11deg),
-    repeating-conic-gradient(from 200deg at 70% 30%, rgba(250, 128, 114, 0.05) 0 3deg, transparent 3deg 13deg),
-    radial-gradient(120% 90% at 50% 100%, #3a1010, #120505 55%, #050202);
-  box-shadow: inset 0 0 0 2px rgba(250, 128, 114, 0.55), inset 0 0 40px rgba(250, 128, 114, 0.12);
+    radial-gradient(70% 40% at 50% 100%, rgba(250, 128, 114, 0.35), transparent 70%),
+    radial-gradient(120% 90% at 50% 0%, #2a0c0a, #120505 55%, #050202);
+  box-shadow: inset 0 0 0 2px rgba(250, 128, 114, 0.55), inset 0 -30px 40px -20px rgba(250, 128, 114, 0.35);
 }
-/* Embers, rising in four fields at four speeds, fading out near the top. */
-[data-special="lorna"] .fx-a::before {
+/* The cracks glow and dim, slowly; they fade under the text so it stays readable. */
+[data-special="hellfire"] .fx-a::before {
   content: '';
   position: absolute;
-  inset: -20% 0 0;
-  background: var(--lorna-embers);
-  opacity: 0.9;
-  -webkit-mask: linear-gradient(180deg, transparent 0, #000 25%, #000 85%, rgba(0, 0, 0, 0.5));
-  mask: linear-gradient(180deg, transparent 0, #000 25%, #000 85%, rgba(0, 0, 0, 0.5));
+  inset: 0;
+  background:
+    var(--hf-cracks) 0 0 / 46cqw 46cqw,
+    var(--hf-cracks) 23cqw 12cqw / 46cqw 46cqw,
+    radial-gradient(circle at 20% 80%, rgba(255, 179, 71, 0.22), transparent 30%),
+    radial-gradient(circle at 80% 70%, rgba(250, 128, 114, 0.22), transparent 32%);
+  -webkit-mask: linear-gradient(180deg, #000 0 48%, rgba(0, 0, 0, 0.3) 62%, rgba(0, 0, 0, 0.25) 100%);
+  mask: linear-gradient(180deg, #000 0 48%, rgba(0, 0, 0, 0.3) 62%, rgba(0, 0, 0, 0.25) 100%);
+  opacity: 0.75;
 }
-.is-lit[data-special="lorna"] .fx-a::before { animation: lorna-rise 9s linear infinite; }
-@keyframes lorna-rise {
-  from { background-position: 12% 90%, 60% 70%, 35% 40%, 85% 20%; }
-  to { background-position: 14% -30%, 58% -50%, 36% -60%, 84% -100%; }
-}
-/* The eclipse: a ring of salmon light turning slowly behind the art. */
-[data-special="lorna"] .fx-a::after {
+.is-lit[data-special="hellfire"] .fx-a::before { animation: hf-glow 3.4s ease-in-out infinite alternate; }
+@keyframes hf-glow { from { opacity: 0.35; } to { opacity: 0.95; } }
+/* Embers: a few large soft sparks rising the whole height, never a lattice. */
+[data-special="hellfire"] .fx-a::after {
   content: '';
   position: absolute;
-  left: 50%; top: 34%;
-  width: 120cqw; height: 120cqw;
-  margin: -60cqw 0 0 -60cqw;
-  border-radius: 50%;
-  background: conic-gradient(from 0deg, transparent 0 40%, rgba(250, 128, 114, 0.55) 48%, rgba(255, 228, 222, 0.9) 50%, rgba(250, 128, 114, 0.55) 52%, transparent 60% 100%);
-  -webkit-mask: radial-gradient(circle, transparent 0 38%, #000 40% 46%, transparent 49%);
-  mask: radial-gradient(circle, transparent 0 38%, #000 40% 46%, transparent 49%);
+  inset: -30% 0 0;
+  background:
+    radial-gradient(circle, rgba(255, 228, 222, 0.95) 0 1.6px, transparent 3px) 14% 92% / 53cqw 71cqw,
+    radial-gradient(circle, rgba(250, 128, 114, 0.9) 0 2px, transparent 3.6px) 66% 78% / 67cqw 89cqw,
+    radial-gradient(circle, rgba(255, 179, 71, 0.8) 0 1.3px, transparent 2.6px) 40% 60% / 41cqw 97cqw;
+  -webkit-mask: linear-gradient(180deg, transparent 0, #000 30%, #000 100%);
+  mask: linear-gradient(180deg, transparent 0, #000 30%, #000 100%);
   opacity: 0.85;
-  transform: rotate(calc(var(--lx) * 40deg));
 }
-.is-lit[data-special="lorna"] .fx-a::after { animation: lorna-turn 18s linear infinite; }
-@keyframes lorna-turn { to { transform: rotate(360deg); } }
-/* The aura: the picture again, in salmon, pushed by the tilt. */
-[data-special="lorna"] .fx-art::before {
+.is-lit[data-special="hellfire"] .fx-a::after { animation: hf-rise 11s linear infinite; }
+@keyframes hf-rise {
+  from { background-position: 14% 92%, 66% 78%, 40% 60%; }
+  to { background-position: 18% -80%, 62% -110%, 44% -140%; }
+}
+/* On the picture: an orange bloom that slides with the tilt. */
+[data-special="hellfire"] .fx-art::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: var(--art) center / cover;
+  background: radial-gradient(60% 55% at calc(50% + var(--lx) * 25%) calc(60% + var(--ly) * 20%), rgba(255, 179, 71, 0.45), rgba(250, 128, 114, 0.18) 45%, transparent 75%);
   mix-blend-mode: screen;
-  opacity: 0.6;
-  filter: grayscale(1) sepia(1) saturate(6) hue-rotate(-22deg) contrast(1.25) blur(1px);
-  transform: translate(calc(var(--lx) * 2.6cqw), calc(var(--ly) * -1.6cqw)) scale(1.04);
 }
-/* Film grain and the lightning. */
-[data-special="lorna"] .fx-art::after {
+/* Flames licking up from the picture's foot, three silhouettes out of step. */
+[data-special="hellfire"] .fx-art::after {
   content: '';
   position: absolute;
-  inset: 0;
+  left: 0; right: 0; bottom: 0;
+  height: 42%;
   background:
-    linear-gradient(115deg, transparent 38%, rgba(255, 236, 232, 0.9) 47%, rgba(255, 255, 255, 1) 49%, rgba(255, 236, 232, 0.9) 51%, transparent 60%),
-    repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
-  background-size: 300% 100%, auto;
-  background-position: 120% 0, 0 0;
-  background-repeat: no-repeat, repeat;
+    var(--hf-flames) 0 100% / 60cqw 20cqw repeat-x,
+    var(--hf-flames) 20cqw 100% / 44cqw 15cqw repeat-x,
+    var(--hf-flames) 9cqw 100% / 80cqw 26cqw repeat-x;
+  -webkit-mask: linear-gradient(180deg, transparent 0, #000 60%);
+  mask: linear-gradient(180deg, transparent 0, #000 60%);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+  filter: blur(0.4px);
+}
+.is-lit[data-special="hellfire"] .fx-art::after { animation: hf-flames 1.6s ease-in-out infinite alternate; }
+@keyframes hf-flames {
+  from { background-position: 0 100%, 20cqw 100%, 9cqw 100%; opacity: 0.7; }
+  to { background-position: 6cqw 100%, 12cqw 100%, 15cqw 100%; opacity: 1; }
+}
+/* Over the face: flames along the card's foot, and a glint riding the tilt. */
+[data-special="hellfire"] .fx-b::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 22%;
+  background:
+    var(--hf-flames) 4cqw 100% / 50cqw 16cqw repeat-x,
+    var(--hf-flames) 30cqw 100% / 70cqw 22cqw repeat-x;
+  -webkit-mask: linear-gradient(180deg, transparent 0, #000 70%);
+  mask: linear-gradient(180deg, transparent 0, #000 70%);
   mix-blend-mode: screen;
   opacity: 0.6;
 }
-.is-lit[data-special="lorna"] .fx-art::after { animation: lorna-lightning 6.5s steps(1, end) infinite; }
-@keyframes lorna-lightning {
-  0%, 92% { background-position: 120% 0, 0 0; opacity: 0.6; }
-  93% { background-position: 60% 0, 0 0; opacity: 1; }
-  94.5% { background-position: 120% 0, 0 0; opacity: 0.6; }
-  96% { background-position: 40% 0, 0 0; opacity: 1; }
-  97% { background-position: 120% 0, 0 0; opacity: 0.6; }
+.is-lit[data-special="hellfire"] .fx-b::before { animation: hf-flames-2 1.3s ease-in-out infinite alternate; }
+@keyframes hf-flames-2 {
+  from { background-position: 4cqw 100%, 30cqw 100%; opacity: 0.45; }
+  to { background-position: 10cqw 100%, 22cqw 100%; opacity: 0.75; }
 }
-/* The holographic sweep, riding the tilt, with its own slow shimmer. */
-[data-special="lorna"] .fx-b::before {
+[data-special="hellfire"] .fx-b::after {
   content: '';
   position: absolute;
   inset: -20% -60%;
-  background: linear-gradient(100deg,
-    transparent 30%, rgba(250, 128, 114, 0.35) 42%, rgba(255, 228, 222, 0.75) 48%, rgba(255, 179, 167, 0.5) 52%, rgba(250, 128, 114, 0.35) 58%, transparent 70%);
+  background: linear-gradient(100deg, transparent 44%, rgba(255, 228, 222, 0.28) 49%, rgba(255, 179, 71, 0.22) 51%, transparent 56%);
   mix-blend-mode: screen;
-  opacity: 0.8;
   transform: translateX(calc(var(--lx) * 45%));
 }
-.is-lit[data-special="lorna"] .fx-b::before { animation: lorna-sweep 5s ease-in-out infinite alternate; }
-@keyframes lorna-sweep { from { opacity: 0.55; } to { opacity: 0.95; } }
-/* The halo of thorns around the plate. */
-[data-special="lorna"] .fx-b::after {
-  content: '';
-  position: absolute;
-  left: 50%; top: 34%;
-  width: 96cqw; height: 96cqw;
-  margin: -48cqw 0 0 -48cqw;
-  border-radius: 50%;
-  background: repeating-conic-gradient(from 0deg, var(--lorna) 0 3deg, transparent 3deg 5deg, rgba(255, 228, 222, 0.9) 5deg 6deg, transparent 6deg 12deg);
-  -webkit-mask: radial-gradient(circle, transparent 0 44%, #000 45% 49%, transparent 50%);
-  mask: radial-gradient(circle, transparent 0 44%, #000 45% 49%, transparent 50%);
-  opacity: 0.7;
-  transform: rotate(calc(var(--lx) * -30deg));
-}
-.is-lit[data-special="lorna"] .fx-b::after { animation: lorna-turn 30s linear infinite reverse; }
-/* The ring burns. */
-[data-special="lorna"] .fx-ring { padding: 3px; }
-[data-special="lorna"] .fx-ring::before {
-  background: conic-gradient(from 0deg, var(--lorna), var(--lorna-light), #000 30%, var(--lorna) 50%, var(--lorna-light), #000 80%, var(--lorna));
+/* The ring of fire. */
+[data-special="hellfire"] .fx-ring { padding: 3px; }
+[data-special="hellfire"] .fx-ring::before {
+  background: conic-gradient(from 0deg, var(--hf), var(--hf-hot), var(--hf-light), var(--hf) 30%, var(--hf-dark) 45%, var(--hf) 60%, var(--hf-hot), var(--hf-light) 80%, var(--hf-dark) 92%, var(--hf));
   transform: rotate(calc(var(--lx) * 60deg));
 }
-.is-lit[data-special="lorna"] .fx-ring::before { animation: spin 7s linear infinite; }
-.is-lit[data-special="lorna"] .fx-ring { animation: lorna-burn 2.8s ease-in-out infinite; }
-@keyframes lorna-burn {
-  0%, 100% { filter: drop-shadow(0 0 4px rgba(250, 128, 114, 0.5)); }
-  50% { filter: drop-shadow(0 0 16px rgba(250, 128, 114, 0.95)); }
+.is-lit[data-special="hellfire"] .fx-ring::before { animation: spin 8s linear infinite; }
+.is-lit[data-special="hellfire"] .fx-ring { animation: hf-burn 2.6s ease-in-out infinite alternate; }
+@keyframes hf-burn {
+  from { filter: drop-shadow(0 0 3px rgba(250, 128, 114, 0.45)); }
+  to { filter: drop-shadow(0 0 14px rgba(255, 179, 71, 0.9)); }
 }
-/* The heartbeat: two quick swells, then rest. */
-.is-lit[data-special="lorna"] .card-face { animation: lorna-heart 2.8s ease-in-out infinite; }
-@keyframes lorna-heart {
-  0%, 20%, 34%, 100% { transform: scale(1); }
-  8% { transform: scale(1.014); }
-  27% { transform: scale(1.01); }
-}
-/* The title: serif capitals, salmon, and colour fringes that split and snap. */
-[data-special="lorna"] .card-title {
+/* The title: serif capitals in fire, flickering slowly. */
+[data-special="hellfire"] .card-title {
   font-family: 'Cinzel', 'Trajan Pro', 'Georgia', ui-serif, serif;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--lorna-light);
-  text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.02em 0 0 rgba(255, 90, 70, 0.8), -0.02em 0 0 rgba(120, 220, 255, 0.6);
+  background: linear-gradient(180deg, #fff5ee 0%, #ffc9a3 40%, var(--hf) 70%, #b0362a 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0 8px rgba(250, 128, 114, 0.8));
 }
-.is-lit[data-special="lorna"] .card-title { animation: lorna-glitch 4s steps(1, end) infinite; }
-@keyframes lorna-glitch {
-  0%, 88%, 100% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.02em 0 0 rgba(255, 90, 70, 0.8), -0.02em 0 0 rgba(120, 220, 255, 0.6); transform: none; }
-  89% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.12em 0 0 rgba(255, 90, 70, 0.9), -0.12em 0 0 rgba(120, 220, 255, 0.9); transform: translateX(-0.04em); }
-  91% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), -0.08em 0 0 rgba(255, 90, 70, 0.9), 0.08em 0 0 rgba(120, 220, 255, 0.9); transform: translateX(0.04em) skewX(-6deg); }
-  93% { text-shadow: 0 0 10px rgba(250, 128, 114, 0.9), 0.02em 0 0 rgba(255, 90, 70, 0.8), -0.02em 0 0 rgba(120, 220, 255, 0.6); transform: none; }
+.is-lit[data-special="hellfire"] .card-title { animation: hf-title 3s ease-in-out infinite alternate; }
+@keyframes hf-title {
+  from { filter: drop-shadow(0 0 5px rgba(250, 128, 114, 0.6)); }
+  to { filter: drop-shadow(0 0 14px rgba(255, 179, 71, 1)); }
 }
-[data-special="lorna"] .card-desc { color: var(--lorna); letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.9em; }
-[data-special="lorna"] .card-extract { color: rgba(255, 228, 222, 0.82); }
-[data-special="lorna"] .rarity-badge { background: var(--lorna); border-color: var(--lorna-light); color: #1a0808; text-shadow: none; }
+[data-special="hellfire"] .card-desc { color: var(--hf); letter-spacing: 0.14em; text-transform: uppercase; font-size: 0.9em; }
+[data-special="hellfire"] .card-extract { color: rgba(255, 228, 222, 0.82); }
+[data-special="hellfire"] .rarity-badge { background: var(--hf); border-color: var(--hf-light); color: #1a0808; text-shadow: none; }

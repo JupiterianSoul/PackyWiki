@@ -822,8 +822,8 @@
   --texture: grain;
 }
 
-/* --- PAIN REMAINS: salmon on black, behind the Creator's own code ------- */
-[data-theme='lorna'] {
+/* --- HELLFIRE: salmon on black, behind the Creator's own code ------------ */
+[data-theme='hellfire'] {
   --ink: #ffe9e4;
   --ink-dim: #d9a49a;
   --ink-faint: #8f6a63;

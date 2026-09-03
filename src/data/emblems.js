@@ -532,16 +532,15 @@ export const EMBLEMS = {
     <circle cx="60" cy="92" r="7" fill="${E2}"/><circle cx="60" cy="92" r="3" fill="${HI}"/>`,
 
   /* A wax seal pressed with a W, a quill laid across it. */
-  thorns: `
+  hellfire: `
     <ellipse cx="60" cy="102" rx="38" ry="6" fill="${INK}" opacity="0.32"/>
-    <circle cx="60" cy="58" r="34" fill="none" stroke="${E2}" stroke-width="9"/>
-    <circle cx="60" cy="58" r="34" fill="none" stroke="${E1}" stroke-width="3" stroke-dasharray="4 9"/>
-    <g fill="${E1}">
-      <path d="M60 18l4 10-4 4-4-4z"/><path d="M88 30l-2 10-5 1-2-5z"/><path d="M100 58l-10 4-4-4 4-4z"/><path d="M88 86l-10-2-1-5 5-2z"/>
-      <path d="M60 98l-4-10 4-4 4 4z"/><path d="M32 86l2-10 5-1 2 5z"/><path d="M20 58l10-4 4 4-4 4z"/><path d="M32 30l10 2 1 5-5 2z"/>
-    </g>
-    <path d="M60 34c-10 12-14 20-14 28a14 14 0 0 0 28 0c0-6-3-9-6-13 0 5-2 8-5 9 3-8-1-16-3-24z" fill="${E3}"/>
-    <path d="M60 48c-5 7-7 11-7 15a7 7 0 0 0 14 0c0-3-2-5-3-7 0 3-1 4-2 5 1-4-1-9-2-13z" fill="${HI}"/>`,
+    <path d="M60 10c-16 12-30 30-30 52 0 12 6 22 14 28-2-8 0-16 6-22-1 9 4 15 10 18 7-3 11-10 10-18 6 6 8 14 6 22 8-6 14-16 14-28 0-14-6-26-14-36 1 8-2 14-7 18 2-12-3-24-9-34z" fill="${E2}"/>
+    <path d="M60 30c-9 8-17 20-17 32 0 8 4 14 9 18-1-5 0-10 4-14 0 6 3 9 6 11 4-2 6-6 5-11 4 4 5 9 4 14 5-4 9-10 9-18 0-9-4-17-9-24 0 5-2 9-5 11 1-7-2-14-6-19z" fill="${E1}"/>
+    <path d="M60 46c-5 5-9 12-9 19 0 5 2 9 5 11 0-4 2-7 4-9 0 4 2 6 3 8 3-2 4-5 4-9 2 2 3 5 3 8 3-2 5-6 5-10 0-7-4-13-8-18 0 3-1 5-3 7 0-4-2-8-4-10z" fill="${HI}"/>
+    <path d="M44 62a16 14 0 0 1 32 0c0 6-3 10-6 12v8H50v-8c-3-2-6-6-6-12z" fill="${E3}"/>
+    <circle cx="53" cy="62" r="4" fill="${INK}"/><circle cx="67" cy="62" r="4" fill="${INK}"/>
+    <path d="M57 71l3-4 3 4z" fill="${INK}"/>
+    <path d="M52 80h16M52 84h16" stroke="${INK}" stroke-width="2" stroke-linecap="round"/>`,
   seal: `
     <ellipse cx="60" cy="100" rx="40" ry="6" fill="${INK}" opacity="0.32"/>
     <path d="M60 22 Q78 18 88 32 Q102 40 96 58 Q100 76 84 84 Q72 96 58 90 Q40 94 32 80 Q18 72 24 56 Q20 38 36 30 Q44 18 60 22Z" fill="${E2}"/>
