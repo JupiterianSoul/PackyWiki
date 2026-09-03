@@ -1187,7 +1187,7 @@ function openTimed() {
   const spec = currentTimedSpec();
   // Track progress is credited when the pack produces cards, not here: a
   // failed draw refunds the booster and must not also count as an opening.
-  store.addBooster(state.inventory, spec, 1);
+  gainBooster(spec, 1);
   timed.count -= 1;
   if (!Number.isFinite(timed.last)) timed.last = Date.now();
   store.saveProfile(state.profile);
@@ -1375,7 +1375,7 @@ function paintFreeButton(button, id, spec) {
 function takeFree(id, spec, button) {
   if (!store.freeAvailable(state.profile, id)) return;
   store.markFreeTaken(state.profile, id);
-  store.addBooster(state.inventory, spec, 1);
+  gainBooster(spec, 1);
   synth.playPurchase();
   toast(`${t('bought')} ${specName(spec)}`, 'ok');
   paintFreeButton(button, id, spec);
@@ -1389,7 +1389,7 @@ function purchase(spec, price, button) {
     return;
   }
   store.saveWallet(state.wallet - price);
-  store.addBooster(state.inventory, spec, 1);
+  gainBooster(spec, 1);
   refreshWallet();
   synth.playPurchase();
   button.classList.add('is-bought');
@@ -1803,8 +1803,19 @@ function warmPictures(cards) {
  * or if it failed, so a stale or broken one never reaches a pack.
  */
 const READY_TTL_MS = 30 * 60 * 1000;
-const READY_WARM_AT_LAUNCH = 3;
+const READY_WARM_AT_LAUNCH = 6;
 const readyDraws = new Map();
+
+/**
+ * Every way a booster is gained: bought, gifted, won, refunded, redeemed.
+ * The pack is put on the shelf AND drawn ahead at once, so that by the time
+ * a player has walked to the shelf and torn it, the cards have been in hand
+ * for a while. A gain is the earliest possible moment to start.
+ */
+function gainBooster(spec, count = 1) {
+  store.addBooster(state.inventory, spec, count);
+  ensureReady(spec);
+}
 
 /** The ready draw for this kind, started now if there is none fresh. */
 function ensureReady(spec) {
@@ -1852,11 +1863,14 @@ function schedulePrefetch(spec, { delay = PREFETCH_DELAY } = {}) {
  */
 function warmDrawer() {
   if (navigator.onLine === false || navigator.connection?.saveData) return;
+  // Every kind on the shelf, most-owned first, up to the limit: enough that
+  // whatever is torn next is ready, few enough that a big shelf does not
+  // turn launch into a storm of requests.
   const owned = Object.values(state.inventory ?? {})
-    .filter((slot) => slot?.spec && slot.count > 0 && slot.spec.kind !== 'code')
+    .filter((slot) => slot?.spec && slot.count > 0)
     .sort((a, b) => b.count - a.count)
     .slice(0, READY_WARM_AT_LAUNCH);
-  owned.forEach((slot, i) => setTimeout(() => ensureReady(slot.spec), i * 1500));
+  owned.forEach((slot, i) => setTimeout(() => ensureReady(slot.spec), i * 1200));
 }
 
 /**
@@ -2034,7 +2048,7 @@ async function runOpen(booster) {
     // If the record did not survive (storage refused it), hand it back
     // directly rather than swallow it.
     if (!store.reclaimOpenInFlight(state.inventory)) {
-      store.addBooster(state.inventory, state.spec, 1);
+      gainBooster(state.spec, 1);
     }
     renderPacks();
     el.openScreen.className = 'screen is-active phase-idle';
@@ -2537,7 +2551,7 @@ function showLevelUp(level) {
 
 function claimLevel(level, reward) {
   if (reward.coins) store.saveWallet(store.loadWallet() + reward.coins);
-  if (reward.spec) store.addBooster(state.inventory, reward.spec, 1);
+  if (reward.spec) gainBooster(reward.spec, 1);
 
   state.profile.pendingLevels = state.profile.pendingLevels.filter((l) => l !== level);
   store.saveProfile(state.profile);
@@ -4438,7 +4452,7 @@ function redeemAchievement(a, btn) {
     store.saveWallet(store.loadWallet() + a.reward.coins);
     refreshWallet();
   } else {
-    store.addBooster(state.inventory, a.reward.spec, 1);
+    gainBooster(a.reward.spec, 1);
     renderPacks();
   }
   store.saveProfile(state.profile);
@@ -4771,6 +4785,8 @@ async function enterApp() {
   }
   hideGate();
   reloadFromStorage();
+  // The shelf may have just arrived from the account: draw ahead for it.
+  setTimeout(warmDrawer, 1500);
   if (!state.account.failed) state.account.syncedAt = Date.now();
   // A save last written by an OLDER build (or one from before builds were
   // stamped) may carry back what this build already repaired on another
@@ -5001,7 +5017,7 @@ async function collectDeliveries() {
     const from = state.social.friends.find((f) => f.otherId === item.sender)?.profile?.username
       ?? t('friendSomeone');
     if (item.kind === 'booster' && item.payload?.spec) {
-      store.addBooster(state.inventory, item.payload.spec, item.payload.count ?? 1);
+      gainBooster(item.payload.spec, item.payload.count ?? 1);
       pushNote('gift', t('notifGiftBooster', { name: esc(from) }), 'packs');
     } else if (item.kind === 'card' && item.payload?.key) {
       store.receiveCardEntry(state.collection, item.payload);
@@ -5191,7 +5207,7 @@ function openGiftBooster(entry) {
           renderPacks();
           syncSoon();
         } catch (error) {
-          store.addBooster(state.inventory, slot.spec, 1);      // undo
+          gainBooster(slot.spec, 1);      // undo
           toast(esc(describeError(error)), 'error');
           row.disabled = false;
         }
@@ -6087,7 +6103,7 @@ function finishQuiz() {
   }
   if (q.rewards.card) store.receiveCardEntry(state.collection, quizEntry(q));
   if (q.rewards.booster) {
-    store.addBooster(state.inventory, q.rewards.booster, 1);
+    gainBooster(q.rewards.booster, 1);
     renderPacks();
   }
   updateBadges();
@@ -6451,7 +6467,7 @@ function redeemRow() {
     // A regalia code carries no cards, so it puts no booster on the shelf. The
     // Creator's code is the only one of these: what it hands over is the badge,
     // the frame, the theme and the icon.
-    if (!entry.regalia) store.addBooster(state.inventory, codeSpec(entry), 1);
+    if (!entry.regalia) gainBooster(codeSpec(entry), 1);
     // The theme goes on now, and the badge is worn now: the whole gift at
     // once, not a booster and a note saying there is more in the menus.
     const theme = THEMES.find((th) => th.code === entry.id);
@@ -7398,7 +7414,7 @@ function grantGift(gift) {
     store.saveWallet(store.loadWallet() + gift.coins);
     refreshWallet();
   } else {
-    store.addBooster(state.inventory, gift.spec, 1);
+    gainBooster(gift.spec, 1);
     renderPacks();
   }
   synth.playGift();
@@ -7511,7 +7527,7 @@ function showStarter() {
   const starters = shuffle(THEME_PACKS).slice(0, STARTER_PACKS).map((theme) => ({
     kind: 'theme', themeId: theme.id, rarityId: null, cards: STARTER_PACK_CARDS
   }));
-  starters.forEach((spec) => store.addBooster(state.inventory, spec, 1));
+  starters.forEach((spec) => gainBooster(spec, 1));
   refreshWallet();
 
   el.starterTitle.textContent = t('starterTitle');
@@ -8154,7 +8170,7 @@ window.__wikster = {
     return forced;
   },
   grant(amount = 10000) { store.saveWallet(store.loadWallet() + amount); refreshWallet(); },
-  giveBooster(spec) { store.addBooster(state.inventory, spec, 1); renderPacks(); },
+  giveBooster(spec) { gainBooster(spec, 1); renderPacks(); },
   giveTimed(n = 5) { state.profile.timed.count += n; store.saveProfile(state.profile); renderTimed(); updateBadges(); },
   addXp(amount = 5000) {
     const levels = addXp(state.profile.progress, amount);
