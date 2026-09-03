@@ -394,7 +394,7 @@
    `backwards`, never `both`: a forwards fill would freeze the card at
    transform:none and the stack offsets would never apply afterwards. */
 .stack-card.is-emerging {
-  animation: card-emerge calc(1060ms * var(--motion-scale)) cubic-bezier(0.3, 0.75, 0.3, 1.04) backwards;
+  animation: card-emerge calc(820ms * var(--motion-scale)) cubic-bezier(0.3, 0.75, 0.3, 1.04) backwards;
 }
 @keyframes card-emerge {
   0%   { opacity: 0; transform: translate(0, 64%) scale(0.46) rotate(0deg); }

@@ -84,7 +84,7 @@ const RIP_TICK_STEP = 0.055;
 const RIP_LOCK_SLOP = 10;
 const SWIPE_COMMIT = 78;
 const EMERGE_STAGGER = 130;
-const EMERGE_DURATION = 1060;
+const EMERGE_DURATION = 820;
 /** Nothing waits on the network longer than this before the booster comes back. */
 const DRAW_HARD_LIMIT = 13000;
 const PREFETCH_DELAY = 350;
@@ -1977,7 +1977,7 @@ async function runOpen(booster) {
   // a wait.
   const [articles] = await Promise.all([
     guarded,
-    wait(EMERGE_DURATION + EMERGE_STAGGER * Math.min(count - 1, 2))
+    wait(EMERGE_DURATION + EMERGE_STAGGER)
   ]);
 
   if (!articles || articles.error) {

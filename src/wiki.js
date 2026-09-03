@@ -805,7 +805,7 @@ async function finishCustomCard(wiki, proto, pack) {
   const { page } = proto;
   let extract = page.extract?.trim();
   if (!extract || extract.length < 80) extract = await customLeadText(wiki, page.pageid).catch(() => null);
-  if (!isUsableText(page.title, extract)) return null;
+  if (!isUsableText(page.title, extract)) throw new Error('NO_TEXT');
   // pageimages misses a lot on Fandom, and what it does return is often a
   // fifty-pixel icon, so a too-small thumbnail is treated as no thumbnail and
   // we go digging rather than stretch it across the card.
@@ -813,7 +813,7 @@ async function finishCustomCard(wiki, proto, pack) {
     ?? (page.original?.source ? upgradeImageUrl(page.original.source, 640) : null)
     ?? await customLeadImage(wiki, page.pageid)
     ?? await customPageImage(wiki, page.pageid, page.title);
-  if (!thumbnail) return null;
+  if (!thumbnail) throw new Error('NO_IMAGE');
   return toCard({
     sourceId: wikiSourceId(wiki),
     sourceName: wiki.sitename,
@@ -842,6 +842,35 @@ async function finishCustomCard(wiki, proto, pack) {
  * pages a request, and only the pages the shelves actually chose pay for
  * their text and picture, all at the same time.
  */
+/**
+ * One card the old way: a few random pages at a time, one looked at at a
+ * time, until one can be a card. Slower per card than the pool, but it is
+ * the path that has always worked on every wiki, so it is what the pack
+ * falls back to when the pooled draw comes up empty. Several run at once,
+ * one per card still owed, so the wall time is one card's, not five.
+ */
+async function huntCustomCard(wiki, pack, seen, outOfTime, tally) {
+  for (let attempt = 0; attempt < 8 && !outOfTime(); attempt++) {
+    const params = new URLSearchParams({
+      action: 'query', list: 'random', rnnamespace: '0', rnlimit: '6', format: 'json', origin: '*'
+    });
+    const rows = ((await fetchJson(`${wiki.apiUrl}?${params}`).catch(() => null))?.query?.random ?? [])
+      .filter((r) => r.id && !seen.has(r.title));
+    if (!rows.length) continue;
+    const choice = pick(rows);
+    seen.add(choice.title);
+    const page = await customPageDetail(wiki, choice.id).catch(() => null);
+    const proto = protoCard(page);
+    if (!proto) { tally.other++; continue; }
+    try {
+      return await finishCustomCard(wiki, proto, pack);
+    } catch (err) {
+      tally[err?.message === 'NO_TEXT' ? 'noText' : err?.message === 'NO_IMAGE' ? 'noImage' : 'other']++;
+    }
+  }
+  return null;
+}
+
 async function drawCustomSet(pack) {
   const wanted = Math.max(1, pack.cards ?? 5);
   const deadline = Date.now() + DRAW_BUDGET_MS;
@@ -850,20 +879,18 @@ async function drawCustomSet(pack) {
 
   const wiki = await wikiForLanguage(pack.wiki);
   const wishes = cappedWishes(pack, rollWishes(pack, wanted));
-
-  // A listing of random pages, then their details twenty a request, then
-  // the text and picture of every candidate at once, ten at a time, until
-  // the pack is full. A page without a picture is not a card, and on a wiki
-  // of short pages most are not, so every candidate a round brought back is
-  // tried rather than a chosen few. Each round says what it found, so a
-  // pack that comes back empty can be read in the console.
   const out = [];
   const seen = new Set();
-  for (let round = 0; out.length < wanted && round < 5 && !outOfTime(); round++) {
+  // Why candidates were turned away, for the console: a pack that comes
+  // back empty has to be readable from the outside.
+  const tally = { noText: 0, noImage: 0, other: 0 };
+  const say = (what) => console.info(`Wikster custom draw "${pack.name}" on ${wiki.apiUrl}: ${what}; turned away: ${tally.noText} without text, ${tally.noImage} without picture, ${tally.other} other`);
+
+  // First the pool: a listing of random pages, their details twenty a
+  // request, then the text and picture of every candidate, ten at a time.
+  for (let round = 0; out.length < wanted && round < 3 && !outOfTime(); round++) {
     const ids = await randomIds(wiki, 20).catch(() => []);
     let details = ids.length ? await customPagesDetail(wiki, ids).catch(() => []) : [];
-    // A wiki that will not answer for twenty pages at once is asked one
-    // page at a time, in parallel, for the first ten.
     if (!details.length && ids.length) {
       details = (await Promise.all(ids.slice(0, 10).map((id) => customPageDetail(wiki, id).catch(() => null)))).filter(Boolean);
     }
@@ -871,15 +898,25 @@ async function drawCustomSet(pack) {
     for (const proto of protos) seen.add(proto.page.title);
     let built = 0;
     for (let i = 0; i < protos.length && out.length < wanted && !outOfTime(); i += 10) {
-      const cards = await Promise.all(protos.slice(i, i + 10).map((proto) => finishCustomCard(wiki, proto, pack).catch(() => null)));
-      for (const card of cards) { if (card && out.length < wanted) { out.push(card); built++; } }
+      const settled = await Promise.allSettled(protos.slice(i, i + 10).map((proto) => finishCustomCard(wiki, proto, pack)));
+      for (const result of settled) {
+        if (result.status === 'fulfilled' && result.value) { if (out.length < wanted) { out.push(result.value); built++; } }
+        else tally[result.reason?.message === 'NO_TEXT' ? 'noText' : result.reason?.message === 'NO_IMAGE' ? 'noImage' : 'other']++;
+      }
     }
-    console.info(`Wikster custom draw "${pack.name}" round ${round + 1}: ${ids.length} random, ${details.length} detailed, ${protos.length} candidates, ${built} cards`);
+    say(`pool round ${round + 1}: ${ids.length} random, ${details.length} detailed, ${protos.length} candidates, ${built} cards`);
     if (!ids.length) break;
   }
 
+  // Then, for whatever is still owed, the old way, one hunt per card at once.
+  if (out.length < wanted && !outOfTime()) {
+    const hunted = await Promise.all(Array.from({ length: wanted - out.length }, () => huntCustomCard(wiki, pack, seen, outOfTime, tally)));
+    for (const card of hunted) if (card) out.push(card);
+    say(`hunt: ${hunted.filter(Boolean).length} of ${hunted.length} cards`);
+  }
+
   if (!out.length) throw new Error(`No usable page found on ${wiki.sitename}`);
-  return stampPrints(out, wishes);
+  return stampPrints(out.slice(0, wanted), wishes);
 }
 
 /** The article's full plain text (lead and body), for the quiz. */
