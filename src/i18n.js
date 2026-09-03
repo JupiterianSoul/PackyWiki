@@ -258,6 +258,8 @@ const STRINGS = {
     framesLocked: 'Frames appear at level 10.',
     frameEquipped: 'Frame style: {name}',
     updatesIntro: 'Everything that has shipped, in order. The newest sits on top.',
+    updateNumbered: 'The {n} update',
+    updateNumbered: 'La {n} mise à jour',
     updatesLatest: 'Latest',
     tabQuiz: 'Quiz',
     quizIntro: 'Pick a subject. One card, a few questions, real rewards at the end.',

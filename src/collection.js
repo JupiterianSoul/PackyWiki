@@ -654,14 +654,26 @@ export function saveMyBids(ids) {
  * Up to four badge ids, chosen on the Badges screen. Empty means "let the
  * app pick": the best-ranked earned chips fill the shelf by default. */
 const LOADOUT_KEY = 'wikster.badgeLoadout.v1';
+/**
+ * The chips worn on the profile. `null` means nobody has chosen yet, and the
+ * profile shows the best-ranked earned badges on its own; an ARRAY, empty
+ * included, is a choice and is shown exactly as it is. The two used to be
+ * the same thing, so taking every badge off emptied the list and the
+ * profile read the empty list as "no choice" and put the four back.
+ */
 export function loadBadgeLoadout() {
   try {
-    const raw = JSON.parse(localStorage.getItem(LOADOUT_KEY) ?? '[]');
-    return Array.isArray(raw) ? raw.filter((id) => typeof id === 'string').slice(0, 4) : [];
-  } catch { return []; }
+    const raw = localStorage.getItem(LOADOUT_KEY);
+    if (raw === null) return null;
+    const ids = JSON.parse(raw);
+    return Array.isArray(ids) ? ids.filter((id) => typeof id === 'string').slice(0, 4) : null;
+  } catch { return null; }
 }
 export function saveBadgeLoadout(ids) {
-  try { localStorage.setItem(LOADOUT_KEY, JSON.stringify(ids.slice(0, 4))); } catch { /* storage unavailable */ }
+  try {
+    if (ids === null) localStorage.removeItem(LOADOUT_KEY);
+    else localStorage.setItem(LOADOUT_KEY, JSON.stringify(ids.slice(0, 4)));
+  } catch { /* storage unavailable */ }
 }
 
 /* --- the equipped level-frame style ---------------------------------------

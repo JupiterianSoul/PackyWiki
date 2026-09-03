@@ -2645,12 +2645,40 @@ async function refreshWishes() {
   } catch { /* no friend wishes today */ }
 }
 
-function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = false, ownedTag = false, wish = true } = {}) {
-  // `lit` runs the tier's animations. Only the one card you are actually
-  // looking at (reveal, detail) earns it - a binder page of forty lit cards
-  // is forty looping animations and a hot phone.
+/*
+ * A card is LIT while it is on screen. Lit means its tier's animations run
+ * and it answers the tilt of the phone: the full treatment a card gets in
+ * the reveal. Everywhere else used to show cards unlit for the phone's sake,
+ * forty looping animations being a hot pocket, but a collection of dead
+ * cards is a sad collection. The compromise is the screen itself: a card is
+ * lit the moment it scrolls into view and put out the moment it leaves, so
+ * only what is actually being looked at is ever animating.
+ */
+const litWatcher = typeof IntersectionObserver === 'function'
+  ? new IntersectionObserver((entries) => {
+    for (const { target, isIntersecting } of entries) {
+      if (isIntersecting) {
+        target.classList.add('is-lit');
+        if (!target.dataset.tilted) { target.dataset.tilted = '1'; attachTilt(target); }
+        tilt.watch(target);
+      } else {
+        target.classList.remove('is-lit');
+        tilt.forget(target);
+      }
+    }
+  }, { rootMargin: '80px 0px', threshold: 0.05 })
+  : null;
+
+function lightWhenVisible(card) {
+  if (!litWatcher) { card.classList.add('is-lit'); return; }
+  litWatcher.observe(card);
+}
+
+function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = 'auto', ownedTag = false, wish = true } = {}) {
+  // `lit` runs the tier's animations: `true` always (the one card in a
+  // sheet), `'auto'` while it is on screen (every grid), `false` never.
   const card = document.createElement('article');
-  card.className = `card is-revealed${lit ? ' is-lit' : ''}`;
+  card.className = `card is-revealed${lit === true ? ' is-lit' : ''}`;
   applyRarityVars(card, rarity);
   card.innerHTML = `<div class="card-inner"><div class="card-face card-front">${CARD_FRONT_MARKUP}</div></div>`;
   const front = card.querySelector('.card-front');
@@ -2668,7 +2696,8 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = fals
     wireWishButton(wishButton, data);
   }
   if (entryKey) card.addEventListener('click', () => openCardDetail(entryKey, data, rarity));
-  if (lit) { attachTilt(card); queueMicrotask(() => tilt.watch(card)); }
+  if (lit === true) { attachTilt(card); queueMicrotask(() => tilt.watch(card)); }
+  else if (lit === 'auto') lightWhenVisible(card);
   return card;
 }
 
@@ -2884,6 +2913,12 @@ const tilt = {
     if (this.cards.has(card)) return;
     this.cards.set(card, { tx: 0, ty: 0, drag: null, phase: Math.random() * Math.PI * 2 });
     this.wake();
+  },
+  /** A card that left the screen, or the page: no frame is spent on it. */
+  forget(card) {
+    this.cards.delete(card);
+    card.style.removeProperty('--tilt-x');
+    card.style.removeProperty('--tilt-y');
   },
   hold(card, tx, ty) {
     const c = this.cards.get(card);
@@ -4228,7 +4263,7 @@ function allBadgeStates() {
 /** Put a badge on the profile without asking: the code's own, the moment it is redeemed. */
 function wearBadge(id) {
   const states = allBadgeStates();
-  if (state.badgeLoadout.length === 0) state.badgeLoadout = wornBadges(states).map((w) => w.badge.id);
+  if (state.badgeLoadout === null) state.badgeLoadout = wornBadges(states).map((w) => w.badge.id);
   const worn = state.badgeLoadout;
   if (!worn.includes(id)) {
     if (worn.length >= 4) worn.shift();
@@ -4243,10 +4278,14 @@ function wearBadge(id) {
  *  chosen, the best-ranked earned ones. */
 function wornBadges(states) {
   const earned = states.filter((st) => st.rank > 0);
-  const chosen = state.badgeLoadout
-    .map((id) => earned.find((st) => st.badge.id === id))
-    .filter(Boolean);
-  if (chosen.length) return chosen.slice(0, 4);
+  // A choice, empty included, is shown as made. Only the absence of any
+  // choice falls back to the automatic shelf.
+  if (state.badgeLoadout !== null) {
+    return state.badgeLoadout
+      .map((id) => earned.find((st) => st.badge.id === id))
+      .filter(Boolean)
+      .slice(0, 4);
+  }
   return [...earned]
     .sort((a, b) => (b.rank / b.max) - (a.rank / a.max) || b.rank - a.rank)
     .slice(0, 4);
@@ -4315,7 +4354,7 @@ function renderBadgesScreen() {
  *  disagree about what "worn" means. */
 function toggleBadgeEquip(st) {
   const states = allBadgeStates();
-  if (state.badgeLoadout.length === 0) {
+  if (state.badgeLoadout === null) {
     state.badgeLoadout = wornBadges(states).map((w) => w.badge.id);
   }
   const worn = state.badgeLoadout;
@@ -5937,6 +5976,27 @@ function openFriendAlbum(entry, album) {
  * Every release since the first, newest on top, no dates: the order is the
  * story. Content lives in src/data/releases.js, bilingual.
  */
+/**
+ * What a release is called on the timeline. The newest four, and every one
+ * after them, are simply numbered: "The 14th update". A themed name ages
+ * badly as the list grows, and by the time the list is long nobody can tell
+ * which came when from names alone. The oldest keep their names as history.
+ */
+const NUMBERED_RELEASES = 4;
+
+function ordinal(n) {
+  if (getLanguage() === 'fr') return n === 1 ? '1re' : `${n}e`;
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
+  return `${n}${['th', 'st', 'nd', 'rd'][n % 10] ?? 'th'}`;
+}
+
+function releaseTitle(release) {
+  const index = RELEASES.indexOf(release);
+  if (index < 0 || index < RELEASES.length - NUMBERED_RELEASES) return tx(release.title);
+  return t('updateNumbered', { n: ordinal(index + 1) });
+}
+
 function renderUpdates() {
   el.updatesTitle.textContent = t('tabUpdates');
   el.updatesSub.textContent = t('updatesIntro');
@@ -5949,7 +6009,7 @@ function renderUpdates() {
       <span class="tl-node">${iconSvg(release.icon, { size: 16 })}</span>
       <div class="tl-head"><h3></h3>${i === 0 ? '<span class="tl-latest"></span>' : ''}</div>
       <ul class="tl-points"></ul>`;
-    item.querySelector('h3').textContent = tx(release.title);
+    item.querySelector('h3').textContent = releaseTitle(release);
     if (i === 0) item.querySelector('.tl-latest').textContent = t('updatesLatest');
     item.querySelector('.tl-points').replaceChildren(...release.points.map((point) => {
       const li = document.createElement('li');
@@ -5972,7 +6032,7 @@ function renderUpdates() {
 
 /** Everything that release changed, in one sheet. */
 function openChangelog(release) {
-  openSheet(tx(release.title), (body) => {
+  openSheet(releaseTitle(release), (body) => {
     const list = document.createElement('ul');
     list.className = 'tl-points is-full';
     list.replaceChildren(...release.changelog.map((line) => {
@@ -7171,8 +7231,8 @@ async function removeAllCards() {
   store.saveInventory(state.inventory);
 
   store.saveWallet(STARTER_COINS);
-  store.saveBadgeLoadout([]);
-  state.badgeLoadout = [];
+  store.saveBadgeLoadout(null);
+  state.badgeLoadout = null;
   store.saveWishlist([]);
   try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); } catch { /* session only */ }
 
