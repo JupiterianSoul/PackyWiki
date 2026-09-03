@@ -426,6 +426,48 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .vault-copy b { font-size: 0.86rem; color: var(--tier); line-height: 1.25; }
 .vault-copy p { font-size: 0.68rem; color: var(--ink-faint); }
 .vault-row .buy { width: auto; min-width: 92px; flex: none; }
+.vault-chance { color: var(--tier) !important; font-weight: 700; }
+
+/* Bundles: three wrappers fanned behind one price. */
+.shop-tile { position: relative; }
+.shop-tile-stack { display: flex; justify-content: center; }
+.shop-tile-stack > * + * { margin-left: -34px; }
+.shop-tile-stack > *:nth-child(2) { transform: translateY(-4px) rotate(4deg); }
+.shop-tile-stack > *:nth-child(3) { transform: translateY(-8px) rotate(8deg); }
+.shop-tile-tag {
+  position: absolute; top: 10px; right: 10px;
+  padding: 3px 8px; border-radius: 999px;
+  font-size: 0.68rem; font-weight: 800; letter-spacing: 0.02em;
+  color: var(--positive); background: color-mix(in srgb, var(--positive) 16%, transparent);
+}
+
+/* The crate: a sealed box until bought. */
+.shop-crate {
+  display: grid; grid-template-columns: auto 1fr; align-items: center; gap: 14px;
+  padding: 14px;
+}
+.shop-crate-art {
+  width: 72px; height: 72px; display: grid; place-items: center;
+  border-radius: var(--radius-lg); color: var(--accent);
+  background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--accent) 12%, transparent) 0 8px, transparent 8px 16px);
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.shop-crate.is-opened .shop-crate-art { background: none; border-style: solid; }
+.shop-crate-copy { display: grid; gap: 4px; min-width: 0; }
+.shop-crate-copy h3 { font-size: 1rem; line-height: 1.2; }
+.shop-crate > .buy { grid-column: 1 / -1; }
+
+/* The sizer: how many cards go in a booster you built. */
+.sizer { display: grid; gap: 6px; padding: 8px 0 10px; }
+.sizer-label { font-size: 0.68rem; color: var(--ink-faint); }
+.sizer-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.sizer-btn {
+  width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center;
+  border: var(--border) var(--border-style) var(--line); background: var(--surface-2); color: var(--ink);
+}
+.sizer-btn:disabled { opacity: 0.35; }
+.sizer-count { font-size: 0.92rem; }
+.sizer-per { font-size: 0.7rem; color: var(--ink-dim); text-align: center; }
 
 .buy {
   display: grid;

@@ -40,6 +40,19 @@ const THEME_SURCHARGE = 1.25;
 /** How many cards a shop booster can hold. */
 export const CARD_COUNT_RANGE = [3, 7];
 
+/** How many cards a booster the player sizes themselves may hold. */
+export const CUSTOM_CARD_RANGE = [1, 10];
+
+/**
+ * The wrapper: what a booster costs on top of its cards, whatever it
+ * holds. Priced per card alone, two one-card boosters would cost exactly one
+ * two-card booster, and a player could split any pack into singles for the
+ * pick of the prints at no cost. The wrapper is a little over one card's
+ * worth, so a pack of one is dear and a pack of ten is the bargain, and the
+ * two prices always land in that order.
+ */
+export const WRAPPER_CARDS = 1.2;
+
 /* --- what a pack is allowed to draw --------------------------------------- */
 
 /**
@@ -97,11 +110,18 @@ export function expectedCardValue(spec) {
 /** What the shop charges. */
 export function boosterPrice(spec) {
   const cards = spec.cards ?? 5;
-  const raw = (expectedCardValue(spec) * cards * SELL_RATE) / RETURN_RATE;
+  const perCard = (expectedCardValue(spec) * SELL_RATE) / RETURN_RATE;
+  const raw = perCard * (cards + WRAPPER_CARDS);
   const themed = spec.themeId || spec.kind === 'custom' ? THEME_SURCHARGE : 1;
   // Round to something that reads like a price tag.
-  return Math.round((raw * themed) / 5) * 5;
+  return Math.max(5, Math.round((raw * themed) / 5) * 5);
 }
+
+/** A bundle of the same booster, a little under the sum of its parts. */
+export const BUNDLE_SIZE = 3;
+export const BUNDLE_OFF_PCT = 12;
+export const bundlePrice = (spec) =>
+  Math.max(5, Math.round((boosterPrice(spec) * BUNDLE_SIZE * (100 - BUNDLE_OFF_PCT)) / 100 / 5) * 5);
 
 /** What the player gets for a card. */
 export const sellPriceFor = (price) => Math.max(1, Math.round(price * SELL_RATE));

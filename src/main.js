@@ -34,6 +34,7 @@ import {
   nextFreeAt, freeWindowAt, STARTER_PACKS, STARTER_PACK_CARDS, STARTER_COINS
 } from './economy.js';
 import { generateShop, formatCountdown } from './shop.js';
+import { CUSTOM_CARD_RANGE, BUNDLE_SIZE, BUNDLE_OFF_PCT } from './economy.js';
 import {
   specId, specName, specTagline, specColours, specIcon, toDrawPack
 } from './booster.js';
@@ -1226,11 +1227,16 @@ function renderShop() {
       title: t('shopSubjects'),
       body: shopGrid(market.subjects.map((item) => shopTile(item)))
     }),
-    buildShopSection({ title: t('shopVault'), note: t('shopVaultNote'), body: buildVault(market.vault) }),
+    buildShopSection({ title: t('shopPress'), note: t('shopPressNote'), body: buildPress(market.vault) }),
+    buildShopSection({
+      title: t('shopBundles'), note: t('shopBundlesNote', { pct: BUNDLE_OFF_PCT }),
+      body: shopGrid(market.bundles.map((item) => bundleTile(item)))
+    }),
+    buildShopSection({ title: t('shopCrate'), note: t('shopCrateNote'), body: buildCrate(market.crate) }),
     market.customs.length
       ? buildShopSection({
-          title: t('shopCustomRow'),
-          body: shopGrid(market.customs.map((item) => shopTile(item)))
+          title: t('shopCustomRow'), note: t('shopSizeNote'),
+          body: shopGrid(market.customs.map((item) => customTile(item)))
         })
       : null
   ];
@@ -1257,14 +1263,14 @@ function shopGrid(tiles) {
 }
 
 /** The one price control everywhere in the market. */
-function buyButton(spec, price) {
+function buyButton(spec, price, { count = 1, after = null } = {}) {
   const buy = document.createElement('button');
   buy.type = 'button';
   buy.className = 'buy';
   press(buy, { sound: null });
   buy.classList.toggle('is-poor', price > state.wallet);
   buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(price)}</span>`;
-  buy.addEventListener('click', () => purchase(spec, price, buy));
+  buy.addEventListener('click', () => { if (purchase(spec, price, buy, count)) after?.(); });
   return buy;
 }
 
@@ -1336,25 +1342,141 @@ function buildFeatured({ spec, price, fullPrice, pct }) {
   return sec;
 }
 
-/** The vault: one row per tier on offer, its floor spelled out in reads. */
-function buildVault(items) {
+/** The press: one row per tier on offer, sold with its real chance. */
+function buildPress(items) {
   const list = document.createElement('div');
   list.className = 'vault';
-  list.replaceChildren(...items.map(({ id, spec, price, rarity }) => {
+  list.replaceChildren(...items.map(({ id, spec, price, rarity, chance }) => {
     const row = document.createElement('div');
     row.className = 'vault-row';
     row.dataset.spec = id;
     row.style.setProperty('--tier', rarity.color);
     row.innerHTML = `
       <span class="vault-gem">${iconSvg('gem', { size: 19 })}</span>
-      <div class="vault-copy"><b></b><p class="tabular"></p></div>`;
+      <div class="vault-copy"><b></b><p class="tabular"></p><p class="tabular vault-chance"></p></div>`;
     row.querySelector('b').textContent = specName(spec);
     row.querySelector('p').textContent =
       `${t('shopItemMeta', { n: spec.cards })} · ${t('shopGuarantee', { rarity: tx(rarity.name) })}`;
+    row.querySelector('.vault-chance').textContent =
+      t('shopPressChance', { pct: Math.round(chance * 100), rarity: tx(rarity.name) });
     row.appendChild(buyButton(spec, price));
     return row;
   }));
   return list;
+}
+
+/** A bundle: three of one booster, one price, one tap. */
+function bundleTile({ id, spec, price, each }) {
+  const tile = document.createElement('div');
+  tile.className = 'shop-tile is-bundle';
+  tile.dataset.spec = id;
+  const art = document.createElement('div');
+  art.className = 'shop-tile-art shop-tile-stack';
+  for (let i = 0; i < BUNDLE_SIZE; i++) art.appendChild(buildBooster(spec, { size: 'is-tiny' }));
+  tile.appendChild(art);
+  const name = document.createElement('p');
+  name.className = 'shop-tile-name';
+  name.textContent = specName(spec);
+  tile.appendChild(name);
+  const meta = document.createElement('p');
+  meta.className = 'shop-tile-meta';
+  meta.innerHTML = t('shopBundleMeta', { n: BUNDLE_SIZE, each: money(each) });
+  tile.appendChild(meta);
+  const tag = document.createElement('span');
+  tag.className = 'shop-tile-tag';
+  tag.textContent = `-${BUNDLE_OFF_PCT}%`;
+  tile.appendChild(tag);
+  tile.appendChild(buyButton(spec, price, { count: BUNDLE_SIZE }));
+  return tile;
+}
+
+/** The crate: a booster with its label sealed until it is bought. */
+function buildCrate({ id, spec, price }) {
+  const tile = document.createElement('div');
+  tile.className = 'shop-crate panel';
+  tile.dataset.spec = id;
+  tile.innerHTML = `
+    <div class="shop-crate-art">${iconSvg('gift', { size: 44 })}</div>
+    <div class="shop-crate-copy"><h3></h3><p class="shop-tile-meta"></p></div>`;
+  tile.querySelector('h3').textContent = t('shopCrateName');
+  tile.querySelector('.shop-tile-meta').textContent = t('shopCrateMeta', { n: spec.cards });
+  const buy = buyButton(spec, price, {
+    after: () => {
+      toast(esc(t('shopCrateOpened', { name: specName(spec) })), 'ok');
+      // The label comes off: the crate shows what it was, until the restock.
+      tile.classList.add('is-opened');
+      tile.querySelector('h3').textContent = specName(spec);
+      paintTileMeta(tile.querySelector('.shop-tile-meta'), spec);
+      tile.querySelector('.shop-crate-art').replaceChildren(buildBooster(spec, { size: 'is-tiny' }));
+    }
+  });
+  tile.appendChild(buy);
+  return tile;
+}
+
+/**
+ * A booster the player built, sized by the player: a stepper from one card
+ * to ten, the price following live. The wrapper (economy.WRAPPER_CARDS) is
+ * what keeps the sizes honest against each other: the per-card price
+ * shown falls as the booster grows, and two of one card always cost more
+ * than one of two.
+ */
+function customTile({ id, spec, price }) {
+  const tile = document.createElement('div');
+  tile.className = 'shop-tile is-sized';
+  tile.dataset.spec = id;
+  const chosen = { ...spec, cards: Math.min(CUSTOM_CARD_RANGE[1], Math.max(CUSTOM_CARD_RANGE[0], spec.cards ?? 5)) };
+
+  const art = document.createElement('div');
+  art.className = 'shop-tile-art';
+  art.appendChild(buildBooster(chosen, { size: 'is-tiny' }));
+  tile.appendChild(art);
+  const name = document.createElement('p');
+  name.className = 'shop-tile-name';
+  name.textContent = specName(chosen);
+  tile.appendChild(name);
+
+  const sizer = document.createElement('div');
+  sizer.className = 'sizer';
+  sizer.innerHTML = `
+    <span class="sizer-label"></span>
+    <div class="sizer-row">
+      <button type="button" class="sizer-btn" data-step="-1" aria-label="-">${iconSvg('minus', { size: 14 })}</button>
+      <b class="sizer-count tabular"></b>
+      <button type="button" class="sizer-btn" data-step="1" aria-label="+">${iconSvg('plus', { size: 14 })}</button>
+    </div>
+    <p class="sizer-per tabular"></p>`;
+  sizer.querySelector('.sizer-label').textContent = t('shopSizeLabel');
+  tile.appendChild(sizer);
+
+  const buy = document.createElement('button');
+  buy.type = 'button';
+  buy.className = 'buy';
+  press(buy, { sound: null });
+  tile.appendChild(buy);
+
+  const paint = () => {
+    const cost = boosterPrice(chosen);
+    sizer.querySelector('.sizer-count').textContent = t('shopItemMeta', { n: chosen.cards });
+    sizer.querySelector('.sizer-per').innerHTML = t('shopPerCard', { amount: money(Math.round(cost / chosen.cards)) });
+    sizer.querySelector('[data-step="-1"]').disabled = chosen.cards <= CUSTOM_CARD_RANGE[0];
+    sizer.querySelector('[data-step="1"]').disabled = chosen.cards >= CUSTOM_CARD_RANGE[1];
+    buy.classList.toggle('is-poor', cost > state.wallet);
+    buy.innerHTML = `<span class="buy-label">${t('buy')}</span><span class="buy-price">${money(cost)}</span>`;
+    buy.onclick = () => purchase({ ...chosen }, cost, buy);
+  };
+  sizer.querySelectorAll('.sizer-btn').forEach((btn) => {
+    press(btn, { sound: null });
+    btn.addEventListener('click', () => {
+      const next = chosen.cards + Number(btn.dataset.step);
+      if (next < CUSTOM_CARD_RANGE[0] || next > CUSTOM_CARD_RANGE[1]) return;
+      chosen.cards = next;
+      synth.playTap();
+      paint();
+    });
+  });
+  paint();
+  return tile;
 }
 
 /**
@@ -1382,20 +1504,21 @@ function takeFree(id, spec, button) {
   renderPacks();
 }
 
-function purchase(spec, price, button) {
+function purchase(spec, price, button, count = 1) {
   if (state.wallet < price) {
     synth.playDenied();
     toast(t('cantAfford'), 'error');
-    return;
+    return false;
   }
   store.saveWallet(state.wallet - price);
-  gainBooster(spec, 1);
+  gainBooster(spec, count);
   refreshWallet();
   synth.playPurchase();
   button.classList.add('is-bought');
   setTimeout(() => button.classList.remove('is-bought'), 700);
-  toast(`${t('bought')} ${specName(spec)}`, 'ok');
+  toast(`${t('bought')} ${count > 1 ? `${count} × ` : ''}${specName(spec)}`, 'ok');
   renderPacks();
+  return true;
 }
 
 function tickRestock() {

@@ -17,8 +17,9 @@
 import { THEME_PACKS } from './data/packs.js';
 import { RARITIES, rarityRank } from './data/rarities.js';
 import {
-  CARD_COUNT_RANGE, windowIndexAt, boosterPrice, FREE_SLOTS, FREE_CARDS, freeWindowAt
+  CARD_COUNT_RANGE, windowIndexAt, boosterPrice, bundlePrice, FREE_SLOTS, FREE_CARDS, freeWindowAt
 } from './economy.js';
+import { chanceOfAtLeast } from './data/odds.js';
 import { specId } from './booster.js';
 
 /** Deterministic PRNG - same window, same shop, on every device and reload. */
@@ -140,8 +141,10 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
     if (item) subjects.push(item);
   }
 
-  // THE VAULT: tier boosters. A tier booster only draws pages famous enough
-  // for its tier (see economy.drawCapsFor), and availability thins fast.
+  // THE PRESS: tier boosters. A tier booster rolls its prints on a better
+  // row and always carries at least one of its tier; the press stocks the
+  // higher rows more rarely. Each row is sold with its real chance of
+  // paying at least its tier, straight off the table.
   const vault = [];
   for (const rarity of RARITIES) {
     const odds = VAULT_ODDS[rarity.id] ?? 0;
@@ -154,10 +157,40 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
       cards: between(rng, 4, 6)
     });
     if (item) {
-      vault.push({ ...item, rarity });
+      vault.push({ ...item, rarity, chance: chanceOfAtLeast(rarity.id, rarity.id) });
     }
   }
   vault.sort((a, b) => rarityRank(a.rarity.id) - rarityRank(b.rarity.id));
+
+  // BUNDLES: three of one subject booster, twelve percent under the sum.
+  // Safe by construction: even at that, opening and selling loses money.
+  const bundles = [];
+  const bundlePool = [...THEME_PACKS];
+  while (bundles.length < 2 && bundlePool.length) {
+    const theme = bundlePool.splice(Math.floor(rng() * bundlePool.length), 1)[0];
+    const spec = { kind: 'theme', themeId: theme.id, rarityId: rng() < 0.35 ? RARITIES[1].id : null, cards: 5 };
+    const id = `bundle|${specId(spec)}`;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    bundles.push({ id, spec, price: bundlePrice(spec), each: boosterPrice(spec) });
+  }
+
+  // THE CRATE: one booster whose subject and tier are not on the label. It
+  // is priced as a plain subject booster and a third of the time it is a
+  // tier booster, so on average the crate is the better buy; the rest of
+  // the time it is exactly what it cost. What it is stays sealed until it
+  // is bought.
+  const crateSpec = {
+    kind: 'theme',
+    themeId: pick(rng, THEME_PACKS).id,
+    rarityId: rng() < 0.34 ? featureTier(rng) : null,
+    cards: between(rng, 4, 6)
+  };
+  const crate = {
+    id: `crate|${windowIndex}`,
+    spec: crateSpec,
+    price: boosterPrice({ ...crateSpec, rarityId: null })
+  };
 
   // YOUR PACKS: everything the player has built, always buyable. Custom
   // boosters were free once, which was an obvious hole - build, open, sell,
@@ -168,7 +201,7 @@ export function generateShop(windowIndex = windowIndexAt(), customPacks = [], fr
     if (item) customs.push(item);
   }
 
-  return { featured, free, subjects, vault, customs };
+  return { featured, free, subjects, vault, bundles, crate, customs };
 }
 
 /** "1h 24m" - how long until the shelves change. */

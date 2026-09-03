@@ -170,6 +170,8 @@ const ICONS = {
   clock: `
     <circle cx="12" cy="12" r="8.4"/>
     <path d="M12 7.2V12l3.2 1.9"/>`,
+  plus: `<path d="M12 5v14M5 12h14"/>`,
+  minus: `<path d="M5 12h14"/>`,
   gift: `
     <path d="M3.8 10.2h16.4v3H3.8z"/>
     <path d="M5.2 13.2h13.6v6.4H5.2z"/>
