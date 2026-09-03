@@ -378,12 +378,18 @@ daily, weekly and all-time, kept by a trigger over every score submitted;
 Sunday. A page is twenty rows and the player's own standing comes back
 separately so it can be pinned to the bottom of the screen.
 
-Deploying the arcade to a Supabase project takes three steps:
+Deploying the arcade to a Supabase project takes three steps: run
+`supabase/schema.sql` (V6) in the SQL editor, enable the `pg_cron` extension
+under Database, Extensions, and deploy the functions. The functions are
+deployed by GitHub: `.github/workflows/supabase.yml` runs
+`supabase functions deploy` for every function on each push that touches
+one, once the repository holds a `SUPABASE_ACCESS_TOKEN` secret (a personal
+access token from the Supabase dashboard, Account, Access Tokens). From a
+terminal instead:
 
 ```
-supabase functions deploy slots roulette quests
-# then run supabase/schema.sql (V6) in the SQL editor
-# and enable the pg_cron extension under Database > Extensions
+npx supabase login
+npx supabase functions deploy slots roulette quests --project-ref lfcehzltokzaymnqodgh
 ```
 
 `tools/sync-game-tables.mjs` copies the books (slots, roulette, quests) into

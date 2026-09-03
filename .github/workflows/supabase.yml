@@ -1,0 +1,59 @@
+# The edge functions, deployed to the Supabase project by GitHub rather than
+# from someone's terminal. Every push that touches a function redeploys all
+# of them, and a run can be started by hand from the Actions tab.
+#
+# One thing has to be done by hand, once: a personal access token from
+# https://supabase.com/dashboard/account/tokens, saved in this repository as
+# the secret SUPABASE_ACCESS_TOKEN (Settings > Secrets and variables >
+# Actions > New repository secret). Without it the run stops at the first
+# step and says so. The project ref is public (it is the subdomain of the
+# API URL shipped in .env.production), so it lives here in the open.
+name: Deploy the Supabase functions
+
+on:
+  push:
+    branches: [main, master, 'claude/**']
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/supabase.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-functions
+  cancel-in-progress: false
+
+env:
+  PROJECT_REF: lfcehzltokzaymnqodgh
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the access token is there
+        env:
+          TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::SUPABASE_ACCESS_TOKEN is not set. Create a token at https://supabase.com/dashboard/account/tokens and add it under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy every function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          supabase functions deploy slots roulette quests quiz delete-account --project-ref "$PROJECT_REF"
+
+      - name: List what the project now has
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: supabase functions list --project-ref "$PROJECT_REF"
