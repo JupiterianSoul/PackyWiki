@@ -185,9 +185,10 @@ falls as the tier rises and still bites harder in practice. Every alternate is
 painted in the rarity's own colour, so a choice never costs the ladder its
 legibility. The table is `src/data/fx.js`; the CSS lives under `[data-fx]`.
 
-**Level frames** open at a level of their own, from 25 to 450 across eight
-styles. A locked frame still shows its drawing, since the point is to see what
-you are climbing towards.
+**Level frames** open at a level of their own, from 15 to 200 across eight
+styles, and a ninth, the Singularity, waits at the level cap of 500. A locked
+frame still shows its drawing, since the point is to see what you are climbing
+towards.
 
 ## Accounts and the social side
 

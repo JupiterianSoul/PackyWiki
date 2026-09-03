@@ -29,13 +29,14 @@
  */
 export const FRAME_STYLES = [
   { id: 'metal',   minLevel: 1,   name: { en: 'Metal Ages',    fr: 'Âges du métal' } },
-  { id: 'circuit', minLevel: 25,  name: { en: 'Neon Circuit',  fr: 'Circuit néon' } },
-  { id: 'orbit',   minLevel: 60,  name: { en: 'Cosmic Orbit',  fr: 'Orbite cosmique' } },
-  { id: 'crest',   minLevel: 110, name: { en: 'Foil Crest',    fr: 'Blason métallisé' } },
-  { id: 'crystal', minLevel: 180, name: { en: 'Crystal Bloom', fr: 'Floraison de cristal' } },
-  { id: 'aurora',  minLevel: 260, name: { en: 'Aurora Veil',   fr: 'Voile aurore' } },
-  { id: 'runic',   minLevel: 350, name: { en: 'Runic Seal',    fr: 'Sceau runique' } },
-  { id: 'solar',   minLevel: 450, name: { en: 'Solar Crown',   fr: 'Couronne solaire' } },
+  { id: 'circuit', minLevel: 15,  name: { en: 'Neon Circuit',  fr: 'Circuit néon' } },
+  { id: 'orbit',   minLevel: 35,  name: { en: 'Cosmic Orbit',  fr: 'Orbite cosmique' } },
+  { id: 'crest',   minLevel: 60,  name: { en: 'Foil Crest',    fr: 'Blason métallisé' } },
+  { id: 'crystal', minLevel: 90,  name: { en: 'Crystal Bloom', fr: 'Floraison de cristal' } },
+  { id: 'aurora',  minLevel: 125, name: { en: 'Aurora Veil',   fr: 'Voile aurore' } },
+  { id: 'runic',   minLevel: 160, name: { en: 'Runic Seal',    fr: 'Sceau runique' } },
+  { id: 'solar',   minLevel: 200, name: { en: 'Solar Crown',   fr: 'Couronne solaire' } },
+  { id: 'singularity', minLevel: 500, name: { en: 'Singularity', fr: 'Singularité' } },
   { id: 'god',     minLevel: Infinity, code: 'creator',
     name: { en: 'Apotheosis', fr: 'Apothéose' } },
   { id: 'hellfire', minLevel: Infinity, code: 'hellfire',
@@ -502,9 +503,54 @@ function drawHellfire(t, uid) {
     </g>`;
 }
 
+/* --- SINGULARITY: the frame at the top of the ladder -------------------------
+ * Level 500 and nothing less, so it never has to sit politely beside the
+ * others: the wrapped circle becomes a black hole. A photon ring so thin it
+ * is almost not there, three rings of an accretion disc turning at three
+ * speeds (sing-* in screens.css), lensed arcs of light bent around the
+ * horizon, two jets pulsing from the poles, and stars circling inward. The
+ * tier only decides how many stars have already been caught. */
+function drawSingularity(t, uid) {
+  const g = `${uid}g`;
+  const defs = glowFilter(g, 2.2) +
+    `<linearGradient id="${uid}in" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/><stop offset="0.5" stop-color="#bae6fd"/><stop offset="1" stop-color="#7dd3fc" stop-opacity=".3"/></linearGradient>
+    <linearGradient id="${uid}mid" x1="1" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fde68a"/><stop offset="0.5" stop-color="#fbbf24"/><stop offset="1" stop-color="#f97316" stop-opacity=".25"/></linearGradient>
+    <linearGradient id="${uid}out" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#c084fc"/><stop offset="0.5" stop-color="#7c3aed"/><stop offset="1" stop-color="#312e81" stop-opacity=".2"/></linearGradient>
+    <linearGradient id="${uid}jet" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#e0f2fe" stop-opacity="0"/><stop offset="0.5" stop-color="#bae6fd"/><stop offset="1" stop-color="#e0f2fe" stop-opacity="0"/></linearGradient>
+    <radialGradient id="${uid}well"><stop offset="0.5" stop-color="#7c3aed" stop-opacity="0"/>
+      <stop offset="0.8" stop-color="#7c3aed" stop-opacity=".28"/><stop offset="1" stop-color="#7c3aed" stop-opacity="0"/></radialGradient>`;
+
+  const stars = Array.from({ length: 12 + Math.min(12, Math.floor(t / 4)) }, (_, i) => {
+    const n = 12 + Math.min(12, Math.floor(t / 4));
+    const a = (360 / n) * i + jit(i, 9) * 14;
+    const [x, y] = P(44 + jit(i, 10) * 9, a).split(',');
+    return `<circle cx="${x}" cy="${y}" r="${(0.6 + jit(i, 11) * 1.1).toFixed(2)}" fill="${i % 3 === 0 ? '#fff' : i % 3 === 1 ? '#bae6fd' : '#fde68a'}" class="sing-star sing-s${i % 3}"/>`;
+  }).join('');
+
+  return `<defs>${defs}</defs>
+    <circle r="54" fill="url(#${uid}well)" class="sing-well"/>
+    <g class="sing-stars">${stars}</g>
+    <g filter="url(#${g})">
+      <rect x="-1.2" y="-55" width="2.4" height="22" rx="1.2" fill="url(#${uid}jet)" class="sing-jet"/>
+      <rect x="-1.2" y="33" width="2.4" height="22" rx="1.2" fill="url(#${uid}jet)" class="sing-jet sing-jet-b"/>
+      <g class="sing-spin sing-out"><circle r="42.5" fill="none" stroke="url(#${uid}out)" stroke-width="3.2" stroke-dasharray="40 9 16 7" stroke-linecap="round"/></g>
+      <g class="sing-spin sing-mid"><circle r="37.5" fill="none" stroke="url(#${uid}mid)" stroke-width="4" stroke-dasharray="27 6 12 8" stroke-linecap="round"/></g>
+      <g class="sing-spin sing-in"><circle r="33" fill="none" stroke="url(#${uid}in)" stroke-width="2.6" stroke-dasharray="19 5 8 4" stroke-linecap="round"/></g>
+      ${arc(47.5, 196, 344, `stroke="#c4b5fd" stroke-width="0.9" stroke-opacity=".7" stroke-linecap="round" class="sing-lens"`)}
+      ${arc(47.5, 16, 164, `stroke="#c4b5fd" stroke-width="0.9" stroke-opacity=".7" stroke-linecap="round" class="sing-lens sing-lens-b"`)}
+      <circle r="30.8" fill="none" stroke="#05030c" stroke-width="2.2" stroke-opacity=".9"/>
+      <circle r="29.4" fill="none" stroke="#ffffff" stroke-width="1.3" class="sing-ring"/>
+    </g>`;
+}
+
 const DRAWERS = {
   metal: drawMetal, circuit: drawCircuit, orbit: drawOrbit, crest: drawCrest, crystal: drawCrystal,
-  aurora: drawAurora, runic: drawRunic, solar: drawSolar, god: drawGod, hellfire: drawHellfire
+  aurora: drawAurora, runic: drawRunic, solar: drawSolar, singularity: drawSingularity,
+  god: drawGod, hellfire: drawHellfire
 };
 
 /**

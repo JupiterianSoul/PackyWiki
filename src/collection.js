@@ -17,7 +17,7 @@ import { specId } from './booster.js';
 import {
   STARTER_COINS, STIPEND, STIPEND_MAX_BANKED, windowIndexAt, freeWindowAt
 } from './economy.js';
-import { emptyDaily } from './daily.js';
+import { normalizeDaily } from './daily.js';
 import { emptyTimed, accrue } from './timed.js';
 import { t } from './i18n.js';
 import { touch } from './save.js';
@@ -490,7 +490,7 @@ export function loadProfile() {
   profile.progress.level ??= 1;
   profile.progress.xp ??= 0;
   profile.pendingLevels ??= [];
-  profile.daily ??= emptyDaily();
+  profile.daily = normalizeDaily(profile.daily);
   profile.timed ??= emptyTimed();
   profile.freeTaken ??= { window: null, ids: [] };
   profile.achievements ??= { redeemed: [] };

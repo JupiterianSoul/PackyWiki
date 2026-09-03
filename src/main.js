@@ -40,8 +40,8 @@ import {
   MAX_LEVEL, xpForCard, xpForLevel, rankFor, rewardForLevel, addXp, levelFraction
 } from './progression.js';
 import {
-  generateBoard, canClaim, claim as claimDaily, nextIndex as nextGiftIndex, BOARD_SIZE,
-  msUntilNextDay, dayNumber
+  weekLadder, canClaim, claim as claimDaily, nextIndex as nextGiftIndex, WEEK,
+  msUntilNextUtcDay, utcDayNumber, loyaltyPct, streakAlive
 } from './daily.js';
 import {
   MAX_TIMED_LEVEL, TIMED_CARDS, accrue, msToNext, timedLevel, timedSpec, maxHeld,
@@ -149,6 +149,7 @@ const state = {
   packSlots: [],
   filters: { search: '', pack: '', rarity: '', band: '', minPrice: '', sort: 'rarity', favoritesOnly: false },
   binderView: store.loadBinderView(),   // 'albums' | 'classic'
+  friendView: 'albums',                 // how a friend's cards are laid out
 
   // Who is signed in, and what the server last told us about them.
   account: { session: null, profile: null, mode: 'signin', syncing: false, syncedAt: null, failed: false },
@@ -234,6 +235,8 @@ bind({
   binderTools: $('#binder-tools'), classicView: $('#classic-view'),
   classicFilter: $('#classic-filter'), classicFilterCount: $('#classic-filter-count'),
   classicCount: $('#classic-count'),
+  classicSearch: $('#classic-search'), classicSearchWrap: $('#classic-search-wrap'),
+  classicSearchMark: $('#classic-search-mark'),
   albumBook: $('#album-book'), albumLeaf: $('#album-leaf'),
   pageSlots: $('#page-slots'), pageno: $('#pageno'),
   albumDots: $('#album-dots'), albumHint: $('#album-hint'),
@@ -243,6 +246,7 @@ bind({
   friendsStale: $('#friends-stale'),
   chatBack: $('#chat-back'), chatAvatar: $('#chat-avatar'), chatName: $('#chat-name'),
   chatPresence: $('#chat-presence'), chatLog: $('#chat-log'),
+  chatWho: $('#chat-who'), chatTools: $('#chat-tools'), chatTyping: $('#chat-typing'),
   chatForm: $('#chat-form'), chatInput: $('#chat-input'), chatSend: $('#chat-send'),
   binderEmpty: $('#binder-empty'), binderEmptyMark: $('#binder-empty-mark'),
   binderEmptyText: $('#binder-empty-text'),
@@ -291,6 +295,9 @@ bind({
   friendBack: $('#friend-back'), friendName: $('#friend-name'), friendRing: $('#friend-ring'),
   friendLevel: $('#friend-level'), friendRank: $('#friend-rank'), friendStats: $('#friend-stats'),
   friendCardsLabel: $('#friend-cards-label'), friendCardsStatus: $('#friend-cards-status'),
+  friendStatsLabel: $('#friend-stats-label'), friendRarityLabel: $('#friend-rarity-label'),
+  friendRarityBars: $('#friend-rarity-bars'), friendSeg: $('#friend-seg'),
+  friendSegWrap: $('#friend-seg-wrap'), friendClassic: $('#friend-classic'),
    friendRemove: $('#friend-remove'),
 
   gate: $('#gate'), gateMark: $('#gate-mark'), gateTitle: $('#gate-title'), gateBody: $('#gate-body'),
@@ -358,12 +365,25 @@ function compactCount(n) {
   return String(n);
 }
 
+/**
+ * The small word at the bottom of the screen: a mark for the kind of news,
+ * the news itself, and a bar that drains while it is shown. A tap sends it
+ * away early; a new one replaces the old on the spot.
+ */
+const TOAST_MARKS = { ok: 'check', error: 'close', bought: 'gem', info: 'bell' };
 function toast(markup, kind = 'ok') {
-  el.toast.innerHTML = markup;
-  el.toast.className = `toast is-${kind} is-showing`;
-  el.toast.hidden = false;
+  const node = el.toast;
+  if (!node.dataset.bound) {
+    node.dataset.bound = '1';
+    node.addEventListener('click', () => node.classList.remove('is-showing'));
+  }
+  node.hidden = false;
+  node.className = `toast is-${kind}`;
+  node.innerHTML = `<span class="toast-mark" aria-hidden="true">${iconSvg(TOAST_MARKS[kind] ?? 'check', { size: 15 })}</span><span class="toast-text">${markup}</span><i class="toast-bar" aria-hidden="true"></i>`;
+  void node.offsetWidth;   // restart the entrance and the bar
+  node.classList.add('is-showing');
   clearTimeout(toast.timer);
-  toast.timer = setTimeout(() => { el.toast.classList.remove('is-showing'); }, 2600);
+  toast.timer = setTimeout(() => { node.classList.remove('is-showing'); }, 3200);
 }
 
 /* --- theming -------------------------------------------------------------------- */
@@ -449,6 +469,7 @@ function showScreen(name) {
   // every ten seconds for the rest of the session on a screen nobody is
   // looking at. Leaving the room stops it.
   if (name !== 'chat' && chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+  if (name !== 'chat') closeChatWire();
   // #app is the scroll container now, not the document.
   document.getElementById('app')?.scrollTo({ top: 0 });
 }
@@ -1539,14 +1560,23 @@ function bundleTile(item) {
   tile.dataset.spec = id;
   const art = document.createElement('div');
   art.className = 'shop-tile-art shop-tile-stack';
-  art.style.setProperty('--n', String(specs.length));
-  specs.forEach((spec, i) => {
+  // Three wrappers at most, fanned; a fourth is a number, never a fourth
+  // sleeve poking out of the pile.
+  const shown = specs.slice(0, 3);
+  art.style.setProperty('--n', String(shown.length));
+  shown.forEach((spec, i) => {
     const wrap = document.createElement('span');
     wrap.className = 'shop-tile-stack-item';
     wrap.style.setProperty('--i', String(i));
     wrap.appendChild(buildBooster(spec, { size: 'is-tiny' }));
     art.appendChild(wrap);
   });
+  if (specs.length > shown.length) {
+    const more = document.createElement('span');
+    more.className = 'shop-tile-stack-more tabular';
+    more.textContent = `+${specs.length - shown.length}`;
+    art.appendChild(more);
+  }
   tile.appendChild(art);
   const name = document.createElement('p');
   name.className = 'shop-tile-name';
@@ -2653,7 +2683,6 @@ const CARD_FRONT_MARKUP = `
   <div class="fx-code" aria-hidden="true"></div>
   <div class="fx-art" aria-hidden="true"></div>
   <div class="card-art"></div>
-  <button class="fav-button" type="button" aria-pressed="false"></button>
   <div class="card-body">
     <h3 class="card-title"></h3>
     <p class="card-desc"></p>
@@ -2807,15 +2836,27 @@ function wikitextLines(data) {
   ].map(cut);
 }
 
-function wireFavButton(button, entryKey) {
+/** The star, unwired. */
+function favButtonNode() {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'fav-button';
+  button.setAttribute('aria-pressed', 'false');
+  return button;
+}
+
+function wireFavButton(button, entryKey, { size = 16 } = {}) {
   const paint = () => {
     const on = Boolean(state.collection.entries[entryKey]?.favorite);
     button.classList.toggle('is-on', on);
     button.setAttribute('aria-pressed', String(on));
     button.setAttribute('aria-label', t('favourites'));
-    button.innerHTML = iconSvg(on ? 'starFilled' : 'star', { size: 16 });
+    button.innerHTML = iconSvg(on ? 'starFilled' : 'star', { size });
   };
   paint();
+  // The card under the star opens on click; the star's whole reach (it is
+  // drawn small and hit large) must never let that through.
+  button.addEventListener('pointerdown', (event) => event.stopPropagation());
   button.addEventListener('click', (event) => {
     event.stopPropagation();
     const on = store.toggleFavorite(state.collection, entryKey);
@@ -2835,7 +2876,11 @@ function bindCards(pulls) {
     const front = card.querySelector('.card-front');
     const data = { ...pull.article, price: pull.price, packIcon: pull.packIcon };
     fillFront(front, data, pull.rarity);
-    wireFavButton(front.querySelector('.fav-button'), pull.article.key);
+    // The star lives on the card, not on the face: a face that leans in 3D
+    // stops answering taps in Chrome, and a star nobody can press is a card
+    // that opens instead. It shows once the card is face up (CSS).
+    card.querySelector(':scope > .fav-button')?.remove();
+    wireFavButton(card.appendChild(favButtonNode()), pull.article.key);
     card.addEventListener('click', () => {
       if (!card.classList.contains('is-revealed')) return;
       openCardDetail(pull.article.key, data, pull.rarity);
@@ -3207,16 +3252,17 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = 'aut
   card.innerHTML = `<div class="card-inner"><div class="card-face card-front">${CARD_FRONT_MARKUP}</div></div>`;
   const front = card.querySelector('.card-front');
   fillFront(front, data, rarity, { ownedTag });
-  const favButton = front.querySelector('.fav-button');
-  if (fav && entryKey) wireFavButton(favButton, entryKey);
-  else favButton.remove();
+  // The star and the bookmark sit on the CARD, above the leaning face: a
+  // face turned in 3D stops answering taps in Chrome, and a button nobody
+  // can press is a card that opens instead.
+  if (fav && entryKey) wireFavButton(card.appendChild(favButtonNode()), entryKey);
   // The wish bookmark sits under the star, on every card that can name
   // itself - your own, a friend's, a stranger's at auction.
   if (wish && data.key && !data.creator) {
     const wishButton = document.createElement('button');
     wishButton.type = 'button';
     wishButton.className = `wish-button${fav && entryKey ? '' : ' is-alone'}`;
-    front.appendChild(wishButton);
+    card.appendChild(wishButton);
     wireWishButton(wishButton, data);
   }
   if (entryKey) card.addEventListener('click', () => openCardDetail(entryKey, data, rarity));
@@ -3250,6 +3296,7 @@ function openCardDetail(entryKey, data, rarity) {
           <div class="fx-code" aria-hidden="true"></div>
           <div class="fx-art" aria-hidden="true"></div>
           <div class="card-art"></div>
+          <button class="fav-button is-giant" type="button" aria-pressed="false"></button>
           <div class="card-body">
             <h3 class="card-title"></h3>
             <p class="card-desc"></p>
@@ -3270,6 +3317,11 @@ function openCardDetail(entryKey, data, rarity) {
         </div>
       </div>`;
     body.appendChild(card);
+
+    // The same star as on the small face, for a card that is actually yours.
+    const giantFav = card.querySelector('.fav-button');
+    if (entry) wireFavButton(giantFav, entryKey, { size: 20 });
+    else giantFav.remove();
 
     // The tag that answers "do I have this?" wherever the card was met.
     if (state.collection.entries[entryKey]) {
@@ -3642,6 +3694,19 @@ function renderBinder() {
  */
 function renderClassic(entries, albums) {
   el.classicFilter.textContent = t('filters');
+  // The search field is the classic view's own: the sheet's field and this
+  // one read and write the same filter, so neither ever contradicts the other.
+  if (!el.classicSearch.dataset.bound) {
+    el.classicSearch.dataset.bound = '1';
+    el.classicSearchMark.innerHTML = iconSvg('search', { size: 15 });
+    el.classicSearch.addEventListener('input', () => {
+      state.filters.search = el.classicSearch.value;
+      renderBinder();
+    });
+  }
+  el.classicSearch.placeholder = t('searchTitles');
+  el.classicSearch.setAttribute('aria-label', t('searchTitles'));
+  if (el.classicSearch.value !== state.filters.search) el.classicSearch.value = state.filters.search;
   const active = activeFilterCount();
   el.classicFilterCount.textContent = String(active);
   el.classicFilterCount.hidden = !active;
@@ -3651,6 +3716,25 @@ function renderClassic(entries, albums) {
   const visible = store.filterEntries(entries, state.filters);
   el.classicCount.textContent = t('classicShowing', { n: visible.length });
 
+  const sections = classicSections(visible, albums, (entry) =>
+    buildStaticCard(entry, rarityById(entry.rarityId), entry.key));
+
+  if (!sections.length) {
+    const empty = document.createElement('p');
+    empty.className = 'muted classic-empty';
+    empty.textContent = t('noMatches');
+    sections.push(empty);
+  }
+  el.classicView.replaceChildren(...sections);
+  reveal(el.classicView.children, { step: 40 });
+}
+
+/**
+ * The classic view's groups: one section per album in shelf order, each card
+ * built by the caller (yours open your binder's detail, a friend's open a
+ * read-only one). Copies are counted on the card.
+ */
+function classicSections(visible, albums, cardFor) {
   const byAlbum = new Map();
   for (const entry of visible) {
     const key = albumKeyOf(entry);
@@ -3683,9 +3767,9 @@ function renderClassic(entries, albums) {
     section.querySelector('.classic-group-n').textContent = String(group.length);
 
     section.querySelector('.classic-grid').replaceChildren(...group.map((entry) => {
-      const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
+      const card = cardFor(entry);
       card.classList.add('is-mini');
-      if (entry.count > 1) {
+      if ((entry.count ?? 1) > 1) {
         const badge = document.createElement('span');
         badge.className = 'copy-badge';
         badge.textContent = `\u00d7${entry.count}`;
@@ -3695,15 +3779,7 @@ function renderClassic(entries, albums) {
     }));
     sections.push(section);
   }
-
-  if (!sections.length) {
-    const empty = document.createElement('p');
-    empty.className = 'muted classic-empty';
-    empty.textContent = t('noMatches');
-    sections.push(empty);
-  }
-  el.classicView.replaceChildren(...sections);
-  reveal(el.classicView.children, { step: 40 });
+  return sections;
 }
 
 /**
@@ -6001,18 +6077,70 @@ function openTradeAnswer(trade) {
 /* --- chat ---------------------------------------------------------------------- */
 
 let chatTimer = null;
+/** The live wire of the open conversation (typing, sent, read), or null. */
+let chatWire = null;
+let typingTimer = null;
+/** When we last told the other side we were typing. */
+let typedAt = 0;
 
 function openChat(entry) {
   state.chat = entry;
+  state.chatRows = [];
   renderChatFrame();
   showScreen('chat');
   refreshChat({ markRead: true });
   clearInterval(chatTimer);
   chatTimer = setInterval(() => { if (state.tab === 'chat') refreshChat(); }, 10000);
+  closeChatWire();
+  chatWire = account.openChatChannel(userId(), entry.otherId, onChatEvent);
+}
+
+function closeChatWire() {
+  chatWire?.close();
+  chatWire = null;
+  typedAt = 0;
+  showTyping(false);
+}
+
+/** What the other person's phone just said, live. */
+function onChatEvent(payload) {
+  if (state.tab !== 'chat' || !state.chat || payload.from !== state.chat.otherId) return;
+  if (payload.kind === 'typing') showTyping(true);
+  else if (payload.kind === 'sent') { showTyping(false); refreshChat({ markRead: true }); }
+  else if (payload.kind === 'read') {
+    // Their receipt, applied to what is on screen without waiting for the poll.
+    const at = new Date(payload.at ?? Date.now()).toISOString();
+    const mine = userId();
+    for (const m of state.chatRows) if (m.sender === mine && !m.read_at) m.read_at = at;
+    paintChat(state.chatRows);
+  }
+}
+
+/** The "typing…" line under the log: shown on every keystroke heard, gone
+ *  four seconds after the last one. */
+function showTyping(on) {
+  clearTimeout(typingTimer);
+  const person = state.chat?.profile;
+  const wasHidden = el.chatTyping.hidden;
+  el.chatTyping.hidden = !on;
+  if (on) {
+    el.chatTyping.innerHTML = `<span class="typing-dots" aria-hidden="true"><i></i><i></i><i></i></span><span></span>`;
+    el.chatTyping.lastElementChild.textContent = t('chatTyping', { name: person?.username ?? '' });
+    if (wasHidden) keepChatBottom();
+    typingTimer = setTimeout(() => showTyping(false), 4000);
+  }
+}
+
+/** Keep the newest message in view: after the keyboard rises, after a
+ *  bubble lands, after the typing line appears. */
+function keepChatBottom() {
+  if (state.tab !== 'chat') return;
+  requestAnimationFrame(() => { el.chatLog.scrollTop = el.chatLog.scrollHeight; });
 }
 
 function renderChatFrame() {
-  const person = state.chat?.profile;
+  const entry = state.chat;
+  const person = entry?.profile;
   if (!person) return;
   el.chatBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
   el.chatName.textContent = person.username ?? '';
@@ -6021,8 +6149,26 @@ function renderChatFrame() {
   el.chatPresence.textContent = online === null ? ''
     : (online ? t('friendOnline') : t('friendOffline'));
   el.chatPresence.className = `chat-presence${online ? ' is-online' : ''}`;
+  el.chatWho.setAttribute('aria-label', t('chatSeeProfile', { name: person.username ?? '' }));
   el.chatInput.placeholder = t('chatPlaceholder');
   el.chatSend.textContent = t('chatSend');
+
+  // Gift and trade, right where the conversation about them happens.
+  const tool = (icon, labelKey, run) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'icon-btn is-mini chat-tool';
+    btn.setAttribute('aria-label', t(labelKey));
+    btn.title = t(labelKey);
+    btn.innerHTML = iconSvg(icon, { size: 16 });
+    press(btn, { sound: null });
+    btn.addEventListener('click', () => { synth.playTap(); run(); });
+    return btn;
+  };
+  el.chatTools.replaceChildren(
+    tool('gift', 'giftOpen', () => openGiftChooser(entry)),
+    tool('trade', 'tradeOpen', () => openTradeSheet(entry))
+  );
 }
 
 async function refreshChat({ markRead = false } = {}) {
@@ -6036,24 +6182,56 @@ async function refreshChat({ markRead = false } = {}) {
       await account.markConversationRead(userId(), entry.otherId);
       state.social.unread.delete(entry.otherId);
       updateBadges();
+      chatWire?.send('read');
     }
   } catch { /* next poll */ }
 }
 
+/**
+ * The bubbles. Yours carry a receipt: one tick once it is on the server, two
+ * once the other person has opened the conversation, and the last one you
+ * sent says it in words as well.
+ */
 function paintChat(rows) {
   const mine = userId();
+  state.chatRows = rows;
   const atBottom = el.chatLog.scrollHeight - el.chatLog.scrollTop - el.chatLog.clientHeight < 60;
-  el.chatLog.replaceChildren(...rows.map((m) => {
+  const lastMine = [...rows].reverse().find((m) => m.sender === mine);
+  el.chatLog.replaceChildren(...rows.flatMap((m) => {
+    const own = m.sender === mine;
     const bubble = document.createElement('div');
-    bubble.className = `bubble${m.sender === mine ? ' is-mine' : ''}`;
+    bubble.className = `bubble${own ? ' is-mine' : ''}${own && m.read_at ? ' is-read' : ''}`;
     bubble.textContent = m.body;
     const when = document.createElement('span');
     when.className = 'bubble-when';
     when.textContent = whenText(m.created_at);
+    if (own) {
+      const ticks = document.createElement('span');
+      ticks.className = 'bubble-ticks';
+      ticks.innerHTML = iconSvg(m.read_at ? 'checks' : 'check', { size: 13 });
+      ticks.title = t(m.read_at ? 'chatSeen' : 'chatSent');
+      when.appendChild(ticks);
+    }
     bubble.appendChild(when);
-    return bubble;
+    if (own && m === lastMine) {
+      const receipt = document.createElement('span');
+      receipt.className = `chat-receipt${m.read_at ? ' is-read' : ''}`;
+      receipt.textContent = m.read_at ? t('chatSeenAt', { when: whenText(m.read_at) }) : t('chatSent');
+      return [bubble, receipt];
+    }
+    return [bubble];
   }));
   if (atBottom || rows.length) el.chatLog.scrollTop = el.chatLog.scrollHeight;
+}
+
+/** A keystroke in the composer: tell the other side, no more than once
+ *  every two seconds, and only while there is something in the box. */
+function chatTyped() {
+  if (!el.chatInput.value.trim()) return;
+  const now = Date.now();
+  if (now - typedAt < 2000) return;
+  typedAt = now;
+  chatWire?.send('typing');
 }
 
 async function sendChat(event) {
@@ -6062,9 +6240,11 @@ async function sendChat(event) {
   const text = el.chatInput.value.trim();
   if (!entry || !text) return;
   el.chatInput.value = '';
+  typedAt = 0;
   try {
     await account.sendChatMessage(userId(), entry.otherId, text);
     synth.playMessage();
+    chatWire?.send('sent');
     refreshChat();
   } catch (error) {
     el.chatInput.value = text;   // let them retry
@@ -6074,15 +6254,44 @@ async function sendChat(event) {
 
 /* --- avatars -------------------------------------------------------------------- */
 
+/**
+ * Where a crop lands on a round mark. A crop is the centre of the circle as
+ * a percentage of the picture (x, y), the circle's diameter as a fraction of
+ * the picture's shorter side (z), and the picture's aspect ratio (r); the
+ * background is then sized and placed so exactly that circle fills the mark.
+ * Crops saved before z existed carry only x and y, and keep the old
+ * "cover, then nudge" placement.
+ */
+function avatarPlacement(avatar) {
+  const x = Number(avatar?.x), y = Number(avatar?.y);
+  const z = Number(avatar?.z), r = Number(avatar?.r);
+  if (!(z > 0) || !(r > 0)) {
+    return { size: 'cover', position: `${Number.isFinite(x) ? x : 50}% ${Number.isFinite(y) ? y : 50}%` };
+  }
+  // The picture, in units of the mark's diameter.
+  const short = 1 / z;
+  const w = r >= 1 ? short * r : short;
+  const h = r >= 1 ? short : short / r;
+  // Where the picture's top-left has to sit so the crop centre is the mark's
+  // centre, then turned into the percentage background-position speaks in.
+  const ox = 0.5 - (x / 100) * w;
+  const oy = 0.5 - (y / 100) * h;
+  const px = Math.abs(1 - w) < 1e-6 ? 0 : (ox / (1 - w)) * 100;
+  const py = Math.abs(1 - h) < 1e-6 ? 0 : (oy / (1 - h)) * 100;
+  return { size: `${(w * 100).toFixed(3)}% ${(h * 100).toFixed(3)}%`, position: `${px.toFixed(3)}% ${py.toFixed(3)}%` };
+}
+
 /** Paint a person's avatar (their chosen card art, at their chosen crop)
  *  into a .person-mark-style circle, or fall back to their initial. */
 function paintAvatarInto(node, profile, { frame = null } = {}) {
   const avatar = profile?.avatar;
   if (avatar?.url) {
     node.textContent = '';
+    const place = avatarPlacement(avatar);
     node.style.backgroundImage = `url("${String(avatar.url).replace(/"/g, '%22')}")`;
-    node.style.backgroundSize = 'cover';
-    node.style.backgroundPosition = `${Number(avatar.x) || 50}% ${Number(avatar.y) || 50}%`;
+    node.style.backgroundSize = place.size;
+    node.style.backgroundPosition = place.position;
+    node.style.backgroundRepeat = 'no-repeat';
     node.classList.add('has-avatar');
   } else {
     node.style.backgroundImage = '';
@@ -6097,8 +6306,8 @@ function paintAvatarInto(node, profile, { frame = null } = {}) {
 
 /**
  * Choose a card as your face. Step one: pick any card you own that has a
- * picture. Step two: drag the picture behind a fixed circle to choose the
- * crop, exactly like every other app does it.
+ * picture. Step two: move the picture behind a fixed circle, and zoom it,
+ * until the circle holds what you want; that circle is the picture.
  */
 function openAvatarPicker() {
   const mine = store.allEntries(state.collection).filter((c) => c.thumbnail);
@@ -6124,6 +6333,10 @@ function openAvatarPicker() {
   });
 }
 
+/** The circle's share of the crop stage. */
+const CROP_CIRCLE = 0.72;
+const CROP_ZOOM = [0.3, 1];   // z: the circle's diameter over the picture's short side
+
 function openAvatarCrop(card) {
   openSheet(t('avatarCropTitle'), (body) => {
     body.innerHTML = `
@@ -6131,66 +6344,132 @@ function openAvatarCrop(card) {
       <div class="crop-stage" data-stage>
         <div class="crop-img" data-img></div>
         <div class="crop-shade" aria-hidden="true"></div>
-        <div class="crop-circle" data-circle aria-hidden="true"></div>
+        <div class="crop-circle" aria-hidden="true"></div>
+      </div>
+      <div class="crop-zoom">
+        <span class="crop-zoom-mark" aria-hidden="true"></span>
+        <input class="crop-zoom-range" type="range" min="100" max="333" step="1" data-zoom />
+        <span class="crop-zoom-mark" aria-hidden="true"></span>
+      </div>
+      <div class="crop-preview-row">
+        <span class="person-mark crop-preview" data-preview aria-hidden="true"></span>
+        <span class="muted" data-preview-label></span>
       </div>
       <div style="display:flex;gap:10px;margin-top:16px">
         <button class="btn btn-primary" type="button" data-save style="flex:1"></button>
       </div>`;
     body.querySelector('[data-hint]').textContent = t('avatarCropHint');
+    body.querySelector('[data-preview-label]').textContent = t('avatarPreview');
     const saveBtn = body.querySelector('[data-save]');
     saveBtn.textContent = t('avatarSave');
 
     const stage = body.querySelector('[data-stage]');
     const img = body.querySelector('[data-img]');
-    const circle = body.querySelector('[data-circle]');
-    const shade = body.querySelector('.crop-shade');
-    img.style.backgroundImage = `url("${String(card.thumbnail).replace(/"/g, '%22')}")`;
+    const zoom = body.querySelector('[data-zoom]');
+    const preview = body.querySelector('[data-preview]');
+    const marks = body.querySelectorAll('.crop-zoom-mark');
+    marks[0].innerHTML = iconSvg('minus', { size: 14 });
+    marks[1].innerHTML = iconSvg('plus', { size: 14 });
+    zoom.setAttribute('aria-label', t('avatarZoom'));
+    const url = String(card.thumbnail);
+    img.style.backgroundImage = `url("${url.replace(/"/g, '%22')}")`;
 
-    // The picture stays put; the CIRCLE is what you move over it. Its centre,
-    // as a percentage of the stage, is exactly what avatars store.
-    let x = Number(state.account.profile?.avatar?.x);
-    let y = Number(state.account.profile?.avatar?.y);
+    // The crop: the same picture as before keeps its crop, a new one starts
+    // centred and a little zoomed in.
+    const saved = state.account.profile?.avatar;
+    const same = saved?.url === url && Number(saved.z) > 0;
+    let x = same ? Number(saved.x) : 50;
+    let y = same ? Number(saved.y) : 50;
+    let z = same ? Number(saved.z) : 0.85;
+    let ratio = same && Number(saved.r) > 0 ? Number(saved.r) : 1;
     if (!Number.isFinite(x)) x = 50;
     if (!Number.isFinite(y)) y = 50;
 
-    // The circle's radius, as a percentage of the stage, sets how far the
-    // centre may travel before the ring leaves the picture.
-    const R = 27;
-    const clampPos = () => {
-      x = Math.min(100 - R, Math.max(R, x));
-      y = Math.min(100 - R, Math.max(R, y));
+    // The displayed picture, in stage pixels.
+    const size = () => {
+      const L = stage.clientWidth || 300;
+      const C = L * CROP_CIRCLE;
+      const short = C / z;
+      return { L, C, W: ratio >= 1 ? short * ratio : short, H: ratio >= 1 ? short : short / ratio };
     };
+    const clampAll = () => {
+      z = Math.min(CROP_ZOOM[1], Math.max(CROP_ZOOM[0], z));
+      const { C, W, H } = size();
+      const minX = (C / 2 / W) * 100, minY = (C / 2 / H) * 100;
+      x = Math.min(100 - minX, Math.max(minX, x));
+      y = Math.min(100 - minY, Math.max(minY, y));
+    };
+    const current = () => ({ url, x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100, z: Math.round(z * 1000) / 1000, r: Math.round(ratio * 1000) / 1000 });
     const paint = () => {
-      clampPos();
-      circle.style.left = `${x}%`;
-      circle.style.top = `${y}%`;
-      shade.style.setProperty('--cx', `${x}%`);
-      shade.style.setProperty('--cy', `${y}%`);
+      clampAll();
+      const { L, W, H } = size();
+      img.style.width = `${W}px`;
+      img.style.height = `${H}px`;
+      img.style.transform = `translate(${(L / 2 - (x / 100) * W).toFixed(2)}px, ${(L / 2 - (y / 100) * H).toFixed(2)}px)`;
+      zoom.value = String(Math.round(100 / z));
+      paintAvatarInto(preview, { avatar: current(), username: '' }, { frame: { style: null, tier: 0 } });
     };
     paint();
 
+    // The real shape of the picture decides how far it can travel.
+    const probe = new Image();
+    probe.addEventListener('load', () => {
+      if (probe.naturalWidth && probe.naturalHeight) ratio = probe.naturalWidth / probe.naturalHeight;
+      paint();
+    });
+    probe.src = url;
+
+    // Drag moves the picture under the circle; a second finger, the wheel or
+    // the slider zoom it about the circle's centre.
+    const pointers = new Map();
+    let pinch = null;
     stage.addEventListener('pointerdown', (event) => {
       event.preventDefault();
-      const rect = stage.getBoundingClientRect();
-      // The circle jumps under the finger, then follows it.
-      x = ((event.clientX - rect.left) / rect.width) * 100;
-      y = ((event.clientY - rect.top) / rect.height) * 100;
+      stage.setPointerCapture?.(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      stage.classList.add('is-held');
+      if (pointers.size === 2) {
+        const [a, b] = [...pointers.values()];
+        pinch = { d: Math.hypot(a.x - b.x, a.y - b.y), z };
+      }
+    });
+    stage.addEventListener('pointermove', (event) => {
+      const was = pointers.get(event.pointerId);
+      if (!was) return;
+      const now = { x: event.clientX, y: event.clientY };
+      pointers.set(event.pointerId, now);
+      if (pointers.size >= 2 && pinch) {
+        const [a, b] = [...pointers.values()];
+        const d = Math.hypot(a.x - b.x, a.y - b.y);
+        if (d > 0 && pinch.d > 0) z = pinch.z * (pinch.d / d);
+      } else {
+        const { W, H } = size();
+        x -= ((now.x - was.x) / W) * 100;
+        y -= ((now.y - was.y) / H) * 100;
+      }
       paint();
-      circle.classList.add('is-held');
-      trackDrag(event, {
-        onMove: (dx, dy, _moved, e) => {
-          x = ((e.clientX - rect.left) / rect.width) * 100;
-          y = ((e.clientY - rect.top) / rect.height) * 100;
-          paint();
-        },
-        onEnd: () => circle.classList.remove('is-held')
-      });
+    });
+    const lift = (event) => {
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinch = null;
+      if (!pointers.size) stage.classList.remove('is-held');
+    };
+    stage.addEventListener('pointerup', lift);
+    stage.addEventListener('pointercancel', lift);
+    stage.addEventListener('wheel', (event) => {
+      event.preventDefault();
+      z *= 1 + Math.sign(event.deltaY) * 0.06;
+      paint();
+    }, { passive: false });
+    zoom.addEventListener('input', () => {
+      z = 100 / Number(zoom.value || 100);
+      paint();
     });
 
     press(saveBtn, { sound: null });
     saveBtn.addEventListener('click', async () => {
       saveBtn.disabled = true;
-      const avatar = { url: card.thumbnail, x: Math.round(x), y: Math.round(y) };
+      const avatar = current();
       // The frame rides in this same column; a new picture must not undress it.
       if (state.account.profile?.avatar?.frame) avatar.frame = state.account.profile.avatar.frame;
       try {
@@ -6379,6 +6658,8 @@ function openFriend(entry) {
   loadFriendCards(entry);
 }
 
+let friendSeg;
+
 function renderFriend() {
   const entry = state.viewing;
   if (!entry) return;
@@ -6389,12 +6670,15 @@ function renderFriend() {
   el.friendBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
   el.friendName.textContent = person.username ?? '';
   friendRing.set(0, String(level));
+  paintFrameInto(el.friendRing, person.avatar?.frame?.style ?? null, person.avatar?.frame?.style ? frameTier(level) : 0);
   el.friendLevel.textContent = t('profileLevel', { n: level });
   el.friendRank.innerHTML = (online === null ? ''
     : `<span class="presence-dot is-inline${online ? ' is-online' : ''}"></span> `
       + esc(online ? t('friendOnline') : t('friendOffline')) + ' · ')
     + esc(tx(rankFor(level).name));
-  el.friendCardsLabel.textContent = t('friendAlbums');
+  el.friendStatsLabel.textContent = t('profileStats');
+  el.friendRarityLabel.textContent = t('statRarity');
+  el.friendCardsLabel.textContent = t('friendCollection');
   el.friendRemove.textContent = t('friendsRemove');
 
   // What you can do with a friend, in one row.
@@ -6414,15 +6698,40 @@ function renderFriend() {
     actionBtn('wish', 'wishTitle', () => openFriendWishlist(entry))
   );
 
+  // Their cards, the two ways yours are shown: albums, or every card at once.
+  if (!friendSeg) {
+    friendSeg = new Segmented(el.friendSeg, [
+      { id: 'albums', label: t('viewAlbums') },
+      { id: 'classic', label: t('viewClassic') }
+    ], (view) => {
+      state.friendView = view;
+      paintFriendCards();
+    });
+  }
+  friendSeg.relabel([{ label: t('viewAlbums') }, { label: t('viewClassic') }]);
+  friendSeg.select(state.friendView, { silent: true });
+
+  paintFriendStats(entry);
+}
+
+/**
+ * The same stats block as your own profile, from what the profile row says
+ * and, once their cards have arrived, from the cards themselves: albums
+ * started and the count per tier are read off the collection, not stored.
+ */
+function paintFriendStats(entry) {
+  const person = entry.profile;
+  const cards = Array.isArray(entry.cards) ? entry.cards : null;
   const best = rarityById(person.best_rarity);
   const stats = [
-    [t('statCards'), (person.cards ?? 0).toLocaleString()],
-    [t('statBoosters'), (person.boosters_opened ?? 0).toLocaleString()],
-    [t('statValue'), formatAmount(person.collection_value ?? 0)],
-    [t('statBest'), person.best_rarity && best ? tx(best.name) : t('none')],
     [t('statPlaytime'), formatDuration(person.play_ms ?? 0)],
     [t('statAccountAge'), new Date(person.created_at ?? Date.now())
-      .toLocaleDateString(getLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })]
+      .toLocaleDateString(getLanguage(), { year: 'numeric', month: 'short', day: 'numeric' })],
+    [t('statBoosters'), (person.boosters_opened ?? 0).toLocaleString()],
+    [t('statCards'), (person.cards ?? 0).toLocaleString()],
+    [t('statValue'), formatAmount(person.collection_value ?? 0)],
+    [t('statAlbums'), cards ? String(albumsDeep(cards, [])) : '…'],
+    [t('statBest'), person.best_rarity && best ? tx(best.name) : t('none')]
   ];
   el.friendStats.replaceChildren(...stats.map(([label, value]) => {
     const cell = document.createElement('div');
@@ -6431,6 +6740,26 @@ function renderFriend() {
     cell.querySelector('b').textContent = value;
     cell.querySelector('span').textContent = label;
     return cell;
+  }));
+
+  const counts = {};
+  for (const card of cards ?? []) counts[card.rarityId] = (counts[card.rarityId] ?? 0) + (card.count ?? 1);
+  const peak = Math.max(1, ...RARITIES.map((r) => counts[r.id] ?? 0));
+  el.friendRarityLabel.parentElement.hidden = !cards;
+  el.friendRarityBars.hidden = !cards;
+  el.friendRarityBars.replaceChildren(...(cards ? RARITIES : []).map((rarity) => {
+    const count = counts[rarity.id] ?? 0;
+    const row = document.createElement('div');
+    row.className = 'rarity-row';
+    row.innerHTML = `<span class="rarity-name"></span><span class="rarity-track"></span><span class="rarity-count"></span>`;
+    const name = row.querySelector('.rarity-name');
+    name.textContent = tx(rarity.name);
+    name.style.color = rarity.color;
+    const bar = new Bar(row.querySelector('.rarity-track'));
+    bar.set(count / peak, { animate: false });
+    bar.fill.style.background = rarity.color;
+    row.querySelector('.rarity-count').textContent = count.toLocaleString();
+    return row;
   }));
 }
 
@@ -6484,43 +6813,80 @@ function openFriendWishlist(entry) {
 /**
  * Their cards. The server hands back the collection key alone, so this cannot
  * see their wallet or their settings even though they are in the same blob.
+ * The cards are kept on the entry so switching views never fetches twice.
  */
 async function loadFriendCards(entry) {
-  el.friendAlbums.replaceChildren();
-  el.friendCardsStatus.textContent = t('friendLoading');
-  el.friendCardsStatus.className = 'find-status is-working';
+  entry.cards = undefined;
+  paintFriendCards();
   try {
     const cards = await account.friendCollection(entry.otherId);
     // Guard against a slow read landing after the player has moved on.
     if (state.viewing !== entry) return;
-    if (cards === null) {
-      el.friendCardsStatus.textContent = t('friendPrivate');
-      el.friendCardsStatus.className = 'find-status is-muted';
-      return;
-    }
-    el.friendCardsStatus.textContent = cards.length ? '' : t('friendNoCards');
-    el.friendCardsStatus.className = 'find-status is-muted';
-
-    // Their collection, shown the way yours is: as albums. Tapping an
-    // unlocked one lists its cards in a sheet.
-    const albums = buildAlbums(cards, []).filter((a) => a.unlocked);
-    el.friendAlbums.replaceChildren(...albums.map((album) => {
-      // cloneNode drops buildAlbumCover's own click (which drives YOUR
-      // collection); this cover opens the friend's album instead.
-      const cover = buildAlbumCover(album).cloneNode(true);
-      press(cover, { sound: null });
-      cover.addEventListener('click', () => {
-        synth.playTap();
-        openFriendAlbum(entry, album);
-      });
-      return cover;
-    }));
-    reveal(el.friendAlbums.children, { step: 22, from: 10 });
+    entry.cards = cards;          // null when their collection is private
+    paintFriendCards();
+    paintFriendStats(entry);
   } catch (error) {
     if (state.viewing !== entry) return;
+    entry.cards = null;
+    paintFriendCards();
     el.friendCardsStatus.textContent = describeError(error);
     el.friendCardsStatus.className = 'find-status is-error';
   }
+}
+
+/** A friend's cards in whichever layout the switch says. */
+function paintFriendCards() {
+  const entry = state.viewing;
+  if (!entry) return;
+  const classic = state.friendView === 'classic';
+  const cards = entry.cards;
+  el.friendAlbums.replaceChildren();
+  el.friendClassic.replaceChildren();
+  el.friendAlbums.hidden = classic;
+  el.friendClassic.hidden = !classic;
+  el.friendSegWrap.hidden = !Array.isArray(cards) || !cards.length;
+
+  if (cards === undefined) {
+    el.friendCardsStatus.textContent = t('friendLoading');
+    el.friendCardsStatus.className = 'find-status is-working';
+    return;
+  }
+  if (cards === null) {
+    el.friendCardsStatus.textContent = t('friendPrivate');
+    el.friendCardsStatus.className = 'find-status is-muted';
+    return;
+  }
+  el.friendCardsStatus.textContent = cards.length ? '' : t('friendNoCards');
+  el.friendCardsStatus.className = 'find-status is-muted';
+
+  const albums = buildAlbums(cards, []).filter((a) => a.unlocked);
+  if (classic) {
+    // Best card first inside each album, the way your own classic view reads.
+    const sorted = [...cards].sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
+    el.friendClassic.replaceChildren(...classicSections(sorted, albums, (card) => {
+      const rarity = rarityById(card.rarityId) ?? RARITIES[0];
+      const node = buildStaticCard(card, rarity, null, { fav: false });
+      node.addEventListener('click', () => { synth.playTap(); openCardDetail(card.key, card, rarity); });
+      return node;
+    }));
+    reveal(el.friendClassic.children, { step: 40 });
+    return;
+  }
+
+  // Their collection, shown the way yours is: as albums. Tapping an
+  // unlocked one lists its cards in a sheet.
+  el.friendAlbums.replaceChildren(...albums.map((album) => {
+    // cloneNode drops buildAlbumCover's own click (which drives YOUR
+    // collection); this cover opens the friend's album instead.
+    const cover = buildAlbumCover(album).cloneNode(true);
+    press(cover, { sound: null });
+    cover.addEventListener('click', () => {
+      synth.playTap();
+      openFriendAlbum(entry, album);
+    });
+    return cover;
+  }));
+  reveal(el.friendAlbums.children, { step: 22, from: 10 });
 }
 
 /** One of a friend's albums, as a sheet of its cards. */
@@ -7960,32 +8326,38 @@ function sliderRow(key, titleKey, noteKey, { preview = null } = {}) {
 
 /* --- daily gift -------------------------------------------------------------------------------------------- */
 
-/**
- * A gift's one-line description. Returns MARKUP, not text: the coins case
- * embeds the drawn Buckarooz glyph. Every caller renders it as HTML.
- */
+/** What a gift is, in words: coins, a booster, or both. */
 function giftLabel(gift) {
-  if (gift.kind === 'coins') return t('giftCoins', { amount: money(gift.coins) });
-  if (gift.kind === 'card') return t('giftCard');
-  return t('giftBooster');
+  const bits = [];
+  if (gift.coins) bits.push(money(gift.coins));
+  if (gift.spec) {
+    bits.push(esc(gift.spec.rarityId
+      ? t('giftBoosterTier', { tier: tx(rarityById(gift.spec.rarityId).name) })
+      : t('giftBoosterN', { n: gift.spec.cards })));
+  }
+  return bits.join(' + ');
 }
 
-/** One stop on the month's trail. */
-function giftStop(slot, status) {
-  const { gift } = slot;
-  const milestone = slot.day % 7 === 0 || slot.day === BOARD_SIZE;
-  const stop = document.createElement('div');
-  stop.className = `gift-stop is-${status} is-${gift.kind}${milestone ? ' is-milestone' : ''}`;
-  stop.innerHTML = `
-    <span class="gift-stop-node"><span class="gift-stop-art"></span></span>
-    <span class="gift-stop-day tabular"></span>`;
-  stop.querySelector('.gift-stop-day').textContent = String(slot.day);
-  const art = stop.querySelector('.gift-stop-art');
-  if (status === 'claimed') art.innerHTML = iconSvg('check', { size: milestone ? 18 : 14 });
-  else if (gift.kind === 'coins') art.innerHTML = buckSvg({ size: milestone ? 18 : 13 });
-  else if (gift.kind === 'card') art.innerHTML = iconSvg('collection', { size: milestone ? 19 : 14 });
-  else art.innerHTML = iconSvg('packs', { size: milestone ? 19 : 14 });
-  return stop;
+/** One rung of the week, as a tile. */
+function giftTile(rung, status) {
+  const tile = document.createElement('div');
+  const kind = rung.spec && rung.coins ? 'both' : rung.spec ? 'booster' : 'coins';
+  tile.className = `daily-tile is-${status} is-${kind}${rung.day === WEEK ? ' is-big' : ''}`;
+  tile.innerHTML = `
+    <span class="daily-tile-day"></span>
+    <span class="daily-tile-art"></span>
+    <span class="daily-tile-val tabular"></span>`;
+  tile.querySelector('.daily-tile-day').textContent = t('dailyDayShort', { n: rung.day });
+  const art = tile.querySelector('.daily-tile-art');
+  if (status === 'claimed') art.innerHTML = iconSvg('check', { size: 15 });
+  else if (kind === 'coins') art.innerHTML = buckSvg({ size: 14 });
+  else art.innerHTML = iconSvg('packs', { size: 15 });
+  const val = tile.querySelector('.daily-tile-val');
+  if (kind === 'coins') val.textContent = rung.coins.toLocaleString();
+  else if (kind === 'booster') val.textContent = rung.spec.rarityId ? tx(rarityById(rung.spec.rarityId).name) : t('dailyCardsN', { n: rung.spec.cards });
+  else val.textContent = `${rung.coins.toLocaleString()} +`;
+  tile.title = giftLabel(rung).replace(/<[^>]+>/g, '');
+  return tile;
 }
 
 function openDaily({ auto = false } = {}) {
@@ -7993,48 +8365,60 @@ function openDaily({ auto = false } = {}) {
   // gift waiting and the badge lit, without the dialog reappearing every time
   // the app is reopened.
   if (auto) {
-    const today = dayNumber();
+    const today = utcDayNumber();
     if (state.profile.daily.shownDay === today) return;
     state.profile.daily.shownDay = today;
     store.saveProfile(state.profile);
   }
-  openSheet(t('dailyTitle'), buildDailyBody);
+  openSheet(t('dailyTitle'), buildDailyBody, { onClose: () => { clearInterval(state.dailyTimer); state.dailyTimer = null; } });
 }
 
+/**
+ * The sheet: the present, the seven rungs of the week, and the world clock.
+ * Everything here is UTC: the gift turns over at 00:00 UTC, the moment the
+ * quests and the leaderboard do, and the footer says so.
+ */
 function buildDailyBody(body) {
   const daily = state.profile.daily;
-  const board = generateBoard(daily.board ?? 0);
-  const next = nextGiftIndex(daily);
+  const ladder = weekLadder(daily.weeks);
   const ready = canClaim(daily);
-  const today = board[next];
+  const next = nextGiftIndex(daily);
+  // A week just completed shows all seven taken until tomorrow's clock.
+  const taken = ready ? next : (daily.day === 0 ? WEEK : daily.day);
+  const broken = ready && daily.lastDay != null && !streakAlive(daily);
+  const today = ladder[next];
 
   body.innerHTML = `
-    <div class="daily-hero${ready ? ' is-ready' : ''}">
-      <button class="present" type="button" data-claim aria-label="">
-        <span class="present-glow" aria-hidden="true"></span>
-        <span class="present-lid" aria-hidden="true"></span>
-        <span class="present-box" aria-hidden="true">
-          <span class="present-ribbon-v"></span>
-        </span>
-      </button>
-      <div class="daily-copy">
-        <b data-headline></b>
-        <span data-status class="tabular"></span>
+    <div class="daily">
+      <div class="daily-hero${ready ? ' is-ready' : ''}">
+        <button class="present" type="button" data-claim aria-label="">
+          <span class="present-glow" aria-hidden="true"></span>
+          <span class="present-lid" aria-hidden="true"></span>
+          <span class="present-box" aria-hidden="true">
+            <span class="present-ribbon-v"></span>
+          </span>
+        </button>
+        <div class="daily-copy">
+          <b data-headline></b>
+          <span data-status></span>
+          <span class="daily-note" data-note hidden></span>
+        </div>
       </div>
-    </div>
-    <div class="gift-trail-wrap">
-      <p class="label" data-board style="margin-bottom:8px"></p>
-      <div class="gift-trail"></div>
+      <div class="daily-week" data-week></div>
+      <div class="daily-foot">
+        <span data-week-n></span>
+        <span class="tabular" data-reset></span>
+      </div>
     </div>`;
-
-  body.querySelector('[data-board]').textContent = t('dailyBoard', { n: (daily.board ?? 0) + 1 });
 
   const headline = body.querySelector('[data-headline]');
   const status = body.querySelector('[data-status]');
+  const note = body.querySelector('[data-note]');
   const present = body.querySelector('.present');
   if (ready) {
-    headline.innerHTML = t('dailyTapToOpen');
-    status.innerHTML = `${t('dailyDayN', { n: today.day })} · ${giftLabel(today.gift)}`;
+    headline.textContent = t('dailyTapToOpen');
+    status.innerHTML = `${t('dailyDayOf', { n: today.day, of: WEEK })} · ${giftLabel(today.gift ?? today)}`;
+    if (broken) { note.hidden = false; note.textContent = t('dailyStreakBroken'); }
     present.setAttribute('aria-label', t('dailyClaim'));
     press(present, { sound: null });
     present.addEventListener('click', () => {
@@ -8050,38 +8434,49 @@ function buildDailyBody(body) {
       setTimeout(() => claimGift(body), 420);
     }, { once: true });
   } else {
-    headline.textContent = t('dailyClaimed');
-    status.textContent = t('dailyNextIn', { time: formatCountdown(msUntilNextDay()) });
+    headline.textContent = taken === WEEK ? t('dailyWeekDone') : t('dailyClaimed');
+    status.textContent = t('dailyDayOf', { n: taken, of: WEEK });
   }
 
-  const trail = body.querySelector('.gift-trail');
-  trail.replaceChildren(...board.map((slot) => giftStop(
-    slot,
-    slot.index < next ? 'claimed' : slot.index === next ? (ready ? 'ready' : 'next') : 'locked'
+  body.querySelector('[data-week]').replaceChildren(...ladder.map((rung, i) => giftTile(
+    rung,
+    i < taken ? 'claimed' : i === next && ready ? 'ready' : i === (ready ? next : taken % WEEK) ? 'next' : 'locked'
   )));
-  // Bring the current stop into view, roughly centred.
-  const current = trail.children[next];
-  if (current) trail.scrollLeft = Math.max(0, current.offsetLeft - trail.clientWidth / 2 + 20);
+
+  const weekLine = body.querySelector('[data-week-n]');
+  const pct = loyaltyPct(daily.weeks);
+  weekLine.textContent = t('dailyWeekN', { n: (daily.weeks ?? 0) + 1 }) + (pct ? ` · ${t('dailyLoyalty', { pct })}` : '');
+  const reset = body.querySelector('[data-reset]');
+  const tick = () => { reset.textContent = t('dailyResetsUtc', { time: formatCountdown(msUntilNextUtcDay()) }); };
+  tick();
+  clearInterval(state.dailyTimer);
+  state.dailyTimer = setInterval(() => {
+    if (!sheet.open) { clearInterval(state.dailyTimer); return; }
+    if (msUntilNextUtcDay() < 1000 && !canClaim(daily)) { buildDailyBody(body); return; }
+    tick();
+  }, 1000);
 }
 
 function grantGift(gift) {
-  if (gift.kind === 'coins') {
+  if (gift.coins) {
     store.saveWallet(store.loadWallet() + gift.coins);
     refreshWallet();
-  } else {
-    gainBooster(gift.spec, 1);
+  }
+  if (gift.spec) {
+    gainBooster({ ...gift.spec }, 1);
     renderPacks();
   }
   synth.playGift();
 }
 
 function claimGift(body) {
-  const slot = claimDaily(state.profile.daily);
-  if (!slot) return;
+  const got = claimDaily(state.profile.daily);
+  if (!got) return;
   store.saveProfile(state.profile);
-  grantGift(slot.gift);
+  grantGift(got.gift);
   reportQuest('daily');
-  toast(t('dailyGot', { reward: giftLabel(slot.gift) }), 'ok');
+  toast(t('dailyGot', { reward: giftLabel(got.gift) }), 'ok');
+  if (got.weekDone) pushNote('gift', t('dailyWeekDoneNote'), 'packs');
   buildDailyBody(body);
   updateBadges();
 }
@@ -8945,72 +9340,130 @@ function renderSlots() {
 
 function renderQuests() {
   el.questsTitle.textContent = t('tabQuests');
-  el.questsSub.textContent = t('questsIntro');
-  const paint = (board) => {
-    const rows = quests.describe(board);
-    const list = document.createElement('div');
-    list.className = 'quests';
-    list.replaceChildren(...rows.map((row) => {
-      const tier = QUEST_TIERS[row.quest.tier];
-      const card = document.createElement('div');
-      card.className = `quest${row.progress >= row.target ? ' is-done' : ''}${row.claimed ? ' is-claimed' : ''}`;
+  el.questsSub.hidden = true;
+  paintQuests(quests.loadBoard(questUserKey()));
+  // Signed in, the server's deal is the deal: fetched in the background, painted when it comes.
+  if (signedIn()) quests.syncBoard(questUserKey()).then((board) => { if (state.tab === 'quests') paintQuests(board); }).catch(() => { /* the device's board stands */ });
+}
+
+/**
+ * The day's board, painted IN PLACE: the shell and the rows are built once
+ * per day and only their numbers, bars and buttons change after that, so a
+ * claim or a server answer never flashes the screen blank and back.
+ */
+function paintQuests(board) {
+  const rows = quests.describe(board);
+  const done = rows.filter((r) => r.progress >= r.target).length;
+  const pot = rows.reduce((sum, r) => sum + (r.quest.reward.money || 0), 0);
+
+  let shell = el.questsBody.querySelector('.quests-shell');
+  const fresh = !shell || shell.dataset.day !== board.day || shell.dataset.user !== questUserKey();
+  if (fresh) {
+    shell = document.createElement('div');
+    shell.className = 'quests-shell';
+    shell.dataset.day = board.day;
+    shell.dataset.user = questUserKey();
+    shell.innerHTML = `
+      <div class="quests-top panel">
+        <span class="quests-ring" data-ring></span>
+        <div class="quests-top-copy">
+          <b data-headline></b>
+          <span data-sub></span>
+          <span class="quests-pot" data-pot></span>
+        </div>
+      </div>
+      <div class="quests" data-list></div>
+      <p class="quests-reset tabular" data-reset></p>`;
+    shell.ring = new Ring(shell.querySelector('[data-ring]'), { size: 58, width: 5 });
+    el.questsBody.replaceChildren(shell);
+    reveal([shell.querySelector('.quests-top')], { step: 0 });
+  }
+  shell.ring.set(rows.length ? done / rows.length : 0, `${done}/${rows.length}`);
+  shell.querySelector('[data-headline]').textContent = done >= rows.length ? t('questsAllDone') : t('questsToGo', { n: rows.length - done });
+  shell.querySelector('[data-sub]').textContent = t('questsIntroShort');
+  shell.querySelector('[data-pot]').innerHTML = t('questsPot', { amount: money(pot) });
+
+  const list = shell.querySelector('[data-list]');
+  const seen = new Set();
+  rows.forEach((row, i) => {
+    seen.add(row.id);
+    const tier = QUEST_TIERS[row.quest.tier];
+    let card = list.querySelector(`[data-quest="${row.id}"]`);
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'quest';
+      card.dataset.quest = row.id;
       card.style.setProperty('--tier', tier.color);
+      card.innerHTML = `
+        <span class="quest-stripe" aria-hidden="true"></span>
+        <div class="quest-main">
+          <div class="quest-head"><b class="quest-name"></b><span class="quest-tier"></span></div>
+          <div class="quest-bar"><i></i><span class="quest-bar-text tabular"></span></div>
+          <div class="quest-foot"><span class="quest-reward"></span><span class="quest-state"></span></div>
+        </div>`;
+      card.querySelector('.quest-name').textContent = tx(row.quest.name);
+      card.querySelector('.quest-tier').textContent = tx(tier.name);
       const rewardBits = [money(row.quest.reward.money)];
       if (row.quest.reward.booster) rewardBits.push(esc(specName(row.quest.reward.booster)));
-      card.innerHTML = `
-        <div class="quest-head"><b></b><span class="quest-tier"></span></div>
-        <div class="quest-bar"><i style="width:${Math.round(100 * Math.min(1, row.progress / row.target))}%"></i></div>
-        <div class="quest-foot"><span class="tabular">${row.progress} / ${row.target}</span><span class="quest-reward">${rewardBits.join(' + ')}</span></div>`;
-      card.querySelector('b').textContent = tx(row.quest.name);
-      card.querySelector('.quest-tier').textContent = tx(tier.name);
-      if (row.claimed) {
-        const tag = document.createElement('span');
-        tag.className = 'game-closed';
-        tag.textContent = t('questClaimed');
-        card.appendChild(tag);
-      } else if (row.progress >= row.target) {
-        const btn = document.createElement('button');
-        btn.type = 'button';
-        btn.className = 'btn btn-primary';
-        btn.textContent = t('questClaim');
-        press(btn, { sound: null });
-        btn.addEventListener('click', async () => {
-          btn.disabled = true;
-          try {
-            const reward = await quests.claim(row.id, questUserKey());
-            if (reward.money) { store.saveWallet(store.loadWallet() + reward.money); refreshWallet(); }
-            if (reward.booster) gainBooster({ ...reward.booster }, 1);
-            synth.playPurchase();
-            toast(esc(t('questPaid', { name: tx(row.quest.name) })), 'ok');
-            renderQuests();
-            paintDrawerLinks();
-          } catch (error) {
-            btn.disabled = false;
-            const code = String(error?.message ?? '');
-            toast(esc(code === 'CLAIMED' ? t('questClaimed') : code === 'NOT_DONE' ? t('questNotDone') : houseError(error)), 'error');
-            synth.playDenied();
-          }
-        });
-        card.appendChild(btn);
-      }
-      return card;
-    }));
-    const reset = document.createElement('p');
-    reset.className = 'quests-reset';
-    const tick = () => { reset.textContent = t('questsReset', { time: formatCountdown(quests.msToReset(board)) }); };
+      card.querySelector('.quest-reward').innerHTML = rewardBits.join(' + ');
+      list.appendChild(card);
+      if (fresh) { card.style.setProperty('--enter-from', '14px'); card.style.animationDelay = `${60 + i * 60}ms`; card.classList.add('is-entering'); }
+    }
+    const complete = row.progress >= row.target;
+    card.classList.toggle('is-done', complete);
+    card.classList.toggle('is-claimed', row.claimed);
+    card.querySelector('.quest-bar i').style.width = `${Math.round(100 * Math.min(1, row.progress / row.target))}%`;
+    card.querySelector('.quest-bar-text').textContent = `${Math.min(row.progress, row.target)} / ${row.target}`;
+    const status = row.claimed ? 'claimed' : complete ? 'ready' : 'going';
+    if (card.dataset.status === status) return;
+    card.dataset.status = status;
+    const slot = card.querySelector('.quest-state');
+    if (status === 'claimed') {
+      slot.innerHTML = `<span class="quest-stamp">${iconSvg('check', { size: 13 })}<span></span></span>`;
+      slot.querySelector('.quest-stamp span').textContent = t('questClaimed');
+    } else if (status === 'ready') {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'btn btn-primary btn-sm quest-claim';
+      btn.textContent = t('questClaim');
+      press(btn, { sound: null });
+      btn.addEventListener('click', async () => {
+        btn.disabled = true;
+        try {
+          const reward = await quests.claim(row.id, questUserKey());
+          if (reward.money) { store.saveWallet(store.loadWallet() + reward.money); refreshWallet(); }
+          if (reward.booster) gainBooster({ ...reward.booster }, 1);
+          synth.playPurchase();
+          const rect = btn.getBoundingClientRect();
+          spawnBurst({ shapes: ['star4', 'orb'], colors: [tier.color, '#f8fafc', '#fbbf24'], count: 16, spread: 1, gravity: 0.3 },
+            { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }, { scale: 0.8 });
+          toast(esc(t('questPaid', { name: tx(row.quest.name) })), 'ok');
+          paintQuests(quests.loadBoard(questUserKey()));
+          paintDrawerLinks();
+        } catch (error) {
+          btn.disabled = false;
+          const code = String(error?.message ?? '');
+          toast(esc(code === 'CLAIMED' ? t('questClaimed') : code === 'NOT_DONE' ? t('questNotDone') : houseError(error)), 'error');
+          synth.playDenied();
+        }
+      });
+      slot.replaceChildren(btn);
+    } else {
+      slot.innerHTML = `<span class="quest-pct tabular"></span>`;
+      slot.querySelector('.quest-pct').textContent = `${Math.round(100 * Math.min(1, row.progress / row.target))}%`;
+    }
+  });
+  for (const stale of [...list.children]) if (!seen.has(stale.dataset.quest)) stale.remove();
+
+  const reset = shell.querySelector('[data-reset]');
+  const tick = () => { reset.textContent = t('questsReset', { time: formatCountdown(quests.msToReset(board)) }); };
+  tick();
+  clearInterval(state.questsTimer);
+  state.questsTimer = setInterval(() => {
+    if (state.tab !== 'quests') { clearInterval(state.questsTimer); return; }
+    if (quests.msToReset(board) <= 0) { renderQuests(); return; }
     tick();
-    clearInterval(state.questsTimer);
-    state.questsTimer = setInterval(() => {
-      if (state.tab !== 'quests') { clearInterval(state.questsTimer); return; }
-      if (quests.msToReset(board) <= 0) { renderQuests(); return; }
-      tick();
-    }, 1000);
-    el.questsBody.replaceChildren(list, reset);
-    reveal(list.children, { step: 60 });
-  };
-  paint(quests.loadBoard(questUserKey()));
-  // Signed in, the server's deal is the deal: fetched in the background, painted when it comes.
-  if (signedIn()) quests.syncBoard(questUserKey()).then((board) => { if (state.tab === 'quests') paint(board); }).catch(() => { /* the device's board stands */ });
+  }, 1000);
 }
 
 /* --- the leaderboard --------------------------------------------------------------------------- */
@@ -9049,8 +9502,6 @@ async function loadLeaderboard() {
   if (state.tab !== 'leaderboard') return;
   view.rows = view.page === 0 ? page.rows : [...view.rows, ...page.rows];
   view.more = page.more;
-  const list = document.createElement('div');
-  list.className = 'leaderboard';
   const me = userId();
   const rowNode = (r, cls = '') => {
     const row = document.createElement('div');
@@ -9061,12 +9512,52 @@ async function loadLeaderboard() {
     row.querySelector('.lb-score').textContent = formatAmount(r.score);
     return row;
   };
+  // The three on the podium, first in the middle and a step higher.
+  const step = (r, rank) => {
+    const node = document.createElement('div');
+    node.className = `lb-step is-r${rank}${r ? '' : ' is-empty'}${r && r.userId === me ? ' is-me' : ''}`;
+    node.innerHTML = `
+      <span class="lb-medal tabular"></span>
+      <span class="person-mark lb-face" aria-hidden="true"></span>
+      <span class="lb-step-name"></span>
+      <span class="lb-step-score tabular"></span>`;
+    node.querySelector('.lb-medal').textContent = String(rank);
+    node.querySelector('.lb-face').textContent = r ? String(r.username).slice(0, 1) : '·';
+    node.querySelector('.lb-step-name').textContent = r ? r.username : t('lbOpenStep');
+    node.querySelector('.lb-step-score').textContent = r ? formatAmount(r.score) : '';
+    return node;
+  };
+  const list = document.createElement('div');
+  list.className = 'lb';
   if (!view.rows.length) list.appendChild(gameStage('podium', t('lbEmpty')));
-  else list.replaceChildren(...view.rows.map((r) => rowNode(r)));
+  else {
+    const podium = document.createElement('div');
+    podium.className = 'lb-podium';
+    podium.replaceChildren(step(view.rows[1], 2), step(view.rows[0], 1), step(view.rows[2], 3));
+    list.appendChild(podium);
+    const rest = view.rows.slice(3);
+    if (rest.length) {
+      const rows = document.createElement('div');
+      rows.className = 'leaderboard';
+      rows.replaceChildren(...rest.map((r) => rowNode(r)));
+      list.appendChild(rows);
+    }
+  }
+  // The world clock: the window turns at midnight UTC, and says so.
   const reset = document.createElement('p');
-  reset.className = 'lb-reset';
-  const ms = leaderboard.msToReset(view.window);
-  reset.textContent = ms == null ? t('lbForever') : t('lbReset', { time: formatCountdown(ms) });
+  reset.className = 'lb-foot';
+  const paintReset = () => {
+    const ms = leaderboard.msToReset(view.window);
+    reset.innerHTML = `${iconSvg('clock', { size: 14 })}<span></span>`;
+    reset.querySelector('span').textContent = ms == null ? t('lbForever')
+      : t(view.window === 'weekly' ? 'lbResetWeekly' : 'lbResetDaily', { time: formatCountdown(ms) });
+  };
+  paintReset();
+  clearInterval(state.lbTimer);
+  state.lbTimer = setInterval(() => {
+    if (state.tab !== 'leaderboard') { clearInterval(state.lbTimer); return; }
+    paintReset();
+  }, 1000);
   list.appendChild(reset);
   if (view.more) {
     const more = document.createElement('button');
@@ -9578,6 +10069,18 @@ function init() {
     showScreen('friends');
   });
   el.chatForm.addEventListener('submit', sendChat);
+  el.chatInput.addEventListener('input', chatTyped);
+  // The keyboard rising shrinks the room; the newest line must stay in it.
+  el.chatInput.addEventListener('focus', () => setTimeout(keepChatBottom, 260));
+  window.visualViewport?.addEventListener('resize', keepChatBottom);
+  window.addEventListener('resize', keepChatBottom);
+  press(el.chatWho, { sound: null });
+  el.chatWho.addEventListener('click', () => {
+    const entry = state.chat;
+    if (!entry) return;
+    synth.playTap();
+    openFriend(entry);
+  });
   el.albumBack.addEventListener('click', () => {
     synth.playSheet(false);
     state.album = null;

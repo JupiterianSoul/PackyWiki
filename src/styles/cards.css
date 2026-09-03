@@ -248,19 +248,40 @@
   color: color-mix(in srgb, var(--ink) 30%, transparent);
 }
 
+/* The star is drawn small and hit large: the button is the reach, the disc
+   is what shows. The reach stops short of the wish bookmark below it. */
 .fav-button {
   position: absolute;
-  top: 8px; right: 8px;
+  top: -4px; right: -4px;
   z-index: 3;
   display: grid;
   place-items: center;
-  width: 30px; height: 30px;
-  border-radius: 50%;
+  width: 54px; height: 48px;
+  padding: 0 0 6px;
   color: rgba(255, 255, 255, 0.7);
+  background: none;
+  touch-action: manipulation;
+}
+.fav-button::before {
+  content: '';
+  position: absolute;
+  inset: 12px 12px 6px 12px;
+  z-index: -1;
+  border-radius: 50%;
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(4px);
 }
 .fav-button.is-on { color: var(--warning); }
+/* On the card itself, the star and the bookmark wait for the face to turn up. */
+.card:not(.is-revealed) > .fav-button,
+.card:not(.is-revealed) > .wish-button { display: none; }
+.fav-button.is-giant {
+  top: 4px; right: 4px;
+  z-index: 5;
+  width: 60px; height: 60px;
+  padding: 0;
+}
+.fav-button.is-giant::before { inset: 8px; background: rgba(0, 0, 0, 0.5); }
 
 .card-body {
   position: relative;
@@ -588,25 +609,51 @@
   box-shadow: inset 0 0 40px -10px rgba(88, 28, 135, 0.9);
 }
 
-/* --- 5. LEGENDARY - classic gold foil ---------------------------------- */
-/* A thick gold frame whose brushed gradient slides with the light, an
-   embossed inner bevel, and six sparks that drift up the plate. */
+/* --- 5. LEGENDARY - solid gold ----------------------------------------- */
+/* The plate IS gold: an opaque, brushed, radiant metal, not a tint over the
+   dark. A light band crosses it with the tilt, a fine brush grain and a
+   little foil grain sit on top, the frame is a darker bronze bevel, and the
+   type is stamped dark into the metal. Six sparks still drift up. */
 [data-rarity="legendary"] .card-front {
-  background: linear-gradient(180deg, #2a2210, #171208 45%, #241b0a);
-  box-shadow: inset 0 0 0 7px rgba(60, 40, 5, 0.85), inset 0 0 0 8px rgba(255, 225, 140, 0.3);
-  color: #fdf3d6;
+  background:
+    linear-gradient(180deg,
+      #b98416 0%, #f0c752 12%, #fbe8a6 26%, #e7bd4c 40%, #c2911f 52%,
+      #a4741a 62%, #dcae3c 76%, #f6dc8c 88%, #c99a2c 100%);
+  box-shadow: inset 0 0 0 7px rgba(60, 40, 5, 0.85), inset 0 0 0 8px rgba(255, 225, 140, 0.4);
+  color: #2b1d05;
 }
-[data-rarity="legendary"] .card-extract { color: rgba(253, 243, 214, 0.72); }
-[data-rarity="legendary"] .card-views { color: rgba(253, 243, 214, 0.55); }
-[data-rarity="legendary"] .card-price { color: #86efac; }
-[data-rarity="legendary"] .card-desc { color: #f7dd86; }
+[data-rarity="legendary"] .card-desc { color: #6b4310; }
+[data-rarity="legendary"] .card-extract { color: rgba(43, 29, 5, 0.78); }
+[data-rarity="legendary"] .card-views { color: rgba(43, 29, 5, 0.62); }
+[data-rarity="legendary"] .card-price { color: #1f5a2e; }
+/* The foil: a moving highlight, then brush lines and grain, all under the art. */
+[data-rarity="legendary"] .fx-a { z-index: -1; overflow: hidden; }
+[data-rarity="legendary"] .fx-a::before {
+  content: '';
+  position: absolute;
+  inset: -20% -60%;
+  background:
+    linear-gradient(105deg,
+      transparent 32%, rgba(255, 255, 255, 0.18) 42%, rgba(255, 255, 255, 0.55) 49%,
+      rgba(255, 255, 255, 0.18) 56%, transparent 66%);
+  transform: translateX(calc(var(--lx) * 38%));
+}
+[data-rarity="legendary"] .fx-a::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.09) 0 1px, transparent 1px 3px),
+    repeating-linear-gradient(0deg, transparent 0 7px, rgba(90, 60, 8, 0.1) 7px 8px),
+    radial-gradient(ellipse at 50% 0%, rgba(255, 255, 255, 0.22), transparent 60%);
+}
 [data-rarity="legendary"] .fx-ring { padding: 6px; }
 [data-rarity="legendary"] .fx-ring::before {
   inset: -50%;
   background:
     linear-gradient(135deg,
-      #6b4a0e, #c7962b 20%, #fff2b8 35%, #e2b53d 45%,
-      #8a6414 58%, #f7dd86 74%, #b4841c 88%, #6b4a0e);
+      #5a3c0a, #b3831f 20%, #fff0b8 35%, #d6a832 45%,
+      #6b4a0e 58%, #f2d47a 74%, #a0731a 88%, #5a3c0a);
   transform: translate(calc(var(--lx) * -18%), calc(var(--ly) * -18%));
 }
 [data-rarity="legendary"] .fx-ring::after {
@@ -620,8 +667,8 @@
   bottom: -4px;
   width: 3px;
   height: 3px;
-  background: #ffe9a3;
-  box-shadow: 0 0 6px 1px rgba(251, 191, 36, 0.8);
+  background: #fff6d2;
+  box-shadow: 0 0 6px 1px rgba(255, 255, 255, 0.8);
 }
 .is-lit[data-rarity="legendary"] .fx-p i { animation: l-spark var(--d) linear infinite; animation-delay: var(--delay); }
 @keyframes l-spark {
@@ -631,10 +678,19 @@
   100% { transform: translateY(-150cqw) translateX(var(--sx)) scale(1); opacity: 0; }
 }
 [data-rarity="legendary"] .rarity-badge {
-  background: linear-gradient(180deg, #f7dd86, #c7962b);
-  color: #2b1d05;
-  border-color: #a9791a;
+  background: linear-gradient(180deg, #3a2707, #1f1403);
+  color: #f7dd86;
+  border-color: #8a6414;
 }
+/* The giant card's extra type and chips are stamped into the gold too. */
+[data-rarity="legendary"] .giant-extract { color: rgba(43, 29, 5, 0.8); }
+[data-rarity="legendary"] .giant-facts .chip,
+[data-rarity="legendary"] .giant-actions .btn {
+  color: #2b1d05;
+  border-color: rgba(43, 29, 5, 0.38);
+  background: rgba(255, 255, 255, 0.2);
+}
+[data-rarity="legendary"] .giant-actions .btn.btn-danger { color: #fff; }
 
 /* --- 6. MYTHIC - inferno glitch ---------------------------------------- */
 /* Fire that misbehaves: a molten ring that spins and melts, embers that
@@ -817,94 +873,85 @@
 [data-rarity="exotic"] .card-desc { color: #22d3ee; }
 
 /* --- 8. PRISMATIC - the rainbow ---------------------------------------- */
-/* The god tier, and the only card with no colour of its own: a liquid prism
-   plate that never stops moving under dark glass, a rainbow ribbon that
-   flows across the face as the phone tilts (a curve, not a straight band),
-   thin-film corners that shift teal to magenta to gold, silver foil
-   lettering that splits red and cyan with the light, and a glass badge
-   rimmed with the whole spectrum. */
+/* The god tier, and the only card with no colour of its own. Four decisions
+   from the board: a holo-foil plate (dense spectrum bands sliding under
+   charcoal foil with a grain of glitter), a rainbow ribbon that is a curve
+   and not a bar, poured from violet to pink through a white core and
+   carried across the face by the tilt, thin-film corners of teal, violet,
+   magenta and gold turning with the light, and a glass badge rimmed with
+   the whole spectrum. Silver foil lettering splits red and cyan. */
+@property --pa { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+@keyframes p-turn { to { --pa: 360deg; } }
 [data-rarity="prismatic"] {
-  --flow: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' preserveAspectRatio='none'%3E%3Cpath d='M34 -12 C 60 16, 14 44, 36 70 C 46 82, 47 92, 46 112 L 60 112 C 61 92, 59 82, 48 70 C 28 46, 72 18, 47 -12 Z' fill='%23ffffff'/%3E%3C/svg%3E");
+  --spectrum: #ff3d7f, #ff8a3d, #ffe14d, #4dff9a, #3dd9ff, #6b7dff, #d94dff, #ff3d7f;
+  --streak: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 140' preserveAspectRatio='none'%3E%3Cg fill='none' stroke-linecap='round' stroke-width='4' opacity='.95'%3E%3Cpath d='M59.5,-12 C17.5,30 81.5,72 35.5,112 C15.5,130 19.5,146 29.5,162' stroke='%23d94dff'/%3E%3Cpath d='M63,-12 C21,30 85,72 39,112 C19,130 23,146 33,162' stroke='%233dd9ff'/%3E%3Cpath d='M66.5,-12 C24.5,30 88.5,72 42.5,112 C22.5,130 26.5,146 36.5,162' stroke='%234dff9a'/%3E%3Cpath d='M70,-12 C28,30 92,72 46,112 C26,130 30,146 40,162' stroke='%23ffffff' stroke-width='4.8'/%3E%3Cpath d='M73.5,-12 C31.5,30 95.5,72 49.5,112 C29.5,130 33.5,146 43.5,162' stroke='%23ffe14d'/%3E%3Cpath d='M77,-12 C35,30 99,72 53,112 C33,130 37,146 47,162' stroke='%23ff8a3d'/%3E%3Cpath d='M80.5,-12 C38.5,30 102.5,72 56.5,112 C36.5,130 40.5,146 50.5,162' stroke='%23ff3d7f'/%3E%3C/g%3E%3C/svg%3E");
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 .6 0 0 0 0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 [data-rarity="prismatic"] .card-front {
-  background: linear-gradient(180deg, #120c22, #1a0f2e 50%, #0e0a1c);
-  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.3);
+  background: linear-gradient(180deg, #1c1c26, #111119 50%, #17171f);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.34);
   color: #fdf4ff;
 }
-[data-rarity="prismatic"] .card-extract { color: rgba(253, 244, 255, 0.74); }
-[data-rarity="prismatic"] .card-views { color: rgba(253, 244, 255, 0.58); }
-[data-rarity="prismatic"] .card-price { color: #a7f3d0; }
-/* The liquid plate: seven blurred spectral pools, painted once and then
-   only turned and scaled, so the colour under the glass keeps shifting. */
+[data-rarity="prismatic"] .card-extract { color: rgba(253, 244, 255, 0.76); }
+[data-rarity="prismatic"] .card-views { color: rgba(253, 244, 255, 0.62); }
+[data-rarity="prismatic"] .card-price { color: #a7f3d0; text-shadow: 0 0 10px rgba(167, 243, 208, 0.45); }
+/* The holo plate: spectrum bands that lean with the tilt and drift on their
+   own, dodged into the charcoal, with glitter grain over them. */
 [data-rarity="prismatic"] .fx-a { z-index: -1; overflow: hidden; }
 [data-rarity="prismatic"] .fx-a::before {
   content: '';
   position: absolute;
-  inset: -40%;
-  mix-blend-mode: screen;
-  filter: blur(16px) saturate(1.35);
+  inset: -30%;
+  mix-blend-mode: color-dodge;
+  opacity: 0.5;
   background:
-    radial-gradient(34% 28% at 24% 30%, rgba(255, 61, 127, 0.85), transparent 70%),
-    radial-gradient(30% 26% at 72% 24%, rgba(61, 217, 255, 0.8), transparent 70%),
-    radial-gradient(36% 30% at 60% 70%, rgba(217, 77, 255, 0.85), transparent 70%),
-    radial-gradient(26% 22% at 24% 76%, rgba(255, 225, 77, 0.75), transparent 70%),
-    radial-gradient(30% 26% at 82% 62%, rgba(77, 255, 154, 0.75), transparent 70%),
-    radial-gradient(24% 20% at 48% 44%, rgba(255, 138, 61, 0.7), transparent 70%),
-    radial-gradient(24% 20% at 36% 56%, rgba(107, 125, 255, 0.75), transparent 70%);
+    repeating-linear-gradient(112deg,
+      #ff3d7f 0, #ff8a3d 3.5cqw, #ffe14d 7cqw, #4dff9a 10.5cqw,
+      #3dd9ff 14cqw, #6b7dff 17.5cqw, #d94dff 21cqw, #ff3d7f 24.5cqw);
+  transform: translateX(calc(var(--lx) * 10%));
 }
-.is-lit[data-rarity="prismatic"] .fx-a::before { animation: p-swirl 20s ease-in-out infinite alternate; }
-@keyframes p-swirl {
-  0% { transform: rotate(0deg) scale(1); }
-  50% { transform: rotate(16deg) scale(1.14) translate(4%, -3%); }
-  100% { transform: rotate(-12deg) scale(1.06) translate(-4%, 3%); }
-}
+.is-lit[data-rarity="prismatic"] .fx-a::before { animation: p-drift 12s linear infinite; }
+@keyframes p-drift { to { background-position: 24.5cqw 0; } }
 [data-rarity="prismatic"] .fx-a::after {
   content: '';
   position: absolute;
   inset: 0;
-  background:
-    repeating-linear-gradient(118deg, transparent 0 8cqw, rgba(255, 255, 255, 0.045) 8cqw 8.5cqw),
-    radial-gradient(ellipse at 50% 34%, rgba(18, 12, 34, 0.05), rgba(18, 12, 34, 0.72) 78%);
+  background: var(--grain) 0 0 / 120px 120px;
+  mix-blend-mode: overlay;
+  opacity: 0.7;
 }
-/* The ribbon: a full rainbow poured through a curved channel, so the light
-   flows across the card instead of cutting a straight diagonal. It travels
-   on the tilt alone - nothing here loops. */
+/* The ribbon: seven bands of the spectrum drawn as one S-curve, blurred to
+   a glow, sliding across the face with the tilt and breathing up and down
+   on its own so it never sits still. */
 [data-rarity="prismatic"] .fx-b { z-index: 3; mix-blend-mode: screen; overflow: hidden; }
 [data-rarity="prismatic"] .fx-b::before {
   content: '';
   position: absolute;
-  inset: -14% -32%;
-  opacity: 0.72;
-  filter: blur(3px) saturate(1.2);
-  -webkit-mask: var(--flow) center / 100% 100% no-repeat;
-  mask: var(--flow) center / 100% 100% no-repeat;
-  background:
-    linear-gradient(178deg,
-      rgba(255, 61, 127, 0.9) 4%, rgba(255, 138, 61, 0.9) 18%, rgba(255, 225, 77, 0.95) 31%,
-      rgba(255, 255, 255, 0.98) 45%, rgba(77, 255, 154, 0.95) 60%, rgba(61, 217, 255, 0.9) 76%,
-      rgba(217, 77, 255, 0.85) 96%);
+  inset: -12% -30%;
+  opacity: 0.85;
+  filter: blur(2.6px) saturate(1.25);
+  background: var(--streak) 50% 50% / 100% 100% no-repeat;
   transform: translateX(calc(var(--lx) * 46%));
+}
+.is-lit[data-rarity="prismatic"] .fx-b::before { animation: p-flow 9s ease-in-out infinite alternate; }
+@keyframes p-flow {
+  0% { background-position: 50% 42%; opacity: 0.78; }
+  100% { background-position: 50% 58%; opacity: 0.92; }
 }
 [data-rarity="prismatic"] .fx-b::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(circle at calc(50% + var(--lx) * 45%) calc(45% + var(--ly) * 40%), rgba(255, 255, 255, 0.24), transparent 42%);
+  background: radial-gradient(circle at calc(50% + var(--lx) * 45%) calc(45% + var(--ly) * 40%), rgba(255, 255, 255, 0.26), transparent 42%);
 }
 /* Thin-film corners: teal, violet, magenta and gold, turning slowly and
    swinging further with the light. */
 [data-rarity="prismatic"] .fx-ring { padding: 3px; }
 [data-rarity="prismatic"] .fx-ring::before {
-  background: conic-gradient(#00e0c0, #5b3cff, #ff2bd6, #ffd23f, #ff6a3d, #00e0c0);
+  background: conic-gradient(from var(--pa), #00e0c0, #5b3cff, #ff2bd6, #ffd23f, #ff6a3d, #00e0c0);
   transform: rotate(calc(var(--lx) * 50deg));
 }
-.is-lit[data-rarity="prismatic"] .fx-ring::after {
-  content: '';
-  position: absolute;
-  inset: -60%;
-  background: conic-gradient(from 180deg, transparent 60%, rgba(255, 255, 255, 0.5) 78%, transparent 92%);
-  animation: spin 9s linear infinite;
-}
+.is-lit[data-rarity="prismatic"] .fx-ring::before { animation: p-turn 16s linear infinite; }
 /* Chromatic aberration on the art: a red copy and a cyan copy, pulled apart
    by the light. --art is set on the front by dressFront(). */
 [data-rarity="prismatic"] .fx-art::before,
@@ -917,12 +964,12 @@
   opacity: 0.5;
 }
 [data-rarity="prismatic"] .fx-art::before {
-  filter: grayscale(1) sepia(1) saturate(12) hue-rotate(-32deg);
-  transform: translate(calc(var(--lx) * -1.3cqw), calc(var(--ly) * -0.9cqw));
+  filter: grayscale(1) sepia(1) saturate(12) hue-rotate(-32deg) brightness(0.85);
+  transform: translate(calc(var(--lx) * -1.5cqw), calc(var(--ly) * -0.4cqw));
 }
 [data-rarity="prismatic"] .fx-art::after {
-  filter: grayscale(1) sepia(1) saturate(12) hue-rotate(140deg);
-  transform: translate(calc(var(--lx) * 1.3cqw), calc(var(--ly) * 0.9cqw));
+  filter: grayscale(1) sepia(1) saturate(12) hue-rotate(140deg) brightness(0.85);
+  transform: translate(calc(var(--lx) * 1.5cqw), calc(var(--ly) * 0.4cqw));
 }
 /* Silver foil lettering, split red and cyan by the light. The glow has to
    be a drop-shadow: a text-shadow would show through the clipped glyphs. */
@@ -937,14 +984,16 @@
     drop-shadow(calc(var(--lx) * 0.45cqw) 0 rgba(61, 217, 255, 0.7));
 }
 [data-rarity="prismatic"] .card-desc { color: #e5e7eb; }
+/* The glass badge: frosted white over the plate, rimmed with the spectrum. */
 [data-rarity="prismatic"] .rarity-badge {
   color: #fff;
   border: 1px solid transparent;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.24), rgba(255, 255, 255, 0.08)) padding-box,
-    conic-gradient(#ff3d7f, #ff8a3d, #ffe14d, #4dff9a, #3dd9ff, #6b7dff, #d94dff, #ff3d7f) border-box;
+    conic-gradient(from var(--pa), var(--spectrum)) border-box;
   text-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
 }
+.is-lit[data-rarity="prismatic"] .rarity-badge { animation: p-turn 5s linear infinite; }
 
 /* One shared spinner. */
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -964,6 +1013,7 @@ html[data-lowpower='1'] .fx-code .col,
 html[data-lowpower='1'] .card-art::before,
 html[data-lowpower='1'] .card-art::after,
 html[data-lowpower='1'] .card-title,
+html[data-lowpower='1'] .rarity-badge,
 html[data-lowpower='1'] .card-desc { animation: none !important; }
 
 /* --- the giant card (the detail view) --------------------------------------
@@ -1015,7 +1065,7 @@ html[data-lowpower='1'] .card-desc { animation: none !important; }
 /* Except the prismatic ribbon: it is the whole point of the tier, and on the
    taller face it simply runs longer. */
 .giant-card[data-rarity="prismatic"] .fx-b { display: block; }
-.giant-card[data-rarity="prismatic"] .fx-b::before { inset: -8% -26%; opacity: 0.6; }
+.giant-card[data-rarity="prismatic"] .fx-b::before { inset: -6% -24%; opacity: 0.62; }
 /* The exotic wikitext scroll reads well behind a small card; behind a tall
    giant card it competes with the extract, so it fades out under the art. */
 .giant-card .fx-code {

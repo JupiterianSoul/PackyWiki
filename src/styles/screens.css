@@ -467,18 +467,31 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .press-foot .shop-stock { margin: 0; }
 .press-plate > .buy { width: 100%; }
 
-/* Bundles: the wrappers fanned sideways behind one price, clipped to the tile. */
+/* Bundles: at most three sleeves, fanned like a hand of cards behind one
+   price, the middle one in front; anything beyond three is a count. */
 .shop-tile-stack {
+  position: relative;
   display: flex; justify-content: center; align-items: flex-end;
-  height: 118px; overflow: hidden; padding: 6px 0 4px;
+  height: 122px; overflow: hidden; padding: 8px 0 6px;
 }
 .shop-tile-stack-item {
   flex: none; display: block;
-  transform: rotate(calc((var(--i) - (var(--n) - 1) / 2) * 9deg)) translateX(calc((var(--i) - (var(--n) - 1) / 2) * 4px));
+  /* The outer sleeves lean away and sit a touch smaller and lower, so the
+     hand reads as a hand and stays inside the tile. */
+  --off: calc(var(--i) - (var(--n) - 1) / 2);
+  transform: translateY(calc(abs(var(--off)) * 6px)) rotate(calc(var(--off) * 6deg)) scale(calc(1 - abs(var(--off)) * 0.1));
   transform-origin: 50% 120%;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.35));
 }
-.shop-tile-stack-item + .shop-tile-stack-item { margin-left: -38px; }
-.shop-tile-stack-item:nth-child(even) { z-index: 1; }
+.shop-tile-stack-item + .shop-tile-stack-item { margin-left: -54px; }
+.shop-tile-stack-item:nth-child(2) { z-index: 2; }
+.shop-tile-stack-more {
+  position: absolute; right: 10px; bottom: 8px; z-index: 3;
+  padding: 3px 8px; border-radius: var(--radius-pill);
+  font-size: 0.66rem; font-weight: 800;
+  color: var(--ink); background: var(--surface-solid);
+  border: var(--border) var(--border-style) var(--line-strong);
+}
 .shop-bundle-list { display: grid; gap: 3px; padding-bottom: 8px; }
 .shop-bundle-list li { display: grid; gap: 1px; font-size: 0.68rem; line-height: 1.3; }
 .shop-bundle-list li b { font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1121,71 +1134,40 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .daily-copy b { font-size: 1rem; font-weight: 800; }
 .daily-copy span { font-size: 0.8rem; color: var(--ink-dim); }
 
-/* The month, as a trail of stops that scrolls sideways. */
-.gift-trail {
-  display: flex;
-  align-items: flex-start;
-  gap: 0;
-  overflow-x: auto;
-  padding: 10px 2px 12px;
-  scrollbar-width: none;
-  touch-action: pan-x;
-}
-.gift-trail::-webkit-scrollbar { display: none; }
-.gift-stop {
+/* The week: seven rungs side by side, the one that is yours lit. */
+.daily { display: grid; gap: 14px; }
+.daily-note { font-size: 0.76rem; color: var(--warning); }
+.daily-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 5px; }
+.daily-tile {
   position: relative;
-  flex: none;
-  display: grid;
-  justify-items: center;
-  gap: 5px;
-  width: 52px;
+  display: grid; justify-items: center; gap: 5px;
+  min-width: 0;
+  padding: 8px 2px 7px;
+  border-radius: 12px;
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
 }
-/* The path between stops. */
-.gift-stop + .gift-stop::before {
-  content: '';
-  position: absolute;
-  right: 50%;
-  top: 16px;
-  width: 52px;
-  height: 3px;
-  margin-right: 16px;
-  border-radius: 2px;
-  background: color-mix(in srgb, var(--ink) 14%, transparent);
-  z-index: 0;
+.daily-tile-day { font-size: 0.56rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-faint); white-space: nowrap; }
+.daily-tile-art {
+  display: grid; place-items: center;
+  width: 30px; height: 30px; border-radius: 50%;
+  color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent);
 }
-.gift-stop.is-claimed + .gift-stop.is-claimed::before,
-.gift-stop.is-claimed + .gift-stop.is-ready::before,
-.gift-stop.is-claimed + .gift-stop.is-next::before { background: color-mix(in srgb, var(--positive) 55%, transparent); }
-.gift-stop-node {
-  position: relative;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 34px; height: 34px;
-  border-radius: 50%;
-  border: 2px solid var(--line);
-  background: var(--surface-solid);
-  color: var(--ink-dim);
-}
-.gift-stop.is-milestone .gift-stop-node { width: 42px; height: 42px; }
-.gift-stop.is-coins .gift-stop-node { color: var(--positive); }
-.gift-stop.is-booster .gift-stop-node, .gift-stop.is-card .gift-stop-node { color: var(--accent); }
-.gift-stop.is-claimed .gift-stop-node {
-  border-color: color-mix(in srgb, var(--positive) 60%, transparent);
-  background: color-mix(in srgb, var(--positive) 16%, var(--surface-solid));
-  color: var(--positive);
-}
-.gift-stop.is-ready .gift-stop-node {
-  border-color: var(--accent);
-  box-shadow: var(--glow);
-  animation: stop-pulse 1.6s ease-in-out infinite;
-}
+.daily-tile.is-coins .daily-tile-art { color: var(--positive); background: color-mix(in srgb, var(--positive) 14%, transparent); }
+.daily-tile-val { max-width: 100%; font-size: 0.6rem; font-weight: 700; color: var(--ink-dim); line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.daily-tile.is-claimed { border-color: color-mix(in srgb, var(--positive) 50%, transparent); }
+.daily-tile.is-claimed .daily-tile-art { color: var(--positive); background: color-mix(in srgb, var(--positive) 16%, transparent); }
+.daily-tile.is-ready { border-color: var(--accent); box-shadow: var(--glow); animation: stop-pulse 1.6s ease-in-out infinite; }
+.daily-tile.is-next { border-color: color-mix(in srgb, var(--accent) 45%, transparent); }
+.daily-tile.is-locked { opacity: 0.55; }
+.daily-tile.is-big { border-color: color-mix(in srgb, #fbbf24 60%, transparent); background: linear-gradient(180deg, color-mix(in srgb, #fbbf24 14%, var(--surface)), var(--surface)); }
+.daily-tile.is-big .daily-tile-art { color: #fbbf24; background: rgba(251, 191, 36, 0.16); }
+.daily-tile.is-big.is-claimed .daily-tile-art { color: var(--positive); }
 @keyframes stop-pulse {
   0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.14); }
+  50% { transform: scale(1.06); }
 }
-.gift-stop.is-locked { opacity: 0.55; }
-.gift-stop-day { font-size: 0.62rem; font-weight: 800; color: var(--ink-faint); }
+.daily-foot { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 0.74rem; color: var(--ink-faint); }
 /* --- level-up ------------------------------------------------------------------------- */
 
 .level-jump { display: flex; align-items: center; gap: 14px; margin: 4px 0 18px; }
@@ -1623,8 +1605,33 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 /* The conversation fills the room above the bottom bar; the log grows and
    the composer stays on the floor, above the bar, whatever the phone's
    idea of a viewport is. */
-#screen-chat.is-active { display: flex; flex-direction: column; min-height: calc(100vh - 150px); min-height: calc(100dvh - 60px - var(--nav-height) - var(--safe-bottom) - 26px); }
+#screen-chat.is-active { display: flex; flex-direction: column; height: calc(100vh - 150px); height: calc(100dvh - 60px - var(--nav-height) - var(--safe-bottom) - 26px); }
 .chat-log { flex: 1; }
+/* The header is a door: the name and the picture open their profile. */
+.chat-who {
+  flex: 1; min-width: 0;
+  display: flex; align-items: center; gap: 10px;
+  padding: 4px 6px 4px 0;
+  border-radius: var(--radius);
+  text-align: left;
+  color: inherit;
+}
+.chat-who-text { display: grid; min-width: 0; }
+.chat-name { display: block; font-size: 1.05rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-tools { display: flex; gap: 6px; }
+.chat-tool { color: var(--ink-dim); }
+/* Receipts: one tick on the server, two once they have opened the room. */
+.bubble-ticks { display: inline-flex; margin-left: 5px; vertical-align: -2px; color: var(--ink-faint); }
+.bubble.is-read .bubble-ticks { color: #38bdf8; }
+.chat-receipt { align-self: flex-end; margin-top: -4px; font-size: 0.62rem; color: var(--ink-faint); }
+.chat-receipt.is-read { color: #38bdf8; }
+/* The typing line under the log: three dots that take turns. */
+.chat-typing { display: flex; align-items: center; gap: 8px; padding-bottom: 6px; font-size: 0.74rem; color: var(--ink-dim); }
+.typing-dots { display: inline-flex; gap: 3px; }
+.typing-dots i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; animation: typing-dot 1.1s ease-in-out infinite; }
+.typing-dots i:nth-child(2) { animation-delay: 0.18s; }
+.typing-dots i:nth-child(3) { animation-delay: 0.36s; }
+@keyframes typing-dot { 0%, 60%, 100% { opacity: 0.35; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
 .chat-bar {
   position: sticky;
   bottom: calc(var(--nav-height) + var(--safe-bottom) + 8px);
@@ -1639,8 +1646,7 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .chat-presence.is-online { color: #4ade80; }
 .chat-log {
   flex: 1;
-  min-height: 200px;
-  max-height: calc(100dvh - 300px);
+  min-height: 0;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -1759,43 +1765,40 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
   overflow: hidden;
   touch-action: none;
   cursor: grab;
+  background: #000;
 }
+.crop-stage.is-held { cursor: grabbing; }
+/* The picture: sized and placed in pixels by the sheet, moved by the finger. */
 .crop-img {
   position: absolute;
-  inset: 0;
-  background-size: cover;
-  background-position: 50% 50%;
+  left: 0; top: 0;
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  will-change: transform;
 }
 /* Everything outside the circle dims; the circle is what you keep. */
 .crop-shade {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background: radial-gradient(ellipse 27% 27% at var(--cx, 50%) var(--cy, 50%),
-    transparent 98%, rgba(0, 0, 0, 0.62) 100%);
+  background: radial-gradient(ellipse 36% 36% at 50% 50%, transparent 98.5%, rgba(0, 0, 0, 0.62) 100%);
 }
 .crop-circle {
   position: absolute;
-  width: 54%;
+  left: 50%; top: 50%;
+  width: 72%;
   aspect-ratio: 1;
   transform: translate(-50%, -50%);
   border-radius: 50%;
   border: 2.5px solid rgba(255, 255, 255, 0.92);
-  box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 4px 18px -6px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(0, 0, 0, 0.35);
   pointer-events: none;
-  transition: transform 120ms var(--ease);
 }
-.crop-circle.is-held { transform: translate(-50%, -50%) scale(1.04); }
-/* A little grab handle drawn on the ring, so it reads as the movable thing. */
-.crop-circle::after {
-  content: '';
-  position: absolute;
-  left: 50%; bottom: -7px;
-  width: 26px; height: 5px;
-  transform: translateX(-50%);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.92);
-}
+.crop-zoom { display: flex; align-items: center; gap: 10px; margin: 14px auto 0; width: min(300px, 82vw); }
+.crop-zoom-mark { display: grid; place-items: center; color: var(--ink-faint); }
+.crop-zoom-range { flex: 1; accent-color: var(--accent); }
+.crop-preview-row { display: flex; align-items: center; gap: 12px; margin: 14px auto 0; width: min(300px, 82vw); font-size: 0.8rem; }
+.crop-preview { width: 56px; height: 56px; }
 
 /* A database that predates a feature: said once, quietly, where it matters. */
 .schema-note {
@@ -2293,10 +2296,30 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 
 .binder-tools {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 0 var(--gutter) 14px;
 }
+.classic-search {
+  flex: 1 1 160px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+.classic-search-mark { position: absolute; left: 12px; display: grid; place-items: center; color: var(--ink-faint); pointer-events: none; }
+.classic-search-input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 12px 9px 34px;
+  border-radius: var(--radius-pill);
+  border: var(--border) var(--border-style) var(--line);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+.classic-search-input:focus { outline: none; border-color: var(--accent); }
 .binder-tools .muted { margin-left: auto; font-size: 0.76rem; }
 .classic-view { display: grid; gap: 22px; padding: 0 var(--gutter); }
 .classic-group { min-width: 0; }
@@ -2367,6 +2390,24 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .fx-chip.is-locked .fx-chip-sub { color: var(--ink-faint); }
 
 /* --- the Apotheosis frame is the only one that moves ---------------------- */
+/* The Singularity: three rings of the disc at three speeds, the inner one
+   fastest, jets that pulse, a photon ring that breathes, stars circling in. */
+.sing-spin { transform-origin: 0 0; animation: god-turn 18s linear infinite; }
+.sing-spin.sing-mid { animation-duration: 11s; animation-direction: reverse; }
+.sing-spin.sing-in { animation-duration: 6s; }
+.sing-stars { transform-origin: 0 0; animation: god-turn 46s linear infinite reverse; }
+.sing-star { animation: sing-twinkle 2.6s ease-in-out infinite alternate; }
+.sing-star.sing-s1 { animation-delay: -0.9s; }
+.sing-star.sing-s2 { animation-delay: -1.7s; }
+.sing-jet { animation: sing-pulse 2.2s ease-in-out infinite alternate; }
+.sing-jet-b { animation-delay: -1.1s; }
+.sing-ring { animation: sing-breathe 3.2s ease-in-out infinite alternate; }
+.sing-lens { animation: sing-pulse 4s ease-in-out infinite alternate; }
+.sing-lens-b { animation-delay: -2s; }
+.sing-well { transform-origin: 0 0; animation: god-breathe 5.2s ease-in-out infinite; }
+@keyframes sing-twinkle { from { opacity: 0.35; } to { opacity: 1; } }
+@keyframes sing-pulse { from { opacity: 0.3; } to { opacity: 1; } }
+@keyframes sing-breathe { from { stroke-opacity: 0.6; stroke-width: 1.1px; } to { stroke-opacity: 1; stroke-width: 1.6px; } }
 .god-spin { transform-origin: 0 0; animation: god-turn 26s linear infinite; }
 .god-spin-back { transform-origin: 0 0; animation: god-turn 18s linear infinite reverse; }
 .god-halo { transform-origin: 0 0; animation: god-breathe 4.6s ease-in-out infinite; }
@@ -2378,7 +2419,8 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 /* A frame that never stops is a frame that never lets the phone idle, so it
    holds still for anyone who asked the system for less motion. */
 @media (prefers-reduced-motion: reduce) {
-  .god-spin, .god-spin-back, .god-halo { animation: none; }
+  .god-spin, .god-spin-back, .god-halo,
+  .sing-spin, .sing-stars, .sing-star, .sing-jet, .sing-ring, .sing-lens, .sing-well { animation: none; }
 }
 
 /* --- the Hellfire frame burns: tongues flicker in three phases, embers turn, the heat breathes --- */

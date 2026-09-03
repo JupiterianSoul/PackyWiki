@@ -19,6 +19,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.webkit.JavascriptInterface;
 
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 import androidx.webkit.WebViewAssetLoader;
 
 /**
@@ -133,7 +136,29 @@ public class MainActivity extends Activity {
             }
         });
 
-        setContentView(webView, new ViewGroup.LayoutParams(
+        // The keyboard. adjustResize in the manifest shrinks the window on
+        // phones that fit the app inside the system bars; on the ones that
+        // draw it edge to edge (Android 15 and up) the window keeps its size
+        // and the keyboard is only reported as an inset, so it is applied
+        // here as a bottom margin. Either way the page ends where the
+        // keyboard starts, the chat log shrinks, and nothing is covered.
+        final android.widget.FrameLayout root = new android.widget.FrameLayout(this);
+        final android.widget.FrameLayout.LayoutParams fill = new android.widget.FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT);
+        root.addView(webView, fill);
+        ViewCompat.setOnApplyWindowInsetsListener(webView, (view, insets) -> {
+            Insets ime = insets.getInsets(WindowInsetsCompat.Type.ime());
+            android.widget.FrameLayout.LayoutParams lp =
+                    (android.widget.FrameLayout.LayoutParams) view.getLayoutParams();
+            int wanted = Math.max(0, ime.bottom);
+            if (lp.bottomMargin != wanted) {
+                lp.bottomMargin = wanted;
+                view.setLayoutParams(lp);
+            }
+            return insets;
+        });
+        setContentView(root, new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 

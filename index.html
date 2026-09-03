@@ -2,7 +2,7 @@
 <html lang="en" data-theme="aurora">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
     <meta name="theme-color" content="#06070d" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Wikster</title>
@@ -158,6 +158,10 @@
           <div class="binder-stats" id="binder-stats"></div>
           <div class="seg-wrap" id="binder-seg-wrap"><div id="binder-seg"></div></div>
           <div class="binder-tools" id="binder-tools" hidden>
+            <label class="classic-search" id="classic-search-wrap">
+              <span class="classic-search-mark" id="classic-search-mark" aria-hidden="true"></span>
+              <input id="classic-search" class="classic-search-input" type="search" autocomplete="off" />
+            </label>
             <button id="classic-filter" class="btn btn-ghost btn-sm" type="button"></button>
             <span class="chip" id="classic-filter-count" hidden></span>
             <span class="muted" id="classic-count"></span>
@@ -285,14 +289,21 @@
                 <p class="hero-rank" id="friend-rank"></p>
               </div>
             </div>
-            <div class="stat-grid" id="friend-stats"></div>
           </div>
 
           <div class="friend-actions pad" id="friend-actions"></div>
 
-          <div class="section-head"><h3 class="label" id="friend-cards-label"></h3></div>
+          <div class="section-head"><h3 class="label" id="friend-stats-label"></h3></div>
+          <div class="stat-grid" id="friend-stats"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="friend-rarity-label"></h3></div>
+          <div class="rarity-bars" id="friend-rarity-bars"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="friend-cards-label"></h3></div>
+          <div class="seg-wrap" id="friend-seg-wrap"><div id="friend-seg"></div></div>
           <p id="friend-cards-status" class="find-status" role="status" aria-live="polite"></p>
           <div id="friend-albums" class="album-shelf"></div>
+          <div id="friend-classic" class="classic-view" hidden></div>
 
           <div class="hero-actions">
             <button id="friend-remove" class="btn btn-ghost btn-sm" type="button"></button>
@@ -302,13 +313,17 @@
         <section id="screen-chat" class="screen">
           <div class="screen-head" style="gap:10px">
             <button id="chat-back" class="icon-btn" type="button" aria-label="Back"></button>
-            <span class="person-mark" id="chat-avatar" aria-hidden="true"></span>
-            <div style="flex:1;min-width:0">
-              <h2 class="open-title" id="chat-name" style="text-align:left"></h2>
-              <p class="chat-presence" id="chat-presence"></p>
-            </div>
+            <button class="chat-who" id="chat-who" type="button">
+              <span class="person-mark" id="chat-avatar" aria-hidden="true"></span>
+              <span class="chat-who-text">
+                <span class="open-title chat-name" id="chat-name"></span>
+                <span class="chat-presence" id="chat-presence"></span>
+              </span>
+            </button>
+            <div class="chat-tools" id="chat-tools"></div>
           </div>
           <div class="chat-log pad" id="chat-log" aria-live="polite"></div>
+          <p class="chat-typing pad" id="chat-typing" hidden></p>
           <form class="chat-bar" id="chat-form" autocomplete="off">
             <input id="chat-input" class="chat-input" type="text" maxlength="500" />
             <button id="chat-send" class="btn btn-primary btn-sm" type="submit"></button>

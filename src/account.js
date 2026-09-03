@@ -866,6 +866,43 @@ export function subscribeAuctions(onChange) {
   }
 }
 
+/**
+ * The live wire between two people in a conversation: "I am typing", "I just
+ * sent one", "I have read yours". It is a Realtime broadcast channel, so it
+ * needs no table and no policy, and nothing here is ever stored: a project
+ * without Realtime loses the typing dots and the instant refresh, and the
+ * ten-second poll still carries every message and every receipt.
+ */
+export function openChatChannel(selfId, otherId, onEvent) {
+  if (!configured) return { send() {}, close() {} };
+  const name = `chat:${[selfId, otherId].sort().join(':')}`;
+  let channel = null;
+  let ready = false;
+  try {
+    channel = supabase.channel(name, { config: { broadcast: { self: false } } });
+    channel
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        if (payload?.from && payload.from !== selfId) onEvent?.(payload);
+      })
+      .subscribe((status) => { ready = status === 'SUBSCRIBED'; });
+  } catch {
+    channel = null;
+  }
+  return {
+    send(kind, extra = {}) {
+      if (!channel || !ready) return;
+      try {
+        channel.send({ type: 'broadcast', event: 'chat', payload: { kind, from: selfId, at: Date.now(), ...extra } });
+      } catch { /* the poll carries it */ }
+    },
+    close() {
+      if (!channel) return;
+      try { supabase.removeChannel(channel); } catch { /* gone */ }
+      channel = null;
+    }
+  };
+}
+
 /* --- the card index and wishlists (V4) ---------------------------------------- */
 
 let indexTables = null;
