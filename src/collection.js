@@ -44,7 +44,17 @@ function readJson(key, fallback) {
   }
 }
 
+/*
+ * Once a wipe has begun, nothing is written again. The wipe cleared storage
+ * and reloaded, and the unload that followed saved the in-memory profile
+ * back, playtime and all, so a player who erased everything came back with
+ * their level, badges and stats intact and only the cards gone.
+ */
+let wiped = false;
+export function freezeWrites() { wiped = true; }
+
 function writeJson(key, value) {
+  if (wiped) return false;
   try {
     localStorage.setItem(key, JSON.stringify(value));
     // Every write to game state passes through here, which makes it the one

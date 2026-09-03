@@ -4861,7 +4861,16 @@ async function onSession(session) {
   // the server would otherwise walk straight in until its token expired.
   if (session) {
     session = await account.verifySession(session);
-    if (!session) handledUser = null;
+    if (!session) {
+      handledUser = null;
+      // The account behind the stored session is gone from the server. The
+      // device is emptied with it: what it holds belonged to that account,
+      // and left in place it would be adopted, level and badges and all, by
+      // the next account created on this device, which is exactly what a
+      // deleted account must not come back as.
+      try { localStorage.clear(); sessionStorage.clear(); } catch { /* storage unavailable */ }
+      reloadFromStorage();
+    }
   }
   state.account.session = session ?? null;
   if (!session) { showGate(); endSplash(); return; }
@@ -7130,6 +7139,7 @@ async function deleteAccountForGood(button) {
     return;
   }
   // The account is gone; the session token that named it is meaningless now.
+  store.freezeWrites();
   await account.signOut().catch(() => { /* the row is already deleted */ });
   try { localStorage.clear(); sessionStorage.clear(); } catch { /* nothing to clear */ }
   location.reload();
@@ -7208,13 +7218,23 @@ async function wipeEverything() {
   // be loaded. Gating on the profile meant a reset run before it arrived left
   // the account untouched, and the next launch pulled the whole save back
   // down: the button looked like it had done nothing.
+  // The device is wiped WHATEVER the server says. This used to stop at the
+  // first refusal from the server and leave the device untouched, so a
+  // player whose account could not be reached (a deleted account, a schema
+  // behind the app, no connection) pressed Erase, saw an error or nothing,
+  // and kept every level, badge and stat they were trying to be rid of.
+  // Now the server is asked, its answer is remembered, and the device is
+  // emptied and the app restarted regardless; if the server refused, the
+  // next launch says so, because signing back into THAT account could pull
+  // its old save down again.
+  let serverFailed = false;
+  // From here on nothing may be written back, whatever unload handlers run.
+  store.freezeWrites();
   if (signedIn()) {
     try {
       await account.hardReset(userId());
-    } catch (error) {
-      toast(esc(describeError(error)), 'error');
-      synth.playDenied();
-      return;
+    } catch {
+      serverFailed = true;
     }
     // Signing out takes the session with it, so the app comes back at the
     // welcome screen the way a new install does. Signing in again finds an
@@ -7227,8 +7247,18 @@ async function wipeEverything() {
     // was untrue the moment it launched.
     localStorage.clear();
     sessionStorage.clear();
+    if (serverFailed) localStorage.setItem(WIPE_NOTE_KEY, 'server');
   } catch { /* storage unavailable: nothing to remove */ }
   location.reload();
+}
+
+/** Left behind by a wipe the server refused, so the next launch can say so. */
+const WIPE_NOTE_KEY = 'wikster.wipeNote';
+
+function sayWipeNote() {
+  let note = null;
+  try { note = localStorage.getItem(WIPE_NOTE_KEY); localStorage.removeItem(WIPE_NOTE_KEY); } catch { /* storage unavailable */ }
+  if (note) setTimeout(() => toast(esc(t('wipeServerRefused')), 'error'), 1800);
 }
 
 /*
@@ -7876,6 +7906,7 @@ function init() {
   // the app comes back to the foreground after a while away.
   setTimeout(lookForUpdate, 4000);
   setTimeout(warmDrawer, 2500);
+  sayWipeNote();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') lookForUpdate();
   });
