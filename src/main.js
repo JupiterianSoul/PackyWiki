@@ -86,7 +86,7 @@ const SWIPE_COMMIT = 78;
 const EMERGE_STAGGER = 130;
 const EMERGE_DURATION = 820;
 /** Nothing waits on the network longer than this before the booster comes back. */
-const DRAW_HARD_LIMIT = 13000;
+const DRAW_HARD_LIMIT = 18000;
 const PREFETCH_DELAY = 350;
 /** How long the last card stays up before the summary takes over. */
 const LAST_CARD_HOLD = 2000;

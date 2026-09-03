@@ -29,7 +29,7 @@ const REQUEST_TIMEOUT_MS = 7000;
  * works to a deadline, hands over whatever it has when the clock runs out,
  * and stops the moment the connection is gone.
  */
-const DRAW_BUDGET_MS = 11000;
+const DRAW_BUDGET_MS = 16000;
 const MAX_SEARCH_OFFSET = 5000;
 const SEARCH_PAGE_SIZE = 50;
 
@@ -801,6 +801,19 @@ function protoCard(page) {
  * without a picture is not a card, ever. Those are exactly the cards the
  * collection used to sweep out again on the next launch.
  */
+/**
+ * Whether a candidate can be a card WITHOUT another request: its opening
+ * text came with the details and so did a usable picture. On a wiki like
+ * Fandom every page that is not free costs one to three slow parse
+ * requests, so the free ones are dealt first and the rest only as needed.
+ */
+const isFreeCard = (proto) => {
+  const page = proto.page;
+  const extract = page.extract?.trim();
+  return Boolean(extract && extract.length >= 80 && isUsableText(page.title, extract)
+    && (usableThumb(page, 640) || page.original?.source));
+};
+
 async function finishCustomCard(wiki, proto, pack) {
   const { page } = proto;
   let extract = page.extract?.trim();
@@ -886,8 +899,15 @@ async function drawCustomSet(pack) {
   const tally = { noText: 0, noImage: 0, other: 0 };
   const say = (what) => console.info(`Wikster custom draw "${pack.name}" on ${wiki.apiUrl}: ${what}; turned away: ${tally.noText} without text, ${tally.noImage} without picture, ${tally.other} other`);
 
-  // First the pool: a listing of random pages, their details twenty a
-  // request, then the text and picture of every candidate, ten at a time.
+  // First the pool: a listing of random pages and their details twenty a
+  // request. The candidates that came back complete (text and a picture in
+  // the details) are dealt at no further cost; the rest are finished three
+  // at a time, only as many as are still owed, because each one is one to
+  // three slow parse requests. Ten at a time was thirty slow requests at
+  // once, which blew the draw's whole budget on a single round and left
+  // nothing for the hunt below: the pack came back empty, or, when a round
+  // happened to be all free cards, instantly.
+  const tallyMiss = (reason) => { tally[reason === 'NO_TEXT' ? 'noText' : reason === 'NO_IMAGE' ? 'noImage' : 'other']++; };
   for (let round = 0; out.length < wanted && round < 3 && !outOfTime(); round++) {
     const ids = await randomIds(wiki, 20).catch(() => []);
     let details = ids.length ? await customPagesDetail(wiki, ids).catch(() => []) : [];
@@ -896,15 +916,21 @@ async function drawCustomSet(pack) {
     }
     const protos = details.map(protoCard).filter((proto) => proto && !seen.has(proto.page.title));
     for (const proto of protos) seen.add(proto.page.title);
+    const free = protos.filter(isFreeCard);
+    const costly = protos.filter((proto) => !isFreeCard(proto));
     let built = 0;
-    for (let i = 0; i < protos.length && out.length < wanted && !outOfTime(); i += 10) {
-      const settled = await Promise.allSettled(protos.slice(i, i + 10).map((proto) => finishCustomCard(wiki, proto, pack)));
+    for (const proto of free) {
+      if (out.length >= wanted) break;
+      try { out.push(await finishCustomCard(wiki, proto, pack)); built++; } catch (err) { tallyMiss(err?.message); }
+    }
+    for (let i = 0; i < costly.length && out.length < wanted && !outOfTime(); i += 3) {
+      const settled = await Promise.allSettled(costly.slice(i, i + 3).map((proto) => finishCustomCard(wiki, proto, pack)));
       for (const result of settled) {
         if (result.status === 'fulfilled' && result.value) { if (out.length < wanted) { out.push(result.value); built++; } }
-        else tally[result.reason?.message === 'NO_TEXT' ? 'noText' : result.reason?.message === 'NO_IMAGE' ? 'noImage' : 'other']++;
+        else tallyMiss(result.reason?.message);
       }
     }
-    say(`pool round ${round + 1}: ${ids.length} random, ${details.length} detailed, ${protos.length} candidates, ${built} cards`);
+    say(`pool round ${round + 1}: ${ids.length} random, ${details.length} detailed, ${protos.length} candidates (${free.length} free), ${built} cards`);
     if (!ids.length) break;
   }
 
