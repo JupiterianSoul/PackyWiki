@@ -317,5 +317,27 @@ export const RELEASES = [
       { en: 'Special cards come from their own wikis (the Terraforming Mars card, not the animal), and the ones already owned are repaired', fr: 'Les cartes spéciales viennent de leurs propres wikis (la carte Terraforming Mars, pas l’animal), et celles déjà possédées sont réparées' },
       { en: 'Music crossfades from one track to the next', fr: 'La musique enchaîne les morceaux en fondu' }
     ]
+  },
+  {
+    id: 'arcade', icon: 'dice', accent: '#f472b6',
+    title: { en: 'The arcade', fr: 'La salle de jeux' },
+    points: [
+      { en: 'Wikdle, a slot machine and a roulette wheel', fr: 'Wikdle, une machine à sous et une roulette' },
+      { en: 'Three quests a day, with rewards to claim', fr: 'Trois quêtes par jour, avec des récompenses à réclamer' },
+      { en: 'A leaderboard for today, this week and all time', fr: 'Un classement du jour, de la semaine et de toujours' },
+      { en: 'The shop rebuilt around the print, and boosters sized by you', fr: 'La boutique refaite autour de l’impression, et des boosters à la taille que vous voulez' }
+    ],
+    changelog: [
+      { en: 'A Minigames tab: Wikdle, the slot machine and the roulette, each with its own help sheet', fr: 'Un onglet Mini-jeux : Wikdle, la machine à sous et la roulette, chacun avec sa fiche d’aide' },
+      { en: 'Wikdle: the encyclopaedia’s five-letter word of the day in six rows, the same word for everyone, with a dictionary that refuses non-words and duplicate letters scored the way the real game scores them. A finished board is locked for the day and pays points', fr: 'Wikdle : le mot de cinq lettres du jour en six lignes, le même pour tout le monde, avec un dictionnaire qui refuse les non-mots et des lettres doublées notées comme dans le vrai jeu. Une grille finie est verrouillée pour la journée et rapporte des points' },
+      { en: 'The slot machine: three reels, five symbols, five paylines, a book tuned to pay back 95%. Every spin is decided on the server with cryptographic randomness; the app checks the answer against the book before paying and refunds the coin if the house does not answer', fr: 'La machine à sous : trois rouleaux, cinq symboles, cinq lignes, un livre réglé pour rendre 95 %. Chaque tour se décide sur le serveur avec un aléa cryptographique ; l’appli vérifie la réponse contre le livre avant de payer et rend la pièce si la maison ne répond pas' },
+      { en: 'The roulette: a real European table, every classic bet, and the game’s own tier bets from Common at 1.5x to Exotic at 10x, several chips a spin up to a table limit. The wheel turns to the pocket the server named and settles on it', fr: 'La roulette : une vraie table européenne, toutes les mises classiques, et les mises de palier du jeu, de Commune à 1,5x jusqu’à Exotique à 10x, plusieurs jetons par tour jusqu’à une limite de table. La roue tourne jusqu’à la case nommée par le serveur et s’y arrête' },
+      { en: 'Daily quests: three a day from a book of over a hundred, dealt at 00:00 UTC, easy, medium and hard by weight, credited by everything you already do in the game. Signed in, the deal and the claim are the server’s', fr: 'Quêtes du jour : trois par jour tirées d’un livre de plus de cent, distribuées à 00 h 00 UTC, faciles, moyennes et difficiles selon leur poids, créditées par tout ce que vous faites déjà dans le jeu. Connecté, la distribution et la réclamation sont celles du serveur' },
+      { en: 'The leaderboard: daily, weekly and all-time tables kept on the server, twenty rows a page, your own row pinned to the bottom when it is not on screen', fr: 'Le classement : des tables du jour, de la semaine et de toujours tenues sur le serveur, vingt lignes par page, votre propre ligne épinglée en bas quand elle n’est pas à l’écran' },
+      { en: 'The shop: the press stocks tier boosters with their real chance printed on the label, bundles of three, a sealed crate, and a card-count picker for custom packs priced so that two one-card packs cost more than one two-card pack', fr: 'La boutique : la presse propose des boosters à palier avec leur vraie chance imprimée sur l’étiquette, des lots de trois, une caisse scellée, et un choix du nombre de cartes des boosters perso, tarifé pour que deux boosters d’une carte coûtent plus qu’un booster de deux' },
+      { en: 'Rarity effects show everywhere a card is shown, not only in the booster', fr: 'Les effets de rareté s’affichent partout où une carte apparaît, pas seulement dans le booster' },
+      { en: 'Special badges can be taken off, all of them, and stay off', fr: 'Les badges spéciaux peuvent tous être retirés, et le restent' },
+      { en: 'Updates are numbered: the fifth update is called the fifth update', fr: 'Les mises à jour sont numérotées : la cinquième s’appelle la cinquième' }
+    ]
   }
 ];

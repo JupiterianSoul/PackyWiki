@@ -62,6 +62,14 @@ import { buildPackElement, buildCardBack } from './packview.js';
 import { buildAlbums, albumsDeep, albumsStarted, fetchAlbumTotal, albumKeyOf, customSlug, CARDS_PER_PAGE } from './albums.js';
 import { RELEASES } from './data/releases.js';
 import { music } from './ui/music.js';
+import * as wikdle from './wikdle.js';
+import { spinSlots, casinoOpen, SPIN_COST, REEL_STOP_MS, REEL_EASE } from './slots.js';
+import { SYMBOLS, REEL, PAYLINES, PAYTABLE, LINE_BETS, ROWS as SLOT_ROWS } from './data/slots.js';
+import { layChip, staked as stakedOn, spinRoulette, restAngle, WHEEL_SPIN_MS, WHEEL_EASE } from './roulette.js';
+import { WHEEL_ORDER, colorOf, TIER_BETS, CHIPS, TABLE_LIMIT, returnsFor } from './data/roulette.js';
+import * as quests from './quests.js';
+import { QUEST_TIERS } from './data/quests.js';
+import * as leaderboard from './leaderboard.js';
 import { canRedeem, codeByInput, codeById, codeCardFor, codeLook, codeSpec, codeTitles, timesRedeemed, hasRedeemed, CREATOR, SPECIAL_RARITY_ID } from './codes.js';
 import {
   quizAvailable, buildQuiz, questionCountFor, quizRewards,
@@ -176,8 +184,17 @@ bind({
     updates: $('#screen-updates'), quiz: $('#screen-quiz'),
     customize: $('#screen-customize'), badges: $('#screen-badges'),
     market: $('#screen-market'), cardindex: $('#screen-cardindex'),
-    glossary: $('#screen-glossary'), open: $('#screen-open')
+    glossary: $('#screen-glossary'), open: $('#screen-open'),
+    games: $('#screen-games'), wikdle: $('#screen-wikdle'), slots: $('#screen-slots'),
+    roulette: $('#screen-roulette'), quests: $('#screen-quests'), leaderboard: $('#screen-leaderboard')
   },
+  gamesTitle: $('#games-title'), gamesSub: $('#games-sub'), gamesList: $('#games-list'),
+  wikdleTitle: $('#wikdle-title'), wikdleBody: $('#wikdle-body'), wikdleBack: $('#wikdle-back'),
+  slotsTitle: $('#slots-title'), slotsBody: $('#slots-body'), slotsBack: $('#slots-back'),
+  rouletteTitle: $('#roulette-title'), rouletteBody: $('#roulette-body'), rouletteBack: $('#roulette-back'),
+  questsTitle: $('#quests-title'), questsSub: $('#quests-sub'), questsBody: $('#quests-body'),
+  leaderboardTitle: $('#leaderboard-title'), leaderboardSeg: $('#leaderboard-seg'),
+  leaderboardBody: $('#leaderboard-body'), leaderboardMe: $('#leaderboard-me'),
   backdrop: $('#backdrop'), navbar: $('#navbar'),
   menuBtn: $('#menu-btn'), menuIcon: $('#menu-icon'),
   giftBtn: $('#gift-btn'), giftIcon: $('#gift-icon'), giftDot: $('#gift-dot'),
@@ -324,10 +341,16 @@ function syncTicker() {
 
 let visibleSince = document.visibilityState === 'visible' ? Date.now() : null;
 
+let playtimeCarry = 0;
 function flushPlaytime() {
   if (visibleSince == null) return;
-  store.addPlaytime(state.profile, Date.now() - visibleSince);
+  const ms = Date.now() - visibleSince;
+  store.addPlaytime(state.profile, ms);
   visibleSince = Date.now();
+  // Whole minutes reach the day's quests; the remainder waits for the next flush.
+  playtimeCarry += ms;
+  const minutes = Math.floor(playtimeCarry / 60000);
+  if (minutes > 0) { playtimeCarry -= minutes * 60000; for (let i = 0; i < minutes; i++) reportQuest('playtime'); }
 }
 
 /* --- toast -------------------------------------------------------------------- */
@@ -444,7 +467,8 @@ const navTabFor = (screen) =>
   screen === 'market' ? 'shop'
     : screen === 'cardindex' ? 'binder'
       : screen === 'glossary' ? 'packs'
-        : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz'].includes(screen) ? 'profile' : screen);
+        : ['wikdle', 'slots', 'roulette'].includes(screen) ? 'games'
+          : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz', 'games', 'quests', 'leaderboard'].includes(screen) ? 'profile' : screen);
 
 function refreshWallet() {
   state.wallet = store.loadWallet();
@@ -548,6 +572,11 @@ function drawerItems() {
       run: go('ach', renderAchievements) },
     { id: 'badges', icon: 'star',       key: 'badgesTitle',    run: go('badges', renderBadgesScreen) },
     { id: 'quiz',   icon: 'quiz',       key: 'tabQuiz',        run: go('quiz', renderQuiz) },
+    { id: 'games',  icon: 'dice',       key: 'tabGames',       run: go('games', renderGames) },
+    { id: 'quests', icon: 'scroll',     key: 'tabQuests',
+      badge: () => quests.claimableCount(questUserKey()),
+      run: go('quests', renderQuests) },
+    { id: 'leaderboard', icon: 'podium', key: 'tabLeaderboard', run: go('leaderboard', renderLeaderboard) },
     { sep: true },
     ...(account.configured
       ? [{ id: 'friends', icon: 'friends', key: 'tabFriends',
@@ -783,7 +812,13 @@ const HELP = {
   friends: { steps: 3, tip: true },
   quiz:    { steps: 3, tip: true },
   market:  { steps: 3, tip: true },
-  index:   { steps: 3, tip: true }
+  index:   { steps: 3, tip: true },
+  games:   { steps: 3, tip: true },
+  wikdle:  { steps: 3, tip: true },
+  slots:   { steps: 3, tip: true },
+  roulette: { steps: 3, tip: true },
+  quests:  { steps: 3, tip: true },
+  leaderboard: { steps: 3, tip: true }
 };
 
 function openHelp(topic) {
@@ -1051,6 +1086,7 @@ async function createCustomPack(event) {
     renderPacks();
     renderShop();
     setCreatorStatus(t('createdGoShop', { name: pack.name }), 'ok');
+    reportQuest('custom');
     el.creatorInput.value = '';
     synth.playResolved();
   } catch {
@@ -1513,6 +1549,7 @@ function purchase(spec, price, button, count = 1) {
   store.saveWallet(state.wallet - price);
   gainBooster(spec, count);
   refreshWallet();
+  for (let i = 0; i < count; i++) reportQuest('buy', { price: price / count, kind: spec.kind });
   synth.playPurchase();
   button.classList.add('is-bought');
   setTimeout(() => button.classList.remove('is-bought'), 700);
@@ -2220,6 +2257,16 @@ async function runOpen(booster) {
   pulls.forEach((pull, i) => { pull.entry = recorded[i].entry; });
   // The cards are in the collection now, so the booster is honestly gone.
   store.clearOpenInFlight();
+  // The day's quests hear about it: the booster, then every card.
+  reportQuest('open', { kind: state.spec.kind, themeId: state.spec.themeId ?? null, rarityId: state.spec.rarityId ?? null });
+  for (const pull of pulls) {
+    reportQuest('pull', {
+      rarityId: pull.rarity.id, themeId: state.spec.themeId ?? null,
+      isNew: Boolean(recorded.find((r) => r.entry === pull.entry)?.isNew),
+      popularity: pull.article.popularity ?? 0
+    });
+  }
+  reportAlbums();
 
   // A special booster is a gift, not progress: no opening counted, no
   // rarity tally, no experience. Everything else about it is untouched.
@@ -2832,6 +2879,7 @@ function buildStaticCard(data, rarity, entryKey = null, { fav = true, lit = 'aut
 function openCardDetail(entryKey, data, rarity) {
   const entry = state.collection.entries[entryKey] ?? null;
   state.detail = { key: entryKey, data, rarity, sellArmed: false };
+  reportQuest('view');
 
   openSheet(data.title, (body) => {
     // The detail IS the card, blown up: same frame, same tier treatment,
@@ -3001,6 +3049,7 @@ function handleSell() {
 
   const amount = sellPriceFor(entry.price);
   store.sellCopy(state.collection, detail.key);
+  reportQuest('sell', { amount });
   state.profile.cardsSold = (state.profile.cardsSold ?? 0) + 1;
   store.saveProfile(state.profile);
   store.saveWallet(store.loadWallet() + amount);
@@ -5195,6 +5244,7 @@ async function collectDeliveries() {
       pushNote('gift', t('notifGiftCard', { name: esc(from), card: esc(item.payload.title) }), 'binder');
     } else if (item.kind === 'trade-return' && Array.isArray(item.payload?.cards)) {
       for (const card of item.payload.cards) store.receiveCardEntry(state.collection, card);
+      reportQuest('trade');
       pushNote('trade', t('notifTradeDone', { name: esc(from) }), 'binder');
     } else if (item.kind === 'auction-card' && item.payload?.key) {
       store.receiveCardEntry(state.collection, item.payload);
@@ -5322,6 +5372,7 @@ function openGiftCard(entry) {
         if (!snapshot) return;
         try {
           await account.sendDelivery(userId(), entry.otherId, 'card', snapshot);
+          reportQuest('gift');
           state.profile.giftsSent = (state.profile.giftsSent ?? 0) + 1;
           store.saveProfile(state.profile);
           toast(t('giftSent', { name: esc(entry.profile.username) }));
@@ -5370,6 +5421,7 @@ function openGiftBooster(entry) {
         if (!store.takeBooster(state.inventory, specId(slot.spec))) return;
         try {
           await account.sendDelivery(userId(), entry.otherId, 'booster', { spec: slot.spec });
+          reportQuest('gift');
           state.profile.giftsSent = (state.profile.giftsSent ?? 0) + 1;
           store.saveProfile(state.profile);
           toast(t('giftSent', { name: esc(entry.profile.username) }));
@@ -6289,6 +6341,7 @@ function finishQuiz() {
   if (q.correct >= 3) state.profile.quizWins = (state.profile.quizWins ?? 0) + 1;
   if (q.correct === q.questions.length) state.profile.quizPerfect = (state.profile.quizPerfect ?? 0) + 1;
   q.rewards = quizRewards(q.correct, q.themeId);
+  reportQuest('quiz', { correct: q.correct });
   if (q.rewards.money > 0) {
     store.saveWallet(store.loadWallet() + q.rewards.money);
     refreshWallet();
@@ -6908,6 +6961,7 @@ function renderCardFx() {
         if (style.id === DEFAULT_FX) delete state.cardFx[rarity.id];
         else state.cardFx[rarity.id] = style.id;
         store.saveCardFx(state.cardFx);
+        reportQuest('fx');
         toast(esc(t('fxEquipped', { name: tx(style.name), rarity: tx(rarity.name) })));
         renderCardFx();
         // Anything already drawn is wearing the old look.
@@ -7638,6 +7692,7 @@ function claimGift(body) {
   if (!slot) return;
   store.saveProfile(state.profile);
   grantGift(slot.gift);
+  reportQuest('daily');
   toast(t('dailyGot', { reward: giftLabel(slot.gift) }), 'ok');
   buildDailyBody(body);
   updateBadges();
@@ -7702,6 +7757,781 @@ function openOdds(rarityId = null) {
       return row;
     }));
   });
+}
+
+/* --- the arcade: minigames, quests and the leaderboard ------------------------------------------------------------ */
+
+/** Who the quests and the boards belong to: the account, or this device. */
+const questUserKey = () => userId() ?? 'local';
+
+/**
+ * Something happened that a quest may count. Never throws: a quest that
+ * cannot be credited is a quest missed, not a game stopped.
+ */
+function reportQuest(metric, detail = {}) {
+  try {
+    const done = quests.track(metric, detail, questUserKey());
+    for (const id of done) {
+      const quest = quests.describe(quests.loadBoard(questUserKey())).find((r) => r.id === id)?.quest;
+      if (quest) { toast(esc(t('questDone', { name: tx(quest.name) })), 'ok'); pushNote('trophy', t('questDone', { name: tx(quest.name) }), 'quests'); }
+    }
+    paintDrawerLinks();
+  } catch (error) {
+    console.warn('quest report failed', error);
+  }
+}
+
+/** Albums completed since the last look: one report each. */
+let albumsDoneBefore = null;
+function reportAlbums() {
+  try {
+    const done = buildAlbums(store.allEntries(state.collection), state.customPacks).filter((a) => a.complete).length;
+    if (albumsDoneBefore !== null && done > albumsDoneBefore) for (let i = albumsDoneBefore; i < done; i++) reportQuest('album');
+    albumsDoneBefore = done;
+  } catch { /* an album that cannot be counted is not a crash */ }
+}
+
+/** The stage a game shows when it cannot run: an icon, a sentence, maybe a button. */
+function gameStage(iconId, text, action = null) {
+  const box = document.createElement('div');
+  box.className = 'game-stage';
+  box.innerHTML = `<span class="game-stage-icon">${iconSvg(iconId, { size: 46 })}</span><p class="game-note"></p>`;
+  box.querySelector('.game-note').textContent = text;
+  if (action) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'btn btn-primary';
+    btn.textContent = action.label;
+    press(btn, { sound: null });
+    btn.addEventListener('click', () => { synth.playTap(); action.run(); });
+    box.appendChild(btn);
+  }
+  return box;
+}
+
+/** What went wrong at the house, in the player's words. */
+function houseError(error) {
+  const code = String(error?.message ?? '');
+  if (code === 'SIGN_IN') return t('gameSignIn');
+  if (code === 'CLOSED') return t('gameClosed');
+  if (code === 'TIMEOUT') return t('gameTimeout');
+  if (code === 'TAMPER') return t('gameTamper');
+  if (code === 'BAD_BET' || code === 'OVER_LIMIT') return t('gameBadBet');
+  if (code === 'SCHEMA') return t('gameSchema');
+  return t('gameFailed');
+}
+
+function renderGames() {
+  el.gamesTitle.textContent = t('tabGames');
+  el.gamesSub.textContent = t('gamesIntro');
+  const tiles = [
+    { id: 'wikdle', icon: 'grid', color: '#4ade80', title: t('wikdleTitle'), note: t('gamesWikdleNote'), run: () => { renderWikdle(); showScreen('wikdle'); } },
+    { id: 'slots', icon: 'reel', color: '#fbbf24', title: t('slotsTitle'), note: t('gamesSlotsNote'), run: () => { renderSlots(); showScreen('slots'); } },
+    { id: 'roulette', icon: 'wheel', color: '#f472b6', title: t('rouletteTitle'), note: t('gamesRouletteNote'), run: () => { renderRoulette(); showScreen('roulette'); } }
+  ];
+  const list = document.createElement('div');
+  list.className = 'games-list';
+  list.replaceChildren(...tiles.map((tile) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'game-tile';
+    btn.style.setProperty('--game', tile.color);
+    btn.innerHTML = `<span class="game-tile-art">${iconSvg(tile.icon, { size: 28 })}</span>
+      <span class="game-tile-copy"><b></b><p></p></span>
+      <span class="game-tile-go">${iconSvg('chevronRight', { size: 18 })}</span>`;
+    btn.querySelector('b').textContent = tile.title;
+    btn.querySelector('p').textContent = tile.note;
+    press(btn, { sound: null });
+    btn.addEventListener('click', () => { synth.playTap(); tile.run(); });
+    return btn;
+  }));
+  const note = document.createElement('p');
+  note.className = 'game-closed';
+  note.textContent = casinoOpen(signedIn()) ? t('gamesCasinoOpen') : t('gamesCasinoNeedsAccount');
+  el.gamesList.replaceChildren(list, note);
+  reveal(list.children, { step: 60 });
+}
+
+/* --- Wikdle ------------------------------------------------------------------------------ */
+
+const KEYBOARD_ROWS = ['qwertyuiop', 'asdfghjkl', '⏎zxcvbnm⌫'];
+
+function renderWikdle() {
+  el.wikdleTitle.textContent = t('wikdleTitle');
+  el.wikdleBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  let game = wikdle.loadGame();
+  let typed = '';
+  const body = el.wikdleBody;
+  const wrap = document.createElement('div');
+  wrap.className = 'wikdle';
+  const grid = document.createElement('div');
+  grid.className = 'wikdle-grid';
+  const status = document.createElement('p');
+  status.className = 'wikdle-status';
+  const keys = document.createElement('div');
+  keys.className = 'wikdle-keys';
+  const done = document.createElement('div');
+  done.className = 'wikdle-done';
+  done.hidden = true;
+  wrap.append(grid, status, keys, done);
+  body.replaceChildren(wrap);
+
+  const paintGrid = (revealRow = -1) => {
+    grid.replaceChildren(...Array.from({ length: wikdle.ROWS }, (_, r) => {
+      const row = document.createElement('div');
+      row.className = 'wikdle-row';
+      row.dataset.row = String(r);
+      const played = game.rows[r];
+      const current = !played && r === game.rows.length && game.status === 'playing';
+      for (let c = 0; c < wikdle.COLUMNS; c++) {
+        const cell = document.createElement('span');
+        cell.className = 'wikdle-cell';
+        if (played) {
+          cell.textContent = played.guess[c];
+          cell.classList.add(`is-${played.marks[c]}`);
+          if (r === revealRow) { cell.classList.add('is-revealing'); cell.style.animationDelay = `${c * 110}ms`; }
+        } else if (current && typed[c]) {
+          cell.textContent = typed[c];
+          cell.classList.add('is-filled');
+        }
+        row.appendChild(cell);
+      }
+      return row;
+    }));
+  };
+
+  const paintKeys = () => {
+    const marks = wikdle.keyMarks(game.rows);
+    keys.replaceChildren(...KEYBOARD_ROWS.map((letters) => {
+      const row = document.createElement('div');
+      row.className = 'wikdle-keyrow';
+      for (const ch of letters) {
+        const key = document.createElement('button');
+        key.type = 'button';
+        key.className = 'wikdle-key';
+        if (ch === '⏎') { key.classList.add('is-wide'); key.textContent = t('wikdleEnter'); key.dataset.key = 'enter'; }
+        else if (ch === '⌫') { key.classList.add('is-wide'); key.innerHTML = iconSvg('chevronLeft', { size: 16 }); key.dataset.key = 'back'; }
+        else { key.textContent = ch; key.dataset.key = ch; if (marks[ch]) key.classList.add(`is-${marks[ch]}`); }
+        key.disabled = game.status !== 'playing';
+        key.addEventListener('click', () => press_(key.dataset.key));
+        row.appendChild(key);
+      }
+      return row;
+    }));
+  };
+
+  const paintDone = () => {
+    if (game.status === 'playing') { done.hidden = true; return; }
+    const stats = wikdle.loadStats();
+    const won = game.status === 'won';
+    const answer = wikdle.wordForDay(game.day).toUpperCase();
+    const points = wikdle.wikdlePoints(game);
+    const max = Math.max(1, ...stats.guesses);
+    done.innerHTML = `
+      <b></b><p class="game-note" data-answer></p>
+      <div class="wikdle-stats">
+        <div class="wikdle-stat"><b>${stats.played}</b><span>${esc(t('wikdlePlayed'))}</span></div>
+        <div class="wikdle-stat"><b>${stats.played ? Math.round(100 * stats.won / stats.played) : 0}%</b><span>${esc(t('wikdleWinRate'))}</span></div>
+        <div class="wikdle-stat"><b>${stats.streak}</b><span>${esc(t('wikdleStreak'))}</span></div>
+        <div class="wikdle-stat"><b>${stats.best}</b><span>${esc(t('wikdleBest'))}</span></div>
+      </div>
+      <div class="wikdle-bars">${stats.guesses.map((n, i) => `<div class="wikdle-bar"><span>${i + 1}</span><i style="width:${Math.max(4, Math.round(100 * n / max))}%"></i></div>`).join('')}</div>
+      <p class="wikdle-next" data-next></p>`;
+    done.querySelector('b').textContent = won ? t('wikdleWon', { n: game.rows.length, points }) : t('wikdleLost');
+    done.querySelector('[data-answer]').textContent = t('wikdleAnswer', { word: answer });
+    const share = document.createElement('button');
+    share.type = 'button';
+    share.className = 'btn btn-ghost btn-sm';
+    share.textContent = t('wikdleShare');
+    press(share, { sound: null });
+    share.addEventListener('click', async () => { synth.playTap(); const ok = await copyText(wikdle.shareText(game)); toast(ok ? t('wikdleCopied') : t('wikdleCopyFailed'), ok ? 'ok' : 'error'); });
+    done.appendChild(share);
+    const tick = () => { const next = done.querySelector('[data-next]'); if (next) next.textContent = t('wikdleNext', { time: formatCountdown(wikdle.msToNextDay()) }); };
+    tick();
+    clearInterval(state.wikdleTimer);
+    state.wikdleTimer = setInterval(() => { if (state.tab !== 'wikdle') { clearInterval(state.wikdleTimer); return; } tick(); }, 1000);
+    done.hidden = false;
+  };
+
+  const settle = () => {
+    // The finished board is worth points, once: on the day's board, into the
+    // quests, the wallet and, signed in, the leaderboard.
+    if (game.status === 'playing' || game.settled) return;
+    game.settled = true;
+    const points = wikdle.wikdlePoints(game);
+    reportQuest('wikdle', { won: game.status === 'won', guesses: game.rows.length });
+    if (points > 0) {
+      reportQuest('points', { amount: points, game: 'wikdle' });
+      const coins = Math.round(points / 2);
+      store.saveWallet(store.loadWallet() + coins);
+      refreshWallet();
+      toast(esc(t('wikdlePaid', { amount: coins })), 'ok');
+      if (signedIn()) leaderboard.submitWikdle(points, game.day).catch(() => { /* the board can miss one */ });
+    }
+  };
+
+  const press_ = (key) => {
+    if (game.status !== 'playing') return;
+    if (key === 'enter') {
+      const result = wikdle.playGuess(game, typed);
+      if (result.error) {
+        status.textContent = result.error === 'short' ? t('wikdleTooShort') : result.error === 'unknown' ? t('wikdleNotAWord') : '';
+        const row = grid.querySelector(`[data-row="${game.rows.length}"]`);
+        row?.classList.add('is-shake');
+        setTimeout(() => row?.classList.remove('is-shake'), 400);
+        synth.playDenied();
+        return;
+      }
+      game = result;
+      typed = '';
+      status.textContent = '';
+      synth.playTap();
+      paintGrid(game.rows.length - 1);
+      paintKeys();
+      if (game.status !== 'playing') { settle(); setTimeout(() => { paintDone(); synth[game.status === 'won' ? 'playResolved' : 'playDenied']?.(); }, 700); }
+      return;
+    }
+    if (key === 'back') { typed = typed.slice(0, -1); paintGrid(); return; }
+    if (/^[a-z]$/.test(key) && typed.length < wikdle.COLUMNS) { typed += key; paintGrid(); }
+  };
+
+  // A hardware keyboard works too.
+  state.wikdleKeys?.abort?.();
+  state.wikdleKeys = new AbortController();
+  document.addEventListener('keydown', (event) => {
+    if (state.tab !== 'wikdle' || event.metaKey || event.ctrlKey) return;
+    const k = event.key.toLowerCase();
+    if (k === 'enter') press_('enter'); else if (k === 'backspace') press_('back'); else if (/^[a-z]$/.test(k)) press_(k);
+  }, { signal: state.wikdleKeys.signal });
+
+  paintGrid();
+  paintKeys();
+  paintDone();
+  status.textContent = game.status === 'playing' ? t('wikdleIntro') : '';
+}
+
+/* --- the slot machine ----------------------------------------------------------------------- */
+
+function renderSlots() {
+  el.slotsTitle.textContent = t('slotsTitle');
+  el.slotsBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  const body = el.slotsBody;
+  if (!casinoOpen(signedIn())) {
+    body.replaceChildren(gameStage('reel', t('gameSignIn'), { label: t('gateSignIn'), run: () => showGate() }));
+    return;
+  }
+  const machine = state.slots ??= { phase: 'idle', lineBet: LINE_BETS[1], last: null };
+  machine.phase = 'idle';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'slots';
+  const cabinet = document.createElement('div');
+  cabinet.className = 'slots-cabinet';
+  const win = document.createElement('div');
+  win.className = 'slots-window';
+  win.innerHTML = '<span class="slots-payline"></span>';
+  const strips = [];
+  const CELL = 64.67;
+  for (let reel = 0; reel < 3; reel++) {
+    const reelBox = document.createElement('div');
+    reelBox.className = 'slots-reel';
+    const strip = document.createElement('div');
+    strip.className = 'slots-strip';
+    // The strip twice over, so a spin can roll through the whole reel and land inside the copy.
+    const twice = [...REEL, ...REEL];
+    strip.replaceChildren(...twice.map((id) => {
+      const cell = document.createElement('div');
+      cell.className = 'slots-cell';
+      const sym = SYMBOLS.find((sy) => sy.id === id);
+      cell.style.color = sym.color;
+      cell.innerHTML = iconSvg(sym.glyph, { size: 40 });
+      return cell;
+    }));
+    reelBox.appendChild(strip);
+    win.appendChild(reelBox);
+    strips.push({ box: reelBox, strip });
+  }
+  cabinet.appendChild(win);
+  const result = document.createElement('p');
+  result.className = 'slots-result';
+  cabinet.appendChild(result);
+  wrap.appendChild(cabinet);
+
+  const bets = document.createElement('div');
+  bets.className = 'slots-bets';
+  const lever = document.createElement('button');
+  lever.type = 'button';
+  lever.className = 'btn btn-primary slots-lever';
+  press(lever, { sound: null });
+  const paintBets = () => {
+    bets.replaceChildren(...LINE_BETS.map((bet) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `slots-bet${machine.lineBet === bet ? ' is-on' : ''}`;
+      btn.innerHTML = money(bet);
+      btn.disabled = machine.phase !== 'idle';
+      btn.addEventListener('click', () => { if (machine.phase !== 'idle') return; machine.lineBet = bet; synth.playTap(); paintBets(); });
+      return btn;
+    }));
+    lever.innerHTML = `${esc(t('slotsSpin'))} · ${money(SPIN_COST(machine.lineBet))}`;
+    lever.disabled = machine.phase !== 'idle';
+    lever.classList.toggle('is-poor', SPIN_COST(machine.lineBet) > state.wallet);
+  };
+  wrap.append(bets, lever);
+
+  const book = document.createElement('div');
+  book.className = 'slots-book';
+  book.replaceChildren(...SYMBOLS.map((sym) => {
+    const row = document.createElement('div');
+    row.className = 'slots-book-row';
+    const pays = Object.entries(PAYTABLE[sym.id] ?? {}).map(([n, m]) => `${n}× ${m}`).join(' · ');
+    row.innerHTML = `<span style="color:${sym.color}">${iconSvg(sym.glyph, { size: 16 })}<span></span></span><span class="tabular">${esc(pays)}</span>`;
+    row.querySelector('span span').textContent = tx(sym.name);
+    return row;
+  }));
+  const bookNote = document.createElement('p');
+  bookNote.className = 'game-closed';
+  bookNote.textContent = t('slotsBookNote', { lines: PAYLINES.length });
+  wrap.append(book, bookNote);
+  body.replaceChildren(wrap);
+
+  const setStrip = (i, stop, animate) => {
+    const { strip, box } = strips[i];
+    const offset = -(stop + REEL.length) * CELL + CELL; // the stop sits on the middle row, from the second copy
+    box.classList.toggle('is-spinning', false);
+    strip.style.transition = animate ? `transform ${REEL_STOP_MS[i]}ms ${REEL_EASE}` : 'none';
+    strip.style.transform = `translateY(${offset}px)`;
+  };
+  // Where the reels sit now: the last spin's stops, or the top of the strip.
+  const last = machine.last?.stops ?? [0, 0, 0];
+  last.forEach((stop, i) => setStrip(i, stop, false));
+
+  const spin = async () => {
+    if (machine.phase !== 'idle') return;
+    const cost = SPIN_COST(machine.lineBet);
+    if (state.wallet < cost) { synth.playDenied(); toast(t('cantAfford'), 'error'); return; }
+    machine.phase = 'spinning';
+    paintBets();
+    result.textContent = '';
+    result.className = 'slots-result';
+    win.querySelectorAll('.is-won').forEach((c) => c.classList.remove('is-won'));
+    store.saveWallet(state.wallet - cost);
+    refreshWallet();
+    // Roll from the top of the strip so every spin visibly travels.
+    strips.forEach(({ strip }) => { strip.style.transition = 'none'; strip.style.transform = 'translateY(0px)'; });
+    let spun;
+    try {
+      spun = await spinSlots(machine.lineBet);
+    } catch (error) {
+      // The house did not answer: the coin comes back, nothing is shown.
+      store.saveWallet(store.loadWallet() + cost);
+      refreshWallet();
+      machine.phase = 'idle';
+      paintBets();
+      last.forEach((stop, i) => setStrip(i, stop, false));
+      toast(esc(houseError(error)), 'error');
+      synth.playDenied();
+      return;
+    }
+    machine.phase = 'settling';
+    // Land the reels left to right on what the house decided.
+    requestAnimationFrame(() => spun.stops.forEach((stop, i) => setStrip(i, stop, true)));
+    await wait(Math.max(...REEL_STOP_MS) + 120);
+    machine.phase = 'paying';
+    machine.last = spun;
+    if (spun.total > 0) {
+      store.saveWallet(store.loadWallet() + spun.total);
+      refreshWallet();
+      for (const line of spun.lines) {
+        const pl = PAYLINES.find((p) => p.id === line.id);
+        pl.rows.forEach((row, reel) => {
+          if (reel >= line.count) return;
+          const cells = strips[reel].strip.children;
+          cells[spun.stops[reel] + REEL.length + row]?.classList.add('is-won');
+        });
+      }
+      result.textContent = t('slotsWon', { amount: formatAmount(spun.total) });
+      result.classList.add('is-win');
+      synth.playPurchase();
+    } else {
+      result.textContent = t('slotsLost');
+    }
+    reportQuest('slots', { bet: cost, won: spun.total > 0, lines: spun.lines });
+    if (spun.total > 0) reportQuest('points', { amount: Math.round(spun.total), game: 'slots' });
+    await wait(500);
+    machine.phase = 'idle';
+    paintBets();
+  };
+  lever.addEventListener('click', spin);
+  paintBets();
+}
+
+/* --- the roulette --------------------------------------------------------------------------- */
+
+function wheelSvg() {
+  const n = WHEEL_ORDER.length;
+  const step = 360 / n;
+  const r = 100, inner = 62;
+  const rad = (deg) => (deg - 90) * Math.PI / 180;
+  const arc = (from, to) => {
+    const a0 = rad(from), a1 = rad(to);
+    return `M${(r * Math.cos(a0)).toFixed(2)},${(r * Math.sin(a0)).toFixed(2)} A${r},${r} 0 0 1 ${(r * Math.cos(a1)).toFixed(2)},${(r * Math.sin(a1)).toFixed(2)} L${(inner * Math.cos(a1)).toFixed(2)},${(inner * Math.sin(a1)).toFixed(2)} A${inner},${inner} 0 0 0 ${(inner * Math.cos(a0)).toFixed(2)},${(inner * Math.sin(a0)).toFixed(2)} Z`;
+  };
+  const fill = { green: '#15803d', red: '#b91c1c', black: '#111827' };
+  const pockets = WHEEL_ORDER.map((num, i) => {
+    const from = i * step - step / 2, to = from + step;
+    const mid = rad(i * step);
+    const tx = (84 * Math.cos(mid)).toFixed(2), ty = (84 * Math.sin(mid)).toFixed(2);
+    return `<path d="${arc(from, to)}" fill="${fill[colorOf(num)]}" stroke="#d4a017" stroke-width="0.6"/>
+      <text x="${tx}" y="${ty}" fill="#fff" font-size="8" font-weight="700" text-anchor="middle" dominant-baseline="middle" transform="rotate(${i * step} ${tx} ${ty})">${num}</text>`;
+  }).join('');
+  return `<svg viewBox="-104 -104 208 208" class="roulette-wheel" aria-hidden="true">
+    <circle r="102" fill="#3b2a12"/>${pockets}
+    <circle r="60" fill="#1c1917" stroke="#d4a017" stroke-width="2"/>
+    <circle r="12" fill="#d4a017"/></svg>`;
+}
+
+function renderRoulette() {
+  el.rouletteTitle.textContent = t('rouletteTitle');
+  el.rouletteBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
+  const body = el.rouletteBody;
+  if (!casinoOpen(signedIn())) {
+    body.replaceChildren(gameStage('wheel', t('gameSignIn'), { label: t('gateSignIn'), run: () => showGate() }));
+    return;
+  }
+  const table = state.roulette ??= { phase: 'idle', chip: CHIPS[1], bets: [], angle: 0, last: null };
+  table.phase = 'idle';
+
+  const wrap = document.createElement('div');
+  wrap.className = 'roulette';
+  const wheelBox = document.createElement('div');
+  wheelBox.className = 'roulette-wheelbox';
+  wheelBox.innerHTML = `<span class="roulette-marker"></span>${wheelSvg()}`;
+  const wheel = wheelBox.querySelector('.roulette-wheel');
+  wheel.style.transform = `rotate(${table.angle}deg)`;
+  const result = document.createElement('div');
+  result.className = 'roulette-result';
+  wrap.append(wheelBox, result);
+
+  const chips = document.createElement('div');
+  chips.className = 'roulette-chips';
+  const CHIP_COLORS = { 5: '#64748b', 10: '#2563eb', 25: '#16a34a', 50: '#dc2626', 100: '#7c3aed' };
+  const paintChips = () => {
+    chips.replaceChildren(...CHIPS.map((value) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = `chip-btn${table.chip === value ? ' is-on' : ''}`;
+      btn.style.setProperty('--chip', CHIP_COLORS[value] ?? '#64748b');
+      btn.textContent = String(value);
+      btn.disabled = table.phase !== 'idle';
+      btn.addEventListener('click', () => { table.chip = value; synth.playTap(); paintChips(); });
+      return btn;
+    }));
+  };
+  wrap.appendChild(chips);
+
+  const layout = document.createElement('div');
+  layout.className = 'roulette-table';
+  const cellFor = (kind, pick, label, cls = '') => {
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.className = `bet-cell ${cls}`;
+    cell.dataset.kind = kind;
+    cell.dataset.pick = String(pick);
+    cell.textContent = label;
+    cell.addEventListener('click', () => {
+      if (table.phase !== 'idle') return;
+      const amount = table.chip;
+      if (stakedOn(table.bets) + amount > state.wallet) { synth.playDenied(); toast(t('cantAfford'), 'error'); return; }
+      const next = layChip(table.bets, { kind, pick, amount });
+      if (next === table.bets) { synth.playDenied(); toast(t('rouletteLimit', { limit: formatAmount(TABLE_LIMIT) }), 'error'); return; }
+      table.bets = next;
+      synth.playTap();
+      paintBets();
+    });
+    return cell;
+  };
+  const zero = document.createElement('div');
+  zero.className = 'roulette-zero';
+  zero.appendChild(cellFor('straight', 0, '0', 'is-green'));
+  const numbers = document.createElement('div');
+  numbers.className = 'roulette-grid';
+  // Three rows of twelve, the top row being the third column of a real table (3, 6, 9 ...).
+  for (let row = 3; row >= 1; row--) for (let col = 0; col < 12; col++) {
+    const n = col * 3 + row;
+    numbers.appendChild(cellFor('straight', n, String(n), `is-${colorOf(n)}`));
+  }
+  const columns = document.createElement('div');
+  columns.className = 'roulette-row is-3';
+  [1, 2, 3].forEach((c) => columns.appendChild(cellFor('column', c, t('rouletteColumn', { n: c }), 'is-outside')));
+  const dozens = document.createElement('div');
+  dozens.className = 'roulette-row is-3';
+  [1, 2, 3].forEach((d) => dozens.appendChild(cellFor('dozen', d, t('rouletteDozen', { n: d }), 'is-outside')));
+  const outside = document.createElement('div');
+  outside.className = 'roulette-row is-6';
+  outside.append(
+    cellFor('half', 'low', '1-18', 'is-outside'), cellFor('parity', 'even', t('rouletteEven'), 'is-outside'),
+    cellFor('color', 'red', t('rouletteRed'), 'is-red'), cellFor('color', 'black', t('rouletteBlack'), 'is-black'),
+    cellFor('parity', 'odd', t('rouletteOdd'), 'is-outside'), cellFor('half', 'high', '19-36', 'is-outside'));
+  const tiers = document.createElement('div');
+  tiers.className = 'roulette-row is-7';
+  for (const tb of TIER_BETS) {
+    const rarity = rarityById(tb.id);
+    const cell = cellFor('tier', tb.id, `${tx(rarity.name).slice(0, 4)} ${tb.multiplier}×`, 'is-tier');
+    cell.style.setProperty('--tier', rarity.color);
+    cell.title = t('rouletteTierHint', { rarity: tx(rarity.name), n: tb.numbers, x: tb.multiplier });
+    tiers.appendChild(cell);
+  }
+  layout.append(zero, numbers, columns, dozens, outside, tiers);
+  wrap.appendChild(layout);
+
+  const stakedLine = document.createElement('p');
+  stakedLine.className = 'roulette-staked';
+  const actions = document.createElement('div');
+  actions.className = 'roulette-actions';
+  const clear = document.createElement('button');
+  clear.type = 'button';
+  clear.className = 'btn btn-ghost';
+  clear.textContent = t('rouletteClear');
+  const spinBtn = document.createElement('button');
+  spinBtn.type = 'button';
+  spinBtn.className = 'btn btn-primary';
+  press(clear, { sound: null });
+  press(spinBtn, { sound: null });
+  actions.append(clear, spinBtn);
+  wrap.append(stakedLine, actions);
+  body.replaceChildren(wrap);
+
+  const paintBets = () => {
+    layout.querySelectorAll('.bet-chip').forEach((c) => c.remove());
+    for (const bet of table.bets) {
+      const cell = layout.querySelector(`.bet-cell[data-kind="${bet.kind}"][data-pick="${bet.pick}"]`);
+      if (!cell) continue;
+      const chip = document.createElement('span');
+      chip.className = 'bet-chip';
+      chip.textContent = String(bet.amount);
+      cell.appendChild(chip);
+    }
+    const total = stakedOn(table.bets);
+    stakedLine.innerHTML = total ? `${esc(t('rouletteStaked'))} ${money(total)}` : esc(t('rouletteLayChips'));
+    spinBtn.innerHTML = esc(t('rouletteSpin'));
+    spinBtn.disabled = table.phase !== 'idle' || !table.bets.length;
+    clear.disabled = table.phase !== 'idle' || !table.bets.length;
+    layout.querySelectorAll('.bet-cell').forEach((c) => { c.disabled = table.phase !== 'idle'; });
+  };
+  clear.addEventListener('click', () => { if (table.phase !== 'idle') return; table.bets = []; synth.playTap(); paintBets(); });
+
+  const spin = async () => {
+    if (table.phase !== 'idle' || !table.bets.length) return;
+    const bets = table.bets.map((b) => ({ ...b }));
+    const total = stakedOn(bets);
+    if (state.wallet < total) { synth.playDenied(); toast(t('cantAfford'), 'error'); return; }
+    table.phase = 'spinning';
+    paintChips();
+    paintBets();
+    result.className = 'roulette-result';
+    result.innerHTML = `<span>${esc(t('rouletteSpinning'))}</span>`;
+    layout.querySelectorAll('.is-won').forEach((c) => c.classList.remove('is-won'));
+    store.saveWallet(state.wallet - total);
+    refreshWallet();
+    let spun;
+    try {
+      spun = await spinRoulette(bets);
+    } catch (error) {
+      store.saveWallet(store.loadWallet() + total);
+      refreshWallet();
+      table.phase = 'idle';
+      result.innerHTML = '';
+      paintChips();
+      paintBets();
+      toast(esc(houseError(error)), 'error');
+      synth.playDenied();
+      return;
+    }
+    table.phase = 'settling';
+    // The wheel turns to the pocket the house named, and comes to rest on it.
+    const angle = restAngle(spun.pocket, table.angle);
+    wheel.style.transition = `transform ${WHEEL_SPIN_MS}ms ${WHEEL_EASE}`;
+    requestAnimationFrame(() => { wheel.style.transform = `rotate(${angle}deg)`; });
+    await wait(WHEEL_SPIN_MS + 80);
+    // Keep the angle small so the next spin's arithmetic stays exact.
+    table.angle = angle % 360;
+    wheel.style.transition = 'none';
+    wheel.style.transform = `rotate(${table.angle}deg)`;
+    table.phase = 'paying';
+    table.last = spun;
+    for (const r of spun.results) {
+      if (!r.won) continue;
+      layout.querySelector(`.bet-cell[data-kind="${r.kind}"][data-pick="${r.pick}"]`)?.classList.add('is-won');
+    }
+    layout.querySelector(`.bet-cell[data-kind="straight"][data-pick="${spun.pocket}"]`)?.classList.add('is-won');
+    if (spun.returned > 0) {
+      store.saveWallet(store.loadWallet() + spun.returned);
+      refreshWallet();
+      result.classList.add('is-win');
+      synth.playPurchase();
+    } else {
+      synth.playDenied();
+    }
+    result.innerHTML = `<b>${spun.pocket} <small>${esc(t(`roulette${spun.color[0].toUpperCase()}${spun.color.slice(1)}`))}</small></b><span>${esc(spun.returned > 0 ? t('rouletteWon', { amount: formatAmount(spun.returned) }) : t('rouletteLost', { amount: formatAmount(total) }))}</span>`;
+    reportQuest('roulette', { staked: total, net: spun.net, won: spun.returned > 0, bets: spun.results });
+    if (spun.returned > 0) reportQuest('points', { amount: Math.round(spun.returned), game: 'roulette' });
+    // The chips come off the table; the player lays the next round.
+    table.bets = [];
+    table.phase = 'idle';
+    paintChips();
+    paintBets();
+  };
+  spinBtn.addEventListener('click', spin);
+  paintChips();
+  paintBets();
+}
+
+/* --- quests --------------------------------------------------------------------------------- */
+
+function renderQuests() {
+  el.questsTitle.textContent = t('tabQuests');
+  el.questsSub.textContent = t('questsIntro');
+  const paint = (board) => {
+    const rows = quests.describe(board);
+    const list = document.createElement('div');
+    list.className = 'quests';
+    list.replaceChildren(...rows.map((row) => {
+      const tier = QUEST_TIERS[row.quest.tier];
+      const card = document.createElement('div');
+      card.className = `quest${row.progress >= row.target ? ' is-done' : ''}${row.claimed ? ' is-claimed' : ''}`;
+      card.style.setProperty('--tier', tier.color);
+      const rewardBits = [money(row.quest.reward.money)];
+      if (row.quest.reward.booster) rewardBits.push(esc(specName(row.quest.reward.booster)));
+      card.innerHTML = `
+        <div class="quest-head"><b></b><span class="quest-tier"></span></div>
+        <div class="quest-bar"><i style="width:${Math.round(100 * Math.min(1, row.progress / row.target))}%"></i></div>
+        <div class="quest-foot"><span class="tabular">${row.progress} / ${row.target}</span><span class="quest-reward">${rewardBits.join(' + ')}</span></div>`;
+      card.querySelector('b').textContent = tx(row.quest.name);
+      card.querySelector('.quest-tier').textContent = tx(tier.name);
+      if (row.claimed) {
+        const tag = document.createElement('span');
+        tag.className = 'game-closed';
+        tag.textContent = t('questClaimed');
+        card.appendChild(tag);
+      } else if (row.progress >= row.target) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-primary';
+        btn.textContent = t('questClaim');
+        press(btn, { sound: null });
+        btn.addEventListener('click', async () => {
+          btn.disabled = true;
+          try {
+            const reward = await quests.claim(row.id, questUserKey());
+            if (reward.money) { store.saveWallet(store.loadWallet() + reward.money); refreshWallet(); }
+            if (reward.booster) gainBooster({ ...reward.booster }, 1);
+            synth.playPurchase();
+            toast(esc(t('questPaid', { name: tx(row.quest.name) })), 'ok');
+            renderQuests();
+            paintDrawerLinks();
+          } catch (error) {
+            btn.disabled = false;
+            const code = String(error?.message ?? '');
+            toast(esc(code === 'CLAIMED' ? t('questClaimed') : code === 'NOT_DONE' ? t('questNotDone') : houseError(error)), 'error');
+            synth.playDenied();
+          }
+        });
+        card.appendChild(btn);
+      }
+      return card;
+    }));
+    const reset = document.createElement('p');
+    reset.className = 'quests-reset';
+    const tick = () => { reset.textContent = t('questsReset', { time: formatCountdown(quests.msToReset(board)) }); };
+    tick();
+    clearInterval(state.questsTimer);
+    state.questsTimer = setInterval(() => {
+      if (state.tab !== 'quests') { clearInterval(state.questsTimer); return; }
+      if (quests.msToReset(board) <= 0) { renderQuests(); return; }
+      tick();
+    }, 1000);
+    el.questsBody.replaceChildren(list, reset);
+    reveal(list.children, { step: 60 });
+  };
+  paint(quests.loadBoard(questUserKey()));
+  // Signed in, the server's deal is the deal: fetched in the background, painted when it comes.
+  if (signedIn()) quests.syncBoard(questUserKey()).then((board) => { if (state.tab === 'quests') paint(board); }).catch(() => { /* the device's board stands */ });
+}
+
+/* --- the leaderboard --------------------------------------------------------------------------- */
+
+let leaderboardSeg = null;
+function renderLeaderboard() {
+  el.leaderboardTitle.textContent = t('tabLeaderboard');
+  const view = state.leaderboardView ??= { window: 'daily', page: 0, rows: [], more: false };
+  if (!leaderboardSeg) {
+    leaderboardSeg = new Segmented(el.leaderboardSeg, leaderboard.WINDOWS.map((id) => ({ id, label: t(`lb_${id}`) })), (id) => {
+      view.window = id; view.page = 0; view.rows = [];
+      loadLeaderboard();
+    });
+  }
+  leaderboardSeg.select?.(view.window, { silent: true });
+  loadLeaderboard();
+}
+
+async function loadLeaderboard() {
+  const view = state.leaderboardView;
+  const body = el.leaderboardBody;
+  el.leaderboardMe.hidden = true;
+  el.screens.leaderboard?.classList.remove('has-pin');
+  if (!signedIn()) {
+    body.replaceChildren(gameStage('podium', t('lbSignIn'), { label: t('gateSignIn'), run: () => showGate() }));
+    return;
+  }
+  if (view.page === 0) body.replaceChildren(gameStage('podium', t('lbLoading')));
+  let page, mine = null;
+  try {
+    [page, mine] = await Promise.all([leaderboard.fetchPage(view.window, view.page), leaderboard.fetchMyRank(view.window).catch(() => null)]);
+  } catch (error) {
+    body.replaceChildren(gameStage('podium', houseError(error), { label: t('retry'), run: () => loadLeaderboard() }));
+    return;
+  }
+  if (state.tab !== 'leaderboard') return;
+  view.rows = view.page === 0 ? page.rows : [...view.rows, ...page.rows];
+  view.more = page.more;
+  const list = document.createElement('div');
+  list.className = 'leaderboard';
+  const me = userId();
+  const rowNode = (r, cls = '') => {
+    const row = document.createElement('div');
+    row.className = `lb-row${r.userId === me ? ' is-me' : ''}${r.rank <= 3 ? ` is-top${r.rank}` : ''} ${cls}`;
+    row.innerHTML = `<span class="lb-rank tabular"></span><span class="lb-name"></span><span class="lb-score tabular"></span>`;
+    row.querySelector('.lb-rank').textContent = `#${r.rank}`;
+    row.querySelector('.lb-name').textContent = r.username;
+    row.querySelector('.lb-score').textContent = formatAmount(r.score);
+    return row;
+  };
+  if (!view.rows.length) list.appendChild(gameStage('podium', t('lbEmpty')));
+  else list.replaceChildren(...view.rows.map((r) => rowNode(r)));
+  const reset = document.createElement('p');
+  reset.className = 'lb-reset';
+  const ms = leaderboard.msToReset(view.window);
+  reset.textContent = ms == null ? t('lbForever') : t('lbReset', { time: formatCountdown(ms) });
+  list.appendChild(reset);
+  if (view.more) {
+    const more = document.createElement('button');
+    more.type = 'button';
+    more.className = 'btn btn-ghost btn-sm lb-more';
+    more.textContent = t('lbMore');
+    press(more, { sound: null });
+    more.addEventListener('click', () => { synth.playTap(); view.page += 1; loadLeaderboard(); });
+    list.appendChild(more);
+  }
+  body.replaceChildren(list);
+  // The player's own row, pinned to the bottom when it is not on the page.
+  const onPage = view.rows.some((r) => r.userId === me);
+  if (mine && !onPage) {
+    el.leaderboardMe.replaceChildren(...rowNode({ rank: mine.rank, userId: me, username: t('lbYou'), score: mine.score }).childNodes);
+    el.leaderboardMe.className = 'leaderboard-me lb-row is-me';
+    el.leaderboardMe.hidden = false;
+    el.screens.leaderboard?.classList.add('has-pin');
+  }
 }
 
 /* --- first run --------------------------------------------------------------------------------------------------- */
@@ -8090,6 +8920,12 @@ function init() {
   setTimeout(lookForUpdate, 4000);
   setTimeout(warmDrawer, 2500);
   sayWipeNote();
+  // The arcade's back buttons, and the quests' chip in the drawer.
+  el.wikdleBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
+  el.slotsBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
+  el.rouletteBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
+  quests.onQuestsChange(() => paintDrawerLinks());
+  reportAlbums();
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') lookForUpdate();
   });

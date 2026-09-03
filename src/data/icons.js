@@ -171,6 +171,16 @@ const ICONS = {
     <circle cx="12" cy="12" r="8.4"/>
     <path d="M12 7.2V12l3.2 1.9"/>`,
   plus: `<path d="M12 5v14M5 12h14"/>`,
+  dice: `<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="8.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="8.5" r="1.2" fill="currentColor"/><circle cx="12" cy="12" r="1.2" fill="currentColor"/><circle cx="8.5" cy="15.5" r="1.2" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.2" fill="currentColor"/>`,
+  wheel: `<circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="2.6"/><path d="M12 3.5v6M12 14.6v6M3.5 12h6M14.6 12h6M6 6l4.2 4.2M13.8 13.8 18 18M18 6l-4.2 4.2M10.2 13.8 6 18"/>`,
+  grid: `<rect x="4" y="4" width="4.5" height="4.5" rx="1"/><rect x="9.75" y="4" width="4.5" height="4.5" rx="1"/><rect x="15.5" y="4" width="4.5" height="4.5" rx="1"/><rect x="4" y="9.75" width="4.5" height="4.5" rx="1"/><rect x="9.75" y="9.75" width="4.5" height="4.5" rx="1"/><rect x="15.5" y="9.75" width="4.5" height="4.5" rx="1"/><rect x="4" y="15.5" width="4.5" height="4.5" rx="1"/><rect x="9.75" y="15.5" width="4.5" height="4.5" rx="1"/><rect x="15.5" y="15.5" width="4.5" height="4.5" rx="1"/>`,
+  scroll: `<path d="M7 4h11a2 2 0 0 1 2 2v11a3 3 0 0 1-3 3H6a2 2 0 0 1-2-2V6a2 2 0 0 1 3-1.7"/><path d="M9 9h7M9 13h7M9 17h4"/>`,
+  podium: `<path d="M3 20h18"/><rect x="9" y="8" width="6" height="12"/><rect x="3" y="12" width="6" height="8"/><rect x="15" y="14" width="6" height="6"/><path d="M12 3.5l1.1 2.2 2.4.35-1.75 1.7.4 2.4L12 9l-2.15 1.15.4-2.4L8.5 6.05l2.4-.35z"/>`,
+  reel: `<rect x="3.5" y="5" width="17" height="14" rx="3"/><path d="M9 5v14M15 5v14"/><circle cx="6.25" cy="12" r="1.1" fill="currentColor"/><circle cx="12" cy="12" r="1.1" fill="currentColor"/><circle cx="17.75" cy="12" r="1.1" fill="currentColor"/>`,
+  page: `<path d="M7 3.5h7l4 4V20a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4.5a1 1 0 0 1 1-1z"/><path d="M14 3.5V8h4M9 12h6M9 15.5h6"/>`,
+  book: `<path d="M5 4.5h6a2 2 0 0 1 2 2v13a1.5 1.5 0 0 0-1.5-1.5H5z"/><path d="M19 4.5h-6a2 2 0 0 0-2 2v13a1.5 1.5 0 0 1 1.5-1.5H19z"/>`,
+  globe: `<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17"/>`,
+  wiki: `<path d="M4 6l4 12 4-9 4 9 4-12"/><path d="M9 6h3M13 6h3"/>`,
   minus: `<path d="M5 12h14"/>`,
   gift: `
     <path d="M3.8 10.2h16.4v3H3.8z"/>
@@ -190,6 +200,7 @@ const ICONS = {
   spark: `
     <path d="M12 3.2 13.9 9.3 20 11.2 13.9 13.1 12 19.2 10.1 13.1 4 11.2 10.1 9.3z"/>`,
   chevron: `<path d="M9.5 5.5 16 12l-6.5 6.5"/>`,
+  chevronRight: `<path d="M9.5 5.5 16 12l-6.5 6.5"/>`,
   chat: `
     <path d="M4 6.4A2.4 2.4 0 0 1 6.4 4h11.2A2.4 2.4 0 0 1 20 6.4v7.2a2.4 2.4 0 0 1-2.4 2.4H9.8L5.6 19.6a1 1 0 0 1-1.6-.8z"/>
     <path d="M8 9h8M8 12h5.4"/>`,

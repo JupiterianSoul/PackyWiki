@@ -328,6 +328,70 @@ What the app can do is not make it worse, so what ships is a release build.
 A debug build sets the `debuggable` flag, which is the thing Android words its
 warnings most strongly about.
 
+## The arcade: minigames, quests and the leaderboard
+
+Behind the shop there is a small arcade, in the drawer as **Minigames**,
+**Daily quests** and **Leaderboard**. The rule that holds all of it together
+is that nothing which pays out is decided on the phone.
+
+**Wikdle** (`src/wikdle.js`, words in `src/data/wikdle-words.js`) is the
+five-letter word of the day in six rows. The word is a function of the UTC
+date, so everyone on Earth has the same one and a phone's clock cannot fetch
+tomorrow's; a guess has to be in the dictionary before it costs a row;
+duplicate letters are scored the way the original scores them (one E in the
+word never lights two); and the board is written down after every guess, so
+it survives a closed app and cannot be replayed once it is over. A solve is
+worth 600 points in one guess down to 100 in six, paid half in Buckarooz and,
+signed in, sent once to the leaderboard.
+
+**The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
+reels, five symbols, five paylines and a paytable tuned so that it returns
+95% of what is bet over the long run; `tools/slots-rtp.mjs` computes that
+figure exactly from the tables. The spin is decided by the `slots` edge
+function with `crypto.getRandomValues`, never by the app: the app takes the
+coin, asks, checks the answer against the book (the stops exist, the windows
+match them, the total adds up) and only then pays. If the house does not
+answer, or the answer does not add up, the coin comes back. The machine is
+one state at a time, idle, spinning, settling, paying, and refuses any input
+that is not for the state it is in, so a double tap buys one spin.
+
+**The roulette** (`src/roulette.js`, table in `src/data/roulette.js`) is a
+European wheel, the real layout, every classic bet, plus the game's own tier
+bets: a chip on Common covers the lowest 24 numbers and returns 1.5x, up to
+Exotic on three numbers at 10x. Several chips ride one spin, up to a table
+limit. The `roulette` edge function names the pocket; the app settles the
+chips itself against the same table, refuses an answer that disagrees, and
+turns the drawn wheel to the pocket on a long deceleration.
+
+**Daily quests** (`src/quests.js`, book in `src/data/quests.js`) are three a
+day from a book of over a hundred, easy, medium and hard by weight, dealt
+from the UTC date and the player's id so the deal is the same wherever it is
+asked. Everything the player already does reports to them: opening, pulling,
+buying, selling, quizzes, trades, the arcade. Signed in, the `quests`
+function deals, records progress and honours a claim only when its own copy
+of the progress meets the target; signed out, the device does the same for
+itself, and nothing reaches a leaderboard.
+
+**The leaderboard** (`src/leaderboard.js`) is three tables on the server,
+daily, weekly and all-time, kept by a trigger over every score submitted;
+`pg_cron` empties the daily table at midnight UTC and the weekly one on
+Sunday. A page is twenty rows and the player's own standing comes back
+separately so it can be pinned to the bottom of the screen.
+
+Deploying the arcade to a Supabase project takes three steps:
+
+```
+supabase functions deploy slots roulette quests
+# then run supabase/schema.sql (V6) in the SQL editor
+# and enable the pg_cron extension under Database > Extensions
+```
+
+`tools/sync-game-tables.mjs` copies the books (slots, roulette, quests) into
+`supabase/functions/_shared/` as TypeScript, so the server and the app can
+never disagree about what a line pays. Without the functions the app still
+runs: Wikdle and the quests work on the device, the casino says the house is
+closed, and the leaderboard says what to run.
+
 ## The website
 
 The site is the same `dist/`, published to GitHub Pages from the `gh-pages`
@@ -358,14 +422,17 @@ src/
   shop.js          the shelves, seeded so everyone sees the same shop
   albums.js        filing cards, and how big an album really is
   codes.js         secret codes and the cards they hand over
+  wikdle.js  slots.js  roulette.js  quests.js  leaderboard.js  house.js
   achievements.js  badges.js  frames.js  progression.js  daily.js  quiz.js
   timed.js  pricing.js  packstyle.js  packview.js  save.js  i18n.js
-  data/            rarities, subjects, icons, emblems, release notes
+  data/            rarities, subjects, icons, emblems, release notes,
+                   the arcade's books and the Wikdle words
   ui/              themes, animated backdrops, the synth, the music player
-  styles/          base, components, screens, cards, themes, desktop
+  styles/          base, components, screens, cards, themes, desktop, games
   assets/          fonts, music, sound kits, the images a code hands over
 android/           the WebView wrapper and its Gradle build
-supabase/          schema.sql: tables, policies, the edge function
+supabase/          schema.sql: tables, policies; functions/: the edge functions
+tools/             sync-game-tables.mjs, slots-rtp.mjs
 ```
 
 ## The names underneath

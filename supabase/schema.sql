@@ -715,3 +715,157 @@ update public.trades
   where status = 'pending'
     and jsonb_typeof(offer) = 'array' and jsonb_typeof(ask) = 'array'
     and (offer::text like '%"artifact"%' or ask::text like '%"artifact"%');
+
+-- ============================================================================
+-- V6 - MINIGAMES, QUESTS AND THE LEADERBOARD
+--
+-- Three new pieces of furniture. `scores` is every point anyone ever earned
+-- in a minigame, written by the game functions with the service key (the
+-- slot machine and the wheel) or by submit_score() for Wikdle, never by a
+-- plain insert from a client. `quests` is each player's dealt quests for
+-- each day, dealt by the quests function. The three leaderboard tables are
+-- caches over `scores`, one per window, kept by a trigger and emptied by
+-- cron on the window's clock: daily at 00:00 UTC, weekly on Sunday 00:00
+-- UTC, all-time never.
+-- ============================================================================
+
+create table if not exists public.scores (
+  id         bigint generated always as identity primary key,
+  user_id    uuid not null references auth.users on delete cascade,
+  game       text not null check (game in ('slots', 'roulette', 'wikdle', 'quest')),
+  points     integer not null check (points >= 0),
+  detail     jsonb,
+  at         timestamptz not null default now()
+);
+create index if not exists scores_user_at_idx on public.scores (user_id, at desc);
+create index if not exists scores_at_idx on public.scores (at desc);
+
+alter table public.scores enable row level security;
+drop policy if exists "your own scores are yours to read" on public.scores;
+create policy "your own scores are yours to read"
+  on public.scores for select to authenticated using (auth.uid() = user_id);
+-- No insert policy on purpose: only the service key and submit_score() write.
+
+-- The three windows. Each holds one row per player with that window's total,
+-- and each has an index on the score, which is what makes a page of twenty
+-- a single index scan.
+create table if not exists public.leaderboard_daily   (user_id uuid primary key references auth.users on delete cascade, score bigint not null default 0, updated_at timestamptz not null default now());
+create table if not exists public.leaderboard_weekly  (user_id uuid primary key references auth.users on delete cascade, score bigint not null default 0, updated_at timestamptz not null default now());
+create table if not exists public.leaderboard_alltime (user_id uuid primary key references auth.users on delete cascade, score bigint not null default 0, updated_at timestamptz not null default now());
+create index if not exists leaderboard_daily_score_idx   on public.leaderboard_daily   (score desc, updated_at asc);
+create index if not exists leaderboard_weekly_score_idx  on public.leaderboard_weekly  (score desc, updated_at asc);
+create index if not exists leaderboard_alltime_score_idx on public.leaderboard_alltime (score desc, updated_at asc);
+
+alter table public.leaderboard_daily   enable row level security;
+alter table public.leaderboard_weekly  enable row level security;
+alter table public.leaderboard_alltime enable row level security;
+drop policy if exists "the board is public" on public.leaderboard_daily;
+create policy "the board is public" on public.leaderboard_daily for select to authenticated using (true);
+drop policy if exists "the board is public" on public.leaderboard_weekly;
+create policy "the board is public" on public.leaderboard_weekly for select to authenticated using (true);
+drop policy if exists "the board is public" on public.leaderboard_alltime;
+create policy "the board is public" on public.leaderboard_alltime for select to authenticated using (true);
+
+-- Every score lands in all three windows the moment it is written.
+create or replace function public.scores_into_windows()
+returns trigger language plpgsql security definer set search_path = public as $$
+begin
+  insert into leaderboard_daily (user_id, score) values (new.user_id, new.points)
+    on conflict (user_id) do update set score = leaderboard_daily.score + excluded.score, updated_at = now();
+  insert into leaderboard_weekly (user_id, score) values (new.user_id, new.points)
+    on conflict (user_id) do update set score = leaderboard_weekly.score + excluded.score, updated_at = now();
+  insert into leaderboard_alltime (user_id, score) values (new.user_id, new.points)
+    on conflict (user_id) do update set score = leaderboard_alltime.score + excluded.score, updated_at = now();
+  return new;
+end $$;
+drop trigger if exists scores_into_windows on public.scores;
+create trigger scores_into_windows after insert on public.scores
+  for each row execute function public.scores_into_windows();
+
+-- Wikdle is scored on the device (the word is the same for everyone and the
+-- board is its own proof), so its points arrive through this, as the caller,
+-- at most one score a day, never above the game's own maximum.
+create or replace function public.submit_score(p_game text, p_points integer, p_day text)
+returns void language plpgsql security definer set search_path = public as $$
+begin
+  if auth.uid() is null then raise exception 'sign in'; end if;
+  if p_game <> 'wikdle' then raise exception 'only wikdle is scored by the client'; end if;
+  if p_points < 0 or p_points > 600 then raise exception 'points out of range'; end if;
+  if exists (select 1 from scores where user_id = auth.uid() and game = 'wikdle' and detail->>'day' = p_day) then
+    return;
+  end if;
+  insert into scores (user_id, game, points, detail) values (auth.uid(), 'wikdle', p_points, jsonb_build_object('day', p_day));
+end $$;
+grant execute on function public.submit_score(text, integer, text) to authenticated;
+
+-- One page of a window: twenty rows, ranked, with usernames. The offset is
+-- the page number times twenty; the tables are small and indexed on the
+-- score, so a page is one scan.
+create or replace function public.leaderboard_page(p_window text, p_page integer default 0)
+returns table (rank bigint, user_id uuid, username text, score bigint)
+language plpgsql stable security definer set search_path = public as $$
+begin
+  if p_window = 'daily' then
+    return query select row_number() over (order by d.score desc, d.updated_at asc) as rank, d.user_id, p.username, d.score
+      from leaderboard_daily d join profiles p on p.id = d.user_id
+      order by d.score desc, d.updated_at asc limit 20 offset greatest(0, p_page) * 20;
+  elsif p_window = 'weekly' then
+    return query select row_number() over (order by w.score desc, w.updated_at asc), w.user_id, p.username, w.score
+      from leaderboard_weekly w join profiles p on p.id = w.user_id
+      order by w.score desc, w.updated_at asc limit 20 offset greatest(0, p_page) * 20;
+  else
+    return query select row_number() over (order by a.score desc, a.updated_at asc), a.user_id, p.username, a.score
+      from leaderboard_alltime a join profiles p on p.id = a.user_id
+      order by a.score desc, a.updated_at asc limit 20 offset greatest(0, p_page) * 20;
+  end if;
+end $$;
+grant execute on function public.leaderboard_page(text, integer) to authenticated;
+
+-- The caller's own standing in a window: rank, score, and how many are ranked.
+create or replace function public.my_rank(p_window text)
+returns table (rank bigint, score bigint, total bigint)
+language plpgsql stable security definer set search_path = public as $$
+declare me uuid := auth.uid(); my_score bigint; my_at timestamptz;
+begin
+  if me is null then return; end if;
+  if p_window = 'daily' then
+    select d.score, d.updated_at into my_score, my_at from leaderboard_daily d where d.user_id = me;
+    if my_score is null then return; end if;
+    return query select (select count(*) + 1 from leaderboard_daily x where x.score > my_score or (x.score = my_score and x.updated_at < my_at)), my_score, (select count(*) from leaderboard_daily);
+  elsif p_window = 'weekly' then
+    select w.score, w.updated_at into my_score, my_at from leaderboard_weekly w where w.user_id = me;
+    if my_score is null then return; end if;
+    return query select (select count(*) + 1 from leaderboard_weekly x where x.score > my_score or (x.score = my_score and x.updated_at < my_at)), my_score, (select count(*) from leaderboard_weekly);
+  else
+    select a.score, a.updated_at into my_score, my_at from leaderboard_alltime a where a.user_id = me;
+    if my_score is null then return; end if;
+    return query select (select count(*) + 1 from leaderboard_alltime x where x.score > my_score or (x.score = my_score and x.updated_at < my_at)), my_score, (select count(*) from leaderboard_alltime);
+  end if;
+end $$;
+grant execute on function public.my_rank(text) to authenticated;
+
+-- The windows are emptied on their clocks. pg_cron ships with Supabase but
+-- has to be switched on once: Database -> Extensions -> pg_cron. If that has
+-- not been done the two schedule lines below error and can be run later.
+create extension if not exists pg_cron;
+select cron.unschedule(jobid) from cron.job where jobname in ('wikster-daily-flush', 'wikster-weekly-flush');
+select cron.schedule('wikster-daily-flush',  '0 0 * * *', $$truncate table public.leaderboard_daily$$);
+select cron.schedule('wikster-weekly-flush', '0 0 * * 0', $$truncate table public.leaderboard_weekly$$);
+
+-- Each player's dealt quests, one row per quest per day, written by the
+-- quests function with the service key. A player may read their own.
+create table if not exists public.quests (
+  user_id    uuid not null references auth.users on delete cascade,
+  day        text not null,
+  quest_id   text not null,
+  target     integer not null,
+  progress   integer not null default 0,
+  claimed    boolean not null default false,
+  expires_at timestamptz not null,
+  primary key (user_id, day, quest_id)
+);
+create index if not exists quests_user_day_idx on public.quests (user_id, day);
+alter table public.quests enable row level security;
+drop policy if exists "your quests are yours to read" on public.quests;
+create policy "your quests are yours to read"
+  on public.quests for select to authenticated using (auth.uid() = user_id);
