@@ -230,14 +230,16 @@
   width: min(440px, calc(100vw - 24px));
   border-radius: var(--radius-pill);
   border: var(--border) var(--border-style) var(--line);
-  background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+  /* Themes that want a solid bar set the token; the desktop rail reads the
+     same one, so a theme's choice holds on a wide screen too. */
+  background: var(--navbar-bg, color-mix(in srgb, var(--surface-solid) 82%, transparent));
   box-shadow: var(--raise-shadow);
   backdrop-filter: var(--blur);
   transition: opacity calc(260ms * var(--motion-scale)) var(--ease),
               transform calc(260ms * var(--motion-scale)) var(--ease);
 }
-[data-theme='arcade'] .navbar { border-radius: var(--radius); background: var(--surface-solid); }
-[data-theme='paper'] .navbar { background: var(--surface); }
+[data-theme='arcade'] .navbar { border-radius: var(--radius); --navbar-bg: var(--surface-solid); }
+[data-theme='paper'] .navbar { --navbar-bg: var(--surface); }
 
 .nav-indicator {
   position: absolute;

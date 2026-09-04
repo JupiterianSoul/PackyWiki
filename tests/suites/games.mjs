@@ -2,7 +2,8 @@
 import { chromium, devices } from 'playwright';
 import { launchOptions } from '../lib/browser.mjs';
 import { installStubs } from '../lib/stubs.mjs';
-import { wordForDay, utcDay } from '/home/user/PackyWiki/src/wikdle.js';
+import { loadWords, wordForDay, utcDay } from '/home/user/PackyWiki/src/wikdle.js';
+await loadWords();
 let fails = 0; const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  ' + e : ''}`); };
 const b = await chromium.launch(launchOptions());
 const p = await (await b.newContext({ ...devices['Pixel 7'] })).newPage(); installStubs(p);

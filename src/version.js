@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * WHICH BUILD THIS IS, AND WHETHER A NEWER ONE EXISTS
  * ----------------------------------------------------------------------------

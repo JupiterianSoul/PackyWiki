@@ -10,21 +10,17 @@ import { synth } from '../ui/sound.js';
 import * as store from '../collection.js';
 import { questUserKey, renderGames } from './arcade.js';
 import { renderBinder } from './binder.js';
-import { renderCardIndex, renderGlossary } from './cardindex.js';
 import { el, esc, navTabFor, openSheet, placeDrawerLinks, showScreen, state } from './core.js';
 import { openDaily } from './daily.js';
 import { userId } from './gate.js';
 import { live } from './live.js';
-import { renderMarket } from './market.js';
 import { renderPacks, renderTimed } from './packs.js';
 import { renderProfile } from './profile.js';
 import { renderLeaderboard, renderQuests } from './quests.js';
-import { renderQuiz } from './quiz.js';
 import { achRedeemableCount, renderAchievements, renderBadgesScreen } from './regalia.js';
 import { renderCustomize, renderSettings } from './settings.js';
 import { payStipend, renderShop } from './shop.js';
 import { loadFriends, openChat, renderFriends } from './social.js';
-import { renderUpdates } from './updates.js';
 
 /* --- the drawer --------------------------------------------------------------------
  *
@@ -37,22 +33,27 @@ import { renderUpdates } from './updates.js';
 /** id, icon, label key, and what opening it does. */
 
 export function drawerItems() {
-  const go = (screen, paint) => () => { paint?.(); showScreen(screen); };
+  // A painter may be async: the screens few sessions visit (the market, the
+  // index, the quiz, the timeline) live in chunks of their own and are
+  // fetched the first time they are opened. The screen is shown once the
+  // paint is done, so the player never sees it half-built.
+  const go = (screen, paint) => async () => { await paint?.(); showScreen(screen); };
+  const lazy = (load, name) => () => load().then((m) => m[name]());
   return [
     { id: 'packs',  icon: 'packs',      key: 'tabBoosters',    run: go('packs', renderPacks) },
     { id: 'timed',  icon: 'hourglass',  key: 'tabTimed',       run: go('timed', renderTimed) },
     { id: 'shop',   icon: 'gem',        key: 'tabShop',        run: go('shop', () => { payStipend(); renderShop(); }) },
     { id: 'binder', icon: 'collection', key: 'tabCollection',  run: go('binder', renderBinder) },
-    { id: 'market', icon: 'trade',      key: 'tabMarket',      run: go('market', renderMarket) },
-    { id: 'cardindex', icon: 'search',  key: 'tabIndex',       run: go('cardindex', renderCardIndex) },
-    { id: 'glossary', icon: 'filter',   key: 'tabGlossary',    run: go('glossary', renderGlossary) },
+    { id: 'market', icon: 'trade',      key: 'tabMarket',      run: go('market', lazy(() => import('./market.js'), 'renderMarket')) },
+    { id: 'cardindex', icon: 'search',  key: 'tabIndex',       run: go('cardindex', lazy(() => import('./cardindex.js'), 'renderCardIndex')) },
+    { id: 'glossary', icon: 'filter',   key: 'tabGlossary',    run: go('glossary', lazy(() => import('./cardindex.js'), 'renderGlossary')) },
     { id: 'daily',  icon: 'gift',       key: 'dailyTitle', dot: () => canClaim(state.profile.daily),
       run: () => openDaily() },
     { id: 'ach',    icon: 'trophy',     key: 'achTitle',
       badge: () => achRedeemableCount(),
       run: go('ach', renderAchievements) },
     { id: 'badges', icon: 'star',       key: 'badgesTitle',    run: go('badges', renderBadgesScreen) },
-    { id: 'quiz',   icon: 'quiz',       key: 'tabQuiz',        run: go('quiz', renderQuiz) },
+    { id: 'quiz',   icon: 'quiz',       key: 'tabQuiz',        run: go('quiz', lazy(() => import('./quiz.js'), 'renderQuiz')) },
     { id: 'games',  icon: 'dice',       key: 'tabGames',       run: go('games', renderGames) },
     { id: 'quests', icon: 'scroll',     key: 'tabQuests',
       badge: () => quests.claimableCount(questUserKey()),
@@ -68,7 +69,7 @@ export function drawerItems() {
       badge: () => unreadCount(),
       run: () => openNotifications() },
     { id: 'profile',  icon: 'profile',  key: 'tabProfile',  run: go('profile', renderProfile) },
-    { id: 'updates',   icon: 'spark',    key: 'tabUpdates',   run: go('updates', renderUpdates) },
+    { id: 'updates',   icon: 'spark',    key: 'tabUpdates',   run: go('updates', lazy(() => import('./updates.js'), 'renderUpdates')) },
     { id: 'customize', icon: 'wand',     key: 'tabCustomize', run: go('customize', renderCustomize) },
     { id: 'settings',  icon: 'settings', key: 'tabSettings',  run: go('settings', renderSettings) }
   ];

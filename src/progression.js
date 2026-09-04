@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Player progression: experience, levels, ranks and level rewards.
  *

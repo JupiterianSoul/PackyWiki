@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * ADULT CONTENT, AND THE SETTING THAT HIDES IT
  * ============================================================================

@@ -57,7 +57,8 @@ export function confettiOver(node, count = 90) {
   requestAnimationFrame(frame);
 }
 
-export function renderWikdle() {
+export async function renderWikdle() {
+  await wikdle.loadWords();
   el.wikdleTitle.textContent = t('wikdleTitle');
   el.wikdleBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
   let game = wikdle.loadGame();

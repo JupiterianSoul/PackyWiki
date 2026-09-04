@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * WIKDLE
  * ============================================================================
@@ -12,7 +13,24 @@
  * GREEN in its right place, YELLOW where the word has an unclaimed copy of it
  * somewhere else, GRAY otherwise, and a word with one E never lights two.
  */
-import { ANSWERS, DICTIONARY } from './data/wikdle-words.js';
+/*
+ * The word lists are the largest file in the app and only a round of Wikdle
+ * reads them, so they are fetched when the board opens rather than shipped
+ * with the first screen. Everything that needs a word awaits loadWords()
+ * once; the board does it before it paints.
+ */
+let words = null;
+
+/** Fetches the answer and dictionary lists, once. */
+export async function loadWords() {
+  words ??= await import('./data/wikdle-words.js');
+  return words;
+}
+
+const lists = () => {
+  if (!words) throw new Error('WIKDLE_WORDS_NOT_LOADED');
+  return words;
+};
 import { t } from './i18n.js';
 
 export const ROWS = 6;
@@ -37,6 +55,7 @@ export const msToNextDay = (now = Date.now()) => {
 export function wordForDay(day = utcDay()) {
   let h = 2166136261;
   for (const ch of `wikdle:${day}`) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; }
+  const { ANSWERS } = lists();
   const n = ANSWERS.length;
   // A stride coprime with the list length visits every word once.
   const stride = 7919 % n || 1;
@@ -45,7 +64,7 @@ export function wordForDay(day = utcDay()) {
 }
 
 /** Whether a guess is a word the dictionary knows. */
-export const isWord = (guess) => DICTIONARY.has(String(guess ?? '').toLowerCase());
+export const isWord = (guess) => lists().DICTIONARY.has(String(guess ?? '').toLowerCase());
 
 /**
  * One row scored against the answer: an array of 'hit' | 'near' | 'miss'.

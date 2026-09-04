@@ -9,18 +9,27 @@
      booster.css     the foil pack and the rip
      cards.css       the card, the flip, and one block per rarity tier
      screens.css     layout for each destination
+     games.css       the arcade: Wikdle, the slot machine, the leaderboard
      desktop.css     the same app, laid out for a mouse and a wide screen
 
    Nothing below themes.css names a colour directly. Every rule reads tokens,
    which is what lets a theme change the app's shape, weight, texture and
    motion and not just its palette.
+
+   The files are cascade layers, in this order. A later layer wins over an
+   earlier one whatever the specificity of the two rules, so a screen can
+   restyle a component with a plain class, and the desktop file can restyle a
+   screen, without either having to out-specify the rule it replaces. Inline
+   styles and anything set from JavaScript sit above every layer, as before.
    ========================================================================== */
 
-@import './styles/themes.css';
-@import './styles/base.css';
-@import './styles/components.css';
-@import './styles/booster.css';
-@import './styles/cards.css';
-@import './styles/screens.css';
-@import './styles/games.css';
-@import './styles/desktop.css';
+@layer themes, base, components, booster, cards, screens, games, desktop;
+
+@import './styles/themes.css' layer(themes);
+@import './styles/base.css' layer(base);
+@import './styles/components.css' layer(components);
+@import './styles/booster.css' layer(booster);
+@import './styles/cards.css' layer(cards);
+@import './styles/screens.css' layer(screens);
+@import './styles/games.css' layer(games);
+@import './styles/desktop.css' layer(desktop);

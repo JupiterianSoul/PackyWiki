@@ -22,8 +22,18 @@ import { themeById, DEFAULT_THEME } from './themes.js';
  * (from the uisfx project, dedicated to the public domain - see
  * src/assets/sfx/LICENSE.md) bundled as data URIs so they play with the app,
  * offline included. Everything else in this file still applies to them: the
- * samples run through the same bus, room, tilt and trim as the synth. */
-const KIT_URIS = import.meta.glob('../assets/sfx/*/*.ogg', { eager: true, query: '?inline', import: 'default' });
+ * samples run through the same bus, room, tilt and trim as the synth.
+ *
+ * Each kit is a chunk of its own (src/ui/kits), fetched the first time a
+ * theme asks for it: half a megabyte of samples has no place in the code the
+ * first screen waits for, and the synth covers every event until the kit
+ * lands, as it always did while the samples decoded. */
+const KITS = {
+  cinematic: () => import('./kits/cinematic.js'),
+  mechanical: () => import('./kits/mechanical.js'),
+  rubber: () => import('./kits/rubber.js'),
+  scifi: () => import('./kits/scifi.js')
+};
 
 const kitBytes = async (uri) => {
   const text = String(uri);
@@ -161,16 +171,18 @@ class Synth {
     if (name === this.kitName) return;
     this.kitName = name;
     this.kitBuffers = new Map();
-    if (!name) return;
-    const prefix = `../assets/sfx/${name}/`;
-    for (const [path, uri] of Object.entries(KIT_URIS)) {
-      if (!path.startsWith(prefix)) continue;
-      const event = path.slice(prefix.length).replace(/\.ogg$/, '');
-      kitBytes(uri)
-        .then((bytes) => this.ctx.decodeAudioData(bytes))
-        .then((buffer) => { if (this.kitName === name) this.kitBuffers.set(event, buffer); })
-        .catch(() => { /* an undecodable file just stays on the synth */ });
-    }
+    const load = KITS[name];
+    if (!load) return;
+    load().then((kit) => {
+      if (this.kitName !== name) return;
+      for (const [path, uri] of Object.entries(kit.default)) {
+        const event = path.slice(path.lastIndexOf('/') + 1).replace(/\.ogg$/, '');
+        kitBytes(uri)
+          .then((bytes) => this.ctx.decodeAudioData(bytes))
+          .then((buffer) => { if (this.kitName === name) this.kitBuffers.set(event, buffer); })
+          .catch(() => { /* an undecodable file just stays on the synth */ });
+      }
+    }).catch(() => { /* offline with the chunk not cached: the synth carries on */ });
   }
 
   /** Play one kit sample through the theme's graph. True when it played;

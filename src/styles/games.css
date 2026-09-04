@@ -338,6 +338,8 @@
 .is-r1 .lb-step-score { font-size: 1.05rem; color: #fbbf24; }
 .leaderboard { display: grid; gap: 6px; }
 .lb-row {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
   display: grid; grid-template-columns: 2.8em 1fr auto; align-items: center; gap: 10px;
   padding: 10px 12px; border-radius: var(--radius); background: var(--surface);
   border: var(--border) var(--border-style) var(--line);

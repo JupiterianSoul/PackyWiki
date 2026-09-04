@@ -11,15 +11,18 @@
     "test": "npm run check && node tests/run.mjs",
     "test:stub": "node tests/run.mjs stub",
     "test:offline": "node tests/run.mjs offline",
-    "check": "node tools/i18n-check.mjs && node tools/sweep.mjs",
+    "check": "node tools/i18n-check.mjs && node tools/sweep.mjs && node tests/unit/run.mjs && npm run typecheck",
     "i18n:check": "node tools/i18n-check.mjs",
     "sweep": "node tools/sweep.mjs",
-    "shots": "node tests/build.mjs offline && node tests/shots/desktop.mjs"
+    "shots": "node tests/build.mjs offline && node tests/shots/desktop.mjs",
+    "typecheck": "tsc -p jsconfig.json",
+    "test:unit": "node tests/unit/run.mjs"
   },
   "devDependencies": {
     "acorn": "^8.18.0",
     "acorn-walk": "^8.3.5",
     "playwright": "1.49.1",
+    "typescript": "^5.9.3",
     "vite": "^6.4.3"
   },
   "dependencies": {

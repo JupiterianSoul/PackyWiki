@@ -12,13 +12,13 @@ import { FRAME_STYLES, frameSvg, frameTier, frameUnlocked } from '../frames.js';
 import { RARITIES, rarityFromPopularity } from '../data/rarities.js';
 import { DEFAULT_FX, FX_STYLES, fxCost, fxUnlocked } from '../data/fx.js';
 import * as account from '../account.js';
-import { copyText, describeSave, exportSave, importSave, parseSave, readText } from '../save.js';
+import { copyText, describeSave, exportSave, importSave, parseSave, readText, touch } from '../save.js';
 import { STARTER_COINS } from '../economy.js';
 import { music } from '../ui/music.js';
+import { fill, h } from '../ui/dom.js';
 import { backdrop } from '../ui/backdrop.js';
 import { reportQuest } from './arcade.js';
 import { renderBinder } from './binder.js';
-import { renderCardIndex } from './cardindex.js';
 import { THEME_KEY, el, esc, money, openSheet, refreshWallet, settings, showScreen, showUpdateBar, state, storedTheme, toast, useTheme } from './core.js';
 import { currentStats, describeError, flushSync, leaveAccount, signedIn, syncSoon, syncTimer, userId } from './gate.js';
 import { live } from './live.js';
@@ -153,7 +153,11 @@ export function renderSettings() {
   paintResetButton(accountBtn, 'account');
   accountBtn.addEventListener('click', () => handleReset(accountBtn, 'account'));
 
-  el.dataList.replaceChildren(transferRow, wipeRow, resetRow, ...(signedIn() ? [accountRow] : []));
+  // The server's earlier versions of the save, for a signed-in player.
+  const backupsRow = settingsRowShell('backupsTitle', 'backupsNote');
+  settingsRowButton(backupsRow, t('backupsOpen'), () => openBackupsSheet());
+
+  el.dataList.replaceChildren(transferRow, ...(signedIn() ? [backupsRow] : []), wipeRow, resetRow, ...(signedIn() ? [accountRow] : []));
 
   // --- secret codes: a booster someone handed you ---------------------------
   el.redeemLabel.textContent = t('redeemTitle');
@@ -460,7 +464,7 @@ export function renderCardFx() {
         renderCardFx();
         // Anything already drawn is wearing the old look.
         renderBinder();
-        renderCardIndex?.();
+        import('./cardindex.js').then((m) => m.renderCardIndex());
       });
       return chip;
     }));
@@ -814,6 +818,64 @@ export function openTransfer() {
   });
 }
 /**
+ * The server's earlier versions of the save, newest first, each with what it
+ * held and the way to put it back. Restoring is armed then confirmed, like
+ * every other button here that cannot be taken back, and reloads the app on
+ * the restored save.
+ */
+export function openBackupsSheet() {
+  openSheet(t('backupsTitle'), (body) => {
+    const list = h('div.press', h('p.empty-note', t('backupsLoading')));
+    body.append(h('p.muted', { style: { fontSize: '.8rem', lineHeight: '1.5', marginBottom: '12px' } }, t('backupsIntro')), list);
+    account.listBackups(userId()).then((rows) => {
+      fill(list, rows.length ? rows.map(backupRow) : h('p.empty-note', t('backupsEmpty')));
+    }).catch((error) => {
+      fill(list, h('p.empty-note', error?.message === 'BACKUPS_UNSET' ? t('backupsUnset') : describeError(error)));
+    });
+  });
+}
+
+function backupRow(row) {
+  const when = new Date(row.at).toLocaleString(getLanguage() === 'fr' ? 'fr-FR' : 'en-GB', { dateStyle: 'medium', timeStyle: 'short' });
+  const facts = [];
+  if (row.cards !== null && row.cards !== undefined) facts.push(t('backupsCards', { n: row.cards }));
+  if (row.coins !== null && row.coins !== undefined) facts.push(h('span', { html: money(row.coins) }));
+  if (row.reason === 'erase') facts.push(t('backupsErase'));
+  if (row.reason === 'before-restore') facts.push(t('backupsBeforeRestore'));
+  const line = h('p');
+  facts.forEach((fact, i) => { if (i) line.append(' \u00b7 '); line.append(fact); });
+
+  let armed = false;
+  let timer = null;
+  const btn = h('button.btn.btn-sm.btn-ghost.row-action', { type: 'button' }, t('backupsRestore'));
+  press(btn, { sound: null });
+  const paint = () => {
+    btn.textContent = armed ? t('backupsRestoreConfirm') : t('backupsRestore');
+    btn.classList.toggle('btn-danger', armed);
+    btn.classList.toggle('is-armed', armed);
+  };
+  btn.addEventListener('click', async () => {
+    if (!armed) {
+      armed = true; paint(); synth.playArm();
+      clearTimeout(timer);
+      timer = setTimeout(() => { armed = false; paint(); }, 5000);
+      return;
+    }
+    btn.disabled = true;
+    btn.textContent = t('backupsRestoring');
+    try {
+      await account.restoreBackup(userId(), row.id);
+      toast(t('backupsRestored'));
+      setTimeout(() => location.reload(), 900);
+    } catch (error) {
+      btn.disabled = false; armed = false; paint();
+      synth.playDenied();
+      toast(esc(describeError(error)), 'error');
+    }
+  });
+  return h('div.row', [h('div.row-copy', [h('h4', when), line]), btn]);
+}
+/**
  * Two different destructive buttons, so two arming states. Sharing one would
  * let a tap that armed the mild button confirm the ruinous one.
  */
@@ -908,7 +970,7 @@ export async function removeAllCards() {
   store.saveBadgeLoadout(null);
   state.badgeLoadout = null;
   store.saveWishlist([]);
-  try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); } catch { /* session only */ }
+  try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); touch(THEME_KEY); } catch { /* session only */ }
 
   // The server holds the same save, so it has to hear about this BEFORE the
   // reload, or the next launch pulls the cards straight back down. That is

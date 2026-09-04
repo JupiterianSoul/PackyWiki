@@ -45,6 +45,12 @@ jobs:
           rm -rf android/app/src/main/assets
           mkdir -p android/app/src/main/assets
           cp -R dist/. android/app/src/main/assets/
+          # The music stays out of the APK: it is thirteen of the sixteen
+          # megabytes, and the wrapper plays the live site whenever it is
+          # online, which is where the music comes from. The built-in copy
+          # only runs offline, and the player goes quiet when its files are
+          # missing rather than asking for them again.
+          find android/app/src/main/assets -name '*.mp3' -delete
           echo "Staged files:"
           find android/app/src/main/assets -type f | sort
 

@@ -20,6 +20,7 @@ export const newDatabase = () => ({
   users: new Map(),         // email -> { id, password, meta }
   profiles: new Map(),      // id -> profile row
   saves: new Map(),         // id -> { user_id, data, updated_at }
+  savesHistory: [],         // { id, user_id, at, reason, cards, coins, data }: what the saves_history trigger files
   friendships: [],          // { id, requester, addressee, status, created_at }
   messages: [],             // { id, sender, recipient, body, created_at, read_at }
   deliveries: [],           // { id, sender, recipient, kind, payload, created_at, claimed_at }
@@ -108,6 +109,14 @@ export function installSupabase(page, { log = null, db = newDatabase(), schema =
   const caller = (route) => {
     const auth = route.request().headers().authorization ?? '';
     return db.tokens.get(auth.replace(/^Bearer /, '')) ?? null;
+  };
+
+  /** Files a save row into the history the way the server's trigger does. */
+  const fileSave = (row, reason) => {
+    let cards = null; let coins = null;
+    try { cards = Object.keys(JSON.parse(row.data?.data?.['wikster.collection.v3'] ?? '{}').entries ?? {}).length; } catch { /* unreadable */ }
+    try { coins = Number(row.data?.data?.['wikster.wallet.v1']); if (!Number.isFinite(coins)) coins = null; } catch { /* unreadable */ }
+    db.savesHistory.push({ id: ++db.seq, user_id: row.user_id, at: new Date().toISOString(), reason, cards, coins, data: row.data });
   };
 
   const areFriends = (a, b) => db.friendships.some((f) =>
@@ -421,8 +430,35 @@ export function installSupabase(page, { log = null, db = newDatabase(), schema =
       }
       if (method === 'POST') {   // upsert
         if (body.user_id !== me) return fail(route, 'row-level security policy', 403);
+        // What the saves_history trigger does on the real server: the row
+        // being replaced is filed first.
+        const previous = db.saves.get(body.user_id);
+        if (previous) fileSave(previous, 'update');
         db.saves.set(body.user_id, { ...body, updated_at: new Date().toISOString() });
         return rows(route, [db.saves.get(body.user_id)], 201);
+      }
+      if (method === 'DELETE') {
+        const target = (params.get('user_id') ?? '').slice(3);
+        if (target !== me) return fail(route, 'row-level security policy', 403);
+        const previous = db.saves.get(target);
+        if (previous) fileSave(previous, 'erase');
+        db.saves.delete(target);
+        return json(route, [], 204);
+      }
+    }
+    if (path === 'saves_history') {
+      if (schema === 'v1') return fail(route, 'relation "public.saves_history" does not exist', 404);
+      if (method === 'GET') {
+        const found = db.savesHistory.filter((h) => h.user_id === me);
+        const id = (params.get('id') ?? '').slice(3);
+        const picked = id ? found.filter((h) => String(h.id) === id) : found;
+        picked.sort((x, y) => new Date(y.at) - new Date(x.at));
+        return rows(route, picked);
+      }
+      if (method === 'POST') {
+        if (body.user_id !== me) return fail(route, 'row-level security policy', 403);
+        fileSave({ user_id: body.user_id, data: body.data }, body.reason ?? 'update');
+        return rows(route, [db.savesHistory[db.savesHistory.length - 1]], 201);
       }
     }
 

@@ -81,11 +81,16 @@ function declared(node) {
 /* --- the file, as top-level nodes with the comments that lead them --- */
 const top = ast.body;
 const imports = top.filter((n) => n.type === 'ImportDeclaration');
-const body = top.filter((n) => n.type !== 'ImportDeclaration');
+// A declaration the file already exports is handled as the declaration it
+// wraps: every declaration is exported on the way out anyway, so the wrapper
+// only has to be dropped (its `export ` keyword ends up in the lead text and
+// is trimmed there). Bare export lists and re-exports stay statements.
+const body = top.filter((n) => n.type !== 'ImportDeclaration')
+  .map((n) => (n.type === 'ExportNamedDeclaration' && n.declaration ? n.declaration : n));
 // The text between two nodes belongs to the second one: section headers, docs.
 const pieces = body.map((node, i) => {
   const prevEnd = i === 0 ? (imports.length ? imports[imports.length - 1].end : 0) : body[i - 1].end;
-  const lead = src.slice(prevEnd, node.start);
+  const lead = src.slice(prevEnd, node.start).replace(/export\s+$/, '');
   return { node, lead, text: src.slice(node.start, node.end) };
 });
 

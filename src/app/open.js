@@ -1,6 +1,7 @@
 /* open: split out of main.js */
 
 import { rarityBurst, styleForSpec } from '../packstyle.js';
+import { touch } from '../save.js';
 import { synth } from '../ui/sound.js';
 import { Bar, dur, press, reveal, trackDrag } from '../ui/components.js';
 import * as store from '../collection.js';
@@ -245,7 +246,7 @@ export function animateRip(from, to, duration) {
 export function lockRipDirection(dx) {
   if (state.ripDir) return;
   state.ripDir = dx > 0 ? 1 : -1;
-  try { localStorage.setItem(RIP_DIR_KEY, String(state.ripDir)); } catch { /* not fatal */ }
+  try { localStorage.setItem(RIP_DIR_KEY, String(state.ripDir)); touch(RIP_DIR_KEY); } catch { /* not fatal */ }
   if (rip.booster) rip.booster.dataset.ripDir = String(state.ripDir);
 }
 /**

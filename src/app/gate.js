@@ -14,7 +14,7 @@ import { DEFAULT_THEME, THEMES } from '../ui/themes.js';
 import { DEFAULT_FRAME_STYLE, FRAME_STYLES } from '../frames.js';
 import { renderBinder } from './binder.js';
 import { endSplash, showWelcome } from './boot.js';
-import { SPECIAL_FIX_KEY, VIEWS_FIX_KEY, applyStrings, el, refreshWallet, showScreen, showUpdateBar, state, storedTheme, useTheme } from './core.js';
+import { SPECIAL_FIX_KEY, VIEWS_FIX_KEY, applyStrings, el, refreshWallet, showScreen, showUpdateBar, state, storedTheme, toast, useTheme } from './core.js';
 import { openDaily } from './daily.js';
 import { live } from './live.js';
 import { dropReady, warmDrawer } from './open.js';
@@ -279,6 +279,9 @@ export async function flushSync() {
     // An older build than the one that last saved this account: play on,
     // never write. Said once, on screen, with the way out.
     if (pushed === 'outdated') { state.account.outdated = true; showUpdateBar('outdated'); return; }
+    // Another device wrote meanwhile and some of its keys were newer: they
+    // are in storage now, and the screen has to be read back from it.
+    if (pushed === 'merged') takeMerge();
     await account.publishStats(userId(), currentStats());
     state.account.syncedAt = Date.now();
     state.account.failed = false;
@@ -289,6 +292,19 @@ export async function flushSync() {
     renderAccountRow();
     if (syncQueued) { syncQueued = false; syncSoon(); }
   }
+}
+
+/**
+ * Storage just took keys from another device. Read the state back from it
+ * and repaint, unless a booster is being opened: then it waits for the
+ * takeover to end (showScreen picks it up), because the reveal is writing
+ * the collection as it goes and must not have it swapped underneath.
+ */
+export function takeMerge() {
+  if (state.tab === 'open' || el.openScreen?.classList.contains('is-active')) { state.account.mergePending = true; return; }
+  state.account.mergePending = false;
+  reloadFromStorage();
+  toast(t('syncMerged'));
 }
 
 export function syncSoon() {

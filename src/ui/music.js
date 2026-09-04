@@ -39,6 +39,7 @@ class Music {
     this.at = 0;
     this.parked = false;
     this.fading = null;
+    this.misses = 0;
   }
 
   #player() {
@@ -56,8 +57,17 @@ class Music {
       if (Number.isFinite(audio.duration) && audio.duration - audio.currentTime <= OVERLAP_S) this.#next();
     });
     audio.addEventListener('ended', () => { if (audio === this.audio && !this.fading) this.#next(); });
-    // A track that cannot decode must not end the music forever.
-    audio.addEventListener('error', () => { if (audio === this.audio) setTimeout(() => this.#next(), 4000); });
+    // A track that cannot decode must not end the music forever; a whole
+    // round of them (an APK running its built-in copy, which ships without
+    // the music) means there is nothing to play, and the player goes quiet
+    // instead of asking for a missing file every four seconds.
+    audio.addEventListener('error', () => {
+      if (audio !== this.audio) return;
+      this.misses += 1;
+      if (this.misses >= this.order.length) return;
+      setTimeout(() => this.#next(), 4000);
+    });
+    audio.addEventListener('playing', () => { if (audio === this.audio) this.misses = 0; });
     return audio;
   }
 

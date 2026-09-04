@@ -1,6 +1,7 @@
 /* detail: split out of main.js */
 
 import * as store from '../collection.js';
+import { repairCard } from '../wiki.js';
 import { synth } from '../ui/sound.js';
 import * as account from '../account.js';
 import { t, tx } from '../i18n.js';
@@ -195,6 +196,9 @@ export function openCardDetail(entryKey, data, rarity) {
       tag.textContent = t('ownedTag');
       card.querySelector('.card-title').appendChild(tag);
     }
+    // A card of yours is checked against its article now and then: renamed
+    // pages bring the card up to date, deleted ones are said to be gone.
+    if (entry) checkArticle(card, entryKey, entry);
 
     // The wish toggle, and who else at the table wants this card.
     const wishBtn = card.querySelector('.wish-giant');
@@ -299,6 +303,46 @@ export function openCardDetail(entryKey, data, rarity) {
   }, { onClose: () => { state.detail = null; } });
 
   synth.playCardOpen();
+}
+
+/** Says, on the giant card, that the article behind it is gone. */
+function noteGone(card) {
+  if (card.querySelector('.giant-gone')) return;
+  const line = document.createElement('p');
+  line.className = 'giant-gone';
+  line.textContent = t('detailGone');
+  card.querySelector('.giant-facts').after(line);
+}
+
+/**
+ * Looks the card's article up (see wiki/repair.js), writes what it learns
+ * into the entry, and repaints the card if it is still the one on screen.
+ * The check itself is recorded whatever it found, so a card is looked at
+ * once a week and not on every open.
+ */
+function checkArticle(card, entryKey, entry) {
+  if (entry.gone) noteGone(card);
+  repairCard(entry).then((fix) => {
+    if (!fix) return;
+    entry.checkedAt = Date.now();
+    if (fix.gone) entry.gone = true;
+    else {
+      delete entry.gone;
+      for (const field of ['title', 'description', 'extract', 'thumbnail']) if (fix[field]) entry[field] = fix[field];
+    }
+    store.saveCollection(state.collection);
+    if (state.detail?.key !== entryKey || !card.isConnected) return;
+    if (fix.gone) { noteGone(card); return; }
+    card.querySelector('.giant-gone')?.remove();
+    if (fix.title) {
+      const title = card.querySelector('.card-title');
+      const tag = title.querySelector('.owned-tag');
+      title.textContent = entry.title;
+      if (tag) title.appendChild(tag);
+    }
+    if (fix.description) card.querySelector('.card-desc').textContent = entry.description;
+    if (fix.extract) card.querySelector('.giant-extract').textContent = entry.extract;
+  }).catch(() => { /* the line, not the card: try another day */ });
 }
 
 export function paintSellButton() {

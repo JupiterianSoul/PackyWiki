@@ -59,7 +59,7 @@ function writeJson(key, value) {
     localStorage.setItem(key, JSON.stringify(value));
     // Every write to game state passes through here, which makes it the one
     // place cloud sync has to be told about a change.
-    touch();
+    touch(key);
     return true;
   } catch {
     return false;

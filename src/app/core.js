@@ -1,6 +1,7 @@
 /* core: split out of main.js */
 
 import * as store from '../collection.js';
+import { touch } from '../save.js';
 import { DEFAULT_FRAME_STYLE } from '../frames.js';
 import { buckSvg, iconSvg } from '../data/icons.js';
 import { formatAmount, popularityFromViews } from '../pricing.js';
@@ -16,7 +17,7 @@ import { reportQuest } from './arcade.js';
 import { renderAlbum, renderBinder } from './binder.js';
 import { regradeCollection } from './boot.js';
 import { paintDrawerLinks } from './drawer.js';
-import { showGate, userId } from './gate.js';
+import { showGate, userId, takeMerge } from './gate.js';
 import { live } from './live.js';
 import { tickTimed } from './packs.js';
 import { holdWakeLock, releaseWakeLock } from './settings.js';
@@ -242,7 +243,7 @@ export function storedTheme() {
 
 export function useTheme(id, { announce = false } = {}) {
   const theme = applyTheme(id);
-  try { localStorage.setItem(THEME_KEY, theme.id); } catch { /* session only */ }
+  try { localStorage.setItem(THEME_KEY, theme.id); touch(THEME_KEY); } catch { /* session only */ }
   backdrop.setTheme(theme.id);
   synth.setTheme(theme.id);
   // Inside the APK, the launcher icon follows the theme. In a browser the
@@ -296,6 +297,7 @@ export function showScreen(name) {
     state.tab = name;
     live.nav?.select(navTabFor(name), { silent: true });
     paintDrawerLinks();
+    if (state.account.mergePending) takeMerge();
   }
 
   // Opening a pack is a takeover: the frame gets out of the way, and the

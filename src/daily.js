@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * The daily gift: a week-long ladder on the world's clock.
  *

@@ -16,7 +16,7 @@ import { createConnection } from 'node:net';
 
 const MODES = {
   app: 'offline', hellfire: 'offline', games: 'offline', regalia: 'offline',
-  fixes6: 'stub', worldclock: 'stub', facetoface: 'stub', g4: 'stub'
+  fixes6: 'stub', worldclock: 'stub', facetoface: 'stub', g4: 'stub', sync: 'stub'
 };
 const PORT = Number(process.env.PORT) || 4173;
 const OUT = 'tests/out';
@@ -28,21 +28,34 @@ const wanted = args.length === 0 ? Object.keys(MODES)
     : args;
 for (const name of wanted) if (!MODES[name]) { console.error(`no suite called ${name}`); process.exit(2); }
 
-const waitForPort = (port, tries = 60) => new Promise((resolve, reject) => {
-  const attempt = (n) => {
-    const sock = createConnection({ port, host: '127.0.0.1' });
-    sock.once('connect', () => { sock.end(); resolve(); });
-    sock.once('error', () => { if (n <= 0) reject(new Error('preview never came up')); else setTimeout(() => attempt(n - 1), 500); });
-  };
-  attempt(tries);
+const portOpen = (port) => new Promise((resolve) => {
+  const sock = createConnection({ port, host: '127.0.0.1' });
+  sock.once('connect', () => { sock.end(); resolve(true); });
+  sock.once('error', () => resolve(false));
 });
+const until = async (test, what, tries = 60) => {
+  for (let n = 0; n < tries; n++) { if (await test()) return; await new Promise((r) => setTimeout(r, 500)); }
+  throw new Error(what);
+};
+
+// The port must be ours. A server left behind by an earlier run would answer
+// in the new one's place and serve the wrong build, and every suite would
+// fail on its first screen for no reason the logs could show.
+if (await portOpen(PORT)) { console.error(`port ${PORT} is already in use; stop that server first (or set PORT)`); process.exit(2); }
+
+// Every mode is built first, each into its own folder, and only then served:
+// the source tree is read once, at the start, so editing it while a long
+// suite runs changes nothing about what that suite is testing.
+const modes = [...new Set(wanted.map((n) => MODES[n]))];
+for (const mode of modes) execSync(`node tests/build.mjs ${mode} ${OUT}/dist-${mode}`, { stdio: 'inherit' });
 
 const results = [];
-for (const mode of [...new Set(wanted.map((n) => MODES[n]))]) {
-  execSync(`node tests/build.mjs ${mode}`, { stdio: 'inherit' });
-  const preview = spawn('npx', ['vite', 'preview', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+for (const mode of modes) {
+  // vite itself, not through npx: killing a wrapper can leave the server
+  // it started alive on the port.
+  const preview = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--outDir', `${OUT}/dist-${mode}`, '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
   try {
-    await waitForPort(PORT);
+    await until(() => portOpen(PORT), 'preview never came up');
     for (const name of wanted.filter((n) => MODES[n] === mode)) {
       const started = Date.now();
       const code = await new Promise((resolve) => {
@@ -59,7 +72,7 @@ for (const mode of [...new Set(wanted.map((n) => MODES[n]))]) {
     }
   } finally {
     preview.kill('SIGTERM');
-    await new Promise((r) => setTimeout(r, 500));
+    await until(async () => !(await portOpen(PORT)), 'preview would not stop', 20).catch(() => preview.kill('SIGKILL'));
   }
 }
 const failed = results.filter((r) => !r.ok);

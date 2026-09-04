@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * Card pricing, in Buckarooz (Ᏸ).
  *

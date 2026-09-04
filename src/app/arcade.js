@@ -11,8 +11,6 @@ import { casinoOpen } from '../slots.js';
 import { el, esc, showScreen, state, toast } from './core.js';
 import { paintDrawerLinks, pushNote } from './drawer.js';
 import { signedIn, userId } from './gate.js';
-import { renderSlots } from './slots.js';
-import { renderWikdle } from './wikdle.js';
 
 /* --- the arcade: minigames, quests and the leaderboard ------------------------------------------------------------ */
 
@@ -84,8 +82,8 @@ export function renderGames() {
   el.gamesTitle.textContent = t('tabGames');
   el.gamesSub.textContent = t('gamesIntro');
   const tiles = [
-    { id: 'wikdle', icon: 'grid', color: '#4ade80', title: t('wikdleTitle'), note: t('gamesWikdleNote'), run: () => { renderWikdle(); showScreen('wikdle'); } },
-    { id: 'slots', icon: 'reel', color: '#fbbf24', title: t('slotsTitle'), note: t('gamesSlotsNote'), run: () => { renderSlots(); showScreen('slots'); } },
+    { id: 'wikdle', icon: 'grid', color: '#4ade80', title: t('wikdleTitle'), note: t('gamesWikdleNote'), run: () => import('./wikdle.js').then(async (m) => { await m.renderWikdle(); showScreen('wikdle'); }) },
+    { id: 'slots', icon: 'reel', color: '#fbbf24', title: t('slotsTitle'), note: t('gamesSlotsNote'), run: () => import('./slots.js').then((m) => { m.renderSlots(); showScreen('slots'); }) },
   ];
   const list = document.createElement('div');
   list.className = 'games-list';

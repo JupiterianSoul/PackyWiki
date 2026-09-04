@@ -1,10 +1,13 @@
 /* ==========================================================================
    DESKTOP
    --------------------------------------------------------------------------
-   Loaded last on purpose. Everything here is a layout the phone build has no
-   use for, and it has to win over the rules it replaces without inflating
-   their selectors: a media query adds no specificity, so the only honest way
-   for `.navbar` here to beat `.navbar` in components.css is to come after it.
+   The last cascade layer on purpose. Everything here is a layout the phone
+   build has no use for, and it has to win over the rules it replaces without
+   inflating their selectors: a media query adds no specificity, so `.navbar`
+   here beats `.navbar` in components.css because this layer comes after that
+   one, whatever either selector weighs. A theme's per-component variant that
+   must survive the desk goes through a token (see --navbar-bg), not through
+   a heavier selector.
 
    Nothing in this file is a different app. The screens, their order and the
    code painting them are untouched; what changes is where the frame puts
@@ -82,7 +85,7 @@
     border-radius: 0;
     border-width: 0;
     border-right: var(--border) var(--border-style) var(--line);
-    background: color-mix(in srgb, var(--surface-solid) 88%, transparent);
+    background: var(--navbar-bg, color-mix(in srgb, var(--surface-solid) 88%, transparent));
     box-shadow: none;
   }
   [data-theme='arcade'] .navbar, [data-theme='paper'] .navbar { border-radius: 0; }

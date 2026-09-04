@@ -17,7 +17,7 @@ import * as quests from '../quests.js';
 import * as account from '../account.js';
 import { canClaim } from '../daily.js';
 import { music } from '../ui/music.js';
-import { onSaveChanged } from '../save.js';
+import { onSaveChanged, touch } from '../save.js';
 import * as wikdle from '../wikdle.js';
 import { drawArticles } from '../wiki.js';
 import { generateShop } from '../shop.js';
@@ -32,11 +32,9 @@ import { tilt } from './detail.js';
 import { buildDrawer, closeDrawer, openDrawer, openHelp, openNotifications, paintDrawerLinks } from './drawer.js';
 import { flushSync, gateAltAction, onSession, purgeRetiredCodes, purgeRetiredThemes, resumeAccount, showGate, stopSocialPoll, submitGate, syncSoon } from './gate.js';
 import { live } from './live.js';
-import { openSellSheet } from './market.js';
 import { applyRarityVars, drainLevelUps, gainBooster, homeTabFor, initSwipe, paintOpenHint, showLevelUp, warmDrawer } from './open.js';
 import { buildBooster, createCustomPack, paintForgeSeal, paintPackCaption, renderPacks, renderTimed, syncTimed } from './packs.js';
 import { renderProfile } from './profile.js';
-import { leaveQuiz } from './quiz.js';
 import { refreshLevelBadge, updateBadges } from './regalia.js';
 import { applySettings, renderCustomize, sayWipeNote, wipeEverything } from './settings.js';
 import { payStipend, renderShop } from './shop.js';
@@ -292,7 +290,7 @@ export function init() {
   // in the default theme rather than one it has no right to.
   const wanted = themeById(storedTheme());
   if (wanted.code && !hasRedeemed(state.profile, wanted.code)) {
-    try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); } catch { /* session only */ }
+    try { localStorage.setItem(THEME_KEY, DEFAULT_THEME); touch(THEME_KEY); } catch { /* session only */ }
   }
   useTheme(storedTheme());
   el.splashMark.innerHTML = logoSvg({ size: 78 });
@@ -420,7 +418,7 @@ export function init() {
     const onOpen = el.openScreen?.classList.contains('is-active');
     openOdds(onOpen ? (state.spec?.rarityId ?? null) : null);
   });
-  el.marketSell.addEventListener('click', () => { synth.playTap(); openSellSheet(); });
+  el.marketSell.addEventListener('click', () => { synth.playTap(); import('./market.js').then((m) => m.openSellSheet()); });
   press(el.marketSell, { sound: null });
   document.querySelectorAll('.help-btn').forEach((button) => {
     press(button, { sound: null });
@@ -428,7 +426,7 @@ export function init() {
   });
   el.filterOpen.addEventListener('click', openFilters);
   el.classicFilter.addEventListener('click', openFilters);
-  el.quizBack.addEventListener('click', leaveQuiz);
+  el.quizBack.addEventListener('click', () => import('./quiz.js').then((m) => m.leaveQuiz()));
   // Scrolling is the one moment the backdrop must get out of the way.
   document.getElementById('app')?.addEventListener('scroll', () => backdrop.markBusy(), { passive: true });
   el.chatBack.addEventListener('click', () => {

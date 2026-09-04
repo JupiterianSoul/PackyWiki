@@ -633,6 +633,22 @@ const STRINGS = {
     saveExportNote: 'Everything you own, as text. Paste it into a note or send it to yourself.',
     saveCopy: 'Copy save',
     saveCopied: 'Copied',
+    backupsTitle: 'Backups',
+    backupsNote: 'Earlier versions of your save, kept on the server.',
+    backupsOpen: 'Open',
+    backupsIntro: 'The server keeps earlier versions of your save: a few from the last hour, one an hour for a day, one a day after that, and the one from before an erase. Restoring one replaces what every device has; the save it replaces is filed here first.',
+    backupsLoading: 'Fetching the list.',
+    backupsEmpty: 'No earlier version yet. One is filed each time the save changes on the server.',
+    backupsUnset: 'This server does not keep backups yet: its schema is older than the app.',
+    backupsCards: '{n} cards',
+    backupsErase: 'before an erase',
+    backupsBeforeRestore: 'before a restore',
+    backupsRestore: 'Restore',
+    backupsRestoreConfirm: 'Tap again to restore',
+    backupsRestoring: 'Restoring',
+    backupsRestored: 'Restored. Reloading.',
+    syncMerged: 'Progress from another device was merged in.',
+    detailGone: 'This article is no longer on Wikipedia. The card stays.',
     saveCopyManually: 'Select it and copy',
     saveImport: 'Paste back in',
     saveImportNote: 'Replaces everything currently on this device. There is no undo.',
@@ -1488,6 +1504,22 @@ const STRINGS = {
     saveExportNote: 'Tout ce que vous possédez, en texte. Collez-le dans une note ou envoyez-le-vous.',
     saveCopy: 'Copier la sauvegarde',
     saveCopied: 'Copié',
+    backupsTitle: 'Sauvegardes',
+    backupsNote: 'Les versions précédentes de votre sauvegarde, gardées sur le serveur.',
+    backupsOpen: 'Ouvrir',
+    backupsIntro: 'Le serveur garde les versions précédentes de votre sauvegarde : quelques-unes de la dernière heure, une par heure pendant un jour, une par jour ensuite, et celle d’avant un effacement. En restaurer une remplace ce qu’ont tous vos appareils ; la sauvegarde remplacée est d’abord classée ici.',
+    backupsLoading: 'Récupération de la liste.',
+    backupsEmpty: 'Pas encore de version précédente. Une est classée à chaque changement de la sauvegarde sur le serveur.',
+    backupsUnset: 'Ce serveur ne garde pas encore de sauvegardes : son schéma est plus ancien que l’application.',
+    backupsCards: '{n} cartes',
+    backupsErase: 'avant un effacement',
+    backupsBeforeRestore: 'avant une restauration',
+    backupsRestore: 'Restaurer',
+    backupsRestoreConfirm: 'Touchez encore pour restaurer',
+    backupsRestoring: 'Restauration',
+    backupsRestored: 'Restauré. Rechargement.',
+    syncMerged: 'La progression d’un autre appareil a été fusionnée.',
+    detailGone: 'Cet article n’est plus sur Wikipédia. La carte reste.',
     saveCopyManually: 'Sélectionnez et copiez',
     saveImport: 'Recoller',
     saveImportNote: 'Remplace tout ce qui se trouve actuellement sur cet appareil. Aucun retour en arrière.',
@@ -1763,7 +1795,7 @@ export function getLanguage() {
 export function setLanguage(id) {
   if (!LANGUAGES.some((l) => l.id === id)) return getLanguage();
   current = id;
-  try { localStorage.setItem(LANG_KEY, id); } catch { /* session-only */ }
+  try { localStorage.setItem(LANG_KEY, id); touch(LANG_KEY); } catch { /* session-only */ }
   touch();
   return current;
 }

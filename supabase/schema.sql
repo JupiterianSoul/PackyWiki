@@ -255,6 +255,109 @@ drop trigger if exists saves_touch on public.saves;
 create trigger saves_touch before update on public.saves
   for each row execute function public.touch_updated_at();
 
+-- --- saves_history ---------------------------------------------------------------
+-- The save's previous versions, kept by the server on every write and on an
+-- erase, and readable only by their owner. This is the net under syncing: a
+-- merge that went wrong, an erase that was a mistake, a phone that died with
+-- the only good copy, are all walked back from here in Settings > Data.
+--
+-- Rows are thinned with age so the table never grows past a few dozen per
+-- player: everything from the last hour, one an hour for the last day, one a
+-- day beyond that, and never more than 40 in all. The version filed before an
+-- erase or a restore is never thinned.
+create table if not exists public.saves_history (
+  id        bigint generated always as identity primary key,
+  user_id   uuid not null references auth.users on delete cascade,
+  at        timestamptz not null default now(),
+  reason    text not null default 'update',   -- update | erase | before-restore
+  cards     integer,                           -- how many different cards the save held
+  coins     bigint,                            -- the wallet
+  data      jsonb not null
+);
+create index if not exists saves_history_owner_at on public.saves_history (user_id, at desc);
+alter table public.saves_history enable row level security;
+
+drop policy if exists "you read only your own backups" on public.saves_history;
+create policy "you read only your own backups"
+  on public.saves_history for select
+  to authenticated
+  using (auth.uid() = user_id);
+
+drop policy if exists "you file only your own backups" on public.saves_history;
+create policy "you file only your own backups"
+  on public.saves_history for insert
+  to authenticated
+  with check (auth.uid() = user_id);
+
+drop policy if exists "you delete only your own backups" on public.saves_history;
+create policy "you delete only your own backups"
+  on public.saves_history for delete
+  to authenticated
+  using (auth.uid() = user_id);
+
+-- Files the row being replaced or erased, then thins the owner's history.
+-- Runs as the definer so a cascade from a deleted account (no session, and
+-- a user row already gone) can be told apart and skipped.
+create or replace function public.keep_save_history()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_reason text := case when tg_op = 'DELETE' then 'erase' else 'update' end;
+  v_cards integer;
+  v_coins bigint;
+  v_last timestamptz;
+begin
+  if not exists (select 1 from auth.users u where u.id = old.user_id) then
+    return coalesce(new, old);
+  end if;
+  -- An erase is always filed. An update is filed at most once a minute, so a
+  -- burst of syncs does not fill the history with copies of the same minute.
+  select max(h.at) into v_last from public.saves_history h where h.user_id = old.user_id;
+  if v_reason = 'update' and v_last is not null and v_last > now() - interval '1 minute' then
+    return coalesce(new, old);
+  end if;
+  begin
+    v_cards := jsonb_object_length(((old.data->'data'->>'wikster.collection.v3')::jsonb)->'entries');
+  exception when others then v_cards := null; end;
+  begin
+    v_coins := (old.data->'data'->>'wikster.wallet.v1')::bigint;
+  exception when others then v_coins := null; end;
+  insert into public.saves_history (user_id, reason, cards, coins, data)
+    values (old.user_id, v_reason, v_cards, v_coins, old.data);
+
+  -- Thin: within each bucket (a minute this hour, an hour today, a day
+  -- before that) only the newest plain update survives.
+  delete from public.saves_history h
+  using (
+    select id, row_number() over (partition by bucket order by at desc) as rn
+    from (
+      select id, at,
+        case when at > now() - interval '1 hour' then to_char(at, 'YYYYMMDDHH24MI')
+             when at > now() - interval '1 day'  then to_char(at, 'YYYYMMDDHH24')
+             else to_char(at, 'YYYYMMDD') end as bucket
+      from public.saves_history
+      where user_id = old.user_id and reason = 'update'
+    ) b
+  ) k
+  where h.id = k.id and k.rn > 1;
+  -- And never more than 40, whatever their reasons.
+  delete from public.saves_history h
+  where h.user_id = old.user_id
+    and h.id not in (
+      select id from public.saves_history
+      where user_id = old.user_id order by at desc limit 40
+    );
+  return coalesce(new, old);
+end;
+$$;
+
+drop trigger if exists saves_history_keep on public.saves;
+create trigger saves_history_keep before update or delete on public.saves
+  for each row execute function public.keep_save_history();
+
 -- --- tell PostgREST about all of the above ------------------------------------------
 --
 -- The API keeps a cached picture of the schema and does not always notice DDL

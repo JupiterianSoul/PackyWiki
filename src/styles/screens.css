@@ -708,6 +708,9 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .card.is-mini .card-body { flex: 0 0 auto; }
 .card.is-mini .card-stats { margin-top: auto; }
 .card.is-mini .fx-art { display: none; }
+/* A mini card is never lit: the particle field and the code layer only show
+   on a lit card, so a grid of two hundred of them carries no such layers. */
+.card.is-mini .fx-p, .card.is-mini .fx-code { display: none; }
 
 /* --- binder -------------------------------------------------------------------- */
 
@@ -2328,7 +2331,10 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 .classic-search input.classic-search-input:focus { outline: none; border-color: var(--accent); }
 .binder-tools .muted { margin-left: auto; font-size: 0.76rem; }
 .classic-view { display: grid; gap: 22px; padding: 0 var(--gutter); }
-.classic-group { min-width: 0; }
+/* Each album group skips layout and paint while it is off screen. Paint
+   containment clips to the box, so the group grows a little downwards to keep
+   the last row's shadows and copy badges, and takes the same back as margin. */
+.classic-group { min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 560px; padding-bottom: 12px; margin-bottom: -12px; }
 .classic-group-head {
   display: flex;
   align-items: center;

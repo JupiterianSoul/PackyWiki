@@ -9,3 +9,6 @@ dist
 .env.production.local
 .DS_Store
 tests/out/
+
+# Stray screenshots at the root: suites write theirs to tests/out
+/*.png

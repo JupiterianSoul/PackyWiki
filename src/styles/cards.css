@@ -1081,6 +1081,8 @@ html[data-lowpower='1'] .card-desc { animation: none !important; }
   height: auto;
 }
 .giant-card .card-title { font-size: 6.4cqw; -webkit-line-clamp: 3; line-clamp: 3; }
+/* The article behind the card is no longer there: said once, under the facts. */
+.giant-gone { font-size: 3.3cqw; font-weight: 700; color: var(--warning); margin-top: 1.2cqw; }
 .giant-extract {
   font-size: 3.8cqw;
   line-height: 1.6;

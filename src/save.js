@@ -1,3 +1,4 @@
+// @ts-check
 /**
  * SAVE TRANSFER
  * ============================================================================
@@ -34,7 +35,26 @@ const LEGACY_FORMATS = ['wiklodo-save', 'packywiki-save'];
 /** What the storage keys were prefixed with before the rename. */
 const LEGACY_PREFIX = 'packywiki.';
 const PREFIX = 'wikster.';
-const VERSION = 1;
+/*
+ * 2: every key carries the time it last changed on the device that wrote it,
+ *    which is what lets two devices' saves be merged key by key instead of
+ *    one replacing the other. A version 1 envelope is read as if every key
+ *    had changed at the moment the envelope was written.
+ */
+const VERSION = 2;
+/** When each save key last changed on this device. Kept beside the save,
+ *  never inside SAVE_KEYS: it describes the save, it is not part of it. */
+const STAMPS_KEY = 'wikster.stamps.v1';
+
+export function loadStamps() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STAMPS_KEY) ?? '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch { return {}; }
+}
+function writeStamps(stamps) {
+  try { localStorage.setItem(STAMPS_KEY, JSON.stringify(stamps)); } catch { /* session-only */ }
+}
 
 /**
  * Storage written under the old prefix is carried over ONCE, the first time
@@ -79,7 +99,14 @@ export function onSaveChanged(fn) {
   return () => listeners.delete(fn);
 }
 
-export function touch() {
+/** Something in the save changed. Named with the key that changed, the
+ *  change is stamped so a merge can tell which device has the newer copy. */
+export function touch(key = null) {
+  if (key && SAVE_KEYS.includes(key)) {
+    const stamps = loadStamps();
+    stamps[key] = Date.now();
+    writeStamps(stamps);
+  }
   for (const fn of listeners) {
     try { fn(); } catch { /* a broken listener must not break saving */ }
   }
@@ -94,9 +121,17 @@ export function exportSave() {
       if (value !== null) data[key] = value;
     } catch { /* unreadable storage: skip the key rather than fail the export */ }
   }
-  // The build that wrote it rides along, so a save can be told from one
-  // written by a newer build and left alone by an older one.
-  return JSON.stringify({ format: FORMAT, version: VERSION, at: Date.now(), build: BUILD, data }, null, 1);
+  const stamps = {};
+  const known = loadStamps();
+  for (const key of Object.keys(data)) stamps[key] = known[key] ?? 0;
+  return JSON.stringify(envelope(data, stamps), null, 1);
+}
+
+/** The save's envelope: format, version, when, which build wrote it (so a save
+ *  can be told from one written by a newer build and left alone by an older
+ *  one), the keys, and when each key last changed. */
+export function envelope(data, stamps) {
+  return { format: FORMAT, version: VERSION, at: Date.now(), build: BUILD, data, stamps };
 }
 
 /** Roughly what is in a save, for the confirmation line before importing. */
@@ -138,7 +173,54 @@ export function parseSave(text) {
     if (typeof value === 'string') data[key] = value;
   }
   if (!Object.keys(data).length) return null;
-  return { ...parsed, data };
+  // Version 1 knew nothing about keys changing separately: every key is taken
+  // to have changed when the envelope was written.
+  const given = parsed.stamps && typeof parsed.stamps === 'object' ? parsed.stamps : {};
+  const stamps = {};
+  for (const key of Object.keys(data)) {
+    const legacy = LEGACY_PREFIX + key.slice(PREFIX.length);
+    const at = Number(given[key] ?? given[legacy]);
+    stamps[key] = Number.isFinite(at) && at > 0 ? at : (Number(parsed.at) || 0);
+  }
+  return { ...parsed, version: Number(parsed.version) || 1, data, stamps };
+}
+
+/**
+ * Two saves of the same account, one from each device: for every key the copy
+ * that changed later wins, and a key only one side has is kept. A tie goes to
+ * the account's copy, which is the one every device has agreed on. Returns
+ * the merged keys and which side each changed key came from, so the caller
+ * knows what to write locally and whether there is anything to push.
+ */
+export function mergeSaves(local, remote) {
+  const data = {};
+  const stamps = {};
+  const fromLocal = [];
+  const fromRemote = [];
+  for (const key of SAVE_KEYS) {
+    const l = local?.data?.[key];
+    const r = remote?.data?.[key];
+    if (l === undefined && r === undefined) continue;
+    const ls = l === undefined ? -1 : (local.stamps?.[key] ?? 0);
+    const rs = r === undefined ? -1 : (remote.stamps?.[key] ?? 0);
+    const takeRemote = rs >= ls;
+    data[key] = takeRemote ? r : l;
+    stamps[key] = Math.max(ls, rs, 0);
+    if (l !== r) (takeRemote ? fromRemote : fromLocal).push(key);
+  }
+  return { data, stamps, fromLocal, fromRemote };
+}
+
+/** Writes the given keys of a merged save, and their stamps, into storage. */
+export function applySave(data, stamps, keys) {
+  const known = loadStamps();
+  for (const key of keys) {
+    if (data[key] === undefined) continue;
+    try { localStorage.setItem(key, data[key]); } catch { return false; }
+    known[key] = stamps[key] ?? 0;
+  }
+  writeStamps(known);
+  return true;
 }
 
 /**
@@ -146,12 +228,17 @@ export function parseSave(text) {
  * save that lacks a key does not leave the old value of it behind mixed in
  * with the new one.
  */
-export function importSave(text) {
+export function importSave(text, { stampNow = false } = {}) {
   const parsed = parseSave(text);
   if (!parsed) return false;
   try {
     for (const key of SAVE_KEYS) localStorage.removeItem(key);
     for (const [key, value] of Object.entries(parsed.data)) localStorage.setItem(key, value);
+    // A restored backup is the player's decision, made now: stamped now, it
+    // wins over whatever any other device still holds.
+    const stamps = {};
+    for (const key of Object.keys(parsed.data)) stamps[key] = stampNow ? Date.now() : (parsed.stamps[key] ?? 0);
+    writeStamps(stamps);
     return true;
   } catch {
     return false;
