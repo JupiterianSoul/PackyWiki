@@ -8,3 +8,4 @@ dist
 !.env.production
 .env.production.local
 .DS_Store
+tests/out/

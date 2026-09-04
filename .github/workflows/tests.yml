@@ -1,0 +1,27 @@
+# The suites, on every push. A build that cannot pass them is not published.
+name: Tests
+on:
+  push:
+    branches: ['**']
+  workflow_dispatch:
+jobs:
+  suites:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run check
+      - run: node tests/run.mjs
+      - name: Keep the logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: tests/out
+          if-no-files-found: ignore

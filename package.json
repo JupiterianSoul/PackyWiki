@@ -7,9 +7,19 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "npm run check && node tests/run.mjs",
+    "test:stub": "node tests/run.mjs stub",
+    "test:offline": "node tests/run.mjs offline",
+    "check": "node tools/i18n-check.mjs && node tools/sweep.mjs",
+    "i18n:check": "node tools/i18n-check.mjs",
+    "sweep": "node tools/sweep.mjs",
+    "shots": "node tests/build.mjs offline && node tests/shots/desktop.mjs"
   },
   "devDependencies": {
+    "acorn": "^8.18.0",
+    "acorn-walk": "^8.3.5",
+    "playwright": "1.49.1",
     "vite": "^6.4.3"
   },
   "dependencies": {
