@@ -53,7 +53,9 @@ const results = [];
 for (const mode of modes) {
   // vite itself, not through npx: killing a wrapper can leave the server
   // it started alive on the port.
-  const preview = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--outDir', `${OUT}/dist-${mode}`, '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+  // Bound to 127.0.0.1 by name: on a runner where localhost is ::1 first, a
+  // server on "localhost" never answers the address the suites dial.
+  const preview = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--outDir', `${OUT}/dist-${mode}`, '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
   try {
     await until(() => portOpen(PORT), 'preview never came up');
     for (const name of wanted.filter((n) => MODES[n] === mode)) {
