@@ -1,13 +1,17 @@
 # The website version of Wikster: the same build the APK wraps, served from
 # GitHub Pages so anyone can play in a browser, desktop included.
 #
-# One thing has to be done by hand, once, by someone who owns the repository:
-# Settings > Pages > Build and deployment > Source: GitHub Actions. A
-# workflow cannot do it for you. The token Actions hands this job may read
-# the Pages settings but not create the site, so until that switch is
-# flipped every run stops at the configure step with "Resource not
-# accessible by integration". After it, every push publishes, and a run can
-# also be started by hand from the Actions tab.
+# The site is served from the `gh-pages` branch (Settings > Pages > Build and
+# deployment > Source: Deploy from a branch), so this workflow publishes by
+# replacing that branch with the build. It used to hand the build to
+# actions/deploy-pages instead, which only works when the source is set to
+# "GitHub Actions": every run failed at the deploy step while the site was
+# updated by hand, which is a red tick on every push and a site nobody
+# noticed was stale. It publishes itself now.
+#
+# The branch holds build output only and is replaced wholesale on each
+# publish, so the push is a force-push on purpose: there is no history worth
+# keeping in it, and the source branch is the record.
 name: Publish the website
 
 on:
@@ -18,19 +22,17 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
-# A deploy that is already running finishes; a newer one waits rather than
+# A publish that is already running finishes; a newer one waits rather than
 # racing it, so the live site is never half of two builds.
 concurrency:
   group: pages
   cancel-in-progress: false
 
 jobs:
-  build:
-    name: Build the site
+  publish:
+    name: Publish the site
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -51,30 +53,25 @@ jobs:
           grep -q "supabase.co" dist/assets/*.js \
             || { echo "::error::Built bundle has no Supabase project in it."; exit 1; }
 
-      # Pages serves the built folder as-is. The app is a single page with no
-      # routes of its own, so a copy of index.html answers any stray deep link
-      # instead of the default 404.
+      # Pages serves the folder as-is. The app is a single page with no routes
+      # of its own, so a copy of index.html answers any stray deep link
+      # instead of the default 404, and .nojekyll stops Pages filtering out
+      # the build's hashed filenames.
       - name: Add the fallback page
-        run: cp dist/index.html dist/404.html
+        run: |
+          cp dist/index.html dist/404.html
+          touch dist/.nojekyll
 
-      # enablement asks GitHub to create the Pages site if it is missing. It
-      # succeeds only where the repository's token is allowed to administer
-      # Pages; otherwise this step is where the run stops, and the fix is the
-      # one-off setting named at the top of this file.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-  deploy:
-    name: Publish
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      - name: Publish to gh-pages
+        run: |
+          subject=$(git log -1 --pretty=%s)
+          cd dist
+          git init -q
+          git checkout -q -b gh-pages
+          git add -A
+          git -c user.name='github-actions[bot]' \
+              -c user.email='41898282+github-actions[bot]@users.noreply.github.com' \
+              commit -q -m "Site: ${subject}"
+          git push -q --force \
+            "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" gh-pages
+          echo "Published ${subject}" >> "$GITHUB_STEP_SUMMARY"
