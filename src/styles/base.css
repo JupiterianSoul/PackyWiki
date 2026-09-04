@@ -9,6 +9,11 @@
    JS relies on this being here. */
 [hidden] { display: none !important; }
 
+/* Keyboard focus is visible, pointer focus is not: a ring in the theme's
+   accent for whoever tabs through the app, and nothing left behind a tap. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+:focus:not(:focus-visible) { outline: none; }
+
 h1, h2, h3, h4, h5, h6, p, figure, ul, ol { margin: 0; padding: 0; }
 ul, ol { list-style: none; }
 button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }

@@ -90,6 +90,7 @@ export function renderSettings() {
     settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
     settingRow('hints', 'settingsHints', 'settingsHintsNote'),
     settingRow('blurAdult', 'settingsBlurAdult', 'settingsBlurAdultNote'),
+    settingRow('rarityShapes', 'settingsRarityShapes', 'settingsRarityShapesNote'),
     language
   );
 
@@ -1101,6 +1102,7 @@ export function applySettings() {
   // Cards are marked as they are built; the switch decides whether the mark
   // means anything, so turning it on or off repaints without redrawing.
   document.documentElement.dataset.blurAdult = s.blurAdult ? '1' : '0';
+  document.documentElement.dataset.rarityShapes = s.rarityShapes ? '1' : '0';
   if (s.awake === false) releaseWakeLock();
   synth.setMuted(!s.sound);
   synth.setVolume(s.volume ?? 1);

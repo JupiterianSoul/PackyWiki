@@ -30,7 +30,7 @@ const OWNED = {
 };
 
 async function newPlayer(label, { cards = {} } = {}) {
-  const ctx = await browser.newContext({ ...devices['Pixel 7'] });
+  const ctx = await browser.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${label} PAGE: ${e.message}`));
   installStubs(page);

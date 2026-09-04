@@ -4,7 +4,7 @@ import { launchOptions } from '../lib/browser.mjs';
 import { installStubs } from '../lib/stubs.mjs';
 let fails = 0; const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  ' + e : ''}`); };
 const b = await chromium.launch(launchOptions());
-const p = await (await b.newContext({ ...devices['Pixel 7'] })).newPage(); installStubs(p);
+const p = await (await b.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] })).newPage(); installStubs(p);
 p.setDefaultTimeout(9000); const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
 await p.addInitScript(() => {
   if (window.name === 'seeded') return; window.name = 'seeded';

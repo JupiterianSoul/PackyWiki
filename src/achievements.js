@@ -62,7 +62,13 @@ export function measure({ profile, entries, albumsDeep, albumsStarted = 0, custo
     maxCopies: entries.reduce((m, e) => Math.max(m, e.count), 0),
     // The eight tiers of the table: Special is outside it and a card with no
     // tier on record is not a ninth one.
-    raritiesOwned: new Set(entries.map((e) => e.rarityId).filter((id) => RARITIES.some((r) => r.id === id))).size
+    raritiesOwned: new Set(entries.map((e) => e.rarityId).filter((id) => RARITIES.some((r) => r.id === id))).size,
+    // Album medals claimed, across every album; and cards fused up a tier.
+    albumTiers: Object.values(profile.albumTiers ?? {}).reduce((sum, n) => sum + (Number(n) || 0), 0),
+    fused: profile.fused ?? 0,
+    // The arcade's two newer games: the best duel streak, and perfect reveal rounds.
+    duelBest: profile.duelBest ?? 0,
+    revealPerfect: profile.revealPerfect ?? 0
   };
 }
 
@@ -87,6 +93,44 @@ const chain = (chainId, icon, stat, desc, steps) => steps.map(([need, reward, na
 }));
 
 export const ACHIEVEMENTS = [
+
+  // --- album medals ---
+  ...chain('medal', 'collection', 'albumTiers',
+    (n) => ({ en: `Claim ${en(n)} album medal${n === 1 ? '' : 's'}`, fr: `Réclamez ${fr(n)} médaille${n === 1 ? '' : 's'} d’album` }),
+    [
+      [1,  coins(500),        { en: 'First medal', fr: 'Première médaille' }],
+      [5,  coins(2500),       { en: 'A shelf of medals', fr: 'Une étagère de médailles' }],
+      [15, pack('legendary', 5), { en: 'Decorated', fr: 'Décoré' }],
+      [40, pack('exotic', 5), { en: 'The full cabinet', fr: 'La vitrine complète' }]
+    ]),
+
+  // --- the popularity duel ---
+  ...chain('duel', 'podium', 'duelBest',
+    (n) => ({ en: `A duel streak of ${en(n)}`, fr: `Une série de ${fr(n)} au duel` }),
+    [
+      [3,  coins(150),        { en: 'Warm-up', fr: 'Échauffement' }],
+      [6,  coins(500),        { en: 'Reading the room', fr: 'Lire la salle' }],
+      [10, coins(1500),       { en: 'Encyclopaedic', fr: 'Encyclopédique' }],
+      [15, pack('legendary', 5), { en: 'The perfect duel', fr: 'Le duel parfait' }]
+    ]),
+
+  // --- guess the article ---
+  ...chain('reveal', 'search', 'revealPerfect',
+    (n) => ({ en: `${en(n)} perfect reveal round${n === 1 ? '' : 's'}`, fr: `${fr(n)} manche${n === 1 ? '' : 's'} parfaite${n === 1 ? '' : 's'} de devinette` }),
+    [
+      [1,  coins(300),        { en: 'Eight for eight', fr: 'Huit sur huit' }],
+      [5,  coins(1200),       { en: 'Sharp eyes', fr: 'L’œil vif' }],
+      [20, pack('mythic', 5), { en: 'Through the blur', fr: 'À travers le flou' }]
+    ]),
+
+  // --- fusing copies ---
+  ...chain('fuse', 'spark', 'fused',
+    (n) => ({ en: `Fuse ${en(n)} set${n === 1 ? '' : 's'} of copies`, fr: `Fusionnez ${fr(n)} lot${n === 1 ? '' : 's'} de doubles` }),
+    [
+      [1,   coins(200),      { en: 'Three into one', fr: 'Trois en un' }],
+      [10,  coins(1200),     { en: 'Alchemist', fr: 'Alchimiste' }],
+      [50,  pack('mythic', 5), { en: 'The furnace', fr: 'La fournaise' }]
+    ]),
 
   // --- opening boosters ---
   ...chain('pack', 'packs', 'boosters',

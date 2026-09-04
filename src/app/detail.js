@@ -1,6 +1,8 @@
 /* detail: split out of main.js */
 
 import * as store from '../collection.js';
+import { renderPacks } from './packs.js';
+import { RARITIES, rarityRank } from '../data/rarities.js';
 import { repairCard } from '../wiki.js';
 import { synth } from '../ui/sound.js';
 import * as account from '../account.js';
@@ -15,7 +17,7 @@ import { renderBinder } from './binder.js';
 import { TILT_REACH, clamp, esc, money, openSheet, refreshWallet, settings, state, toast } from './core.js';
 import { signedIn, userId } from './gate.js';
 import { live } from './live.js';
-import { CARD_FRONT_MARKUP, applyRarityVars, dressFront, favButtonNode, fillFront, wireFavButton } from './open.js';
+import { CARD_FRONT_MARKUP, applyRarityVars, dressFront, favButtonNode, fillFront, gainBooster, wireFavButton } from './open.js';
 import { updateBadges } from './regalia.js';
 
 /* --- card detail ---------------------------------------------------------------------------------- */
@@ -175,6 +177,7 @@ export function openCardDetail(entryKey, data, rarity) {
           <div class="giant-actions">
             <a class="btn btn-ghost btn-sm" target="_blank" rel="noopener noreferrer"></a>
             <button class="btn btn-ghost btn-sm wish-giant" type="button"></button>
+            <button class="btn btn-ghost btn-sm fuse" type="button" hidden></button>
             <button class="btn btn-ghost btn-sm sell" type="button" hidden></button>
           </div>
           <div class="fx-p" aria-hidden="true"></div>
@@ -285,6 +288,17 @@ export function openCardDetail(entryKey, data, rarity) {
 
     // Selling only makes sense for a card actually in the binder, and never
     // for a special card: that one says so in its facts instead.
+    // Three spare copies fuse into a one-card booster a tier up: a use for
+    // the fourth Cat that is not selling it for a third of its price.
+    const fuse = card.querySelector('.fuse');
+    fuse.hidden = !canFuse(entry);
+    if (!fuse.hidden) {
+      state.detail.fuseButton = fuse;
+      paintFuseButton();
+      press(fuse, { sound: null });
+      fuse.addEventListener('click', handleFuse);
+    }
+
     const sell = card.querySelector('.sell');
     sell.hidden = !entry || store.isLocked(entry);
     if (store.isLocked(entry ?? data)) {
@@ -354,6 +368,66 @@ export function paintSellButton() {
   detail.sellButton.classList.toggle('btn-danger', detail.sellArmed);
   detail.sellButton.classList.toggle('is-armed', detail.sellArmed);
   detail.sellButton.innerHTML = detail.sellArmed ? t('sellConfirm') : t('sell', { amount: money(amount) });
+}
+
+/** Copies to spare, a tier above to reach, and nothing locked about it. */
+/** Copies a fusion takes; the card keeps at least one. */
+export const FUSE_COPIES = 3;
+
+export function canFuse(entry) {
+  if (!entry || store.isLocked(entry) || entry.special) return false;
+  const rank = rarityRank(entry.rarityId);
+  return (entry.count ?? 1) >= FUSE_COPIES + 1 && rank >= 0 && rank < RARITIES.length - 1;
+}
+
+/** The tier a fused booster is guaranteed: one above the card's. */
+export const fuseTierFor = (entry) => RARITIES[Math.min(RARITIES.length - 1, rarityRank(entry.rarityId) + 1)];
+
+export function paintFuseButton() {
+  const detail = state.detail;
+  const btn = detail?.fuseButton;
+  if (!btn) return;
+  const entry = state.collection.entries[detail.key];
+  if (!entry || !canFuse(entry)) { btn.hidden = true; return; }
+  btn.textContent = detail.fuseArmed
+    ? t('fuseConfirm', { tier: tx(fuseTierFor(entry).name) })
+    : t('fuse', { n: FUSE_COPIES, tier: tx(fuseTierFor(entry).name) });
+  btn.classList.toggle('is-armed', Boolean(detail.fuseArmed));
+}
+
+export function handleFuse() {
+  const detail = state.detail;
+  if (!detail) return;
+  const entry = state.collection.entries[detail.key];
+  if (!canFuse(entry)) { synth.playDenied(); return; }
+
+  if (!detail.fuseArmed) {
+    detail.fuseArmed = true;
+    paintFuseButton();
+    synth.playArm();
+    setTimeout(() => {
+      if (state.detail === detail && detail.fuseArmed) { detail.fuseArmed = false; paintFuseButton(); }
+    }, 4000);
+    return;
+  }
+
+  const tier = fuseTierFor(entry);
+  for (let i = 0; i < FUSE_COPIES; i++) store.takeCardCopy(state.collection, detail.key);
+  const spec = { kind: 'open', themeId: null, rarityId: tier.id, cards: 1 };
+  gainBooster(spec);
+  state.profile.fused = (state.profile.fused ?? 0) + 1;
+  store.saveProfile(state.profile);
+  reportQuest('fuse');
+  updateBadges();
+  synth.playCoins();
+  toast(t('fused', { n: FUSE_COPIES, tier: tx(tier.name) }), 'ok');
+  detail.fuseArmed = false;
+  // The card is still yours, with fewer copies: the sheet is rebuilt on it.
+  const left = state.collection.entries[detail.key];
+  if (left) openCardDetail(detail.key, detail.data, detail.rarity);
+  else live.sheet.hide();
+  renderBinder();
+  renderPacks();
 }
 
 export function handleSell() {

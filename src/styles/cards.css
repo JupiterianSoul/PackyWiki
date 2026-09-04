@@ -389,6 +389,24 @@ html[data-blur-adult='1'] [data-adult] .adult-reveal { display: inline-flex; }
   z-index: 2;
   padding: 0 4.9cqw 4cqw;
 }
+/* With the setting on, every tier carries its own mark before its name, so
+   a tier reads without its colour: dot, square, triangle, diamond, pentagon,
+   hexagon, star, sparkle, and a crown for a personal card. */
+[data-rarity='common'] { --rarity-shape: '\25CF'; }
+[data-rarity='uncommon'] { --rarity-shape: '\25A0'; }
+[data-rarity='rare'] { --rarity-shape: '\25B2'; }
+[data-rarity='epic'] { --rarity-shape: '\25C6'; }
+[data-rarity='legendary'] { --rarity-shape: '\2B1F'; }
+[data-rarity='mythic'] { --rarity-shape: '\2B22'; }
+[data-rarity='exotic'] { --rarity-shape: '\2605'; }
+[data-rarity='prismatic'] { --rarity-shape: '\2726'; }
+[data-rarity='special'] { --rarity-shape: '\265B'; }
+html[data-rarity-shapes='1'] .rarity-badge::before {
+  content: var(--rarity-shape, '');
+  margin-right: 0.45em;
+  font-size: 0.9em;
+  line-height: 1;
+}
 .rarity-badge {
   display: inline-flex;
   padding: 1.5cqw 4.2cqw;

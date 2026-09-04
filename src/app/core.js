@@ -327,7 +327,7 @@ export function navTabFor(screen) {
   return (screen === 'market' ? 'shop'
     : screen === 'cardindex' ? 'binder'
       : screen === 'glossary' ? 'packs'
-        : ['wikdle', 'slots'].includes(screen) ? 'games'
+        : ['wikdle', 'slots', 'duel', 'reveal'].includes(screen) ? 'games'
           : (['settings', 'customize', 'badges', 'friends', 'friend', 'chat', 'ach', 'updates', 'quiz', 'games', 'quests', 'leaderboard'].includes(screen) ? 'profile' : screen));
 }
 

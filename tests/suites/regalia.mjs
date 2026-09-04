@@ -4,7 +4,7 @@ import { installStubs } from '../lib/stubs.mjs';
 let fails = 0;
 const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  ' + e : ''}`); };
 const b = await chromium.launch(launchOptions());
-const ctx = await b.newContext({ ...devices['Pixel 7'] });
+const ctx = await b.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] });
 const p = await ctx.newPage(); installStubs(p);
 const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
 await p.addInitScript(() => {

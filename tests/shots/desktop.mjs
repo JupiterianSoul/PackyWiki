@@ -3,7 +3,7 @@ import { chromium } from 'playwright';
 import { launchOptions } from '../lib/browser.mjs';
 import { installStubs } from '../lib/stubs.mjs';
 const browser = await chromium.launch(launchOptions());
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+const ctx = await browser.newContext({ serviceWorkers: 'block', viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
 const p = await ctx.newPage(); installStubs(p);
 const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
 const PX = 'data:image/gif;base64,R0lGODlhAQABAAAAACw=';

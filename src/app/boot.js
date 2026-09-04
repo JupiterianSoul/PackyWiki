@@ -51,11 +51,14 @@ bind({
     market: $('#screen-market'), cardindex: $('#screen-cardindex'),
     glossary: $('#screen-glossary'), open: $('#screen-open'),
     games: $('#screen-games'), wikdle: $('#screen-wikdle'), slots: $('#screen-slots'),
+    duel: $('#screen-duel'), reveal: $('#screen-reveal'),
     quests: $('#screen-quests'), leaderboard: $('#screen-leaderboard')
   },
   gamesTitle: $('#games-title'), gamesSub: $('#games-sub'), gamesList: $('#games-list'),
   wikdleTitle: $('#wikdle-title'), wikdleBody: $('#wikdle-body'), wikdleBack: $('#wikdle-back'),
   slotsTitle: $('#slots-title'), slotsBody: $('#slots-body'), slotsBack: $('#slots-back'),
+  duelTitle: $('#duel-title'), duelBody: $('#duel-body'), duelBack: $('#duel-back'),
+  revealTitle: $('#reveal-title'), revealBody: $('#reveal-body'), revealBack: $('#reveal-back'),
   questsTitle: $('#quests-title'), questsSub: $('#quests-sub'), questsBody: $('#quests-body'),
   leaderboardTitle: $('#leaderboard-title'), leaderboardSeg: $('#leaderboard-seg'),
   leaderboardBody: $('#leaderboard-body'), leaderboardMe: $('#leaderboard-me'),
@@ -272,6 +275,18 @@ export function regradeCollection() {
   return changed;
 }
 
+/**
+ * The offline shell (src/sw.js), asked for once the app is up rather than
+ * in its way. Not in development, where the files change under it, and not
+ * from the APK's built-in copy: that origin is answered by the wrapper, not
+ * by the network the worker would ask.
+ */
+export function registerShell() {
+  if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
+  if (location.hostname === 'appassets.androidplatform.net') return;
+  navigator.serviceWorker.register('./sw.js').catch(() => { /* no shell: the app still runs online */ });
+}
+
 export function init() {
   // The idle open screen carries a live connection warning, so it follows the
   // connection rather than whatever was true when the screen was built.
@@ -333,11 +348,14 @@ export function init() {
   // Whether a newer build is out: asked once at launch, and again whenever
   // the app comes back to the foreground after a while away.
   setTimeout(lookForUpdate, 4000);
+  setTimeout(registerShell, 3000);
   setTimeout(warmDrawer, 2500);
   sayWipeNote();
   // The arcade's back buttons, and the quests' chip in the drawer.
   el.wikdleBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
   el.slotsBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
+  el.duelBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
+  el.revealBack.addEventListener('click', () => { synth.playTap(); import('./reveal.js').then((m) => m.leaveReveal()); showScreen('games'); });
   quests.onQuestsChange(() => paintDrawerLinks());
   reportAlbums();
   document.addEventListener('visibilitychange', () => {

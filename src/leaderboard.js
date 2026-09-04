@@ -39,12 +39,18 @@ export async function fetchMyRank(window = 'daily') {
   return { rank: Number(row.rank), score: Number(row.score) || 0, total: Number(row.total) || 0 };
 }
 
-/** Wikdle's points for the day, sent once; the server keeps a second copy out. */
-export async function submitWikdle(points, day) {
+/**
+ * A game scored on the device sends its points for the day: Wikdle once, a
+ * duel or a reveal round whenever it beats the day's best. The server keeps
+ * one row per game and day and refuses points above the game's maximum.
+ */
+export async function submitScore(game, points, day) {
   if (!supabase) throw new Error('CLOSED');
-  const { error } = await withTimeout(supabase.rpc('submit_score', { p_game: 'wikdle', p_points: points, p_day: day }));
+  const { error } = await withTimeout(supabase.rpc('submit_score', { p_game: game, p_points: points, p_day: day }));
   if (error) throw new Error(error.message);
 }
+
+export const submitWikdle = (points, day) => submitScore('wikdle', points, day);
 
 /** Milliseconds until a window resets: midnight UTC, or Sunday midnight UTC; never for all-time. */
 export function msToReset(window, now = Date.now()) {

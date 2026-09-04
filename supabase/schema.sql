@@ -835,7 +835,7 @@ update public.trades
 create table if not exists public.scores (
   id         bigint generated always as identity primary key,
   user_id    uuid not null references auth.users on delete cascade,
-  game       text not null check (game in ('slots', 'roulette', 'wikdle', 'quest')),
+  game       text not null check (game in ('slots', 'roulette', 'wikdle', 'quest', 'duel', 'reveal')),
   points     integer not null check (points >= 0),
   detail     jsonb,
   at         timestamptz not null default now()
@@ -885,19 +885,37 @@ drop trigger if exists scores_into_windows on public.scores;
 create trigger scores_into_windows after insert on public.scores
   for each row execute function public.scores_into_windows();
 
--- Wikdle is scored on the device (the word is the same for everyone and the
--- board is its own proof), so its points arrive through this, as the caller,
--- at most one score a day, never above the game's own maximum.
+-- The games scored on the device arrive through this, as the caller: Wikdle
+-- (the word is the same for everyone and the board is its own proof), the
+-- Popularity Duel and Guess the Article (a round's points, from the player's
+-- own cards). One row per game and day: Wikdle's is written once, a duel or
+-- a reveal round replaces the day's row when it beats it. Never above the
+-- game's own maximum, which is what keeps a forged score off the board.
+--
+-- A project on the older shape of this table (the check constraint without
+-- the two new games) is brought up by the alter below.
+alter table public.scores drop constraint if exists scores_game_check;
+alter table public.scores add constraint scores_game_check
+  check (game in ('slots', 'roulette', 'wikdle', 'quest', 'duel', 'reveal'));
+
 create or replace function public.submit_score(p_game text, p_points integer, p_day text)
 returns void language plpgsql security definer set search_path = public as $$
+declare
+  v_max integer;
+  v_existing integer;
 begin
   if auth.uid() is null then raise exception 'sign in'; end if;
-  if p_game <> 'wikdle' then raise exception 'only wikdle is scored by the client'; end if;
-  if p_points < 0 or p_points > 600 then raise exception 'points out of range'; end if;
-  if exists (select 1 from scores where user_id = auth.uid() and game = 'wikdle' and detail->>'day' = p_day) then
-    return;
+  v_max := case p_game when 'wikdle' then 1400 when 'duel' then 3100 when 'reveal' then 2000 else null end;
+  if v_max is null then raise exception 'this game is not scored by the client'; end if;
+  if p_points < 0 or p_points > v_max then raise exception 'points out of range'; end if;
+  select points into v_existing from scores
+    where user_id = auth.uid() and game = p_game and detail->>'day' = p_day
+    limit 1;
+  if v_existing is not null then
+    if p_game = 'wikdle' or p_points <= v_existing then return; end if;
+    delete from scores where user_id = auth.uid() and game = p_game and detail->>'day' = p_day;
   end if;
-  insert into scores (user_id, game, points, detail) values (auth.uid(), 'wikdle', p_points, jsonb_build_object('day', p_day));
+  insert into scores (user_id, game, points, detail) values (auth.uid(), p_game, p_points, jsonb_build_object('day', p_day));
 end $$;
 grant execute on function public.submit_score(text, integer, text) to authenticated;
 

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { execSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
 
 /*
  * The build stamp: which commit, built when. It goes into the bundle (every
@@ -23,6 +24,26 @@ const versionFile = () => ({
   }
 });
 
+/*
+ * The offline shell: src/sw.js written out as sw.js with this build's own
+ * file list in it, so the worker stores exactly the files the build is made
+ * of. The music stays out (thirteen megabytes nobody needs to open the app);
+ * everything else, sounds included, is part of the shell.
+ */
+const serviceWorker = () => ({
+  name: 'wikster-service-worker',
+  generateBundle(_options, bundle) {
+    const files = Object.keys(bundle).filter((f) => !f.endsWith('.mp3') && f !== 'sw.js');
+    const precache = ['./index.html', './version.json', './manifest.webmanifest',
+      './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png',
+      ...files.filter((f) => f !== 'index.html' && f !== 'version.json').map((f) => `./${f}`)];
+    const source = readFileSync('src/sw.js', 'utf8')
+      .replace("'__STAMP__'", JSON.stringify(`${STAMP.sha}-${STAMP.at}`))
+      .replace('__PRECACHE__', JSON.stringify([...new Set(precache)], null, 2));
+    this.emitFile({ type: 'asset', fileName: 'sw.js', source });
+  }
+});
+
 export default defineConfig({
   // Every asset is referenced relative to index.html, so the same build runs
   // from the APK's asset origin, from a project page under a repository path,
@@ -30,7 +51,7 @@ export default defineConfig({
   // three the moment the site does not sit at the domain root.
   base: './',
   define: { __WIKSTER_BUILD__: JSON.stringify(STAMP) },
-  plugins: [versionFile()],
+  plugins: [versionFile(), serviceWorker()],
   build: {
     // The sound kits must ride inside the bundle as data URIs: the APK's
     // WebView cannot reliably fetch() loose files, and a sound that loads

@@ -15,7 +15,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 
 const MODES = {
-  app: 'offline', hellfire: 'offline', games: 'offline', regalia: 'offline',
+  app: 'offline', hellfire: 'offline', games: 'offline', regalia: 'offline', offline: 'offline', product: 'offline', arcade2: 'offline',
   fixes6: 'stub', worldclock: 'stub', facetoface: 'stub', g4: 'stub', sync: 'stub'
 };
 const PORT = Number(process.env.PORT) || 4173;

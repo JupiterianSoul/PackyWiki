@@ -1,15 +1,21 @@
 /* binder: split out of main.js */
 
 import { t, tx } from '../i18n.js';
+import { renderPacks } from './packs.js';
+import { reportQuest } from './arcade.js';
+import { updateBadges } from './regalia.js';
+import { gainBooster } from './open.js';
+import { specName } from '../booster.js';
 import * as store from '../collection.js';
-import { CARDS_PER_PAGE, albumKeyOf, buildAlbums, fetchAlbumTotal } from '../albums.js';
+import { ALBUM_TIERS, CARDS_PER_PAGE, albumHasTiers, albumKeyOf, albumTierBooster, albumTierNeed, albumTiersClaimed, albumTiersReached, buildAlbums, fetchAlbumTotal } from '../albums.js';
+import { h } from '../ui/dom.js';
 import { iconSvg } from '../data/icons.js';
 import { Segmented, dur, press, reveal } from '../ui/components.js';
 import { RARITIES, rarityById } from '../data/rarities.js';
 import { emblemSvg, monogramSvg } from '../data/emblems.js';
 import { synth } from '../ui/sound.js';
 import { POPULARITY_BANDS, formatAmount } from '../pricing.js';
-import { compactCount, el, money, openSheet, state, toast } from './core.js';
+import { compactCount, el, esc, money, openSheet, refreshWallet, state, toast } from './core.js';
 import { buildStaticCard } from './detail.js';
 import { live } from './live.js';
 
@@ -216,7 +222,8 @@ export function buildAlbumCover(album) {
     <b class="album-cover-name"></b>
     <span class="album-cover-count tabular"></span>
     <span class="album-cover-bar"><i></i></span>
-    ${album.complete ? `<span class="album-cover-done">${iconSvg('spark', { size: 13 })}</span>` : ''}`;
+    ${album.complete ? `<span class="album-cover-done">${iconSvg('spark', { size: 13 })}</span>` : ''}
+    ${albumTiersReached(album) ? `<span class="album-cover-medal" data-tier="${ALBUM_TIERS[albumTiersReached(album) - 1].id}" aria-hidden="true"></span>` : ''}`;
   cover.querySelector('.album-cover-name').textContent = album.name;
   cover.querySelector('.album-cover-count').textContent =
     album.unlocked ? `${album.owned}/${album.total == null ? '?' : compactCount(album.total)}` : t('albumLocked');
@@ -253,6 +260,7 @@ export function renderAlbum() {
   el.albumProgress.textContent = `${album.owned}/${album.total == null ? '?' : compactCount(album.total)}`
     + (album.complete ? ` · ${t('albumComplete')}` : '');
   if (album.total == null) refreshAlbumTotals([album]);
+  paintAlbumTiers(album);
   el.filterOpen.textContent = t('filters');
   const active = activeFilterCount();
   el.filterCount.textContent = String(active);
@@ -429,4 +437,57 @@ export function openFilters() {
 
     body.appendChild(wrap);
   });
+}
+
+/* --- the medals ---------------------------------------------------------------------
+
+ * Four rungs per album (see ALBUM_TIERS): what each asks, which are reached,
+ * which are claimed. The strip sits under the album's count; a reached rung
+ * not yet claimed is the one button on it.
+ */
+
+export function paintAlbumTiers(album) {
+  let strip = el.albumView.querySelector('.album-tiers');
+  if (!albumHasTiers(album)) { strip?.remove(); return; }
+  if (!strip) {
+    strip = h('div.album-tiers');
+    el.albumProgress.after(strip);
+  }
+  const reached = albumTiersReached(album);
+  const claimed = albumTiersClaimed(state.profile, album);
+  strip.replaceChildren(...ALBUM_TIERS.map((tier, i) => {
+    const state_ = i < claimed ? 'claimed' : i < reached ? 'ready' : 'locked';
+    const need = albumTierNeed(album, tier);
+    const chip = h('div.album-tier', { dataset: { tier: tier.id, state: state_ }, title: t(`albumTier_${tier.id}`) }, [
+      h('span.album-tier-disc', { 'aria-hidden': 'true' }),
+      h('b', t(`albumTier_${tier.id}`)),
+      h('span.album-tier-need.tabular', state_ === 'locked' ? t('albumTierNeed', { n: need }) : t(state_ === 'claimed' ? 'albumTierClaimed' : 'albumTierReached'))
+    ]);
+    if (state_ === 'ready' && i === claimed) {
+      const btn = h('button.btn.btn-sm.btn-primary.album-tier-claim', { type: 'button' }, t('albumTierClaim'));
+      press(btn, { sound: null });
+      btn.addEventListener('click', () => claimAlbumTier(album, i));
+      chip.appendChild(btn);
+    }
+    return chip;
+  }));
+}
+
+/** Pays the rung: coins, and from silver up a booster of the subject. */
+export function claimAlbumTier(album, index) {
+  const tier = ALBUM_TIERS[index];
+  if (!tier || albumTiersClaimed(state.profile, album) !== index || albumTiersReached(album) <= index) return;
+  state.profile.albumTiers = { ...(state.profile.albumTiers ?? {}), [album.key]: index + 1 };
+  store.saveProfile(state.profile);
+  store.saveWallet(store.loadWallet() + tier.coins);
+  refreshWallet();
+  const spec = albumTierBooster(album, tier);
+  if (spec) gainBooster(spec);
+  const reward = spec ? `${money(tier.coins)} + ${esc(specName(spec))}` : money(tier.coins);
+  toast(t('albumTierWon', { tier: t(`albumTier_${tier.id}`), album: esc(album.name), reward }), 'ok');
+  synth.playCoins();
+  updateBadges();
+  reportQuest('albumTier');
+  paintAlbumTiers(album);
+  renderPacks();
 }

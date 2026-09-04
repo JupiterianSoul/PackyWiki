@@ -356,6 +356,8 @@ export const HELP = {
   games:   { steps: 3, tip: true },
   wikdle:  { steps: 3, tip: true },
   slots:   { steps: 3, tip: true },
+  duel:    { steps: 3, tip: true },
+  reveal:  { steps: 3, tip: true },
   quests:  { steps: 3, tip: true },
   leaderboard: { steps: 3, tip: true }
 };

@@ -530,6 +530,7 @@ export function loadProfile() {
   // Off unless it is asked for: it hides pictures, and a player who has not
   // asked for that would read it as the app failing to load them.
   profile.settings.blurAdult ??= false;
+  profile.settings.rarityShapes ??= false;
   accrue(profile.timed);
   return profile;
 }

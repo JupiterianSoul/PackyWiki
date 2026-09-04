@@ -84,6 +84,8 @@ export function renderGames() {
   const tiles = [
     { id: 'wikdle', icon: 'grid', color: '#4ade80', title: t('wikdleTitle'), note: t('gamesWikdleNote'), run: () => import('./wikdle.js').then(async (m) => { await m.renderWikdle(); showScreen('wikdle'); }) },
     { id: 'slots', icon: 'reel', color: '#fbbf24', title: t('slotsTitle'), note: t('gamesSlotsNote'), run: () => import('./slots.js').then((m) => { m.renderSlots(); showScreen('slots'); }) },
+    { id: 'duel', icon: 'podium', color: '#f472b6', title: t('duelTitle'), note: t('gamesDuelNote'), run: () => import('./duel.js').then((m) => { m.renderDuel(); showScreen('duel'); }) },
+    { id: 'reveal', icon: 'search', color: '#22d3ee', title: t('revealGameTitle'), note: t('gamesRevealNote'), run: () => import('./reveal.js').then((m) => { m.renderReveal(); showScreen('reveal'); }) },
   ];
   const list = document.createElement('div');
   list.className = 'games-list';

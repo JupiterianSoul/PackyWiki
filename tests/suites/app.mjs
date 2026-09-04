@@ -14,7 +14,7 @@ const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : '
 const section = (s) => console.log(`\n— ${s} ${'—'.repeat(Math.max(0, 52 - s.length))}`);
 
 const browser = await chromium.launch(launchOptions());
-const ctx = await browser.newContext({ ...devices['Pixel 7'] });
+const ctx = await browser.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] });
 const page = await ctx.newPage();
 const errors = [];
 page.on('pageerror', (e) => errors.push('PAGE: ' + e.message));
@@ -508,7 +508,7 @@ await viaMenu(/settings/i);
 check('settings reachable from the menu', await page.locator('#screen-settings').isVisible());
 check('no theme grid in settings any more', (await page.locator('#screen-settings .theme-card').count()) === 0);
 const switches = await page.locator('#settings-list .switch').count();
-check('every preference switch is present', switches === 10, `${switches} switches`);
+check('every preference switch is present', switches === 11, `${switches} switches`);
 check('two volume sliders', (await page.locator('#settings-list input[type="range"]').count()) === 2);
 check('music is one of them', /music|musique/i.test(await page.locator('#settings-list').textContent()));
 check('sound lives here', /sound/i.test(await page.locator('#settings-list').textContent()));

@@ -57,6 +57,13 @@ easy({ id: 'open-theme-1', metric: 'open', where: { kind: 'theme' }, target: 1, 
 easy({ id: 'open-timed-1', metric: 'open', where: { kind: 'timed' }, target: 1, reward: R(60), name: { en: 'Open a free pack', fr: 'Ouvrez un pack gratuit' } });
 easy({ id: 'open-custom-1', metric: 'open', where: { kind: 'custom' }, target: 1, reward: R(90), name: { en: 'Open a booster you built', fr: 'Ouvrez un booster fait maison' } });
 medium({ id: 'open-5', metric: 'open', target: 5, reward: R(300), name: { en: 'Five packs today', fr: 'Cinq boosters aujourd’hui' } });
+
+// --- the duel and the reveal --------------------------------------------------
+easy({ id: 'duel-1', metric: 'duel', target: 1, reward: R(80), name: { en: 'Play a popularity duel', fr: 'Jouez un duel de popularité' } });
+easy({ id: 'reveal-1', metric: 'reveal', target: 1, reward: R(80), name: { en: 'Guess the article, one round', fr: 'Devinez l’article, une manche' } });
+medium({ id: 'duel-streak-5', metric: 'duel', where: { minCorrect: 5 }, target: 1, reward: R(240), name: { en: 'A duel streak of five', fr: 'Une série de cinq au duel' } });
+medium({ id: 'reveal-6', metric: 'reveal', where: { minCorrect: 6 }, target: 1, reward: R(240), name: { en: 'Six of eight articles named', fr: 'Six articles sur huit nommés' } });
+hard({ id: 'reveal-perfect', metric: 'reveal', where: { minCorrect: 8 }, target: 1, reward: R(520), name: { en: 'A perfect reveal round', fr: 'Une manche parfaite de devinette' } });
 medium({ id: 'pull-25', metric: 'pull', target: 25, reward: R(320), name: { en: 'Twenty-five pages', fr: 'Vingt-cinq pages' } });
 medium({ id: 'pull-rare-3', metric: 'pull', where: { rarityId: 'rare' }, target: 3, reward: R(340), name: { en: 'Three Rare prints', fr: 'Trois impressions Rares' } });
 medium({ id: 'pull-epic-1', metric: 'pull', where: { rarityId: 'epic' }, target: 1, reward: R(380), name: { en: 'An Epic print', fr: 'Une impression Épique' } });

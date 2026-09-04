@@ -7,6 +7,8 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <title>Wikster</title>
     <meta name="description" content="Open booster packs of real Wikipedia articles as collectible trading cards." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='12' y='6' width='33' height='52' rx='7' fill='%230f1220' stroke='%23c7d2fe' stroke-width='3'/><path d='M12 17h33' stroke='%23c7d2fe' stroke-width='3'/><path d='M19.5 27 24.5 46 28.5 35.5 32.5 46 37.5 27' fill='none' stroke='%23fbbf24' stroke-width='3.8' stroke-linejoin='round' stroke-linecap='round'/><circle cx='54' cy='12' r='3' fill='%23fbbf24'/></svg>" />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
@@ -382,6 +384,24 @@
             <button class="help-btn" data-help="slots" type="button" aria-label="What is this?">?</button>
           </div>
           <div class="pad" id="slots-body"></div>
+        </section>
+
+        <section id="screen-duel" class="screen">
+          <div class="screen-head">
+            <button id="duel-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="duel-title"></h2>
+            <button class="help-btn" data-help="duel" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="duel-body"></div>
+        </section>
+
+        <section id="screen-reveal" class="screen">
+          <div class="screen-head">
+            <button id="reveal-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="reveal-title"></h2>
+            <button class="help-btn" data-help="reveal" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="reveal-body"></div>
         </section>
 
         <!-- QUESTS: three things to do today ------------------------------------ -->

@@ -278,6 +278,54 @@ export function buildAlbums(entries, customPacks = []) {
  */
 export const ALBUM_DEEP = 25;
 
+/* --- the medals ----------------------------------------------------------- */
+
+/*
+ * An album against a real category is never finished: Animals has tens of
+ * thousands of pages. The medals are the targets that can be reached, and
+ * each one is a real climb: 75 different cards of one subject is a few dozen
+ * boosters, a thousand is a season. An album smaller than a rung (a subject
+ * whose category is short) awards the rung on being complete instead. The
+ * personal albums behind a code have no medals: they are five cards, and
+ * complete is the whole story.
+ */
+export const ALBUM_TIERS = [
+  { id: 'bronze',  need: 75,   coins: 2500,  booster: null },
+  { id: 'silver',  need: 200,  coins: 7500,  booster: { rarityId: null,     cards: 5 } },
+  { id: 'gold',    need: 500,  coins: 20000, booster: { rarityId: 'rare',   cards: 5 } },
+  { id: 'diamond', need: 1000, coins: 60000, booster: { rarityId: 'mythic', cards: 5 } }
+];
+
+/** Whether the album has medals to win at all. */
+export const albumHasTiers = (album) => album.kind !== 'code';
+
+/** How many different cards the rung asks of this album. */
+export function albumTierNeed(album, tier) {
+  return album.total != null && album.total < tier.need ? album.total : tier.need;
+}
+
+/** The rungs reached so far, 0 to 4. */
+export function albumTiersReached(album) {
+  if (!albumHasTiers(album)) return 0;
+  let n = 0;
+  for (const tier of ALBUM_TIERS) {
+    if (album.owned >= albumTierNeed(album, tier)) n++;
+    else break;
+  }
+  return n;
+}
+
+/** The rungs already claimed for this album, from the profile. */
+export const albumTiersClaimed = (profile, album) => Math.min(ALBUM_TIERS.length, Number(profile?.albumTiers?.[album.key]) || 0);
+
+/** The booster a rung pays, for this album: the subject's own where there is one. */
+export function albumTierBooster(album, tier) {
+  if (!tier.booster) return null;
+  return album.kind === 'theme'
+    ? { kind: 'theme', themeId: album.themeId, rarityId: tier.booster.rarityId, cards: tier.booster.cards }
+    : { kind: 'open', themeId: null, rarityId: tier.booster.rarityId, cards: tier.booster.cards };
+}
+
 function decorate(album) {
   const style = styleForSpec(albumSpec(album));
   album.style = style;

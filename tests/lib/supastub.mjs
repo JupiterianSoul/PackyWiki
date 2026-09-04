@@ -186,6 +186,22 @@ export function installSupabase(page, { log = null, db = newDatabase(), schema =
       const page = Number(body.p_page) || 0;
       return json(route, all.slice(page * 20, page * 20 + 20).map((r, i) => ({ rank: page * 20 + i + 1, user_id: r.user_id, username: r.username, score: r.score })));
     }
+    if (path === 'rpc/submit_score') {
+      // The server's rule: one row per game and day, a duel or reveal round
+      // replacing the day's when it beats it, never above the game's maximum.
+      const max = { wikdle: 1400, duel: 3100, reveal: 2000 }[body.p_game];
+      if (!max) return fail(route, 'this game is not scored by the client', 400);
+      if (body.p_points < 0 || body.p_points > max) return fail(route, 'points out of range', 400);
+      db.scores ??= [];
+      const at = db.scores.findIndex((r) => r.user_id === me && r.game === body.p_game && r.day === body.p_day);
+      if (at >= 0) {
+        if (body.p_game === 'wikdle' || body.p_points <= db.scores[at].score) return json(route, null, 204);
+        db.scores.splice(at, 1);
+      }
+      const username = db.profiles.get(me)?.username ?? 'someone';
+      db.scores.push({ user_id: me, username, game: body.p_game, day: body.p_day, score: body.p_points });
+      return json(route, null, 204);
+    }
     if (path === 'rpc/my_rank') {
       const all = [...(db.scores ?? [])].sort((a, b) => b.score - a.score);
       const at = all.findIndex((r) => r.user_id === me);

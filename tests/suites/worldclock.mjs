@@ -9,7 +9,7 @@ const section = (s) => console.log(`\n== ${s}`);
 const browser = await chromium.launch(launchOptions());
 const shared = newDatabase();
 const errors = [];
-const ctx = await browser.newContext({ ...devices['Pixel 7'] });
+const ctx = await browser.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] });
 const p = await ctx.newPage();
 p.on('pageerror', (e) => errors.push(e.message));
 installStubs(p); installSupabase(p, { db: shared });

@@ -6,7 +6,7 @@ import { loadWords, wordForDay, utcDay } from '/home/user/PackyWiki/src/wikdle.j
 await loadWords();
 let fails = 0; const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  ' + e : ''}`); };
 const b = await chromium.launch(launchOptions());
-const p = await (await b.newContext({ ...devices['Pixel 7'] })).newPage(); installStubs(p);
+const p = await (await b.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] })).newPage(); installStubs(p);
 p.setDefaultTimeout(8000); const errs = []; p.on('pageerror', (e) => errs.push(String(e)));
 p.on('console', (m) => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errs.push('CONSOLE ' + m.text()); });
 await p.addInitScript(() => {
@@ -26,7 +26,7 @@ const text = (sel) => p.locator(sel).first().textContent().then((s) => (s ?? '')
 await p.evaluate(() => document.querySelector('.appbar .icon-btn')?.click()); await p.waitForTimeout(400);
 for (const link of ['games', 'quests', 'leaderboard']) check(`drawer has the ${link} tab`, (await p.locator(`.drawer-link[data-link="${link}"]`).count()) === 1);
 await go('games');
-check('the hub shows two games', (await p.locator('#screen-games .game-tile').count()) === 2, String(await p.locator('#screen-games .game-tile').count()));
+check('the hub shows four games', (await p.locator('#screen-games .game-tile').count()) === 4, String(await p.locator('#screen-games .game-tile').count()));
 check('the hub says the house needs an account when there is none', /account/i.test(await text('#screen-games .game-closed')), await text('#screen-games .game-closed'));
 
 /* --- Wikdle -------------------------------------------------------------------- */

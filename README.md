@@ -45,7 +45,30 @@ npm run preview    # serve the built dist/ on :4173
 ```
 
 `npm run build` is the whole product. `dist/` is what the website serves and
-what the Android app wraps, byte for byte.
+what the Android app wraps, byte for byte (less the music, which the app
+plays from the site).
+
+```sh
+npm test               # npm run check, then every browser suite
+npm run check          # i18n parity, the sweep, the unit checks, the type check
+npm run test:offline   # the suites that need no backend
+npm run test:stub      # the suites that run against the fake Supabase
+npm run shots          # every screen at 1440x900, for looking at
+node tools/economy-report.mjs   # where Buckarooz come from and go
+```
+
+The suites live in `tests/suites` and run with Playwright against a real
+build served by `vite preview`; `tests/run.mjs` builds each mode into its
+own folder first, so editing while a suite runs changes nothing about what
+it tests. `tests/lib/supastub.mjs` is a Supabase that answers from memory
+(auth, saves and their history, friends, chat, trades, auctions, the codex,
+the leaderboard), which is what lets the social suites run without a
+project. `tests/unit` holds Node-only checks of the pure modules. The same
+`npm test` runs on every push in `.github/workflows/tests.yml`.
+
+`jsconfig.json` and `npm run typecheck` run TypeScript over the JavaScript:
+the pure modules carry `// @ts-check`, `src/types.js` names the shapes
+(Card, Entry, PackSpec, SaveEnvelope) and `src/env.d.ts` the build's globals.
 
 The app works with no backend at all: without Supabase credentials it runs
 fully offline-capable and local, and only the account features are missing.
@@ -163,6 +186,21 @@ Duplicates stack as `×2`. The binder has an album shelf and a **classic**
 view of every card at once, grouped by subject, with a search field of its
 own.
 
+Since most albums cannot be finished, each has **medals** that can be
+(`ALBUM_TIERS` in `src/albums.js`): Bronze at 75 different cards of the
+subject, Silver at 200, Gold at 500, Diamond at 1,000, each paying coins and
+from Silver up a booster of the subject with a guaranteed tier. An album
+smaller than a rung awards it on being complete instead; the personal
+albums behind a code have none. The rung reached shows as a disc on the
+cover, and the open album carries the four rungs with the one to claim.
+
+Three spare copies of a card **fuse** into a one-card booster guaranteed a
+tier above the card's (the fourth Cat becomes an Epic pull), from the card's
+own sheet; a Prismatic has nowhere to go. When a card is looked at, its
+article is checked once a week (`src/wiki/repair.js`): a renamed page brings
+the card's title and text up to date, a deleted one is said to be gone. The
+card itself is never taken away.
+
 Cards are drawn from the whole encyclopaedia, and the whole encyclopaedia
 includes articles nobody wants opening on a bus, so Settings carries **Blur
 adult content**. It reads the card's own title, description and opening
@@ -224,9 +262,26 @@ and every policy in `schema.sql` is written on the assumption that anyone can
 see this key. The **secret** key must never appear in this repository or in a
 build.
 
-Syncing is last-writer-wins on a debounce, with the local save always
-authoritative for the session you are in, so a dropped connection never costs
-you cards.
+Syncing is per key, not per blob (`src/save.js`, `src/account/save.js`).
+Every storage key in the save carries the time it last changed on the
+device that wrote it, and a push first looks at the server's row: if another
+device wrote since this one last looked, the two saves are merged key by
+key, the newer copy of each winning and a tie going to the account, and
+keys the other device changed later come down before the merged save goes
+up. A device that has already played the account merges the same way at
+sign-in; a fresh device, or one holding another account's save, takes the
+account's save whole, which is what carries a collection onto a new phone.
+The local save stays authoritative for the session you are in, so a dropped
+connection never costs you cards.
+
+Under all of it the server keeps the save's history: `saves_history` in
+`schema.sql` files the row being replaced on every write (thinned with age:
+the last hour, one an hour for a day, one a day after that, never more than
+forty) and always the one from before an erase. Settings, Data, **Backups**
+lists them and puts one back; the save it replaces is filed first, so a
+restore can be undone. A project that ran an older `schema.sql` has to run
+the current one again for the table and for the `submit_score` function the
+newer games use.
 
 ### Ending a save, and ending an account
 
@@ -344,6 +399,28 @@ bonus of five percent a day up to half again; a solve in two rows hands over
 a Rare booster, and every seventh day of a streak a booster too. Signed in,
 the points are sent once to the leaderboard.
 
+**The Popularity Duel** (`src/duel.js`) is two of your own cards: one shows
+how many people read its article in a month, the other hides it, and the
+call is more or fewer. Right, and the challenger takes the seat and a new
+one walks in, the streak growing (100 points, then 110, then 120); wrong,
+and the round is over; fifteen in a row is a perfect with a 500-point
+bonus. Three rounds a day, paid at a quarter of the points in Buckarooz.
+The cards are the player's, so the game is about knowing what you collected,
+and it opens once the album holds ten different cards with a readership.
+
+**Guess the Article** (`src/reveal.js`) is a card's picture, blurred past
+recognition, and four titles: the answer and three decoys from the same
+album, so the subject is never the tell. The blur lifts a step every few
+seconds, or sooner on request, and the points fall with it, 250, 180, 120,
+60; a wrong pick pays nothing and names the card. Eight cards a round,
+three rounds a day, paid at thirty percent. It opens at twelve different
+cards with a picture, and never shows a card the adult filter would blur.
+
+Both send the day's best round to the leaderboard through `submit_score`,
+which now takes the three device-scored games with a maximum per game and
+keeps one row per game and day, replacing a duel's or a reveal's when a
+later round beats it.
+
 **The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
 reels, five paylines and eight symbols drawn as their own small pictures: six
 that pay, a **wild** that stands in for any of them (three wilds is the
@@ -412,14 +489,39 @@ Above 1024px the app stops being a phone in the middle of a monitor:
 `src/styles/desktop.css` stands the bottom bar up as a rail down the left,
 opens sheets as centred dialogues, and lets the grids use the width.
 
+The site is also an installable web app: `public/manifest.webmanifest` and
+its icons (drawn from the logo by `tools/icons.mjs`), and a service worker
+written out by the build from `src/sw.js` with the build's own file list in
+it. The worker stores the shell on the first visit (the page, the scripts,
+the styles, the sounds; not the music) and answers navigations from the
+network first, three seconds, then the shell, so an update is never held
+back by the cache and no connection still opens the app. Card pictures from
+Wikipedia are kept as they go by, a few hundred at most. Wikipedia itself is
+never cached: a draw needs the live encyclopaedia. The APK's built-in copy
+does not register it; that origin is answered by the wrapper.
+
+The eight stylesheets are cascade layers in the order `src/style.css` lists
+them, so a later file restyles an earlier one by position rather than by
+selector weight, and the first screen loads a third of the JavaScript it
+used to: the market, the index, the quiz, the timeline, the games, the Wikdle
+word lists and the sample kits are chunks fetched when they are opened.
+
 ## Project layout
 
 ```
 src/
-  main.js          the application: screens, rendering, every interaction
-  wiki.js          all Wikipedia and Fandom access, and the draw itself
+  main.js          the entry: it loads src/app/boot.js
+  app/             the application, one module per screen: boot, core,
+                   open, packs, shop, binder, detail, market, social, gate,
+                   settings, arcade, wikdle, slots, duel, reveal, quiz...
+  wiki.js          the public face of src/wiki/: fetch, draw, custom,
+                   translate, repair, filter, core
   collection.js    saved state and every localStorage key
-  account.js       Supabase: auth, sync, friends, trades, auctions
+  account.js       the public face of src/account/: client, session,
+                   profile, save (sync and backups), schema, social,
+                   market, index
+  duel.js  reveal.js   the two newer games' arithmetic and ledgers
+  sw.js            the service worker, written out by the build
   booster.js       a booster spec, and what it is allowed to draw
   economy.js       prices, tiers, the shop cadence, what a pack guarantees
   shop.js          the shelves, seeded so everyone sees the same shop
@@ -429,12 +531,18 @@ src/
   timed.js  pricing.js  packstyle.js  packview.js  save.js  i18n.js
   data/            rarities, subjects, icons, emblems, release notes,
                    the arcade's books and the Wikdle words
-  ui/              themes, animated backdrops, the synth, the music player
-  styles/          base, components, screens, cards, themes, desktop, games
+  ui/              themes, animated backdrops, the synth, the music player,
+                   the sample kits, h() for building DOM, the event bus
+  styles/          themes, base, components, booster, cards, screens, games,
+                   desktop: cascade layers, in that order
   assets/          fonts, music, sound kits, a few bundled pictures
+public/            the web manifest and its icons
 android/           the WebView wrapper and its Gradle build
 supabase/          schema.sql: tables, policies; functions/: the edge functions
-tools/             sync-game-tables.mjs, slots-rtp.mjs
+tests/             the browser suites, their stubs, the runner, the unit checks
+tools/             split-module.mjs (the AST splitter), i18n-check.mjs,
+                   sweep.mjs, economy-report.mjs, icons.mjs,
+                   sync-game-tables.mjs, slots-rtp.mjs
 ```
 
 ## The names underneath

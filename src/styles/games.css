@@ -361,3 +361,61 @@
   box-shadow: 0 10px 30px rgba(0,0,0,0.35);
 }
 .leaderboard-me[hidden] { display: none; }
+
+/* --- the popularity duel --- */
+.duel, .reveal { display: grid; gap: 14px; justify-items: center; }
+.duel-intro, .reveal-intro { max-width: 40ch; text-align: center; }
+.duel-score { display: flex; gap: 10px; align-items: center; font-size: 0.8rem; font-weight: 800; }
+.duel-points { color: var(--accent); }
+.duel-arena {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch; gap: 8px; width: 100%;
+}
+.duel-vs { align-self: center; font-size: 0.7rem; font-weight: 900; letter-spacing: 0.1em; color: var(--ink-faint); text-transform: uppercase; }
+.duel-card {
+  display: grid; gap: 6px; justify-items: center; align-content: start; min-width: 0;
+  padding: 10px; border-radius: var(--radius-lg); border: var(--border) var(--border-style) var(--line);
+  background: var(--surface); text-align: center;
+  transition: border-color calc(200ms * var(--motion-scale)) var(--ease), box-shadow calc(200ms * var(--motion-scale)) var(--ease);
+}
+.duel-card.is-right { border-color: var(--positive); box-shadow: 0 0 0 2px color-mix(in srgb, var(--positive) 35%, transparent); }
+.duel-card.is-wrong { border-color: var(--negative); box-shadow: 0 0 0 2px color-mix(in srgb, var(--negative) 35%, transparent); }
+.duel-art { width: 100%; aspect-ratio: 1; border-radius: var(--radius); overflow: hidden; background: var(--surface-2); }
+.duel-art img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.duel-name { font-size: 0.86rem; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.duel-figure { font-size: 0.74rem; font-weight: 700; color: var(--ink-dim); }
+.duel-unknown { font-size: 1.4rem; color: var(--accent); }
+.duel-calls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.duel-summary { display: grid; justify-items: center; gap: 10px; padding: 18px 0; text-align: center; }
+.duel-summary b { font-size: 1.15rem; }
+.duel-last { font-size: 0.78rem; }
+
+/* --- guess the article --- */
+.reveal-stage {
+  position: relative; width: min(100%, 300px); aspect-ratio: 1; border-radius: var(--radius-lg); overflow: hidden;
+  background: var(--surface-2); border: var(--border) var(--border-style) var(--line);
+}
+.reveal-stage img {
+  width: 100%; height: 100%; object-fit: cover; display: block; transform: scale(1.12);
+  transition: filter calc(600ms * var(--motion-scale)) var(--ease);
+}
+.reveal-count {
+  position: absolute; top: 8px; left: 8px; padding: 3px 8px; border-radius: 999px;
+  font-size: 0.66rem; font-weight: 800; color: var(--ink); background: color-mix(in srgb, var(--surface-solid) 82%, transparent);
+}
+.reveal-steps { display: flex; gap: 6px; }
+.reveal-step {
+  padding: 4px 10px; border-radius: 999px; font-size: 0.7rem; font-weight: 800;
+  border: var(--border) var(--border-style) var(--line); color: var(--ink-dim); background: var(--surface);
+}
+.reveal-step[data-state='now'] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
+.reveal-step[data-state='past'] { opacity: 0.45; text-decoration: line-through; }
+.reveal-verdict { min-height: 1.4em; text-align: center; }
+.reveal-verdict.is-right { color: var(--positive); font-weight: 700; }
+.reveal-verdict.is-wrong { color: var(--negative); font-weight: 700; }
+.reveal-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; width: 100%; }
+.reveal-choice { min-height: 52px; white-space: normal; line-height: 1.2; font-size: 0.82rem; }
+.reveal-choice.is-right { border-color: var(--positive); color: var(--positive); }
+.reveal-choice.is-wrong { border-color: var(--negative); color: var(--negative); }
+@media (min-width: 720px) {
+  .duel-calls, .reveal-choices { max-width: 520px; }
+}

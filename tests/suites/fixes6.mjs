@@ -28,7 +28,7 @@ entries['en:Nude'] = card(900, { key: 'en:Nude', title: 'Nude photography', desc
 entries['en:Reichelt'] = card(901, { key: 'en:Reichelt', title: 'Franz Reichelt', packId: 'theme|darwin', packName: 'Darwin Awards' });
 
 async function open({ mobile = true } = {}) {
-  const ctx = await browser.newContext(mobile ? { ...devices['Pixel 7'] } : { viewport: { width: 1440, height: 900 } });
+  const ctx = await browser.newContext(mobile ? { serviceWorkers: 'block', ...devices['Pixel 7'] } : { serviceWorkers: 'block', viewport: { width: 1440, height: 900 } });
   const p = await ctx.newPage();
   p.on('pageerror', (e) => errs.push(String(e)));
   installStubs(p);

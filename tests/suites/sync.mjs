@@ -32,7 +32,7 @@ const keysOf = (page) => page.evaluate((k) => Object.keys(JSON.parse(localStorag
 const local = (page, key) => page.evaluate((k) => localStorage.getItem(k), key);
 
 async function device(label, { cards = {}, wallet = '50000', owner = null, extra = {} } = {}) {
-  const ctx = await browser.newContext({ ...devices['Pixel 7'] });
+  const ctx = await browser.newContext({ serviceWorkers: 'block', ...devices['Pixel 7'] });
   const page = await ctx.newPage();
   page.on('pageerror', (e) => errors.push(`${label} PAGE: ${e.message}`));
   installStubs(page);
