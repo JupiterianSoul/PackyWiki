@@ -515,22 +515,6 @@ export const EMBLEMS = {
     <path d="M46 46 Q60 30 74 46 L70 58 L78 78 L64 78 L60 66 L56 78 L42 78 L50 58Z" fill="${E3}"/>
     <path d="M52 44 Q60 36 68 44 L66 50 L54 50Z" fill="${E1}" opacity="0.5"/>`,
 
-  /* A laurel wreath around a skull, a medal ribbon below: the award. */
-  darwin: `
-    <ellipse cx="60" cy="104" rx="40" ry="6" fill="${INK}" opacity="0.32"/>
-    <path d="M22 62 Q14 40 32 26" fill="none" stroke="${E2}" stroke-width="5" stroke-linecap="round"/>
-    <path d="M98 62 Q106 40 88 26" fill="none" stroke="${E2}" stroke-width="5" stroke-linecap="round"/>
-    <g fill="${E2}">
-      <path d="M20 58 q-8 -6 -2 -14 q8 4 2 14Z"/><path d="M18 46 q-8 -4 -4 -13 q8 3 4 13Z"/><path d="M22 36 q-6 -6 0 -13 q6 5 0 13Z"/>
-      <path d="M100 58 q8 -6 2 -14 q-8 4 -2 14Z"/><path d="M102 46 q8 -4 4 -13 q-8 3 -4 13Z"/><path d="M98 36 q6 -6 0 -13 q-6 5 0 13Z"/>
-    </g>
-    <path d="M40 46 q0 -22 20 -22 q20 0 20 22 q0 10 -6 16 l0 10 l-28 0 l0 -10 q-6 -6 -6 -16Z" fill="${E1}"/>
-    <ellipse cx="51" cy="46" rx="6" ry="7" fill="${INK}"/><ellipse cx="69" cy="46" rx="6" ry="7" fill="${INK}"/>
-    <path d="M57 56 l3 -6 l3 6Z" fill="${INK}" opacity="0.7"/>
-    <path d="M50 64 h20 M52 70 h16" stroke="${INK}" stroke-width="2.5" stroke-linecap="round"/>
-    <path d="M46 78 l-6 22 l10 -6 l10 6 l10 -6 l10 6 l-6 -22Z" fill="${E3}"/>
-    <circle cx="60" cy="92" r="7" fill="${E2}"/><circle cx="60" cy="92" r="3" fill="${HI}"/>`,
-
   /* A wax seal pressed with a W, a quill laid across it. */
   hellfire: `
     <ellipse cx="60" cy="102" rx="38" ry="6" fill="${INK}" opacity="0.32"/>

@@ -240,6 +240,39 @@
   inset: 0;
   background: linear-gradient(180deg, rgba(0, 0, 0, 0.16), transparent 24% 70%, rgba(0, 0, 0, 0.3));
 }
+/* --- adult content, hidden when the setting asks ---------------------------
+   The mark is on the card whatever the setting says; only this block reads
+   it, so the switch takes effect on the spot with nothing redrawn. */
+html[data-blur-adult='1'] [data-adult] .card-art img,
+html[data-blur-adult='1'] [data-adult] .fx-art,
+html[data-blur-adult='1'] [data-adult] .card-art::before {
+  filter: blur(22px) saturate(0.5);
+}
+html[data-blur-adult='1'] .avatar-cell[data-adult] { filter: blur(9px) saturate(0.5); }
+html[data-blur-adult='1'] [data-adult] .card-art { position: relative; }
+html[data-blur-adult='1'] [data-adult] .card-art::after {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.55));
+}
+/* The one control the blur adds: it belongs to the open card, not the grid. */
+.adult-reveal {
+  position: absolute;
+  left: 50%; bottom: 10px;
+  z-index: 4;
+  display: none;
+  align-items: center;
+  gap: 6px;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(6px);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+}
+html[data-blur-adult='1'] [data-adult] .adult-reveal { display: inline-flex; }
+
 .card-art-fallback {
   position: absolute;
   inset: 0;
@@ -249,15 +282,17 @@
 }
 
 /* The star is drawn small and hit large: the button is the reach, the disc
-   is what shows. The reach stops short of the wish bookmark below it. */
+   is what shows. Both are centred on the same point, so the star sits in the
+   middle of the disc however wide the reach is made. The reach stops short of
+   the wish bookmark below it. */
 .fav-button {
   position: absolute;
-  top: -4px; right: -4px;
+  top: -5px; right: -6px;
   z-index: 3;
   display: grid;
   place-items: center;
   width: 54px; height: 48px;
-  padding: 0 0 6px;
+  padding: 0;
   color: rgba(255, 255, 255, 0.7);
   background: none;
   touch-action: manipulation;
@@ -265,12 +300,16 @@
 .fav-button::before {
   content: '';
   position: absolute;
-  inset: 12px 12px 6px 12px;
+  left: 50%; top: 50%;
+  width: 30px; height: 30px;
+  transform: translate(-50%, -50%);
   z-index: -1;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.42);
   backdrop-filter: blur(4px);
 }
+/* The glyph is the grid's only item, so it lands on the same centre. */
+.fav-button svg { display: block; }
 .fav-button.is-on { color: var(--warning); }
 /* On the card itself, the star and the bookmark wait for the face to turn up. */
 .card:not(.is-revealed) > .fav-button,
@@ -278,10 +317,9 @@
 .fav-button.is-giant {
   top: 4px; right: 4px;
   z-index: 5;
-  width: 60px; height: 60px;
-  padding: 0;
+  width: 62px; height: 62px;
 }
-.fav-button.is-giant::before { inset: 8px; background: rgba(0, 0, 0, 0.5); }
+.fav-button.is-giant::before { width: 44px; height: 44px; background: rgba(0, 0, 0, 0.5); }
 
 .card-body {
   position: relative;
@@ -1066,6 +1104,11 @@ html[data-lowpower='1'] .card-desc { animation: none !important; }
    taller face it simply runs longer. */
 .giant-card[data-rarity="prismatic"] .fx-b { display: block; }
 .giant-card[data-rarity="prismatic"] .fx-b::before { inset: -6% -24%; opacity: 0.62; }
+/* On a small card the ribbon runs over everything and that is the effect.
+   On the giant card the words are the point, so they sit above it. */
+.giant-card[data-rarity="prismatic"] .card-body,
+.giant-card[data-rarity="prismatic"] .card-stats,
+.giant-card[data-rarity="prismatic"] .giant-actions { position: relative; z-index: 5; }
 /* The exotic wikitext scroll reads well behind a small card; behind a tall
    giant card it competes with the extract, so it fades out under the art. */
 .giant-card .fx-code {

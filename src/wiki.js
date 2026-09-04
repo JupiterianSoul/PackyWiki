@@ -29,7 +29,13 @@ const REQUEST_TIMEOUT_MS = 7000;
  * works to a deadline, hands over whatever it has when the clock runs out,
  * and stops the moment the connection is gone.
  */
-const DRAW_BUDGET_MS = 16000;
+/* A booster has to come back with the number of cards printed on it, so the
+   budget is the one thing that gives when a subject is thin. Sixteen seconds
+   was two extra rounds; a ten-card pack on a subject whose pages mostly have
+   no picture needs more than that. */
+const DRAW_BUDGET_MS = 26000;
+/** How many extra pools of random pages a short booster may pull in. */
+const FILL_ROUNDS = 8;
 const MAX_SEARCH_OFFSET = 5000;
 const SEARCH_PAGE_SIZE = 50;
 
@@ -364,6 +370,24 @@ function rollWishes(pack, wanted) {
 }
 
 /**
+ * The prints, settled against the cards the draw actually came back with.
+ *
+ * The rolls are made for the size the pack was sold as, but a thin subject
+ * can come back short. Trimming the rolls to the cards in hand can throw the
+ * guaranteed one away - a ten-card Epic pack that found four cards would put
+ * the Epic at roll seven and hand over four Commons - so the promise is made
+ * again over what is left.
+ */
+function settleWishes(pack, wishes, count) {
+  const kept = wishes.slice(0, Math.max(1, count));
+  if (!pack.guarantee) return kept;
+  const promised = rarityRank(pack.guarantee);
+  if (kept.some((wish) => rarityRank(wish) >= promised)) return kept;
+  kept[Math.floor(Math.random() * kept.length)] = pack.guarantee;
+  return kept;
+}
+
+/**
  * The highest tier a pack may hand out. Only a timed booster has one: its
  * track level caps the print, so a roll above the cap is brought down to it.
  */
@@ -438,16 +462,19 @@ async function drawWikipediaSet(pack) {
   const wishes = cappedWishes(pack, rollWishes(pack, wanted));
   const out = pagesToCards(await gatherCandidates(pack), seen).slice(0, wanted);
 
-  // Still short (a dead query, a thin subject): random articles, which always
-  // exist, rather than an error the player cannot do anything about.
-  for (let round = 0; out.length < wanted && round < 2 && !outOfTime(); round++) {
+  // Still short (a dead query, a thin subject, a candidate list mostly
+  // without pictures): random articles, which always exist, rather than a
+  // ten-card booster that hands over four. Each round is one request for
+  // twenty pages, and the loop only runs while the pack is still owed cards.
+  for (let round = 0; out.length < wanted && round < FILL_ROUNDS && !outOfTime(); round++) {
     const extra = pagesToCards(await randomPool().catch(() => []), seen);
     for (const card of extra) { if (out.length >= wanted) break; out.push(card); }
   }
+  if (out.length < wanted) console.warn(`Wikster draw "${pack.name}": ${out.length} of ${wanted} cards`);
 
   if (!out.length) throw new Error(`No usable article found for "${pack.name}"`);
   if (!outOfTime()) await priceOnReadership(out);
-  return stampPrints(out, wishes);
+  return stampPrints(out, settleWishes(pack, wishes, out.length));
 }
 
 /* --- custom wikis -------------------------------------------------------- */
@@ -926,7 +953,7 @@ async function drawCustomSet(pack) {
   // nothing for the hunt below: the pack came back empty, or, when a round
   // happened to be all free cards, instantly.
   const tallyMiss = (reason) => { tally[reason === 'NO_TEXT' ? 'noText' : reason === 'NO_IMAGE' ? 'noImage' : 'other']++; };
-  for (let round = 0; out.length < wanted && round < 3 && !outOfTime(); round++) {
+  for (let round = 0; out.length < wanted && round < 6 && !outOfTime(); round++) {
     const ids = await randomIds(wiki, 20).catch(() => []);
     let details = ids.length ? await customPagesDetail(wiki, ids).catch(() => []) : [];
     if (!details.length && ids.length) {
@@ -954,14 +981,18 @@ async function drawCustomSet(pack) {
   }
 
   // Then, for whatever is still owed, the old way, one hunt per card at once.
-  if (out.length < wanted && !outOfTime()) {
+  // A hunt can come back empty, so it is run again while the pack is short
+  // and there is time: the size printed on the wrapper is a promise.
+  for (let pass = 0; out.length < wanted && pass < 3 && !outOfTime(); pass++) {
     const hunted = await Promise.all(Array.from({ length: wanted - out.length }, () => huntCustomCard(wiki, pack, seen, outOfTime, tally)));
-    for (const card of hunted) if (card) out.push(card);
-    say(`hunt: ${hunted.filter(Boolean).length} of ${hunted.length} cards`);
+    for (const card of hunted) if (card && out.length < wanted) out.push(card);
+    say(`hunt ${pass + 1}: ${hunted.filter(Boolean).length} of ${hunted.length} cards`);
   }
+  if (out.length < wanted) console.warn(`Wikster custom draw "${pack.name}": ${out.length} of ${wanted} cards`);
 
   if (!out.length) throw new Error(`No usable page found on ${wiki.sitename}`);
-  return stampPrints(out.slice(0, wanted), wishes);
+  const dealt = out.slice(0, wanted);
+  return stampPrints(dealt, settleWishes(pack, wishes, dealt.length));
 }
 
 /** The article's full plain text (lead and body), for the quiz. */
@@ -1070,8 +1101,8 @@ export async function translateCard(entry, targetLang) {
  */
 async function drawTitleSet(pack) {
   let wanted = (pack.titles ?? []).slice();
-  // A curated pack (the Darwin Awards) names more pages than a booster
-  // holds and deals a random hand of them.
+  // A curated pack may name more pages than a booster holds, and deals a
+  // random hand of them.
   if (pack.pick) wanted = shuffled(wanted).slice(0, pack.pick);
   wanted = wanted.slice(0, POOL_LIMIT);
   const out = [];

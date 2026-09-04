@@ -78,10 +78,10 @@ French article falls back to the English one rather than vanishing.
 A booster has a **subject**, a **size** (3 to 7 cards) and sometimes a
 **tier**.
 
-There are 27 subjects, from Animals and Space to Cinema, Football and the
-Darwin Awards. Two of them are curated rolls rather than searches: their
-articles are named outright in `src/data/packs.js` and the booster deals a
-random hand from that list.
+There are 26 subjects, from Animals and Space to Cinema, Football and Memes.
+Most are searches; a subject may instead be a curated roll, its articles named
+outright in `src/data/packs.js`, and the booster then deals a random hand from
+that list.
 
 ### Rarity is the print
 
@@ -159,8 +159,18 @@ and for each personal booster. An album knows its real total: for a searched
 subject it is the number of matching articles on Wikipedia, so most albums
 cannot be finished, and that is the joke.
 
-Duplicates stack as `×2`. The binder has a grid view and a classic two-page
-book view you turn by swiping.
+Duplicates stack as `×2`. The binder has an album shelf and a **classic**
+view of every card at once, grouped by subject, with a search field of its
+own.
+
+Cards are drawn from the whole encyclopaedia, and the whole encyclopaedia
+includes articles nobody wants opening on a bus, so Settings carries **Blur
+adult content**. It reads the card's own title, description and opening
+against a short list of unambiguous terms (`src/sensitive.js`) and hides the
+picture on the ones that match, in the collection, the albums and the picture
+picker. Nothing is removed, no draw changes, and an open card can be
+uncovered with a tap: the setting hides a picture, it does not edit the
+game.
 
 Alongside it, the **Card Index** is the shared record of every card anyone has
 pulled, and a **wishlist** marks cards you want, which friends and the auction
@@ -323,13 +333,16 @@ tomorrow's; a guess has to be in the dictionary before it costs a row;
 duplicate letters are scored the way the original scores them (one E in the
 word never lights two); and the board is written down after every guess, so
 it survives a closed app and cannot be replayed once it is over. Two hints
-come from the word's own Wikipedia article, its short description and its
-opening sentence with the word blanked, for a hundred of the day's points
-each. A solve is worth 600 points in one guess down to 100 in six, paid
-half in Buckarooz with a streak bonus of five percent a day up to half
-again; a solve in two rows hands over a Rare booster, and every seventh day
-of a streak a booster too. Signed in, the points are sent once to the
-leaderboard.
+are offered for 120 of the day's points each, and both have to earn it: the
+first is always a letter in its place, read off the answer itself, so it
+needs no connection and can never be vague; the second is what the word
+means, taken from Wikipedia and only when the page is a real article rather
+than a list of the things the word can name, and another letter when it is
+not. A solve is worth 1,400 points in one guess down to 500 in six, never
+less than 320 after hints, paid at ninety percent in Buckarooz with a streak
+bonus of five percent a day up to half again; a solve in two rows hands over
+a Rare booster, and every seventh day of a streak a booster too. Signed in,
+the points are sent once to the leaderboard.
 
 **The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
 reels, five paylines and eight symbols drawn as their own small pictures: six
@@ -346,62 +359,6 @@ up, the bonus has exactly eight spins) and only then pays. If the house does
 not answer, or the answer does not add up, the coin comes back. The machine
 is one state at a time, idle, spinning, settling, paying, bonus, and refuses
 any input that is not for the state it is in, so a double tap buys one spin.
-
-**Daily quests** and **Leaderboard**. The rule that holds all of it together
-is that nothing which pays out is decided on the phone.
-
-**Wikdle** (`src/wikdle.js`, words in `src/data/wikdle-words.js`) is the
-five-letter word of the day in six rows. The word is a function of the UTC
-date, so everyone on Earth has the same one and a phone's clock cannot fetch
-tomorrow's; a guess has to be in the dictionary before it costs a row;
-duplicate letters are scored the way the original scores them (one E in the
-word never lights two); and the board is written down after every guess, so
-it survives a closed app and cannot be replayed once it is over. A solve is
-worth 600 points in one guess down to 100 in six, paid half in Buckarooz and,
-signed in, sent once to the leaderboard.
-
-**The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
-reels, five symbols, five paylines and a paytable tuned so that it returns
-95% of what is bet over the long run; `tools/slots-rtp.mjs` computes that
-figure exactly from the tables. The spin is decided by the `slots` edge
-function with `crypto.getRandomValues`, never by the app: the app takes the
-coin, asks, checks the answer against the book (the stops exist, the windows
-match them, the total adds up) and only then pays. If the house does not
-answer, or the answer does not add up, the coin comes back. The machine is
-one state at a time, idle, spinning, settling, paying, and refuses any input
-that is not for the state it is in, so a double tap buys one spin.
-
-**Daily quests** and **Leaderboard**. The rule that holds all of it together
-is that nothing which pays out is decided on the phone.
-
-**Wikdle** (`src/wikdle.js`, words in `src/data/wikdle-words.js`) is the
-five-letter word of the day in six rows. The word is a function of the UTC
-date, so everyone on Earth has the same one and a phone's clock cannot fetch
-tomorrow's; a guess has to be in the dictionary before it costs a row;
-duplicate letters are scored the way the original scores them (one E in the
-word never lights two); and the board is written down after every guess, so
-it survives a closed app and cannot be replayed once it is over. A solve is
-worth 600 points in one guess down to 100 in six, paid half in Buckarooz and,
-signed in, sent once to the leaderboard.
-
-**The slot machine** (`src/slots.js`, book in `src/data/slots.js`) has three
-reels, five symbols, five paylines and a paytable tuned so that it returns
-95% of what is bet over the long run; `tools/slots-rtp.mjs` computes that
-figure exactly from the tables. The spin is decided by the `slots` edge
-function with `crypto.getRandomValues`, never by the app: the app takes the
-coin, asks, checks the answer against the book (the stops exist, the windows
-match them, the total adds up) and only then pays. If the house does not
-answer, or the answer does not add up, the coin comes back. The machine is
-one state at a time, idle, spinning, settling, paying, and refuses any input
-that is not for the state it is in, so a double tap buys one spin.
-
-**The roulette** (`src/roulette.js`, table in `src/data/roulette.js`) is a
-European wheel, the real layout, every classic bet, plus the game's own tier
-bets: a chip on Common covers the lowest 24 numbers and returns 1.5x, up to
-Exotic on three numbers at 10x. Several chips ride one spin, up to a table
-limit. The `roulette` edge function names the pocket; the app settles the
-chips itself against the same table, refuses an answer that disagrees, and
-turns the drawn wheel to the pocket on a long deceleration.
 
 **Daily quests** (`src/quests.js`, book in `src/data/quests.js`) are three a
 day from a book of over a hundred, easy, medium and hard by weight, dealt

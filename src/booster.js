@@ -146,8 +146,8 @@ export function toDrawPack(spec) {
   // every band and every search, and ends with The Creator: that is what
   // makes it personal. Every card it draws is marked with the code.
   const code = spec.kind === 'code' ? codeById(spec.codeId) : null;
-  // A curated subject (the Darwin Awards) names its pages outright too, and
-  // deals a random hand of them.
+  // A curated subject names its pages outright too, rather than searching
+  // for them, and deals a random hand of them.
   const roll = !code && themeById(spec.themeId)?.titles;
   const lang = getLanguage();
   const titles = code ? codeTitles(code)

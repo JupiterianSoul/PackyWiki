@@ -13,6 +13,7 @@
  * somewhere else, GRAY otherwise, and a word with one E never lights two.
  */
 import { ANSWERS, DICTIONARY } from './data/wikdle-words.js';
+import { t } from './i18n.js';
 
 export const ROWS = 6;
 export const COLUMNS = 5;
@@ -171,38 +172,25 @@ export function playGuess(game, guess) {
   return next;
 }
 
-/* --- hints, from the encyclopaedia ----------------------------------------- */
+/* --- hints ------------------------------------------------------------------
+ * Two hints, and both have to be worth what they cost.
+ *
+ * The first is always a letter in its place: it is drawn from the answer
+ * itself, so it cannot be wrong, cannot be vague, and works with no
+ * connection at all. The second is what the word MEANS, taken from
+ * Wikipedia - but only when the page is a real article. A five-letter word
+ * usually has a page listing its meanings instead, and "Topics referred to
+ * by the same term" is not a hint; when that is what comes back, or nothing
+ * does, the second hint is another letter rather than a wasted hundred
+ * points.
+ */
 
 /** What a hint costs, in the day's points, and how many a board may take. */
-export const HINT_COST = 100;
+export const HINT_COST = 120;
 export const HINTS_MAX = 2;
 
 /** The word with its letters hidden, in a sentence about it. */
 const mask = (text, word) => String(text ?? '').replace(new RegExp(`\\b${word}(s|es|ed|ing)?\\b`, 'gi'), (m) => '▮'.repeat(word.length) + (m.length > word.length ? m.slice(word.length) : ''));
-
-/**
- * A hint for the day's word: first its short description on Wikipedia,
- * then the opening sentence of its article with the word blanked out. Both
- * come from the encyclopaedia's summary endpoint for the word itself; a
- * word whose page is a list of meanings still says so, which is a hint of
- * its own. Resolves to null when nothing can be reached, and then nothing
- * is charged.
- */
-export async function fetchHint(word, n) {
-  try {
-    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`, { headers: { accept: 'application/json' } });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (n === 0) {
-      const description = String(data.description ?? '').trim();
-      return description ? mask(description, word) : mask(firstSentence(data.extract), word) || null;
-    }
-    const sentence = firstSentence(data.extract);
-    return sentence ? mask(sentence, word) : null;
-  } catch {
-    return null;
-  }
-}
 
 const firstSentence = (text) => {
   const clean = String(text ?? '').replace(/\s+/g, ' ').trim();
@@ -211,22 +199,95 @@ const firstSentence = (text) => {
   return (cut ? cut[0] : clean).trim().slice(0, 220);
 };
 
+/**
+ * Whether a summary is about the word or about the many things the word can
+ * name. A page of meanings, a list, a name page: none of them say anything
+ * about the answer, and all of them used to be handed over as the hint.
+ */
+const EMPTY_MEANING = /(may|can) (also )?refer to|refers? to:|same term|disambiguat|Wikimedia|list of |^(surname|given name|family name)/i;
+function usefulMeaning(data, word) {
+  if (!data || (data.type && data.type !== 'standard')) return null;
+  for (const candidate of [String(data.description ?? '').trim(), firstSentence(data.extract)]) {
+    if (!candidate || candidate.length < 8) continue;
+    if (EMPTY_MEANING.test(candidate)) continue;
+    const hidden = mask(candidate, word);
+    // A sentence that is nothing but the blanked-out word says nothing.
+    if (hidden.replace(/▮/g, '').replace(/[^a-zA-Z]/g, '').length < 6) continue;
+    return hidden.charAt(0).toUpperCase() + hidden.slice(1);
+  }
+  return null;
+}
+
+/**
+ * Which letter a letter-hint gives away: the same order every time for a
+ * given word, so taking the second hint never repeats the first, and
+ * positions the board has already turned green are skipped as worthless.
+ */
+function letterHint(word, taken, greens = []) {
+  const order = [2, 4, 0, 3, 1];   // middle first: the least guessable places
+  const known = new Set(greens);
+  const free = order.filter((i) => !known.has(i) && !taken.has(i));
+  const at = (free.length ? free : order.filter((i) => !taken.has(i)))[0];
+  if (at == null) return null;
+  taken.add(at);
+  return { at, text: t('wikdleHintLetter', { n: at + 1, of: COLUMNS, letter: String(word[at]).toUpperCase() }) };
+}
+
+/** The positions a board's letter hints have already given away. */
+const hintedPositions = (hints) => new Set((hints ?? [])
+  .map((h) => (typeof h === 'string' ? null : h?.at))
+  .filter((at) => Number.isInteger(at)));
+
+/**
+ * A hint for the day's word. The first is a letter; the second is the
+ * meaning when Wikipedia has one worth reading, and another letter when it
+ * does not. Never resolves to nothing: a hint always tells you something.
+ */
+export async function fetchHint(word, n, { greens = [], hints = [] } = {}) {
+  const taken = hintedPositions(hints);
+  if (n === 0) return letterHint(word, taken, greens);
+  const meaning = await wikipediaMeaning(word);
+  if (meaning) return { text: meaning };
+  return letterHint(word, taken, greens);
+}
+
+/** The word's own article, when it has one worth quoting. */
+async function wikipediaMeaning(word) {
+  try {
+    const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(word)}`, { headers: { accept: 'application/json' } });
+    if (!res.ok) return null;
+    return usefulMeaning(await res.json(), word);
+  } catch {
+    return null;
+  }
+}
+
 /** Record a hint taken on today's board, so it is charged once and shown again after a relaunch. */
-export function takeHint(game, text) {
-  const hints = [...(game.hints ?? []), text];
+export function takeHint(game, hint) {
+  const hints = [...(game.hints ?? []), typeof hint === 'string' ? { text: hint } : hint];
   const next = { ...game, hints };
   saveGame(next);
   return next;
 }
 
+/** A stored hint's words, whichever shape it was written in. */
+export const hintText = (hint) => (typeof hint === 'string' ? hint : String(hint?.text ?? ''));
+
 /** The Wikipedia article of the day's word, to read once the board is done. */
 export const articleUrl = (word) => `https://en.wikipedia.org/wiki/${encodeURIComponent(word)}`;
 
-/** What a finished board is worth: more for fewer rows, less for each hint, nothing for a loss. */
-export const WIKDLE_POINTS = [600, 500, 400, 300, 200, 100];
-export const basePoints = (game) => (game.status === 'won' ? WIKDLE_POINTS[game.rows.length - 1] ?? 100 : 0);
+/**
+ * What a finished board is worth: more for fewer rows, less for each hint,
+ * nothing for a loss.
+ *
+ * A board is once a day and takes real thought, so it pays like it: solving
+ * one is worth a few slot spins rather than a consolation. The floor keeps a
+ * slow solve with both hints from ever reading as a waste of a morning.
+ */
+export const WIKDLE_POINTS = [1400, 1150, 950, 800, 650, 500];
+export const basePoints = (game) => (game.status === 'won' ? WIKDLE_POINTS[game.rows.length - 1] ?? 500 : 0);
 export const wikdlePoints = (game) =>
-  game.status === 'won' ? Math.max(50, basePoints(game) - (game.hints?.length ?? 0) * HINT_COST) : 0;
+  game.status === 'won' ? Math.max(320, basePoints(game) - (game.hints?.length ?? 0) * HINT_COST) : 0;
 
 /**
  * The streak's bonus on the day's coins: five percent a day, up to half

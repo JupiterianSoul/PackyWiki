@@ -71,6 +71,7 @@ import {
   quizPlaysLeft, recordQuizPlay, QUIZ_PER_DAY
 } from './quiz.js';
 import { evaluate as evaluateAchievements, measure as measureAchievements, redeemableCount } from './achievements.js';
+import { isSensitive } from './sensitive.js';
 import { FRAME_STYLES, DEFAULT_FRAME_STYLE, frameStyleById, frameTier, frameSvg, frameUnlocked } from './frames.js';
 import { BADGES, badgeStates, romanRank, badgeSvg } from './badges.js';
 import { emblemSvg, monogramSvg } from './data/emblems.js';
@@ -2727,6 +2728,9 @@ function applyRarityVars(node, rarity) {
 
 function fillFront(front, data, rarity, { ownedTag = false } = {}) {
   const art = front.querySelector('.card-art');
+  // What the card is about, marked once here; whether the mark hides the
+  // picture is the setting's business, not the card's.
+  front.closest('.card')?.toggleAttribute('data-adult', isSensitive(data));
   art.replaceChildren();
   art.classList.remove('is-small-art', 'is-no-art');
   const fallback = () => {
@@ -3289,6 +3293,7 @@ function openCardDetail(entryKey, data, rarity) {
     card.className = 'card giant-card is-revealed is-lit';
     applyRarityVars(card, rarity);
     if (data.special) card.dataset.special = data.creator ? 'creator' : data.special;
+    if (isSensitive(data)) card.toggleAttribute('data-adult', true);
     card.innerHTML = `
       <div class="card-inner">
         <div class="card-face card-front">
@@ -3371,6 +3376,21 @@ function openCardDetail(entryKey, data, rarity) {
     card.querySelector('.card-title').textContent = data.title;
     card.querySelector('.card-desc').textContent = data.description || data.sourceName || '';
     card.querySelector('.giant-extract').textContent = data.extract;
+    // A hidden picture can be asked for, once, here: the card is open because
+    // the player chose to open it.
+    if (card.hasAttribute('data-adult') && settings().blurAdult) {
+      const reveal = document.createElement('button');
+      reveal.type = 'button';
+      reveal.className = 'adult-reveal';
+      reveal.innerHTML = `${iconSvg('spark', { size: 15 })}<span>${esc(t('adultReveal'))}</span>`;
+      press(reveal, { sound: null });
+      reveal.addEventListener('click', (event) => {
+        event.stopPropagation();
+        card.removeAttribute('data-adult');
+        reveal.remove();
+      });
+      card.querySelector('.card-art').appendChild(reveal);
+    }
     dressFront(card.querySelector('.card-front'), data, rarity);
     attachTilt(card);
     tilt.watch(card);
@@ -5454,6 +5474,44 @@ async function enterApp() {
  * so it is called after every load, local or from the cloud. Returns
  * whether anything was removed.
  */
+/**
+ * A subject that has been withdrawn from the game.
+ *
+ * A pack can be taken off the shelf by deleting it from THEME_PACKS, but the
+ * cards it already dealt stay in saves, in an album that no longer exists.
+ * Retiring it here removes them too: the cards, any booster of it still on
+ * the shelf, and the wishes for cards from it, at every launch and after
+ * every cloud load, so a save restored from before the withdrawal is cleaned
+ * the same way.
+ */
+const RETIRED_THEMES = ['darwin'];
+
+function purgeRetiredThemes() {
+  const retired = new Set(RETIRED_THEMES);
+  const fromRetired = (packId) => retired.has(String(packId ?? '').split('|')[1] ?? '');
+  let changed = false;
+  try {
+    const entries = state.collection?.entries ?? {};
+    for (const [key, entry] of Object.entries(entries)) {
+      if (fromRetired(entry?.packId)) { delete entries[key]; changed = true; }
+    }
+    if (changed) store.saveCollection(state.collection);
+    let shelf = false;
+    for (const [id, slot] of Object.entries(state.inventory ?? {})) {
+      if (slot?.spec?.kind !== 'code' && retired.has(slot?.spec?.themeId)) {
+        delete state.inventory[id];
+        dropReady(id);
+        shelf = true;
+      }
+    }
+    if (shelf) { store.saveInventory(state.inventory); changed = true; }
+    if (changed) { console.info('A withdrawn subject was removed from this save'); syncSoon(); }
+  } catch (error) {
+    console.warn('could not remove a withdrawn subject', error);
+  }
+  return changed;
+}
+
 function purgeRetiredCodes() {
   let changed = false;
   const retired = new Set(RETIRED_CODES);
@@ -5500,6 +5558,7 @@ function reloadFromStorage() {
   state.customPacks = store.loadCustomPacks();
   state.wallet = store.loadWallet();
   purgeRetiredCodes();
+  purgeRetiredThemes();
   applySettings();
   applyStrings();
   refreshWallet();
@@ -6310,7 +6369,11 @@ function paintAvatarInto(node, profile, { frame = null } = {}) {
  * until the circle holds what you want; that circle is the picture.
  */
 function openAvatarPicker() {
-  const mine = store.allEntries(state.collection).filter((c) => c.thumbnail);
+  // Every card with a picture, best first: a face is chosen from the whole
+  // collection, not from the first handful of it.
+  const mine = store.allEntries(state.collection)
+    .filter((c) => c.thumbnail)
+    .sort((a, b) => rarityRank(b.rarityId) - rarityRank(a.rarityId));
   openSheet(t('avatarTitle'), (body) => {
     if (!mine.length) {
       body.innerHTML = '<p class="muted"></p>';
@@ -6319,11 +6382,12 @@ function openAvatarPicker() {
     }
     const grid = document.createElement('div');
     grid.className = 'avatar-grid';
-    grid.replaceChildren(...mine.slice(0, 60).map((card) => {
+    grid.replaceChildren(...mine.map((card) => {
       const cell = document.createElement('button');
       cell.type = 'button';
       cell.className = 'avatar-cell';
       cell.style.backgroundImage = `url("${String(card.thumbnail).replace(/"/g, '%22')}")`;
+      cell.toggleAttribute('data-adult', isSensitive(card));
       cell.setAttribute('aria-label', card.title);
       press(cell, { sound: null });
       cell.addEventListener('click', () => openAvatarCrop(card));
@@ -7350,6 +7414,7 @@ function renderSettings() {
     settingRow('prices', 'settingsPrices', 'settingsPricesNote'),
     settingRow('lowPower', 'settingsLowPower', 'settingsLowPowerNote'),
     settingRow('hints', 'settingsHints', 'settingsHintsNote'),
+    settingRow('blurAdult', 'settingsBlurAdult', 'settingsBlurAdultNote'),
     language
   );
 
@@ -8293,6 +8358,9 @@ function applySettings() {
   document.documentElement.dataset.lowpower = s.lowPower ? '1' : '0';
   document.documentElement.dataset.hints = s.hints ? '1' : '0';
   document.documentElement.dataset.prices = s.prices === false ? '0' : '1';
+  // Cards are marked as they are built; the switch decides whether the mark
+  // means anything, so turning it on or off repaints without redrawing.
+  document.documentElement.dataset.blurAdult = s.blurAdult ? '1' : '0';
   if (s.awake === false) releaseWakeLock();
   synth.setMuted(!s.sound);
   synth.setVolume(s.volume ?? 1);
@@ -8764,16 +8832,19 @@ function renderWikdle() {
     }));
   };
 
-  // THE HINTS: two, from the word's own article, each for a hundred of the day's points.
+  // THE HINTS: two, and both have to be worth their points. A letter in its
+  // place always is; the meaning is only offered when the encyclopaedia has
+  // a real article rather than a page of things the word can mean.
   const paintHints = () => {
     const used = game.hints ?? [];
     hintsPill.textContent = t('wikdleHintsLeft', { n: Math.max(0, wikdle.HINTS_MAX - used.length) });
-    hints.replaceChildren(...used.map((text, i) => {
+    hints.replaceChildren(...used.map((hint) => {
+      const letter = Number.isInteger(hint?.at);
       const line = document.createElement('p');
       line.className = 'wikdle-hint';
       line.innerHTML = `<span class="wikdle-hint-icon">${iconSvg('bulb', { size: 15 })}</span><b></b><span></span>`;
-      line.querySelector('b').textContent = i === 0 ? t('wikdleHintDef') : t('wikdleHintSentence');
-      line.querySelector('span:last-child').textContent = text;
+      line.querySelector('b').textContent = letter ? t('wikdleHintLetterLabel') : t('wikdleHintMeaning');
+      line.querySelector('span:last-child').textContent = wikdle.hintText(hint);
       return line;
     }));
     if (game.status === 'playing' && used.length < wikdle.HINTS_MAX && game.rows.length >= 1) {
@@ -8788,10 +8859,15 @@ function renderWikdle() {
         btn.disabled = true;
         btn.classList.add('is-busy');
         synth.playTap();
-        const text = await wikdle.fetchHint(wikdle.wordForDay(game.day), used.length);
+        // Letters the board has already turned green are worth nothing as a
+        // hint, so the hint skips them.
+        const greens = new Set();
+        for (const row of game.rows ?? []) row.marks?.forEach((m, i) => { if (m === 'hit') greens.add(i); });
+        const hint = await wikdle.fetchHint(wikdle.wordForDay(game.day), used.length,
+          { greens: [...greens], hints: used });
         if (game.status !== 'playing') return;
-        if (!text) { btn.disabled = false; btn.classList.remove('is-busy'); toast(esc(t('wikdleHintNone')), 'error'); synth.playDenied(); return; }
-        game = wikdle.takeHint(game, text);
+        if (!hint) { btn.disabled = false; btn.classList.remove('is-busy'); toast(esc(t('wikdleHintNone')), 'error'); synth.playDenied(); return; }
+        game = wikdle.takeHint(game, hint);
         synth.playReveal?.();
         paintHints();
       });
@@ -8870,7 +8946,9 @@ function renderWikdle() {
     reportQuest('wikdle', { won: game.status === 'won', guesses: game.rows.length });
     if (points > 0) {
       reportQuest('points', { amount: points, game: 'wikdle' });
-      const coins = Math.round((points / 2) * (1 + wikdle.streakBonus(stats.streak)));
+      // A solved board pays close to its points, not half of them: one a day,
+      // won with thought, against a slot machine that pays out on every spin.
+      const coins = Math.round(points * 0.9 * (1 + wikdle.streakBonus(stats.streak)));
       store.saveWallet(store.loadWallet() + coins);
       refreshWallet();
       toast(esc(t('wikdlePaid', { amount: coins })), 'ok');
@@ -9946,9 +10024,10 @@ function init() {
   const pruned = store.pruneImagelessCards(state.collection);
   if (pruned) console.info(`Removed ${pruned} pictureless card(s) from the collection`);
 
-  // A withdrawn code leaves nothing behind, before anything else looks at
-  // the collection.
+  // A withdrawn code and a withdrawn subject leave nothing behind, before
+  // anything else looks at the collection.
   purgeRetiredCodes();
+  purgeRetiredThemes();
   // Prices follow fame and print; a card from before prints existed gets its
   // tier here. Silent on purpose: it runs on every launch and changes
   // nothing on a save that is already right.
@@ -10267,6 +10346,7 @@ init();
 
 window.__wikster = {
   state, store, debug, RARITIES, synth, music, backdrop, THEMES, THEME_PACKS, regrade: regradeCollection,
+  levelUp: showLevelUp, wikdle,
   codeByInput,
   draw: drawArticles, generateShop, syncSocial, drawCaps: drawCapsFor, drawPack: toDrawPack, odds, specId,
   setTheme: (id) => { useTheme(id); renderPacks(); renderShop(); renderBinder(); renderCustomize(); },

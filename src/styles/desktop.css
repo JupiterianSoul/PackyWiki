@@ -255,3 +255,62 @@
   /* Grids that stopped at two columns on a screen with room for four. */
   .shop-free, .shop-grid, .free-grid { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
 }
+
+/* ==========================================================================
+   ONE MEASURE, AND CARDS THE SIZE OF CARDS
+   --------------------------------------------------------------------------
+   Two things go wrong when a phone layout is handed a desk. A grid built to
+   fit two cards across a palm puts two cards across a monitor, and a card
+   the size of a paperback is a slideshow, not a collection. And a row built
+   to fill a phone fills 1180px too, so a switch, a price or a name ends up
+   marooned at the far end of a panel with a hole in the middle.
+
+   So: every grid of cards is sized in card-widths rather than in columns,
+   and everything that is a row rather than a wall keeps its own measure and
+   sits at the left of the deck with the rest of its screen.
+   ========================================================================== */
+@media (min-width: 1024px) {
+  /* --- cards are cards --------------------------------------------------- */
+  .classic-grid { grid-template-columns: repeat(auto-fill, minmax(158px, 1fr)); gap: 14px; }
+  .sheet-card-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+  /* The open album is a book, and a book has a page size: it stops growing
+     rather than turning four cards into four posters. */
+  .album-book-wrap { max-width: 720px; margin-inline: auto; }
+  .binder-tools, .binder-stats { max-width: var(--deck); }
+
+  /* --- rows keep their measure ------------------------------------------- */
+  /* Anything below is a line of information or a control, not a wall: given
+     the whole deck it reads as a gap with something at each end. */
+  .hero-card,
+  .shop-banner,
+  .frame-styles,
+  .fx-styles,
+  .quests-shell,
+  .daily-hero,
+  .lb-podium, .leaderboard,
+  .binder-stats,
+  .wallet-row,
+  #next-reward,
+  .friend-actions { max-width: 860px; }
+  .shop-feature { max-width: 900px; }
+  /* The reward is one card, not a banner the width of the desk. */
+  #next-reward .reward-card { max-width: 420px; }
+  /* Badges are chips: they cluster, they do not spread out to the horizon. */
+  .badge-grid { grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); max-width: 860px; }
+  .badge-grid.is-all { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+  /* A section's title belongs over its section, at the same measure. */
+  .section-head, .screen-sub { max-width: 900px; }
+
+  /* --- sheets sit in the middle of themselves ---------------------------- */
+  /* A dialogue is centred on the screen, so its own content is centred in
+     it rather than stacked against the left edge. */
+  .sheet-body > .level-jump { justify-content: center; }
+  .sheet-body .level-jump .bar { max-width: 220px; }
+  .sheet-body .level-reward { display: grid; justify-items: center; }
+  .sheet-body .level-reward .reward-card { width: min(420px, 100%); }
+  /* A .btn is inline-flex, and auto margins do nothing to an inline box, so
+     the one that fills the sheet becomes block-level to sit in the middle. */
+  .sheet-body > .btn-block { display: flex; margin-inline: auto; }
+  .sheet-body .daily-week { max-width: 520px; margin-inline: auto; }
+  .sheet-body .crop-stage, .sheet-body .crop-zoom, .sheet-body .crop-preview-row { margin-inline: auto; }
+}
