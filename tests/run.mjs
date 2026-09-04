@@ -11,11 +11,11 @@
  * A suite passes when it exits 0. Screenshots and logs land in tests/out.
  */
 import { spawn, execSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { createConnection } from 'node:net';
 
 const MODES = {
-  app: 'offline', hellfire: 'offline', games: 'offline', regalia: 'offline', offline: 'offline', product: 'offline', arcade2: 'offline',
+  app: 'offline', hellfire: 'offline', games: 'offline', regalia: 'offline', offline: 'offline', product: 'offline', arcade2: 'offline', desk: 'offline',
   fixes6: 'stub', worldclock: 'stub', facetoface: 'stub', g4: 'stub', sync: 'stub'
 };
 const PORT = Number(process.env.PORT) || 4173;
@@ -55,9 +55,17 @@ for (const mode of modes) {
   // it started alive on the port.
   // Bound to 127.0.0.1 by name: on a runner where localhost is ::1 first, a
   // server on "localhost" never answers the address the suites dial.
-  const preview = spawn(process.execPath, ['node_modules/vite/bin/vite.js', 'preview', '--outDir', `${OUT}/dist-${mode}`, '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'], { stdio: 'ignore' });
+  const previewLog = openSync(`${OUT}/preview-${mode}.log`, 'w');
+  const preview = spawn(process.execPath,
+    ['node_modules/vite/bin/vite.js', 'preview', '--outDir', `${OUT}/dist-${mode}`, '--host', '127.0.0.1', '--port', String(PORT), '--strictPort'],
+    { stdio: ['ignore', previewLog, previewLog] });
   try {
-    await until(() => portOpen(PORT), 'preview never came up');
+    // Its own words when it will not come up: this is the one failure with no
+    // suite log to explain it.
+    await until(() => portOpen(PORT), 'preview never came up').catch((error) => {
+      console.error(readFileSync(`${OUT}/preview-${mode}.log`, 'utf8').trim() || '(the preview server said nothing)');
+      throw error;
+    });
     for (const name of wanted.filter((n) => MODES[n] === mode)) {
       const started = Date.now();
       const code = await new Promise((resolve) => {

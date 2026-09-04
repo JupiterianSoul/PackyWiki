@@ -55,30 +55,23 @@ const tab = async (name) => { await p.locator(`.nav-item[data-tab="${name}"]`).c
 section('album medals');
 await tab('binder');
 await p.locator('#binder-seg .seg-option[data-value="albums"]').click();
-await p.waitForTimeout(600);
+await p.waitForTimeout(900);
 const animals = p.locator('.album-cover', { hasText: /animals/i });
 check('the shelf shows the animals album', (await animals.count()) === 1);
 check('its cover wears a medal', (await animals.locator('.album-cover-medal').count()) === 1);
 check('a bronze one', (await animals.locator('.album-cover-medal').getAttribute('data-tier')) === 'bronze');
 const geography = p.locator('.album-cover', { hasText: /geography/i });
 check('an album under seventy-five wears none', (await geography.locator('.album-cover-medal').count()) === 0);
-// The shelf is repainted when the category sizes arrive, so the click goes to the DOM, not to a node that may just have been replaced.
+// Reaching the rung pays it: no button, and the album stays a book of cards.
+check('the medal was paid on reaching it', await p.evaluate(() => JSON.parse(localStorage.getItem('wikster.profile.v1')).albumTiers?.['theme:animals'] === 1));
+check('and the coins came with it', (await wallet()) === 12500, String(await wallet()));
+check('a note says so', await p.evaluate(() => (JSON.parse(localStorage.getItem('wikster.profile.v1')).notifFeed ?? []).some((n) => /bronze/i.test(n.title))));
 await p.evaluate(() => [...document.querySelectorAll('.album-cover')].find((c) => /animals/i.test(c.textContent))?.click());
 await p.waitForTimeout(1200);
-const tiers = p.locator('.album-tiers .album-tier');
-check('the open album shows four rungs', (await tiers.count()) === 4, String(await tiers.count()));
-check('bronze is reached and waiting', (await tiers.nth(0).getAttribute('data-state')) === 'ready');
-check('silver is locked', (await tiers.nth(1).getAttribute('data-state')) === 'locked');
-check('and says what it asks', /200/.test(await tiers.nth(1).textContent()));
-check('exactly one claim button', (await p.locator('.album-tier-claim').count()) === 1);
-await p.screenshot({ path: 'product-medals.png' });
-const before = await wallet();
-await p.locator('.album-tier-claim').click();
-await p.waitForTimeout(900);
-check('claiming pays the coins', (await wallet()) === before + 2500, `${before} -> ${await wallet()}`);
-check('bronze is now claimed', (await tiers.nth(0).getAttribute('data-state')) === 'claimed');
-check('no claim button is left', (await p.locator('.album-tier-claim').count()) === 0);
-check('the medal is remembered', await p.evaluate(() => JSON.parse(localStorage.getItem('wikster.profile.v1')).albumTiers?.['theme:animals'] === 1));
+check('the open album shows no medals', (await p.locator('.album-tiers, .album-tier').count()) === 0);
+check('and nothing to claim', (await p.locator('.album-tier-claim').count()) === 0);
+check('the book fills its page', (await p.locator('#page-slots > *').count()) === 4, String(await p.locator('#page-slots > *').count()));
+await p.screenshot({ path: 'product-album.png' });
 await p.evaluate(() => document.querySelector('#album-back')?.click());
 await p.waitForTimeout(600);
 

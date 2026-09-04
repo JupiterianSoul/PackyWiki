@@ -463,5 +463,25 @@ export const RELEASES = [
       { en: 'Opening the shop before the Auction House no longer leaves the house showing an error until the next launch', fr: 'Ouvrir la boutique avant la Maison des enchères ne laisse plus la maison afficher une erreur jusqu’au lancement suivant' },
       { en: 'Wikdle scores reach the leaderboard again: the server refused anything above 600 points since the puzzle started paying up to 1,400', fr: 'Les scores Wikdle atteignent de nouveau le classement : le serveur refusait tout ce qui dépassait 600 points depuis que le puzzle paie jusqu’à 1 400' }
     ]
+  },
+  {
+    id: 'thedesk', icon: 'grid', accent: '#7dd3fc',
+    title: { en: 'The Desk', fr: 'Le bureau' },
+    points: [
+      { en: 'A real desktop app: a rail, the work, and a panel that carries the day', fr: 'Une vraie application de bureau : un rail, le travail, et un panneau qui porte la journée' },
+      { en: 'Settings, achievements and the shop in two columns; the album book holds eight', fr: 'Réglages, succès et boutique en deux colonnes ; l’album tient huit cartes' },
+      { en: 'Album medals are paid the moment you reach them, and leave the album alone', fr: 'Les médailles d’album sont payées dès que vous les atteignez, et laissent l’album tranquille' },
+      { en: 'Guess the Article opens where you can actually see something, with a clock you can read', fr: 'Devinez l’article commence là où l’on voit quelque chose, avec un chrono lisible' }
+    ],
+    changelog: [
+      { en: 'On a screen 1280px and wider the app grows a third column: a panel down the right carrying your level, the daily gift, the day’s quests and the bell under every screen, and above them whatever the screen at hand keeps out of sight on a phone: the shop’s clocks and pull rates, the collection’s count and filters, the arcade’s rounds left, your own lots at the auction house. It folds away to a handle, and remembers', fr: 'Sur un écran de 1280px et plus, l’application gagne une troisième colonne : un panneau à droite qui porte votre niveau, le cadeau du jour, les quêtes et la cloche sous chaque écran, et au-dessus ce que l’écran en cours garde hors de vue sur un téléphone : les horloges et les taux de la boutique, le compte et les filtres de la collection, les manches restantes de l’arcade, vos propres lots aux enchères. Il se replie en une poignée, et s’en souvient' },
+      { en: 'The middle column stops being an 1180px letterbox down the centre of a monitor and takes the room it is given, with insets on an 8px rhythm instead of a phone’s padding', fr: 'La colonne centrale cesse d’être une bande de 1180px au milieu du moniteur et prend la place qu’on lui donne, avec des marges au rythme de 8px plutôt que celles d’un téléphone' },
+      { en: 'Lists of self-contained rows run in two columns (settings, achievements, the glossary), the shop’s stalls sit side by side, and the profile puts who you are beside everything you have', fr: 'Les listes de lignes autonomes passent en deux colonnes (réglages, succès, glossaire), les étals de la boutique se rangent côte à côte, et le profil met qui vous êtes à côté de tout ce que vous avez' },
+      { en: 'The album book holds eight cards to a page on a desk instead of four, so a card in an album is the size of a card rather than a poster', fr: 'L’album tient huit cartes par page sur un bureau au lieu de quatre : une carte dans un album a la taille d’une carte, pas d’une affiche' },
+      { en: 'Icon-only buttons say what they do on hover and on keyboard focus, rows answer a pointer the moment it arrives, and a row holding a focused control says so', fr: 'Les boutons sans texte disent ce qu’ils font au survol et au focus clavier, les lignes répondent au pointeur dès son arrivée, et une ligne contenant un contrôle au focus le montre' },
+      { en: 'Album medals are paid the moment an album reaches one, with a note in the bell; the album itself goes back to being a book of cards', fr: 'Les médailles d’album sont payées dès qu’un album en atteint une, avec une note dans la cloche ; l’album redevient un livre de cartes' },
+      { en: 'Guess the Article drops its first blur, the one nothing could be read through: three steps now, opening where a good eye has something to go on, with a clock that shows how long is left and a longer step to think in', fr: 'Devinez l’article abandonne son premier flou, celui qu’on ne pouvait pas percer : trois paliers désormais, commençant là où un bon œil a de quoi travailler, avec un chrono qui montre le temps restant et un palier plus long pour réfléchir' },
+      { en: '"Blur adult content" is now "Hide sensitive content". It does exactly what it did', fr: '« Flouter le contenu adulte » devient « Masquer le contenu sensible ». Le comportement est identique' }
+    ]
   }
 ];

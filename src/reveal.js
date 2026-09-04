@@ -15,12 +15,19 @@
 export const REVEAL_ROUND_LENGTH = 8;
 /** Rounds a day. */
 export const REVEAL_PER_DAY = 3;
-/** Points by the step the blur is at when the right title is picked. */
-export const REVEAL_POINTS = [250, 180, 120, 60];
-/** Blur radius by step, in pixels of a 300-pixel picture. */
-export const REVEAL_BLUR = [26, 14, 7, 2];
+/**
+ * Points by the step the blur is at when the right title is picked, and the
+ * blur at each step in pixels of a 300-pixel picture.
+ *
+ * Three steps, not four: the round used to open at a blur nothing could be
+ * read through, so the first step was never a real chance to answer, only a
+ * few seconds of waiting. It now opens where a good eye has something to go
+ * on, and the two steps after it are the ones that were already right.
+ */
+export const REVEAL_POINTS = [200, 120, 60];
+export const REVEAL_BLUR = [14, 7, 2];
 /** How long a step lasts before the blur lifts on its own, in milliseconds. */
-export const REVEAL_STEP_MS = 3500;
+export const REVEAL_STEP_MS = 6000;
 /** Coins per point. */
 export const REVEAL_COIN_RATE = 0.3;
 /** Titles offered per card. */

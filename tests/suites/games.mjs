@@ -2,7 +2,10 @@
 import { chromium, devices } from 'playwright';
 import { launchOptions } from '../lib/browser.mjs';
 import { installStubs } from '../lib/stubs.mjs';
-import { loadWords, wordForDay, utcDay } from '/home/user/PackyWiki/src/wikdle.js';
+// Relative to this file, not to anybody's checkout: a suite runs with
+// tests/out as its working directory, and on a CI runner nobody's home
+// directory is where it was written.
+import { loadWords, wordForDay, utcDay } from '../../src/wikdle.js';
 await loadWords();
 let fails = 0; const check = (l, c, e = '') => { if (!c) fails++; console.log(`${c ? 'PASS' : 'FAIL'}  ${l}${e ? '  ' + e : ''}`); };
 const b = await chromium.launch(launchOptions());

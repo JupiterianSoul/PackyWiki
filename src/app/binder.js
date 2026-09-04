@@ -7,7 +7,7 @@ import { updateBadges } from './regalia.js';
 import { gainBooster } from './open.js';
 import { specName } from '../booster.js';
 import * as store from '../collection.js';
-import { ALBUM_TIERS, CARDS_PER_PAGE, albumHasTiers, albumKeyOf, albumTierBooster, albumTierNeed, albumTiersClaimed, albumTiersReached, buildAlbums, fetchAlbumTotal } from '../albums.js';
+import { ALBUM_TIERS, albumKeyOf, albumTiersReached, buildAlbums, cardsPerPage, fetchAlbumTotal } from '../albums.js';
 import { h } from '../ui/dom.js';
 import { iconSvg } from '../data/icons.js';
 import { Segmented, dur, press, reveal } from '../ui/components.js';
@@ -260,7 +260,6 @@ export function renderAlbum() {
   el.albumProgress.textContent = `${album.owned}/${album.total == null ? '?' : compactCount(album.total)}`
     + (album.complete ? ` · ${t('albumComplete')}` : '');
   if (album.total == null) refreshAlbumTotals([album]);
-  paintAlbumTiers(album);
   el.filterOpen.textContent = t('filters');
   const active = activeFilterCount();
   el.filterCount.textContent = String(active);
@@ -280,7 +279,7 @@ export function renderAlbum() {
   const page = Math.min(state.album.spread, pages - 1);
   state.album.spread = page;
 
-  fillAlbumPage(el.pageSlots, visible, page * CARDS_PER_PAGE, album);
+  fillAlbumPage(el.pageSlots, visible, page * cardsPerPage(), album);
   el.pageno.textContent = String(page + 1);
 
   if (pages <= 12) {
@@ -300,7 +299,7 @@ export function renderAlbum() {
 
 export function fillAlbumPage(node, entries, offset, album) {
   const slots = [];
-  for (let i = 0; i < CARDS_PER_PAGE; i++) {
+  for (let i = 0; i < cardsPerPage(); i++) {
     const entry = entries[offset + i];
     if (entry) {
       const card = buildStaticCard(entry, rarityById(entry.rarityId), entry.key);
@@ -324,7 +323,7 @@ export function fillAlbumPage(node, entries, offset, album) {
 /** How many pages this album's book holds, given what the filters let through. */
 
 export function pageCount(album, visibleCount) {
-  const filled = Math.max(1, Math.ceil(visibleCount / CARDS_PER_PAGE));
+  const filled = Math.max(1, Math.ceil(visibleCount / cardsPerPage()));
   // One blank page at the back says there is more of this category out there,
   // unless you have actually finished it.
   return album.complete ? filled : filled + 1;
@@ -437,57 +436,4 @@ export function openFilters() {
 
     body.appendChild(wrap);
   });
-}
-
-/* --- the medals ---------------------------------------------------------------------
-
- * Four rungs per album (see ALBUM_TIERS): what each asks, which are reached,
- * which are claimed. The strip sits under the album's count; a reached rung
- * not yet claimed is the one button on it.
- */
-
-export function paintAlbumTiers(album) {
-  let strip = el.albumView.querySelector('.album-tiers');
-  if (!albumHasTiers(album)) { strip?.remove(); return; }
-  if (!strip) {
-    strip = h('div.album-tiers');
-    el.albumProgress.after(strip);
-  }
-  const reached = albumTiersReached(album);
-  const claimed = albumTiersClaimed(state.profile, album);
-  strip.replaceChildren(...ALBUM_TIERS.map((tier, i) => {
-    const state_ = i < claimed ? 'claimed' : i < reached ? 'ready' : 'locked';
-    const need = albumTierNeed(album, tier);
-    const chip = h('div.album-tier', { dataset: { tier: tier.id, state: state_ }, title: t(`albumTier_${tier.id}`) }, [
-      h('span.album-tier-disc', { 'aria-hidden': 'true' }),
-      h('b', t(`albumTier_${tier.id}`)),
-      h('span.album-tier-need.tabular', state_ === 'locked' ? t('albumTierNeed', { n: need }) : t(state_ === 'claimed' ? 'albumTierClaimed' : 'albumTierReached'))
-    ]);
-    if (state_ === 'ready' && i === claimed) {
-      const btn = h('button.btn.btn-sm.btn-primary.album-tier-claim', { type: 'button' }, t('albumTierClaim'));
-      press(btn, { sound: null });
-      btn.addEventListener('click', () => claimAlbumTier(album, i));
-      chip.appendChild(btn);
-    }
-    return chip;
-  }));
-}
-
-/** Pays the rung: coins, and from silver up a booster of the subject. */
-export function claimAlbumTier(album, index) {
-  const tier = ALBUM_TIERS[index];
-  if (!tier || albumTiersClaimed(state.profile, album) !== index || albumTiersReached(album) <= index) return;
-  state.profile.albumTiers = { ...(state.profile.albumTiers ?? {}), [album.key]: index + 1 };
-  store.saveProfile(state.profile);
-  store.saveWallet(store.loadWallet() + tier.coins);
-  refreshWallet();
-  const spec = albumTierBooster(album, tier);
-  if (spec) gainBooster(spec);
-  const reward = spec ? `${money(tier.coins)} + ${esc(specName(spec))}` : money(tier.coins);
-  toast(t('albumTierWon', { tier: t(`albumTier_${tier.id}`), album: esc(album.name), reward }), 'ok');
-  synth.playCoins();
-  updateBadges();
-  reportQuest('albumTier');
-  paintAlbumTiers(album);
-  renderPacks();
 }

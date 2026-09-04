@@ -202,8 +202,8 @@ the card's title and text up to date, a deleted one is said to be gone. The
 card itself is never taken away.
 
 Cards are drawn from the whole encyclopaedia, and the whole encyclopaedia
-includes articles nobody wants opening on a bus, so Settings carries **Blur
-adult content**. It reads the card's own title, description and opening
+includes articles nobody wants opening on a bus, so Settings carries **Hide
+sensitive content**. It reads the card's own title, description and opening
 against a short list of unambiguous terms (`src/sensitive.js`) and hides the
 picture on the ones that match, in the collection, the albums and the picture
 picker. Nothing is removed, no draw changes, and an open card can be
@@ -485,9 +485,33 @@ integration or through `.github/workflows/cloudflare.yml`, which deploys
 `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` exist as repository
 secrets, and does nothing at all until then.
 
-Above 1024px the app stops being a phone in the middle of a monitor:
-`src/styles/desktop.css` stands the bottom bar up as a rail down the left,
-opens sheets as centred dialogues, and lets the grids use the width.
+### On a desk
+
+`src/styles/desktop.css` has two widths in it, and they are different rooms.
+
+**From 1024px the phone stands up.** The bottom bar becomes a rail down the
+left with its labels beside its icons and the drawer's list folded into it, so
+the hamburger goes; sheets open as centred dialogues rather than climbing from
+an edge no mouse lives near; hover becomes real input; and every grid of cards
+is measured in card widths rather than in columns.
+
+**From 1280px it is a desk.** Three columns: the rail, the work, and a panel
+down the right (`src/app/panel.js`) carrying the day (level, gift, quests, the
+bell) under every screen and, above it, whatever the screen at hand keeps out
+of sight on a phone: the shop's clocks and pull rates, the collection's count
+and filters, the arcade's rounds left, the auction house's own lots. It
+collapses to a handle and remembers. The middle column stops being an 1180px
+letterbox and takes the width it is given; insets come down to an 8px rhythm;
+lists of self-contained rows (settings, achievements, the glossary) run in two
+columns; the shop's stalls sit side by side; the profile puts who you are
+beside what you have; the album book holds eight cards to a page instead of
+four (`cardsPerPage` in `albums.js`, asked on every paint so the two agree the
+moment the window changes). Icon-only buttons say what they do on hover and on
+keyboard focus, from the same `aria-label` a screen reader reads.
+
+What does not change is the app: the same screens, in the same order, painted
+by the same code, with the same state. `tests/suites/desk.mjs` holds the frame
+to it, including that nothing on a screen ever runs under the panel.
 
 The site is also an installable web app: `public/manifest.webmanifest` and
 its icons (drawn from the logo by `tools/icons.mjs`), and a service worker

@@ -18,6 +18,7 @@ import { renderAlbum, renderBinder } from './binder.js';
 import { regradeCollection } from './boot.js';
 import { paintDrawerLinks } from './drawer.js';
 import { showGate, userId, takeMerge } from './gate.js';
+import { paintPanel } from './panel.js';
 import { live } from './live.js';
 import { tickTimed } from './packs.js';
 import { holdWakeLock, releaseWakeLock } from './settings.js';
@@ -308,6 +309,8 @@ export function showScreen(name) {
   // The screen stays lit for a pack and is let go the moment it is done.
   if (immersive) holdWakeLock(); else releaseWakeLock();
 
+  paintPanel();
+  setTickerJob('panel', WIDE.matches ? paintPanel : null);
   setTickerJob('shop', name === 'shop' ? tickRestock : null);
   setTickerJob('timed', name === 'timed' ? tickTimed : null);
   // The chat poll used to survive every exit but the back button, ticking

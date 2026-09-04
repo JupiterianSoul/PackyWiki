@@ -25,6 +25,7 @@ import * as odds from '../data/odds.js';
 import { addXp } from '../progression.js';
 import { timedTopTier } from '../timed.js';
 import { reportAlbums } from './arcade.js';
+import { applyPanelState, paintPanel, togglePanel } from './panel.js';
 import { openFilters, renderBinder, turnAlbumPage } from './binder.js';
 import { $, THEME_KEY, WIDE, applyStrings, bind, debug, el, flushPlaytime, lookForUpdate, migrateLanguages, migrateSpecialCards, migrateViews, money, placeDrawerLinks, refreshWallet, showScreen, shuffle, state, storedTheme, syncTicker, toast, useTheme, wait } from './core.js';
 import { openDaily, openOdds, openWallet } from './daily.js';
@@ -111,6 +112,7 @@ bind({
   classicSearchMark: $('#classic-search-mark'),
   albumBook: $('#album-book'), albumLeaf: $('#album-leaf'),
   pageSlots: $('#page-slots'), pageno: $('#pageno'),
+  panel: $('#panel'), panelBody: $('#panel-body'), panelToggle: $('#panel-toggle'),
   albumDots: $('#album-dots'), albumHint: $('#album-hint'),
   achTitle: $('#ach-title'), achSub: $('#ach-sub'), achList: $('#ach-list'),
   friendActions: $('#friend-actions'), friendAlbums: $('#friend-albums'),
@@ -354,10 +356,14 @@ export function init() {
   // The arcade's back buttons, and the quests' chip in the drawer.
   el.wikdleBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
   el.slotsBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
+  el.panelToggle.addEventListener('click', togglePanel);
+  press(el.panelToggle, { sound: null });
   el.duelBack.addEventListener('click', () => { synth.playTap(); showScreen('games'); });
   el.revealBack.addEventListener('click', () => { synth.playTap(); import('./reveal.js').then((m) => m.leaveReveal()); showScreen('games'); });
   quests.onQuestsChange(() => paintDrawerLinks());
   reportAlbums();
+  applyPanelState();
+  paintPanel({ force: true });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') lookForUpdate();
   });

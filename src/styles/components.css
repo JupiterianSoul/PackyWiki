@@ -17,6 +17,10 @@
 }
 .panel-2 { background: var(--surface-2); }
 
+/* The desk's right-hand column. It has no place on a phone, and the width it
+   appears at is decided in desktop.css. */
+.desk-panel { display: none; }
+
 /* --- press ----------------------------------------------------------------- */
 
 .pressable {

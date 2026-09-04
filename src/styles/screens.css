@@ -810,40 +810,6 @@ input[type='search']::-webkit-search-cancel-button { filter: invert(1) opacity(0
 [data-tier='gold'] { --medal: #f2c14e; }
 [data-tier='diamond'] { --medal: #7fe3ff; }
 
-/* The four rungs under an open album's count. */
-.album-tiers {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-.album-tier {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 8px;
-  align-items: center;
-  padding: 6px 10px 6px 8px;
-  border-radius: var(--radius-pill);
-  border: var(--border) var(--border-style) var(--line);
-  background: var(--surface);
-  font-size: 0.7rem;
-  line-height: 1.2;
-}
-.album-tier > b { font-size: 0.74rem; font-weight: 800; }
-.album-tier-disc {
-  grid-row: 1 / 3;
-  width: 18px; height: 18px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #fff8, transparent 45%), var(--medal);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.35);
-}
-.album-tier[data-state='locked'] { opacity: 0.62; }
-.album-tier[data-state='locked'] .album-tier-disc { filter: grayscale(1); opacity: 0.6; }
-.album-tier[data-state='ready'] { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent); }
-.album-tier-need { color: var(--ink-dim); }
-.album-tier-claim { grid-column: 1 / 3; margin-top: 6px; }
-
 .album-cover-done {
   position: absolute;
   top: 8px; right: 8px;

@@ -409,6 +409,17 @@
 }
 .reveal-step[data-state='now'] { color: var(--accent-ink); background: var(--accent); border-color: var(--accent); }
 .reveal-step[data-state='past'] { opacity: 0.45; text-decoration: line-through; }
+.reveal-tools { display: grid; justify-items: center; gap: 8px; }
+.reveal-clock { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; width: min(100%, 300px); }
+.reveal-clock-bar {
+  height: 6px; border-radius: 999px; overflow: hidden;
+  background: color-mix(in srgb, var(--ink) 12%, transparent);
+}
+.reveal-clock-bar::before {
+  content: ''; display: block; height: 100%; width: var(--left, 100%);
+  border-radius: 999px; background: var(--accent);
+}
+.reveal-clock-label { font-size: 0.7rem; font-weight: 700; color: var(--ink-dim); white-space: nowrap; }
 .reveal-verdict { min-height: 1.4em; text-align: center; }
 .reveal-verdict.is-right { color: var(--positive); font-weight: 700; }
 .reveal-verdict.is-wrong { color: var(--negative); font-weight: 700; }

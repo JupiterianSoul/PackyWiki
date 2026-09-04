@@ -2,14 +2,17 @@
 
 import * as quests from '../quests.js';
 import { t, tx } from '../i18n.js';
-import { buildAlbums } from '../albums.js';
+import { ALBUM_TIERS, albumHasTiers, albumTierBooster, albumTiersReached, buildAlbums } from '../albums.js';
 import * as store from '../collection.js';
 import { iconSvg } from '../data/icons.js';
 import { press, reveal } from '../ui/components.js';
 import { synth } from '../ui/sound.js';
 import { casinoOpen } from '../slots.js';
-import { el, esc, showScreen, state, toast } from './core.js';
+import { el, esc, money, refreshWallet, showScreen, state, toast } from './core.js';
+import { specName } from '../booster.js';
 import { paintDrawerLinks, pushNote } from './drawer.js';
+import { gainBooster } from './open.js';
+import { updateBadges } from './regalia.js';
 import { signedIn, userId } from './gate.js';
 
 /* --- the arcade: minigames, quests and the leaderboard ------------------------------------------------------------ */
@@ -42,10 +45,48 @@ export let albumsDoneBefore = null;
 
 export function reportAlbums() {
   try {
-    const done = buildAlbums(store.allEntries(state.collection), state.customPacks).filter((a) => a.complete).length;
+    const albums = buildAlbums(store.allEntries(state.collection), state.customPacks);
+    const done = albums.filter((a) => a.complete).length;
     if (albumsDoneBefore !== null && done > albumsDoneBefore) for (let i = albumsDoneBefore; i < done; i++) reportQuest('album');
     albumsDoneBefore = done;
+    awardAlbumTiers(albums);
   } catch { /* an album that cannot be counted is not a crash */ }
+}
+
+/**
+ * The medals, paid the moment they are reached.
+ *
+ * There is no button and nothing to notice: an album that passes 75 different
+ * cards of its subject hands over the bronze medal there and then, says so,
+ * and leaves a note in the bell. The album itself stays a book of cards; what
+ * you have won is on its cover and in the achievements.
+ */
+export function awardAlbumTiers(albums) {
+  const claimed = { ...(state.profile.albumTiers ?? {}) };
+  let paid = 0;
+  let coins = 0;
+  for (const album of albums) {
+    if (!albumHasTiers(album)) continue;
+    const reached = albumTiersReached(album);
+    const had = Math.min(ALBUM_TIERS.length, Number(claimed[album.key]) || 0);
+    for (let i = had; i < reached; i++) {
+      const tier = ALBUM_TIERS[i];
+      coins += tier.coins;
+      const spec = albumTierBooster(album, tier);
+      if (spec) gainBooster(spec);
+      const reward = spec ? `${money(tier.coins)} + ${esc(specName(spec))}` : money(tier.coins);
+      const line = t('albumTierWon', { tier: t(`albumTier_${tier.id}`), album: esc(album.name), reward });
+      toast(line, 'ok');
+      pushNote('album', line, 'binder');
+      paid += 1;
+    }
+    if (reached > had) claimed[album.key] = reached;
+  }
+  if (!paid) return;
+  state.profile.albumTiers = claimed;
+  store.saveProfile(state.profile);
+  if (coins) { store.saveWallet(store.loadWallet() + coins); refreshWallet(); synth.playCoins(); }
+  updateBadges();
 }
 /** The stage a game shows when it cannot run: an icon, a sentence, maybe a button. */
 

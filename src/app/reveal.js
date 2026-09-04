@@ -24,9 +24,8 @@ const pill = (icon, text) => h('span.wikdle-pill', [h('span.wikdle-pill-icon', {
 export function renderReveal() {
   el.revealTitle.textContent = t('revealGameTitle');
   el.revealBack.innerHTML = iconSvg('chevronLeft', { size: 18 });
-  const g = state.reveal ??= { round: null, timer: null };
-  clearTimeout(g.timer);
-  g.timer = null;
+  const g = state.reveal ??= { round: null, timer: null, until: 0 };
+  stopClock(g);
   const entries = store.allEntries(state.collection);
   if (!reveal.canPlay(entries, isSensitive)) {
     el.revealBody.replaceChildren(gameStage('search', t('revealNeedCards', { n: reveal.REVEAL_MIN_CARDS })));
@@ -36,12 +35,40 @@ export function renderReveal() {
   paintReveal();
 }
 
+/**
+ * The clock.
+ *
+ * A step used to be a silent setTimeout: the blur lifted out of nowhere and
+ * the points fell with it, which read as the game hurrying. It is a deadline
+ * now, shown as a bar draining and the seconds beside it, and the frame that
+ * finds the deadline past is the one that lifts. Same clock on screen as in
+ * the code, so what the player sees is what they get.
+ */
+function stopClock(g) {
+  if (g?.timer) cancelAnimationFrame(g.timer);
+  if (g) { g.timer = null; g.until = 0; }
+}
+
+function runClock(bar, label) {
+  const g = state.reveal;
+  if (!g?.round || g.round.over) return;
+  const tick = () => {
+    if (state.reveal !== g || !g.until) return;
+    const left = g.until - performance.now();
+    if (left <= 0) { stopClock(g); liftNow(); return; }
+    if (bar.isConnected) {
+      bar.style.setProperty('--left', `${(100 * left) / reveal.REVEAL_STEP_MS}%`);
+      label.textContent = t('revealLiftIn', { s: Math.ceil(left / 1000) });
+    }
+    g.timer = requestAnimationFrame(tick);
+  };
+  g.until = performance.now() + reveal.REVEAL_STEP_MS;
+  g.timer = requestAnimationFrame(tick);
+}
+
 /** The clock stops with the screen: a lift on a screen nobody is looking at is a point lost for nothing. */
 export function leaveReveal() {
-  const g = state.reveal;
-  if (!g) return;
-  clearTimeout(g.timer);
-  g.timer = null;
+  stopClock(state.reveal);
 }
 
 function paintReveal() {
@@ -75,9 +102,14 @@ function paintReveal() {
   ]);
   const steps = h('div.reveal-steps', reveal.REVEAL_POINTS.map((pts, i) =>
     h('span.reveal-step.tabular', { dataset: { state: i < item.step ? 'past' : i === item.step ? 'now' : 'ahead' } }, String(pts))));
-  const clearer = h('button.btn.btn-ghost.btn-sm.reveal-clearer', { type: 'button', disabled: picked || item.step >= reveal.REVEAL_BLUR.length - 1 }, t('revealClearer'));
+  const last = item.step >= reveal.REVEAL_BLUR.length - 1;
+  const clearer = h('button.btn.btn-ghost.btn-sm.reveal-clearer', { type: 'button', disabled: picked || last }, t('revealClearer'));
   press(clearer, { sound: null });
-  clearer.addEventListener('click', () => { synth.playTap(); liftNow(); });
+  clearer.addEventListener('click', () => { synth.playTap(); stopClock(g); liftNow(); });
+  // The clock: a bar draining toward the next lift, and the seconds on it.
+  const bar = h('span.reveal-clock-bar', { 'aria-hidden': 'true' });
+  const label = h('span.reveal-clock-label.tabular');
+  const clock = h('div.reveal-clock', { hidden: picked || last }, [bar, label]);
   const choices = h('div.reveal-choices', item.choices.map((choice) => {
     const btn = h('button.btn.reveal-choice', { type: 'button', dataset: { key: choice.key }, disabled: picked }, choice.title);
     if (picked && choice.key === item.card.key) btn.classList.add('is-right');
@@ -93,11 +125,10 @@ function paintReveal() {
   const next = picked ? h('button.btn.btn-primary.reveal-next', { type: 'button' }, r.index + 1 < r.items.length ? t('revealNext') : t('revealFinish')) : null;
   if (next) { press(next, { sound: null }); next.addEventListener('click', () => { synth.playTap(); afterPick(); }); }
   const score = h('div.duel-score', [h('span.duel-points.tabular', t('duelPoints', { n: r.points }))]);
-  fill(body, h('div.reveal', [head, score, stage, steps, clearer, verdict, choices, next]));
+  fill(body, h('div.reveal', [head, score, stage, steps, h('div.reveal-tools', [clearer, clock]), verdict, choices, next]));
   // The blur lifts on its own, a step at a time, until a title is picked.
-  clearTimeout(g.timer);
-  g.timer = null;
-  if (!picked && item.step < reveal.REVEAL_BLUR.length - 1) g.timer = setTimeout(liftNow, reveal.REVEAL_STEP_MS);
+  stopClock(g);
+  if (!picked && !last) runClock(bar, label);
 }
 
 function liftNow() {
@@ -111,6 +142,7 @@ function liftNow() {
 function pickReveal(key) {
   const g = state.reveal;
   if (!g?.round || g.round.over) return;
+  stopClock(g);
   const before = g.round;
   g.round = reveal.pick(before, key);
   if (g.round === before) return;
@@ -128,6 +160,7 @@ function afterPick() {
 }
 
 function settleReveal(round) {
+  stopClock(state.reveal);
   const ledger = reveal.recordRound(round);
   const coins = reveal.coinsFor(round.points);
   if (coins > 0) { store.saveWallet(store.loadWallet() + coins); refreshWallet(); synth.playCoins(); }

@@ -189,7 +189,7 @@ export function installSupabase(page, { log = null, db = newDatabase(), schema =
     if (path === 'rpc/submit_score') {
       // The server's rule: one row per game and day, a duel or reveal round
       // replacing the day's when it beats it, never above the game's maximum.
-      const max = { wikdle: 1400, duel: 3100, reveal: 2000 }[body.p_game];
+      const max = { wikdle: 1400, duel: 3100, reveal: 1600 }[body.p_game];
       if (!max) return fail(route, 'this game is not scored by the client', 400);
       if (body.p_points < 0 || body.p_points > max) return fail(route, 'points out of range', 400);
       db.scores ??= [];

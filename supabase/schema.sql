@@ -905,7 +905,7 @@ declare
   v_existing integer;
 begin
   if auth.uid() is null then raise exception 'sign in'; end if;
-  v_max := case p_game when 'wikdle' then 1400 when 'duel' then 3100 when 'reveal' then 2000 else null end;
+  v_max := case p_game when 'wikdle' then 1400 when 'duel' then 3100 when 'reveal' then 1600 else null end;
   if v_max is null then raise exception 'this game is not scored by the client'; end if;
   if p_points < 0 or p_points > v_max then raise exception 'points out of range'; end if;
   select points into v_existing from scores

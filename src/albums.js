@@ -21,7 +21,13 @@ import { THEME_PACKS, themeById } from './data/packs.js';
 import { styleForSpec } from './packstyle.js';
 import { tx, getLanguage, wikiLang } from './i18n.js';
 
-export const CARDS_PER_PAGE = 4;
+/**
+ * Slots on one page of the book. A phone holds four, two across; a desk
+ * holds eight, four across, so a card on a monitor is the size of a card
+ * rather than a poster and a page shows a shelf's worth at once. The book
+ * asks on every paint, so the two agree the moment the window changes.
+ */
+export const cardsPerPage = () => (typeof matchMedia === 'function' && matchMedia('(min-width: 1024px)').matches ? 8 : 4);
 
 /* --- real category sizes -------------------------------------------------- */
 
