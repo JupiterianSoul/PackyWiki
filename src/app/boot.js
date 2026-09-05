@@ -27,7 +27,7 @@ import { timedTopTier } from '../timed.js';
 import { reportAlbums } from './arcade.js';
 import { applyPanelState, paintPanel, togglePanel } from './panel.js';
 import { openFilters, renderBinder, turnAlbumPage } from './binder.js';
-import { $, THEME_KEY, WIDE, applyStrings, bind, debug, el, flushPlaytime, lookForUpdate, migrateLanguages, migrateSpecialCards, migrateViews, money, placeDrawerLinks, refreshWallet, showScreen, shuffle, state, storedTheme, syncTicker, toast, useTheme, wait } from './core.js';
+import { $, THEME_KEY, WIDE, applyStrings, bind, debug, el, flushPlaytime, lookForUpdate, migrateLanguages, migrateSpecialCards, migrateViews, money, placeDrawerLinks, refreshWallet, setTickerJob, showScreen, shuffle, state, storedTheme, syncTicker, toast, useTheme } from './core.js';
 import { openDaily, openOdds, openWallet } from './daily.js';
 import { tilt } from './detail.js';
 import { buildDrawer, closeDrawer, openDrawer, openHelp, openNotifications, paintDrawerLinks } from './drawer.js';
@@ -300,7 +300,17 @@ export function init() {
   // button left to open it with: the rail IS it, so it has to exist from the
   // start rather than the first time somebody reaches for a menu.
   buildDrawer();
-  WIDE.addEventListener('change', () => { buildDrawer(); });
+  // A window dragged across the threshold changes more than the drawer: the
+  // album book holds eight cards to a page instead of four, the shelf's hint
+  // speaks of a mouse instead of a thumb, and the panel arrives or leaves.
+  WIDE.addEventListener('change', () => {
+    buildDrawer();
+    applyPanelState();
+    setTickerJob('panel', WIDE.matches ? paintPanel : null);
+    paintPanel({ force: true });
+    if (state.tab === 'binder') renderBinder();
+    if (state.tab === 'packs') renderPacks();
+  });
 
   // A special theme belongs to whoever redeemed its code. A save that lost
   // the code (an erased save, a transfer that went the other way) wakes up

@@ -10,6 +10,7 @@ import { synth } from '../ui/sound.js';
 import { casinoOpen } from '../slots.js';
 import { el, esc, money, refreshWallet, showScreen, state, toast } from './core.js';
 import { specName } from '../booster.js';
+import { CURRENCY_NAME, formatAmount } from '../pricing.js';
 import { paintDrawerLinks, pushNote } from './drawer.js';
 import { gainBooster } from './open.js';
 import { updateBadges } from './regalia.js';
@@ -74,10 +75,10 @@ export function awardAlbumTiers(albums) {
       coins += tier.coins;
       const spec = albumTierBooster(album, tier);
       if (spec) gainBooster(spec);
-      const reward = spec ? `${money(tier.coins)} + ${esc(specName(spec))}` : money(tier.coins);
-      const line = t('albumTierWon', { tier: t(`albumTier_${tier.id}`), album: esc(album.name), reward });
-      toast(line, 'ok');
-      pushNote('album', line, 'binder');
+      const tierName = t(`albumTier_${tier.id}`);
+      const extra = spec ? ` + ${specName(spec)}` : '';
+      toast(t('albumTierWon', { tier: tierName, album: esc(album.name), reward: `${money(tier.coins)}${esc(extra)}` }), 'ok');
+      pushNote('album', t('albumTierWon', { tier: tierName, album: album.name, reward: `${formatAmount(tier.coins)} ${CURRENCY_NAME}${extra}` }), 'binder');
       paid += 1;
     }
     if (reached > had) claimed[album.key] = reached;

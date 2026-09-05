@@ -180,6 +180,23 @@ await a.locator('.drawer-link[data-link="bell"]').click();
 await a.waitForTimeout(700);
 check('and it opens the bell sheet', /wished card|auction/i.test(await a.locator('#sheet-body').textContent()));
 await a.screenshot({ path: 'g4-bell.png' });
+await a.locator('#sheet-close').click();
+await a.waitForTimeout(400);
+
+/* --- the seller can open their own lot --------------------------------------- */
+section('the seller and their lot');
+// B is the seller of the Ada Lovelace lot; the tile must open its sheet for
+// them too, with the way out while nobody has bid.
+await viaDrawer(b, 'market');
+await b.waitForTimeout(1200);
+check('B sees the lot banded as theirs', /yours/i.test(await b.locator('.auction-tile').first().textContent()));
+await b.locator('.auction-tile .card').first().click();
+await b.waitForTimeout(700);
+check('tapping their own lot opens its sheet', await b.locator('#sheet .market-sheet').isVisible());
+check('with the withdraw button', (await b.locator('#sheet .btn-danger').count()) === 1);
+check('and the rarity line', /epic/i.test(await b.locator('#sheet .market-lines').textContent()));
+await b.locator('#sheet-close').click();
+await b.waitForTimeout(400);
 
 console.log(errors.length ? `\nERRORS:\n${errors.join('\n')}` : '\nno page errors');
 console.log(fails ? `\n${fails} FAILURES` : '\nALL PASS');

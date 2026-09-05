@@ -539,7 +539,10 @@
       <!-- The desk's right-hand column: the day, and what the screen at hand
            keeps out of sight on a phone. Hidden below 1280px. -->
       <aside id="panel" class="desk-panel" aria-label="Details">
-        <button id="panel-toggle" class="icon-btn panel-toggle" type="button" aria-expanded="true"></button>
+        <div class="panel-head">
+          <button id="panel-toggle" class="icon-btn panel-toggle" type="button" aria-expanded="true"></button>
+          <span class="panel-head-title" id="panel-title"></span>
+        </div>
         <div id="panel-body" class="panel-body"></div>
       </aside>
 

@@ -1,21 +1,15 @@
 /* binder: split out of main.js */
 
 import { t, tx } from '../i18n.js';
-import { renderPacks } from './packs.js';
-import { reportQuest } from './arcade.js';
-import { updateBadges } from './regalia.js';
-import { gainBooster } from './open.js';
-import { specName } from '../booster.js';
 import * as store from '../collection.js';
 import { ALBUM_TIERS, albumKeyOf, albumTiersReached, buildAlbums, cardsPerPage, fetchAlbumTotal } from '../albums.js';
-import { h } from '../ui/dom.js';
 import { iconSvg } from '../data/icons.js';
 import { Segmented, dur, press, reveal } from '../ui/components.js';
 import { RARITIES, rarityById } from '../data/rarities.js';
 import { emblemSvg, monogramSvg } from '../data/emblems.js';
 import { synth } from '../ui/sound.js';
 import { POPULARITY_BANDS, formatAmount } from '../pricing.js';
-import { compactCount, el, esc, money, openSheet, refreshWallet, state, toast } from './core.js';
+import { compactCount, el, money, openSheet, state, toast } from './core.js';
 import { buildStaticCard } from './detail.js';
 import { live } from './live.js';
 

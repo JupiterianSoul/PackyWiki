@@ -81,6 +81,23 @@ check('and what the screen at hand keeps out of sight', (await d.locator('.panel
 const edge = await rightEdge(d);
 check('nothing on the screen runs under the panel', edge <= panel.x, `content to ${edge}, panel from ${panel.x}`);
 check('no sideways overflow', await d.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+// The header is a toolbar on the right: purse, gift, bell, level, in one
+// line, and nothing of it left of the middle of the work.
+const purse = await box(d, '#wallet');
+const ring = await box(d, '#level-badge');
+const bell = await box(d, '#bell');
+check('the purse is on the toolbar, not dead centre', purse.x > (rail.w + panel.x) / 2, JSON.stringify(purse));
+check('bell and level share its line', Math.abs(bell.y - ring.y) < 12 && bell.x > purse.x && ring.x > bell.x);
+check('the panel names itself beside its handle', /glance/i.test(await d.locator('#panel-title').textContent()));
+// A caption sits under its title, never beside it.
+await link(d, 'market');
+const title = await box(d, '#market-title');
+const intro = await box(d, '#market-intro');
+check('a screen\'s caption sits under its title', intro.y >= title.y + title.h - 2 && Math.abs(intro.x - title.x) < 2, JSON.stringify({ title, intro }));
+await tab(d, 'packs');
+const seg = await box(d, '#packs-seg');
+const odds = await box(d, '#odds-btn');
+check('the Boosters tools stand in one row', Math.abs(seg.y - odds.y) < 24 && odds.x > seg.x + seg.w, JSON.stringify({ seg, odds }));
 
 /* --- the panel follows the screen ---------------------------------------------- */
 section('the panel follows the screen');

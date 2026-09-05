@@ -15,7 +15,7 @@ import { RARITIES } from '../data/rarities.js';
 import { formatCountdown } from '../shop.js';
 import { reportQuest } from './arcade.js';
 import { packsRail } from './boot.js';
-import { el, esc, showScreen, state, toast } from './core.js';
+import { WIDE, el, esc, showScreen, state, toast } from './core.js';
 import { pushNote } from './drawer.js';
 import { live } from './live.js';
 import { gainBooster, openScreenFor, schedulePrefetch } from './open.js';
@@ -96,7 +96,7 @@ export function paintPackCaption(index) {
   el.packsOwn.innerHTML = `${t('youOwn', { n: slot.count })} · ${slot.spec.cards} ${t('cards')}`;
   el.packsOpen.textContent = t('openPack');
   el.packsOpen.onclick = () => openScreenFor(slot.spec);
-  el.packsHint.textContent = t('swipeShelf');
+  el.packsHint.textContent = t(WIDE.matches ? 'dragShelf' : 'swipeShelf');
   schedulePrefetch(slot.spec);
 }
 /* --- custom boosters ---------------------------------------------------------------- */

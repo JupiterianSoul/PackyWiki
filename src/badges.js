@@ -18,7 +18,6 @@
  * art, a diagonal sheen, and one pip per rank along the bottom edge.
  */
 import { tx } from './i18n.js';
-import { ACHIEVEMENTS } from './achievements.js';
 
 /* --- the set ---------------------------------------------------------------
  * `chain` + `from`: upgradeable, one rank per unlocked rung from `from` up.

@@ -140,6 +140,18 @@ export function esc(value) {
   return (String(value ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])));
 }
+/**
+ * The plain words of a string that may carry markup: tags dropped, entities
+ * decoded, whitespace folded. For text that ends up in textContent (the bell,
+ * a note title) after being built by hands that assumed innerHTML.
+ */
+export function plainText(value) {
+  const raw = String(value ?? '');
+  if (!/[<&]/.test(raw)) return raw.trim();
+  const box = document.createElement('div');
+  box.innerHTML = raw;
+  return (box.textContent ?? '').replace(/\s+/g, ' ').trim();
+}
 /* --- elements --------------------------------------------------------------- */
 
 export const el = {};

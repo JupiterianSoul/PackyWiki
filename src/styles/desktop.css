@@ -47,15 +47,31 @@
   }
   #app::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--ink) 32%, transparent); }
 
-  /* Header, content and footer of a screen line up with each other rather
-     than each finding its own centre. */
-  .appbar > *, main > .screen {
+  /* Header and content line up with each other rather than each finding
+     its own centre: the screens take the deck's width, and the header pads
+     itself out to the same edges. */
+  main > .screen {
     max-width: var(--deck);
     margin-inline: auto;
+    width: 100%;
   }
-  main > .screen { width: 100%; }
+  .appbar {
+    padding: 12px max(var(--gutter), calc((100% - var(--deck)) / 2)) 10px;
+    justify-content: flex-end;
+    gap: 8px;
+    min-height: 60px;
+  }
 
-  .appbar { padding-top: 18px; padding-bottom: 14px; }
+  /* --- the toolbar ------------------------------------------------------- */
+  /* A phone keeps the purse dead centre between two wings so a thumb finds
+     it. A pointer does not need it in the middle: the header becomes a
+     toolbar on the right, in one line: purse, gift, bell, level. */
+  .appbar-side { flex: none; }
+  .appbar-side.is-right { display: contents; }
+  .appbar > .wallet-chip { order: 1; }
+  #gift-btn { order: 2; }
+  .appbar-side.is-left { order: 3; }
+  #level-badge { order: 4; margin-left: 4px; }
 
   /* A pointer has no thumb reach to respect, and hover is real input. */
   .card:hover, .booster:hover { cursor: pointer; }
@@ -170,10 +186,36 @@
   .shop-feature { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; max-width: 900px; }
   .shop-feature > .buy { grid-column: 3; grid-row: 1; align-self: center; width: 240px; }
 
-  /* The Boosters screen leads with a toolbar rather than a title, so it needs
-     the air a screen head would have given it. */
-  .packs-tools { padding-top: 8px; align-items: center; }
-  .packs-side { flex-direction: row; }
+  /* --- screen heads ------------------------------------------------------- */
+  /* On a phone the head is a flex line that wraps its paragraph under the
+     title. On a wide head the paragraph's measure lets it fit beside the
+     title instead, which reads as a caption that has wandered off; a grid
+     pins it under the title whatever the width. */
+  .screen-head {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 12px;
+    row-gap: 4px;
+    max-width: none;
+  }
+  .screen-head h2 { grid-column: 1; grid-row: 1; }
+  .screen-head .help-btn { grid-column: 2; grid-row: 1; justify-self: end; }
+  .screen-head p { grid-column: 1 / -1; max-width: 68ch; }
+  /* The chat's head is a row of its own: back, who, and the way out. */
+  #screen-chat .screen-head { display: flex; }
+
+  /* The Boosters screen leads with a toolbar rather than a title. On a phone
+     the side buttons hang off its right edge, out of the flow, so the
+     control can sit dead centre; here they sit in the flow, in one line. */
+  .packs-tools {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    padding-top: 8px;
+  }
+  .packs-seg-wrap { grid-column: 2; }
+  .packs-side { position: static; grid-column: 3; justify-self: end; flex-direction: row; }
 
   /* --- the book ----------------------------------------------------------- */
   /* Eight slots to a page here, four across (see cardsPerPage in albums.js),
@@ -223,10 +265,6 @@
   .drawer-panel { width: min(420px, 92vw); margin-left: var(--rail); padding-top: 28px; }
   .drawer-head { display: none; }
 
-  /* The level ring sits at the edge of the window and its frame is drawn
-     larger than the ring it wraps: the header keeps room for it. */
-  .appbar-side.is-right { padding-right: 10px; }
-  .appbar { padding-right: 22px; }
 }
 
 /* ==========================================================================
@@ -245,12 +283,13 @@
     --gutter: 16px;
     --unit: 8px;
   }
-  /* Collapsed, the panel leaves only the handle that brings it back. */
-  html[data-panel='closed'] { --panel-gap: 44px; }
+  /* Collapsed, the panel leaves only the strip that brings it back. */
+  html[data-panel='closed'] { --panel-gap: 48px; }
 
   /* The work takes the room between the rail and the panel. A screen is no
      longer a column down the middle of a monitor. */
-  .appbar > *, main > .screen { max-width: none; margin-inline: 0; }
+  main > .screen { max-width: none; margin-inline: 0; }
+  .appbar { padding-inline: var(--gutter); }
   main { padding-inline: 0; }
 
   /* --- the panel ---------------------------------------------------------- */
@@ -274,17 +313,26 @@
     transition: transform calc(220ms * var(--motion-scale)) var(--ease);
   }
   .desk-panel::-webkit-scrollbar { width: 0; }
-  html[data-panel='closed'] .desk-panel { transform: translateX(calc(var(--panel) - 44px)); }
-  html[data-panel='closed'] .panel-body { opacity: 0; pointer-events: none; }
+  html[data-panel='closed'] .desk-panel { transform: translateX(calc(var(--panel) - 48px)); }
+  html[data-panel='closed'] .panel-body,
+  html[data-panel='closed'] .panel-head-title { opacity: 0; pointer-events: none; }
   .panel-body { display: grid; gap: 16px; align-content: start; transition: opacity 160ms var(--ease); }
-  .panel-toggle {
-    position: sticky;
-    top: 0;
-    align-self: flex-start;
-    margin-left: -4px;
-    width: 32px;
-    height: 32px;
-    z-index: 2;
+  /* The head is the panel's handle: the toggle on the strip that stays in
+     view when the panel is folded away, and the name beside it. */
+  .panel-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 32px;
+  }
+  .panel-toggle { flex: none; width: 32px; height: 32px; }
+  .panel-head-title {
+    font-size: 0.66rem;
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    transition: opacity 160ms var(--ease);
   }
   .panel-block {
     display: grid;
@@ -387,6 +435,33 @@
   #screen-profile > :not(.hero-card) { grid-column: 2; }
   #screen-profile > .section-head { padding-inline: 0; }
   #screen-profile > .badge-grid, #screen-profile > .stat-grid, #screen-profile > .rarity-bars { margin-inline: 0; max-width: none; }
+
+  /* Free Packs is two things: the dial with the button under it, and the
+     track that says what the next level brings. Side by side, in one look,
+     rather than one under the other with a monitor's width of air. */
+  #screen-timed.is-active {
+    display: grid;
+    grid-template-columns: minmax(340px, 440px) minmax(0, 1fr);
+    /* The dial spans the track's two rows; the last row takes whatever of
+       the dial's height the head above it did not, so the head keeps its
+       own height instead of sharing the dial's. */
+    grid-template-rows: auto auto 1fr;
+    column-gap: 24px;
+    align-content: start;
+    padding-right: var(--gutter);
+  }
+  #screen-timed > .screen-head { grid-column: 1 / -1; }
+  #screen-timed > .free-hero { grid-column: 1; grid-row: 2 / span 2; margin: 0 0 0 var(--gutter); align-self: start; }
+  #screen-timed > .section-head, #screen-timed > .free-track { grid-column: 2; margin: 0; max-width: 720px; align-self: start; }
+  #screen-timed > .section-head { padding-inline: 0; }
+
+  /* Lists of things to pick from, one per row on a phone, sit in columns. */
+  .frame-styles, .fx-styles {
+    max-width: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+    align-items: start;
+  }
 
   /* --- type --------------------------------------------------------------- */
   /* A phone's heading scale is set by the width of a palm. A monitor can hold

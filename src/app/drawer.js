@@ -10,7 +10,7 @@ import { synth } from '../ui/sound.js';
 import * as store from '../collection.js';
 import { questUserKey, renderGames } from './arcade.js';
 import { renderBinder } from './binder.js';
-import { el, esc, navTabFor, openSheet, placeDrawerLinks, showScreen, state } from './core.js';
+import { el, esc, navTabFor, openSheet, placeDrawerLinks, plainText, showScreen, state } from './core.js';
 import { openDaily } from './daily.js';
 import { userId } from './gate.js';
 import { live } from './live.js';
@@ -150,7 +150,7 @@ export function closeDrawer() {
 export function pushNote(icon, title, screen = 'friends') {
   const feed = state.profile.notifFeed ??= [];
   feed.unshift({ id: `note-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
-    icon, title, when: new Date().toISOString(), screen });
+    icon, title: plainText(title), when: new Date().toISOString(), screen });
   if (feed.length > 30) feed.length = 30;
   store.saveProfile(state.profile);
   paintBell();
@@ -290,7 +290,7 @@ export function openNotifications() {
         row.innerHTML = `<span class="note-mark">${iconSvg(note.icon, { size: 18 })}</span>
           <span class="note-copy"><b></b><span class="note-sub"><em></em><i></i></span></span>
           <span class="note-go">${iconSvg('chevron', { size: 16 })}</span>`;
-        row.querySelector('b').textContent = note.title;
+        row.querySelector('b').textContent = plainText(note.title);
         row.querySelector('em').textContent = t(`notifKind_${note.kind}`);
         const when = whenText(note.when);
         row.querySelector('i').textContent = when ? ` · ${when}` : '';

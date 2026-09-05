@@ -270,6 +270,15 @@ export async function flushSync() {
   if (!signedIn() || !state.account.profile) return;
   clearTimeout(syncTimer);
   syncTimer = null;
+  // Not while a booster is being opened: a push can merge another device's
+  // keys into storage, and the reveal is writing the collection there card
+  // by card from the copy it holds in memory. Written on top of the merge,
+  // that copy would put the other device's cards back the way they were and
+  // stamp them newer. It waits for the takeover to end.
+  if (state.tab === 'open' || el.openScreen?.classList.contains('is-active')) {
+    syncTimer = setTimeout(flushSync, SYNC_DEBOUNCE);
+    return;
+  }
   if (state.account.syncing) { syncQueued = true; return; }
 
   state.account.syncing = true;

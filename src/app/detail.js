@@ -9,7 +9,7 @@ import * as account from '../account.js';
 import { t, tx } from '../i18n.js';
 import { iconSvg } from '../data/icons.js';
 import { isSensitive } from '../sensitive.js';
-import { press, reveal, trackDrag } from '../ui/components.js';
+import { press, trackDrag } from '../ui/components.js';
 import { bandFor, formatViews } from '../pricing.js';
 import { sellPriceFor } from '../economy.js';
 import { reportQuest } from './arcade.js';

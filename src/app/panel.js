@@ -47,6 +47,8 @@ let signature = '';
 /** Puts the panel's state on the document, where the stylesheet reads it. */
 export function applyPanelState() {
   document.documentElement.dataset.panel = panelOpen() ? 'open' : 'closed';
+  const title = document.getElementById('panel-title');
+  if (title) title.textContent = t('panelTitle');
   if (el.panelToggle) {
     el.panelToggle.innerHTML = iconSvg(panelOpen() ? 'chevronRight' : 'chevronLeft', { size: 16 });
     el.panelToggle.setAttribute('aria-label', t(panelOpen() ? 'panelHide' : 'panelShow'));

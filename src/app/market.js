@@ -119,7 +119,7 @@ export async function refreshMarket({ quiet = false } = {}) {
       if (!state.wishlist.has(a.card?.key) || state.wishSeen.has(a.id)) continue;
       state.wishSeen.add(a.id);
       rang = true;
-      pushNote('wish', t('notifWishAuction', { card: esc(a.card?.title ?? '?') }), 'market');
+      pushNote('wish', t('notifWishAuction', { card: a.card?.title ?? '?' }), 'market');
     }
     if (rang) store.saveWishSeen([...state.wishSeen]);
     el.marketStatus.textContent = '';
@@ -328,6 +328,7 @@ export function openAuctionSheet(auctionId) {
   const me = userId();
   const mine = a.seller === me;
   const floor = auctionFloor(a);
+  const rarity = rarityOfCard(a.card);
 
   openSheet(a.card?.title ?? '?', (body) => {
     const wrap = document.createElement('div');

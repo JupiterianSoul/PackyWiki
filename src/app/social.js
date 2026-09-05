@@ -11,13 +11,13 @@ import { RARITIES, rarityById, rarityRank } from '../data/rarities.js';
 import { specId, specName } from '../booster.js';
 import { frameTier } from '../frames.js';
 import { isSensitive } from '../sensitive.js';
-import { formatAmount } from '../pricing.js';
+import { CURRENCY_NAME, formatAmount } from '../pricing.js';
 import { albumsDeep, buildAlbums } from '../albums.js';
 import { reportQuest } from './arcade.js';
 import { buildAlbumCover, classicSections, renderBinder } from './binder.js';
-import { el, esc, money, openSheet, refreshWallet, showScreen, state, toast } from './core.js';
+import { el, esc, openSheet, refreshWallet, showScreen, state, toast } from './core.js';
 import { buildStaticCard, openCardDetail, refreshWishes } from './detail.js';
-import { markRead, pushNote, whenText } from './drawer.js';
+import { pushNote, whenText } from './drawer.js';
 import { describeError, signedIn, syncSoon, userId } from './gate.js';
 import { live } from './live.js';
 import { gainBooster } from './open.js';
@@ -151,14 +151,14 @@ export async function collectDeliveries() {
       ?? t('friendSomeone');
     if (item.kind === 'booster' && item.payload?.spec) {
       gainBooster(item.payload.spec, item.payload.count ?? 1);
-      pushNote('gift', t('notifGiftBooster', { name: esc(from) }), 'packs');
+      pushNote('gift', t('notifGiftBooster', { name: from }), 'packs');
     } else if (item.kind === 'card' && item.payload?.key) {
       store.receiveCardEntry(state.collection, item.payload);
-      pushNote('gift', t('notifGiftCard', { name: esc(from), card: esc(item.payload.title) }), 'binder');
+      pushNote('gift', t('notifGiftCard', { name: from, card: item.payload.title }), 'binder');
     } else if (item.kind === 'trade-return' && Array.isArray(item.payload?.cards)) {
       for (const card of item.payload.cards) store.receiveCardEntry(state.collection, card);
       reportQuest('trade');
-      pushNote('trade', t('notifTradeDone', { name: esc(from) }), 'binder');
+      pushNote('trade', t('notifTradeDone', { name: from }), 'binder');
     } else if (item.kind === 'auction-card' && item.payload?.key) {
       store.receiveCardEntry(state.collection, item.payload);
       // A card from someone ELSE is a card won at auction; my own sender
@@ -167,7 +167,7 @@ export async function collectDeliveries() {
         state.profile.auctionsWon = (state.profile.auctionsWon ?? 0) + 1;
         store.saveProfile(state.profile);
       }
-      pushNote('trade', t('notifAuctionCard', { card: esc(item.payload.title ?? '?') }), 'binder');
+      pushNote('trade', t('notifAuctionCard', { card: item.payload.title ?? '?' }), 'binder');
     } else if (item.kind === 'auction-money' && Number.isFinite(item.payload?.amount)) {
       store.saveWallet(store.loadWallet() + item.payload.amount);
       refreshWallet();
@@ -176,7 +176,7 @@ export async function collectDeliveries() {
         store.saveProfile(state.profile);
       }
       pushNote('trade', t(item.payload.reason === 'sale' ? 'notifAuctionSold' : 'notifAuctionRefund',
-        { amount: money(item.payload.amount), card: esc(item.payload.title ?? '?') }), 'shop');
+        { amount: `${formatAmount(item.payload.amount)} ${CURRENCY_NAME}`, card: item.payload.title ?? '?' }), 'shop');
     }
     await account.claimDelivery(item.id);
   }
@@ -198,7 +198,7 @@ export async function reconcileTrades() {
       for (const card of trade.offer ?? []) store.receiveCardEntry(state.collection, card);
       await account.setTradeStatus(trade.id, 'closed');
       const who = state.social.friends.find((f) => f.otherId === trade.recipient)?.profile?.username ?? '?';
-      pushNote('trade', t('notifTradeDeclined', { name: esc(who) }), 'binder');
+      pushNote('trade', t('notifTradeDeclined', { name: who }), 'binder');
       syncSoon();
     } else if (trade.status === 'accepted') {
       await account.setTradeStatus(trade.id, 'closed');

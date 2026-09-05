@@ -18,7 +18,7 @@
  */
 import { RARITIES, rarityById } from './data/rarities.js';
 import { oddsFor } from './data/odds.js';
-import { basePrice, priceFor } from './pricing.js';
+import { priceFor } from './pricing.js';
 import { timedDrawCaps } from './timed.js';
 
 /** A card sells for this fraction of its listed price. */

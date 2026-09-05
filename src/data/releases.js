@@ -483,5 +483,22 @@ export const RELEASES = [
       { en: 'Guess the Article drops its first blur, the one nothing could be read through: three steps now, opening where a good eye has something to go on, with a clock that shows how long is left and a longer step to think in', fr: 'Devinez l’article abandonne son premier flou, celui qu’on ne pouvait pas percer : trois paliers désormais, commençant là où un bon œil a de quoi travailler, avec un chrono qui montre le temps restant et un palier plus long pour réfléchir' },
       { en: '"Blur adult content" is now "Hide sensitive content". It does exactly what it did', fr: '« Flouter le contenu adulte » devient « Masquer le contenu sensible ». Le comportement est identique' }
     ]
+  },
+  {
+    id: 'cleandesk', icon: 'grid', accent: '#a5b4fc',
+    title: { en: 'A clean desk', fr: 'Un bureau net' },
+    points: [
+      { en: 'Your own lots at the Auction House open again', fr: 'Vos propres lots à la Maison des enchères s’ouvrent de nouveau' },
+      { en: 'The desk gets a real toolbar, and its heads and panel sit where they should', fr: 'Le bureau reçoit une vraie barre d’outils, et ses en-têtes et son panneau sont à leur place' },
+      { en: 'Medal notes in the bell read as words, not code', fr: 'Les notes de médaille dans la cloche sont des mots, pas du code' }
+    ],
+    changelog: [
+      { en: 'Tapping a lot you put up for auction opened nothing, so a card at auction could not be withdrawn or even looked at: the sheet asked for a rarity it had never been told. It opens', fr: 'Toucher un lot que vous aviez mis aux enchères n’ouvrait rien : impossible de retirer la carte ou même de la regarder. La fiche demandait une rareté qu’on ne lui avait jamais donnée. Elle s’ouvre' },
+      { en: 'The note the bell keeps when an album medal is paid showed the markup of the coin instead of the amount. Every note in the bell is plain words now, old ones included', fr: 'La note gardée par la cloche quand une médaille d’album est payée montrait le code de la pièce au lieu du montant. Chaque note de la cloche est en mots simples désormais, les anciennes comprises' },
+      { en: 'On a desk the header is a toolbar on the right (purse, gift, bell, level) instead of a phone’s bar stretched across a monitor; a screen’s caption sits under its title instead of drifting beside it; the Boosters screen’s help and odds buttons stand in the row instead of under the level ring; Free Packs puts the dial beside the track; frame and effect pickers run in columns', fr: 'Sur un bureau, l’en-tête est une barre d’outils à droite (bourse, cadeau, cloche, niveau) plutôt que la barre d’un téléphone étirée sur un moniteur ; la légende d’un écran se place sous son titre au lieu de dériver à côté ; l’aide et les taux de l’écran Boosters sont dans la ligne et non sous l’anneau de niveau ; Packs gratuits met le cadran à côté de la piste ; les choix de cadres et d’effets se rangent en colonnes' },
+      { en: 'The panel’s handle sits in the panel’s own head, with its name, instead of floating above it', fr: 'La poignée du panneau est dans l’en-tête du panneau, avec son nom, au lieu de flotter au-dessus' },
+      { en: 'A window dragged across the desk’s edge repaints the book, the shelf’s hint and the panel, not only the drawer', fr: 'Une fenêtre déplacée au-delà du seuil du bureau repeint l’album, l’indice de l’étagère et le panneau, pas seulement le tiroir' },
+      { en: 'Sync waits until a booster is opened before pushing: a merge landing mid-reveal could hand another device’s cards back to it undone', fr: 'La synchronisation attend la fin de l’ouverture d’un booster avant d’envoyer : une fusion tombée en pleine révélation pouvait rendre à un autre appareil ses cartes défaites' }
+    ]
   }
 ];

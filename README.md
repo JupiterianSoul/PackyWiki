@@ -507,7 +507,10 @@ columns; the shop's stalls sit side by side; the profile puts who you are
 beside what you have; the album book holds eight cards to a page instead of
 four (`cardsPerPage` in `albums.js`, asked on every paint so the two agree the
 moment the window changes). Icon-only buttons say what they do on hover and on
-keyboard focus, from the same `aria-label` a screen reader reads.
+keyboard focus, from the same `aria-label` a screen reader reads. The
+header is a toolbar on the right (purse, gift, bell, level) rather than a
+phone's bar with the purse dead centre, a screen's caption sits under its
+title, and the panel's handle lives in the panel's own head.
 
 What does not change is the app: the same screens, in the same order, painted
 by the same code, with the same state. `tests/suites/desk.mjs` holds the frame
