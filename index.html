@@ -1,0 +1,628 @@
+<!doctype html>
+<html lang="en" data-theme="aurora">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#06070d" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <title>Wikster</title>
+    <meta name="description" content="Open booster packs of real Wikipedia articles as collectible trading cards." />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'><rect x='12' y='6' width='33' height='52' rx='7' fill='%230f1220' stroke='%23c7d2fe' stroke-width='3'/><path d='M12 17h33' stroke='%23c7d2fe' stroke-width='3'/><path d='M19.5 27 24.5 46 28.5 35.5 32.5 46 37.5 27' fill='none' stroke='%23fbbf24' stroke-width='3.8' stroke-linejoin='round' stroke-linecap='round'/><circle cx='54' cy='12' r='3' fill='%23fbbf24'/></svg>" />
+    <script type="module" crossorigin src="./assets/index-D0FCq4gD.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/vendor-BnGCNdwk.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-BzZXyKiW.css">
+  </head>
+  <body>
+    <!-- The live, per-theme backdrop, and the texture that sits over it. -->
+    <canvas id="backdrop" aria-hidden="true"></canvas>
+    <div id="texture" aria-hidden="true"></div>
+    <div id="flash" aria-hidden="true"></div>
+
+    <div id="app">
+      <header class="appbar">
+        <div class="appbar-side is-left">
+          <button id="menu-btn" class="icon-btn" type="button" aria-label="Menu"
+                  aria-haspopup="dialog" aria-expanded="false">
+            <span id="menu-icon" aria-hidden="true"></span>
+          </button>
+          <button id="bell" class="icon-btn" type="button" aria-haspopup="dialog" aria-label="Notifications">
+            <span id="bell-icon" aria-hidden="true"></span>
+            <span class="count" id="bell-count" hidden></span>
+          </button>
+        </div>
+        <button id="wallet" class="wallet-chip" type="button" aria-haspopup="dialog">
+          <span id="wallet-mark" aria-hidden="true"></span>
+          <span id="wallet-amount"></span>
+        </button>
+        <div class="appbar-side is-right">
+          <button id="gift-btn" class="icon-btn" type="button" aria-label="Daily gift">
+            <span id="gift-icon" aria-hidden="true"></span>
+            <span class="dot" id="gift-dot" hidden></span>
+          </button>
+          <button id="level-badge" class="ring" type="button" aria-label="Profile"></button>
+        </div>
+      </header>
+
+      <main>
+        <!-- PACKS: what you own, and the custom builder ------------------- -->
+        <section id="screen-packs" class="screen is-active">
+          <div class="packs-tools">
+            <div class="seg-wrap packs-seg-wrap"><div id="packs-seg"></div></div>
+            <div class="packs-side">
+              <button class="help-btn" data-help="packs" type="button" aria-label="What is this?">?</button>
+              <button id="odds-btn" class="help-btn" type="button">
+                <span id="odds-icon" aria-hidden="true"></span>
+              </button>
+            </div>
+          </div>
+          <div id="packs-rail" class="rail"></div>
+          <div class="hero-caption" id="packs-caption">
+            <h3 id="packs-name"></h3>
+            <p class="sub" id="packs-sub"></p>
+            <p class="own" id="packs-own"></p>
+          </div>
+          <div class="hero-actions" id="packs-actions">
+            <button id="packs-open" class="btn btn-primary" type="button"></button>
+            <p class="hint" id="packs-hint"></p>
+          </div>
+          <div class="empty" id="packs-empty" hidden>
+            <span class="empty-mark" id="packs-empty-mark"></span>
+            <p id="packs-empty-text"></p>
+            <button id="packs-empty-cta" class="btn btn-ghost btn-sm" type="button"></button>
+          </div>
+
+          <!-- CUSTOM BUILDER: name a subject, get a pack made of its own wiki -->
+          <div id="creator-wrap" class="creator-wrap" hidden>
+            <form id="creator" class="forge panel" autocomplete="off">
+              <div class="forge-seal" id="forge-seal" aria-hidden="true"></div>
+              <h3 id="forge-title"></h3>
+              <p id="forge-note"></p>
+              <input id="creator-input" class="forge-input" type="text" maxlength="60"
+                     aria-label="Subject" enterkeyhint="go" />
+              <div class="forge-ideas" id="forge-ideas"></div>
+              <button id="creator-go" class="btn btn-primary forge-go" type="submit"></button>
+              <p id="creator-status" class="forge-status" role="status" aria-live="polite" hidden></p>
+            </form>
+            <div class="section-head"><h3 class="label" id="creator-mine-label"></h3></div>
+            <div class="forge-mine" id="creator-mine"></div>
+            <div class="empty" id="creator-empty" hidden>
+              <span class="empty-mark" id="creator-empty-mark"></span>
+              <p id="creator-empty-text"></p>
+            </div>
+          </div>
+        </section>
+
+        <!-- FREE PACKS: one arrives on a timer, whether you are playing or not -->
+        <section id="screen-timed" class="screen">
+          <div class="screen-head">
+            <h2 id="timed-title"></h2>
+            <button class="help-btn" data-help="timed" type="button" aria-label="What is this?">?</button>
+          </div>
+
+          <!-- The whole state of the feature, read left to right in one look:
+               how many are waiting, and how long until the next. -->
+          <div class="free-hero panel">
+            <div class="free-dial">
+              <span id="free-ring"></span>
+              <div class="free-dial-copy">
+                <b id="free-count"></b>
+                <span id="free-cap"></span>
+              </div>
+            </div>
+            <p class="free-state" id="free-state"></p>
+            <div class="free-pips" id="free-pips" aria-hidden="true"></div>
+            <button id="timed-open" class="btn btn-primary btn-block" type="button"></button>
+            <p class="free-foot" id="free-foot"></p>
+          </div>
+
+          <div class="section-head"><h3 class="label" id="free-track-label"></h3></div>
+          <div class="free-track panel">
+            <div class="free-track-head">
+              <span class="free-level" id="track-level"></span>
+              <span class="free-remaining tabular" id="track-remaining"></span>
+            </div>
+            <div id="track-bar"></div>
+            <div class="free-perks" id="free-perks"></div>
+            <p class="free-next" id="track-next"></p>
+          </div>
+        </section>
+
+        <!-- SHOP ------------------------------------------------------------ -->
+        <section id="screen-shop" class="screen">
+          <div class="screen-head">
+            <h2 id="shop-title"></h2>
+            <button class="help-btn" data-help="shop" type="button" aria-label="What is this?">?</button>
+          </div>
+
+          <!-- One banner carrying the two things you need before browsing:
+               what you can spend, and how long this stock lasts. -->
+          <div class="shop-banner panel">
+            <div class="shop-banner-cell">
+              <span class="label" id="shop-purse-label"></span>
+              <b id="shop-purse"></b>
+            </div>
+            <div class="shop-banner-rule" aria-hidden="true"></div>
+            <div class="shop-banner-cell">
+              <span class="label" id="shop-restock-label"></span>
+              <b class="tabular" id="restock"></b>
+            </div>
+          </div>
+
+          <div id="shop-market" class="shop-market"></div>
+        </section>
+
+        <!-- BINDER ---------------------------------------------------------- -->
+        <section id="screen-binder" class="screen">
+          <div class="screen-head">
+            <h2 id="binder-title"></h2>
+            <button class="help-btn" data-help="binder" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="binder-stats" id="binder-stats"></div>
+          <div class="seg-wrap" id="binder-seg-wrap"><div id="binder-seg"></div></div>
+          <div class="binder-tools" id="binder-tools" hidden>
+            <label class="classic-search" id="classic-search-wrap">
+              <span class="classic-search-mark" id="classic-search-mark" aria-hidden="true"></span>
+              <input id="classic-search" class="classic-search-input" type="search" autocomplete="off" />
+            </label>
+            <button id="classic-filter" class="btn btn-ghost btn-sm" type="button"></button>
+            <span class="chip" id="classic-filter-count" hidden></span>
+            <span class="muted" id="classic-count"></span>
+          </div>
+          <div id="album-shelf" class="album-shelf"></div>
+          <div id="classic-view" class="classic-view" hidden></div>
+          <div class="empty" id="binder-empty" hidden>
+            <span class="empty-mark" id="binder-empty-mark"></span>
+            <p id="binder-empty-text"></p>
+          </div>
+
+          <div id="album-view" hidden>
+            <div class="album-head pad">
+              <button id="album-back" class="icon-btn" type="button" aria-label="Back"></button>
+              <div class="album-title-wrap">
+                <h2 id="album-name"></h2>
+                <p class="album-progress" id="album-progress"></p>
+              </div>
+              <button id="filter-open" class="btn btn-ghost btn-sm" type="button"></button>
+              <span class="chip" id="filter-count" hidden></span>
+            </div>
+            <div class="album-book-wrap">
+              <div id="album-book" class="album-book">
+                <div class="album-page" id="album-leaf">
+                  <div class="album-slots" id="page-slots"></div>
+                  <span class="album-pageno" id="pageno"></span>
+                </div>
+              </div>
+            </div>
+            <div class="album-dots" id="album-dots" aria-hidden="true"></div>
+            <p class="album-hint" id="album-hint"></p>
+          </div>
+        </section>
+
+        <!-- PROFILE ---------------------------------------------------------- -->
+        <section id="screen-profile" class="screen">
+          <div class="hero-card panel">
+            <div class="hero-id">
+              <span id="profile-ring"></span>
+              <div>
+                <h2 id="profile-level"></h2>
+                <p class="hero-rank" id="profile-rank"></p>
+              </div>
+            </div>
+            <div>
+              <div id="xp-bar"></div>
+              <p class="xp-line" id="xp-line" style="margin-top:8px"></p>
+            </div>
+            <div>
+              <p class="label" id="next-reward-label"></p>
+              <div id="next-reward" style="margin-top:8px"></div>
+            </div>
+          </div>
+
+          <div class="section-head"><h3 class="label" id="badges-label"></h3></div>
+          <div class="badge-grid" id="badge-grid"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="stats-label"></h3></div>
+          <div class="stat-grid" id="stat-grid"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="rarity-label"></h3></div>
+          <div class="rarity-bars" id="rarity-bars"></div>
+
+        </section>
+
+        <!-- FRIENDS ------------------------------------------------------------ -->
+        <section id="screen-friends" class="screen">
+          <div class="screen-head">
+            <h2 id="friends-title"></h2>
+            <p id="friends-intro"></p>
+            <button class="help-btn" data-help="friends" type="button" aria-label="What is this?">?</button>
+          </div>
+
+          <form id="find" class="find panel" autocomplete="off">
+            <span class="find-mark" id="find-mark" aria-hidden="true"></span>
+            <input id="find-input" class="find-input" type="text" maxlength="20" aria-label="Find a player" />
+            <button id="find-go" class="btn btn-primary btn-sm" type="submit"></button>
+          </form>
+          <p id="find-status" class="find-status" role="status" aria-live="polite"></p>
+          <p id="friends-stale" class="pad schema-note" hidden></p>
+          <div class="section-head" id="results-head" hidden>
+            <h3 class="label" id="results-label"></h3>
+          </div>
+          <div id="find-results" class="people"></div>
+
+          <div class="section-head" id="trades-head" hidden>
+            <h3 class="label" id="trades-label"></h3>
+          </div>
+          <div id="trades-list" class="people"></div>
+
+          <div class="section-head" id="incoming-head" hidden>
+            <h3 class="label" id="incoming-label"></h3>
+          </div>
+          <div id="incoming-list" class="people"></div>
+
+          <div class="section-head" id="friends-head" hidden>
+            <h3 class="label" id="friends-label"></h3>
+          </div>
+          <div id="friends-list" class="people"></div>
+
+          <div class="section-head" id="outgoing-head" hidden>
+            <h3 class="label" id="outgoing-label"></h3>
+          </div>
+          <div id="outgoing-list" class="people"></div>
+
+          <div class="empty" id="friends-empty" hidden>
+            <span class="empty-mark" id="friends-empty-mark"></span>
+            <p id="friends-empty-text"></p>
+          </div>
+        </section>
+
+        <!-- A FRIEND'S PROFILE AND COLLECTION ---------------------------------- -->
+        <section id="screen-friend" class="screen">
+          <div class="open-top">
+            <button id="friend-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 class="open-title" id="friend-name"></h2>
+            <span style="width:42px"></span>
+          </div>
+
+          <div class="hero-card panel">
+            <div class="hero-id">
+              <span id="friend-ring"></span>
+              <div>
+                <h2 id="friend-level"></h2>
+                <p class="hero-rank" id="friend-rank"></p>
+              </div>
+            </div>
+          </div>
+
+          <div class="friend-actions pad" id="friend-actions"></div>
+
+          <div class="section-head"><h3 class="label" id="friend-stats-label"></h3></div>
+          <div class="stat-grid" id="friend-stats"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="friend-rarity-label"></h3></div>
+          <div class="rarity-bars" id="friend-rarity-bars"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="friend-cards-label"></h3></div>
+          <div class="seg-wrap" id="friend-seg-wrap"><div id="friend-seg"></div></div>
+          <p id="friend-cards-status" class="find-status" role="status" aria-live="polite"></p>
+          <div id="friend-albums" class="album-shelf"></div>
+          <div id="friend-classic" class="classic-view" hidden></div>
+
+          <div class="hero-actions">
+            <button id="friend-remove" class="btn btn-ghost btn-sm" type="button"></button>
+          </div>
+        </section>
+
+        <section id="screen-chat" class="screen">
+          <div class="screen-head" style="gap:10px">
+            <button id="chat-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <button class="chat-who" id="chat-who" type="button">
+              <span class="person-mark" id="chat-avatar" aria-hidden="true"></span>
+              <span class="chat-who-text">
+                <span class="open-title chat-name" id="chat-name"></span>
+                <span class="chat-presence" id="chat-presence"></span>
+              </span>
+            </button>
+            <div class="chat-tools" id="chat-tools"></div>
+          </div>
+          <div class="chat-log pad" id="chat-log" aria-live="polite"></div>
+          <p class="chat-typing pad" id="chat-typing" hidden></p>
+          <form class="chat-bar" id="chat-form" autocomplete="off">
+            <input id="chat-input" class="chat-input" type="text" maxlength="500" />
+            <button id="chat-send" class="btn btn-primary btn-sm" type="submit"></button>
+          </form>
+        </section>
+
+        <!-- SETTINGS ---------------------------------------------------------- -->
+        <section id="screen-ach" class="screen">
+          <div class="screen-head">
+            <h2 id="ach-title"></h2>
+          </div>
+          <p class="pad muted" id="ach-sub" style="padding-bottom:14px;font-size:.86rem"></p>
+          <div class="ach-list pad" id="ach-list"></div>
+        </section>
+
+        <section id="screen-updates" class="screen">
+          <div class="screen-head">
+            <h2 id="updates-title"></h2>
+          </div>
+          <p class="pad muted" id="updates-sub" style="padding-bottom:16px;font-size:.86rem"></p>
+          <div class="timeline" id="updates-list"></div>
+        </section>
+
+        <section id="screen-quiz" class="screen">
+          <div class="screen-head">
+            <button id="quiz-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="quiz-title"></h2>
+            <button class="help-btn" data-help="quiz" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="quiz-body pad" id="quiz-body"></div>
+        </section>
+
+        <!-- MINIGAMES: the arcade behind the shop ------------------------------- -->
+        <section id="screen-games" class="screen">
+          <div class="screen-head">
+            <h2 id="games-title"></h2>
+            <button class="help-btn" data-help="games" type="button" aria-label="What is this?">?</button>
+          </div>
+          <p class="screen-sub pad" id="games-sub"></p>
+          <div class="pad" id="games-list"></div>
+        </section>
+
+        <section id="screen-wikdle" class="screen">
+          <div class="screen-head">
+            <button id="wikdle-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="wikdle-title"></h2>
+            <button class="help-btn" data-help="wikdle" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="wikdle-body"></div>
+        </section>
+
+        <section id="screen-slots" class="screen">
+          <div class="screen-head">
+            <button id="slots-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="slots-title"></h2>
+            <button class="help-btn" data-help="slots" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="slots-body"></div>
+        </section>
+
+        <section id="screen-duel" class="screen">
+          <div class="screen-head">
+            <button id="duel-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="duel-title"></h2>
+            <button class="help-btn" data-help="duel" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="duel-body"></div>
+        </section>
+
+        <section id="screen-reveal" class="screen">
+          <div class="screen-head">
+            <button id="reveal-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 id="reveal-title"></h2>
+            <button class="help-btn" data-help="reveal" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="reveal-body"></div>
+        </section>
+
+        <!-- QUESTS: three things to do today ------------------------------------ -->
+        <section id="screen-quests" class="screen">
+          <div class="screen-head">
+            <h2 id="quests-title"></h2>
+            <button class="help-btn" data-help="quests" type="button" aria-label="What is this?">?</button>
+          </div>
+          <p class="screen-sub pad" id="quests-sub"></p>
+          <div class="pad" id="quests-body"></div>
+        </section>
+
+        <!-- LEADERBOARD: who is ahead today, this week, and ever ----------------- -->
+        <section id="screen-leaderboard" class="screen">
+          <div class="screen-head">
+            <h2 id="leaderboard-title"></h2>
+            <button class="help-btn" data-help="leaderboard" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="pad" id="leaderboard-seg"></div>
+          <div class="pad" id="leaderboard-body"></div>
+          <div class="leaderboard-me" id="leaderboard-me" hidden></div>
+        </section>
+
+        <!-- CARD INDEX: everything anyone has ever found ----------------------- -->
+        <section id="screen-cardindex" class="screen">
+          <div class="screen-head">
+            <h2 id="index-title"></h2>
+            <p id="index-intro"></p>
+            <button class="help-btn" data-help="index" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="index-counts" id="index-counts"></div>
+          <div class="market-tools">
+            <input class="creator-input market-search" id="index-search" type="search"
+              autocomplete="off" spellcheck="false">
+            <div class="market-sorts" id="index-rarities"></div>
+            <div class="market-sorts" id="index-sorts"></div>
+          </div>
+          <p id="index-status" class="find-status" role="status" aria-live="polite"></p>
+          <div class="market-list" id="index-list"></div>
+          <button id="index-more" class="btn btn-ghost btn-block" type="button" style="margin-top:12px" hidden></button>
+        </section>
+
+        <!-- GLOSSARY: every booster category, look but do not open ------------- -->
+        <section id="screen-glossary" class="screen">
+          <div class="screen-head">
+            <h2 id="glossary-title"></h2>
+            <p id="glossary-intro"></p>
+          </div>
+          <div class="glossary-list" id="glossary-list"></div>
+        </section>
+
+        <!-- MARKET: every player's auction floor ------------------------------- -->
+        <section id="screen-market" class="screen">
+          <div class="screen-head">
+            <h2 id="market-title"></h2>
+            <p id="market-intro"></p>
+            <button class="help-btn" data-help="market" type="button" aria-label="What is this?">?</button>
+          </div>
+          <div class="seg-wrap"><div id="market-seg"></div></div>
+          <p id="market-status" class="find-status" role="status" aria-live="polite"></p>
+          <div class="market-list" id="market-list"></div>
+          <button id="market-sell" class="btn btn-primary btn-block" type="button" style="margin-top:14px"></button>
+        </section>
+
+        <!-- BADGES: every chip, and the four you wear -------------------------- -->
+        <section id="screen-badges" class="screen">
+          <div class="screen-head">
+            <h2 id="badges-title"></h2>
+            <p id="badges-intro"></p>
+          </div>
+          <div class="badge-grid is-all" id="badges-all"></div>
+        </section>
+
+        <!-- CUSTOMIZATION: how the app, and you, look ------------------------ -->
+        <section id="screen-customize" class="screen">
+          <div class="screen-head"><h2 id="customize-title"></h2></div>
+
+          <div class="section-head"><h3 class="label" id="theme-label"></h3></div>
+          <div class="theme-grid" id="theme-grid"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="identity-label"></h3></div>
+          <div class="settings-list" id="identity-list"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="frames-label"></h3></div>
+          <p class="frames-note" id="frames-note"></p>
+          <div class="frame-styles" id="frame-styles"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="fx-label"></h3></div>
+          <p class="frames-note" id="fx-note"></p>
+          <div class="fx-tiers" id="fx-tiers"></div>
+        </section>
+
+        <section id="screen-settings" class="screen">
+          <div class="screen-head"><h2 id="settings-title"></h2></div>
+
+          <div class="section-head"><h3 class="label" id="prefs-label"></h3></div>
+          <div class="settings-list" id="settings-list"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="account-label"></h3></div>
+          <div class="settings-list" id="account-list"></div>
+
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="data-label"></h3></div>
+          <div class="settings-list" id="data-list"></div>
+
+          <!-- The last thing in Settings: a code someone was given by hand. -->
+          <div class="section-head" style="padding-top:24px"><h3 class="label" id="redeem-label"></h3></div>
+          <div class="settings-list" id="redeem-list"></div>
+        </section>
+
+        <!-- OPENING: full-screen takeover -------------------------------------- -->
+        <section id="screen-open" class="screen phase-idle">
+          <div class="open-top">
+            <button id="open-back" class="icon-btn" type="button" aria-label="Back"></button>
+            <h2 class="open-title" id="open-title"></h2>
+            <span style="width:42px"></span>
+          </div>
+          <p class="open-progress" id="open-progress"></p>
+          <div class="open-stage" id="open-stage">
+            <div class="booster-slot" id="booster-slot"></div>
+            <div class="card-stack" id="card-stack"></div>
+            <div class="burst-layer" id="burst-layer" aria-hidden="true"></div>
+          </div>
+          <div class="summary" id="summary"></div>
+          <div class="open-nav">
+            <button id="open-prev" class="icon-btn" type="button" aria-label="Previous card"></button>
+            <button id="open-next" class="icon-btn" type="button" aria-label="Next card"></button>
+          </div>
+          <div class="open-foot">
+            <p class="open-hint" id="open-hint"></p>
+            <button id="open-done" class="btn btn-primary" type="button" hidden></button>
+          </div>
+        </section>
+      </main>
+
+      <!-- The desk's right-hand column: the day, and what the screen at hand
+           keeps out of sight on a phone. Hidden below 1280px. -->
+      <aside id="panel" class="desk-panel" aria-label="Details">
+        <div class="panel-head">
+          <button id="panel-toggle" class="icon-btn panel-toggle" type="button" aria-expanded="true"></button>
+          <span class="panel-head-title" id="panel-title"></span>
+        </div>
+        <div id="panel-body" class="panel-body"></div>
+      </aside>
+
+      <nav id="navbar" aria-label="Sections"></nav>
+    </div>
+
+    <!-- One sheet component, reused for every panel in the app. ------------- -->
+    <div id="sheet" class="sheet" hidden>
+      <div class="sheet-scrim"></div>
+      <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <div class="sheet-handle" aria-hidden="true"></div>
+        <div class="sheet-head">
+          <h2 id="sheet-title"></h2>
+          <button id="sheet-close" class="icon-btn" type="button" aria-label="Close"></button>
+        </div>
+        <div class="sheet-body" id="sheet-body"></div>
+      </div>
+    </div>
+
+    <!-- First run ----------------------------------------------------------- -->
+    <div id="welcome" class="welcome" hidden>
+      <div class="welcome-card panel">
+        <div class="welcome-mark" id="welcome-mark"></div>
+        <h1 id="welcome-title"></h1>
+        <p id="welcome-body"></p>
+        <div class="choices" id="lang-choices"></div>
+        <div id="starter" hidden style="display:grid;gap:14px">
+          <h2 id="starter-title" style="text-align:center;font-size:1.2rem"></h2>
+          <p id="starter-body"></p>
+          <div class="starter-loot" id="starter-loot"></div>
+          <button id="starter-go" class="btn btn-primary btn-block" type="button"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- The account gate: sits in front of everything until you are signed in. -->
+    <div id="gate" class="gate" hidden>
+      <div class="gate-card panel">
+        <div class="gate-mark" id="gate-mark"></div>
+        <h1 id="gate-title"></h1>
+        <p id="gate-body"></p>
+        <div class="seg-wrap"><div id="gate-seg"></div></div>
+        <form id="gate-form" class="gate-form" autocomplete="on"></form>
+        <p id="gate-status" class="gate-status" role="status" aria-live="polite"></p>
+        <button id="gate-alt" class="gate-alt" type="button"></button>
+        <p class="gate-foot" id="gate-foot"></p>
+      </div>
+    </div>
+
+    <!-- The drawer: every destination in the app, including the ones with no
+         room in the bottom bar. ------------------------------------------- -->
+    <div id="drawer" class="drawer" hidden>
+      <div class="drawer-scrim"></div>
+      <nav class="drawer-panel" role="dialog" aria-modal="true" aria-labelledby="drawer-brand">
+        <div class="drawer-head">
+          <span class="drawer-mark" id="drawer-mark" aria-hidden="true"></span>
+          <div>
+            <h2 id="drawer-brand">Wikster</h2>
+            <p id="drawer-who"></p>
+          </div>
+        </div>
+        <div class="drawer-links" id="drawer-links"></div>
+      </nav>
+    </div>
+
+    <!-- Opening animation. Also what the account gate hides behind until the
+         stored session has been read, so it cannot flash on every launch. -->
+    <div id="splash" class="splash">
+      <div class="splash-stage" aria-hidden="true">
+        <div class="splash-halo"></div>
+        <div class="splash-mark" id="splash-mark"></div>
+        <div class="splash-shine"></div>
+      </div>
+      <div class="splash-word" id="splash-word">Wikster</div>
+    </div>
+
+    <div id="xp-pop" class="xp-pop" hidden></div>
+    <div id="toast" class="toast" hidden></div>
+
+  </body>
+</html>
